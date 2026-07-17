@@ -13,7 +13,7 @@ Cameras
 
 Camera sensors in ovrtx simulate physically accurate imaging and produce rendered outputs through RenderVar prims attached to a RenderProduct.
 
-For how to configure RenderProducts and RenderVars, see :doc:`configuration`.
+For how to configure RenderProducts and RenderVars, refer to :doc:`configuration`.
 
 Example USD
 -----------

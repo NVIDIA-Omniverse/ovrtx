@@ -137,6 +137,8 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 | Setting | Type | Default |
 |---------|------|---------|
 | `omni:rtx:rtpt:gaussian:accumulatedDepth:enabled` | `bool` | `true` |
+| `omni:rtx:rtpt:gaussian:accumulatedAlbedo:enabled` | `bool` | `true` |
+| `omni:rtx:rtpt:gaussian:maxGaussiansToAccumulate` | `int` | `48` |
 
 ## Path Tracing Settings (`pt:`)
 
@@ -228,11 +230,13 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 
 ## Minimal Settings
 
+Minimal mode is optimized for speed-of-light rendering performance and stability. It only respects the first `DistantLight` found in the scene, and shadows from that light are hard shadows. Other light types, including `DomeLight`, are ignored for Minimal mode lighting; if no `DistantLight` exists, Minimal mode uses a single camera light instead. For improved visibility, use the ambient light attributes documented in `docs/sensors/cameras/render_modes/minimal.rst`, or disable shadows with `omni:rtx:minimal:castShadows`.
+
 | Setting | Type | Description |
 |---------|------|-------------|
 | `omni:rtx:minimal:mode` | `int` | Minimal render mode variant |
 | `omni:rtx:minimal:constantColor` | `float3` | Constant color output |
-| `omni:rtx:minimal:castShadows` | `bool` | Enable shadow casting |
+| `omni:rtx:minimal:castShadows` | `bool` | Enable hard shadows from the first `DistantLight` |
 | `omni:rtx:rt:ambientLight:color` | `float3` | Ambient light color |
 | `omni:rtx:rt:ambientLight:intensity` | `float` | Ambient light intensity |
 

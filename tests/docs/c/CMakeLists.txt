@@ -19,10 +19,12 @@ set(FETCHCONTENT_QUIET FALSE)
 # Share large deps with the C examples.
 set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../examples/c/_deps" CACHE PATH "")
 
-# Fetch ovrtx library (reuse the cmake module from examples/c/)
+# Fetch ovrtx + ovstage libraries (reuse the cmake modules from examples/c/)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../../examples/c/cmake")
 include(ovrtx)
+include(ovstage)
 ovrtx_fetch()
+ovstage_fetch()
 
 # Fetch GoogleTest
 include(FetchContent)
@@ -59,17 +61,26 @@ add_executable(ovrtx_docs_tests
     stb_impl.cpp
     helpers.h
 )
-target_link_libraries(ovrtx_docs_tests PRIVATE ovrtx::ovrtx GTest::gtest)
+# Static-loader model: link the static ovrtx loader. main.cpp calls
+# ovrtx_initialize() once with the package root (a side-by-side `ovrtx/` link
+# beside the exe, created by ovrtx_setup_runtime), so the system stays up and the
+# per-test ovrtx_create_renderer() calls inherit it without repeating the root.
+target_link_libraries(ovrtx_docs_tests PRIVATE ovrtx::ovrtx_static ovstage::ovstage_static GTest::gtest)
 target_include_directories(ovrtx_docs_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Setup runtime dependencies (rpath, DLL copying)
-ovrtx_setup_runtime(ovrtx_docs_tests)
+# The ovrtx package ships a release-only static loader (compiled /MD). Force the
+# release CRT so the Debug config links cleanly.
+if(MSVC)
+    set_target_properties(ovrtx_docs_tests PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
 
-add_subdirectory("../../../examples/c/sensors/lidar" "${CMAKE_CURRENT_BINARY_DIR}/examples/lidar")
-add_subdirectory("../../../examples/c/sensors/radar" "${CMAKE_CURRENT_BINARY_DIR}/examples/radar")
+# Setup runtime dependencies. Under ovrtx's model #1 the exe root's plugins/
+# is free, so both loaders can stage side-by-side links (ovrtx/ and ovstage/).
+ovrtx_setup_runtime(ovrtx_docs_tests)
+ovstage_setup_runtime(ovrtx_docs_tests)
 
 include(GoogleTest)
-gtest_discover_tests(ovrtx_docs_tests TEST_FILTER "*-PickingSelectionTest.*:SelectionStyleTest.*")
+gtest_discover_tests(ovrtx_docs_tests TEST_FILTER "*-PickingSelectionTest.*:SelectionStyleTest.*:PickingSelectionLegacyTest.*")
 
 # Add picking tests manually so CTest reports fixture setup failures as
 # failures instead of converting GoogleTest's skipped child-test lines into a
@@ -77,9 +88,9 @@ gtest_discover_tests(ovrtx_docs_tests TEST_FILTER "*-PickingSelectionTest.*:Sele
 foreach(test_name
     PickingSelectionTest.PickCenterPixel
     PickingSelectionTest.MarqueePicksMultiplePrims
-    PickingSelectionTest.PickableFalseExcludesPrim
     PickingSelectionTest.SelectionOutlineGroupRenders
     SelectionStyleTest.SelectionStyleGroupsControlOutlineAndFill
+    PickingSelectionLegacyTest.PickableFalseExcludesPrim
 )
     add_test(NAME ${test_name}
         COMMAND ovrtx_docs_tests
@@ -90,21 +101,3 @@ foreach(test_name
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 endforeach()
-
-add_test(
-    NAME DocsCExampleLidar
-    COMMAND
-        ${CMAKE_COMMAND}
-        "-DEXAMPLE_NAME=lidar"
-        "-DEXAMPLE_EXECUTABLE=$<TARGET_FILE:lidar-composite-tensor>"
-        -P "${CMAKE_CURRENT_LIST_DIR}/run_sensor_example_check.cmake"
-)
-
-add_test(
-    NAME DocsCExampleRadar
-    COMMAND
-        ${CMAKE_COMMAND}
-        "-DEXAMPLE_NAME=radar"
-        "-DEXAMPLE_EXECUTABLE=$<TARGET_FILE:radar-composite-tensor>"
-        -P "${CMAKE_CURRENT_LIST_DIR}/run_sensor_example_check.cmake"
-)

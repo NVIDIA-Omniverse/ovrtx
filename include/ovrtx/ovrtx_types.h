@@ -11,7 +11,7 @@
 #define OVRTX_TYPES_H
 
 #define OVRTX_VERSION_MAJOR 0
-#define OVRTX_VERSION_MINOR 3
+#define OVRTX_VERSION_MINOR 4
 #define OVRTX_VERSION_PATCH 0
 
 #include <stdint.h>
@@ -461,10 +461,10 @@ extern "C"
      *  @{
      */
 
-    /** Handle to the result of a @ref ovrtx_read_attribute() operation. */
+    /** Handle to the result of a @ref ovrtx_read_attribute() operation.
+     *  The same handle is passed to @ref ovrtx_fetch_read_result() and
+     *  @ref ovrtx_release_read_result(). */
     typedef uint64_t ovrtx_read_handle_t;
-    /** Handle to a fetched read result that can be released. */
-    typedef uint64_t ovrtx_read_map_handle_t;
 
     /** Attribute read output retrieved via @ref ovrtx_fetch_read_result().
      *
@@ -478,7 +478,6 @@ extern "C"
      */
     typedef struct ovrtx_read_output_t
     {
-        ovrtx_read_map_handle_t map_handle; /**< Handle to use with @ref ovrtx_release_read_result() */
         ovrtx_output_buffer_t* buffers;     /**< Array of output tensors (NULL when dest tensor was used) */
         size_t buffer_count;                /**< Number of buffers (1 for scalar, prim_count for array, 0 if dest tensor) */
         size_t prim_count;                  /**< Number of prims that were actually read */
@@ -513,6 +512,13 @@ extern "C"
         ovrtx_render_var_output_handle_t output_handle; /**< Handle to the rendered output. */
     } ovrtx_render_product_render_var_output_t;
 
+    /** Path-tracing accumulation status for a rendered frame. */
+    typedef struct
+    {
+        uint32_t progression; /**< PT sample accumulation progress since the last reset, increments each time an output is renderered to */
+        bool converged;         /**< True when a stop criterion was reached (ex: omni:rtx:pt:samplesPerPixel) */
+    } ovrtx_accumulation_status_t;
+
     /** Output of a particular RenderProduct for a particular frame. 
      *
      * May contain one or more RenderVar outputs in @ref ovrtx_render_product_frame_output_t::output_render_vars which may
@@ -524,6 +530,7 @@ extern "C"
         double frame_end_time; /**< Sensor time (based on step(delta_time) history) when the sensor simulation for this frame ended */
         ovrtx_render_product_render_var_output_t* output_render_vars; /**< Pointer to array of render var outputs */
         size_t render_var_count; /**< Number of render var outputs for this render product frame */
+        ovrtx_accumulation_status_t accumulation_status; /**< Path-tracing accumulation status for this frame */
     } ovrtx_render_product_frame_output_t;
 
     /** The output of a particular RenderProduct for a particular @ref ovrtx_step() operation. 
@@ -554,9 +561,6 @@ extern "C"
         double end_time; /**< Sensor time (based on step(delta_time) history) when the sensor simulation for this step ended */
     } ovrtx_render_product_set_outputs_t;
 
-    /* Reserved attribute names — written via ovrtx_write_attribute; not persisted to Fabric. */
-#define OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP "omni:selectionOutlineGroup"
-#define OVRTX_ATTR_NAME_PICKABLE "omni:pickable"
 #define OVRTX_RENDER_VAR_PICK_HIT "ovrtx_pick_hit"
 
     /** @defgroup ovrtx_pick_types Pick query and pick-hit buffer layout
@@ -566,14 +570,20 @@ extern "C"
 #define OVRTX_PICK_FLAG_GIZMO (1u << 0)
 #define OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO (1u << 1)
 
-    /** Pick rectangle in RenderProduct pixel coordinates (inclusive left/top, exclusive right/bottom). */
+    /** Pick rectangle in normalized RenderProduct coordinates. Values use [0, 1] top-left-origin NDC:
+     *  x increases left-to-right and y increases top-to-bottom. The rectangle uses the same convention as
+     *  the old pixel API: @c right_ndc and @c bottom_ndc mark the edge just past the last included pixel.
+     *  For example, pixel (x, y) on a width x height RenderProduct is
+     *  [x / width, y / height, (x + 1) / width, (y + 1) / height]; the full RenderProduct is [0, 0, 1, 1].
+     *  Out-of-bounds values are rejected; boundary values may be clamped to the valid range to account for
+     *  floating-point roundoff. */
     typedef struct ovrtx_pick_query_desc_t
     {
         ovx_string_t render_product_path;
-        int32_t left;
-        int32_t top;
-        int32_t right;
-        int32_t bottom;
+        float left_ndc;
+        float top_ndc;
+        float right_ndc;
+        float bottom_ndc;
         uint32_t flags;
     } ovrtx_pick_query_desc_t;
 
@@ -598,8 +608,7 @@ extern "C"
      *
      * 1. Per-group state (outline color, fill color) — set at runtime via
      *    @ref ovrtx_set_selection_group_styles. The slot is keyed by the
-     *    @c omni:selectionOutlineGroup attribute value of each prim
-     *    (see @ref OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP).
+     *    per-prim group id passed to @ref ovrtx_set_selection_outline_group.
      *
      * 2. Global state (outline thickness, fill mode) — set at renderer creation
      *    via @ref OVRTX_CONFIG_SELECTION_OUTLINE_WIDTH and
@@ -623,6 +632,18 @@ extern "C"
         /** Use each group's dedicated fill/shade color as its interior fill (kShadeColorForInterior). */
         OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR = 3,
     } ovrtx_selection_fill_mode_t;
+
+    /** Motion BVH (ray-traced motion) mode for sensor and motion-sensitive pipelines.
+     *  Set via @ref OVRTX_CONFIG_MOTION_BVH at renderer creation. */
+    typedef enum ovrtx_motion_bvh_t
+    {
+        /** Motion BVH disabled (default when the config entry is omitted). */
+        OVRTX_MOTION_BVH_DISABLE = 0,
+        /** Motion BVH enabled from renderer creation. */
+        OVRTX_MOTION_BVH_ENABLE = 1,
+        /** Motion BVH enabled at runtime when a non-visual sensor or motion-sensitive camera is rendered. */
+        OVRTX_MOTION_BVH_AUTO = 2,
+    } ovrtx_motion_bvh_t;
 
     /** Visual styling for one selection-outline group. RGBA components in [0..1]. */
     typedef struct ovrtx_selection_group_style_t
@@ -825,14 +846,9 @@ extern "C"
         OVRTX_CONFIG_ENABLE_GEOMETRY_STREAMING,
         /** API key for the geometry streaming LOD opt-in flag. Create_renderer. */
         OVRTX_CONFIG_ENABLE_GEOMETRY_STREAMING_LOD,
-        /** Experimental: if true, enable Sensor Processing Graphs (SPG), default: disabled.
-         * This is a global setting, applying to all active renderer instances.
-         * Known issue: do not enable SPG with content that uses MaterialX material graphs */
+        /** If false, disables Sensor Processing Graphs (SPG), default: enabled.
+         * This is a global setting, applying to all active renderer instances. */
         OVRTX_CONFIG_ENABLE_SPG,
-        /** If true, enables motion BVH (ray-traced motion blur) for sensor pipelines.
-         *  Required when rendering non-visual sensor render products (lidar, radar, acoustic).
-         *  When not specified, defaults to false. */
-        OVRTX_CONFIG_ENABLE_MOTION_BVH,
         OVRTX_CONFIG_BOOL_COUNT
     } ovrtx_config_bool_t;
 
@@ -862,7 +878,11 @@ extern "C"
          *  Init-time only; changing requires renderer recreation.
          *  Default: @ref OVRTX_SELECTION_FILL_MODE_GLOBAL. */
         OVRTX_CONFIG_SELECTION_FILL_MODE,
-        OVRTX_CONFIG_INT64_COUNT
+        /** Motion BVH mode. Value type: @ref ovrtx_motion_bvh_t.
+         *  Init-time only; changing requires renderer recreation.
+         *  When not specified, defaults to @ref OVRTX_MOTION_BVH_DISABLE. */
+        OVRTX_CONFIG_MOTION_BVH,
+        OVRTX_CONFIG_INT64_COUNT = 4
     } ovrtx_config_int64_t;
 
     /** Uint64 config keys (reserved for future use). Value type: uint64_t. */

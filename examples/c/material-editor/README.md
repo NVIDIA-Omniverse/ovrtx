@@ -2,6 +2,8 @@
 
 An interactive desktop application that demonstrates how to use the ovrtx C API to build a material editing workflow. The application loads a USD scene, renders it with ovrtx, and provides a GUI for browsing materials, inspecting shader graphs, and editing shader parameters with live-rendered feedback.
 
+> **ovrtx 0.4 compatibility:** This example uses deprecated standalone renderer population and attribute-write APIs for its live material-editing workflow. Use the 0.3-to-0.4 migration skill when moving scene management and edits to ovstage.
+
 > _“Create a C++ Qt desktop application that combines live ovrtx rendering with read-only USD material introspection, showing materials, a rendered viewport, a shader graph, and editable shader properties, while keeping runtime material edits and rendering resets separate from introspection.”_
 
 ![Material Editor window](../../../img/example-material-editor.avif)

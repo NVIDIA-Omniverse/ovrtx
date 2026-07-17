@@ -37,13 +37,15 @@ def _load() -> ctypes.CDLL:
         return _lib
     with _lock:
         if _lib is None:
-            last_err: Optional[OSError] = None
+            # Keep only the message: retaining an exception retains its traceback,
+            # which would form a cycle through callers of the first sync operation.
+            last_err: Optional[str] = None
             for candidate in _LIB_CANDIDATES:
                 try:
                     lib = ctypes.CDLL(candidate)
                     break
                 except OSError as err:
-                    last_err = err
+                    last_err = str(err)
             else:
                 raise RuntimeError(f"Could not load CUDA runtime (tried {_LIB_CANDIDATES}): {last_err}")
 

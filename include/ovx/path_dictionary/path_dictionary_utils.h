@@ -68,11 +68,26 @@ extern "C"
             instance->context, path_strings, num_paths, out_path_list);
     }
 
-    static inline ovx_api_result_t path_dictionary_destroy_path_list(
+    /* Increments the path-list refcount. See path_dictionary.h for the
+       refcount contract. OVX_INVALID_PRIMPATH_LIST is a no-op success;
+       unknown handle is OVX_API_ERROR. */
+    static inline ovx_api_result_t path_dictionary_add_path_list_reference(
         path_dictionary_instance_t* instance,
         ovx_primpath_list_t path_list)
     {
-        return instance->vtable->destroy_path_list(
+        return instance->vtable->add_path_list_reference(
+            instance->context, path_list);
+    }
+
+    /* Decrements the path-list refcount; erases storage and invalidates the
+       handle at zero. See path_dictionary.h for the refcount contract.
+       OVX_INVALID_PRIMPATH_LIST is a no-op success; unknown handle is
+       OVX_API_ERROR. */
+    static inline ovx_api_result_t path_dictionary_release_path_list_reference(
+        path_dictionary_instance_t* instance,
+        ovx_primpath_list_t path_list)
+    {
+        return instance->vtable->release_path_list_reference(
             instance->context, path_list);
     }
 

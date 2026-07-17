@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 import pytest
 from PIL import Image
 
@@ -59,17 +60,26 @@ def test_path_tracing_mode():
         log_file_path=str(OUTPUT_DIR / "test_render_modes.log"),
     )
     renderer = ovrtx.Renderer(config)
-    renderer.open_usd_from_string(USDA)
+    stage = ovstage.Stage("ovrtx.docs.render-modes")
+    renderer.attach_ovstage(stage)
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, USDA, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
 
     for product_name, product in products.items():
         for frame in product.frames:
             var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
-            ldr_color = np.from_dlpack(var)
+            view = np.from_dlpack(var)
+            ldr_color = view.copy()
+            del view
+            var.unmap()
+            del var
 
             assert ldr_color.shape == (480, 640, 4) and ldr_color.dtype == np.uint8
             assert not np.all(ldr_color == 0), "LdrColor is all zeros"
@@ -77,4 +87,8 @@ def test_path_tracing_mode():
             # Save output for visual inspection
             Image.fromarray(ldr_color).save(OUTPUT_DIR / "test_path_tracing_mode.LdrColor.png")
 
-    del renderer
+    del products
+
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()

@@ -10,11 +10,10 @@
 # its affiliates is strictly prohibited.
 name: mapping-attributes
 description: >
-  Zero-copy attribute map/unmap for direct memory access to ovrtx internal buffers.
-  Use when user asks about zero-copy writes, map attribute, direct memory access,
-  Warp/CUDA kernel writes into mapped tensors, or GPU attribute updates. Use
-  attribute-bindings for repeated writes with caller-owned tensors when a copy is
-  acceptable.
+  Zero-copy attribute map/unmap for direct memory access to ovstage buffers. Use
+  when user asks about zero-copy writes, map attribute, direct memory access, or
+  repeated mapped updates. Use attribute-bindings for repeated writes with
+  caller-owned tensors when a copy is acceptable.
 license: LicenseRef-NvidiaProprietary
 version: "0.3.0"
 author: NVIDIA ovrtx
@@ -31,7 +30,7 @@ tools:
 
 ## When to Use
 
-Use this skill when the user asks about zero-copy writes, `map_attribute`, direct memory access, Warp/CUDA kernel writes into mapped tensors, or GPU attribute updates. Use `attribute-bindings` instead for repeated writes to the same prims/attribute when the caller already owns the data tensor and a copy into ovrtx is acceptable.
+Use this skill when the user asks about zero-copy writes, `map_attribute`, direct memory access, or mapped attribute updates. Use `attribute-bindings` for repeated writes through a reusable ovstage query when the caller already owns the data tensor.
 
 ## Inputs
 
@@ -39,7 +38,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 - Target API surface: Python, C/C++, or both.
 - Prim paths, attribute name, element type, semantic conversion, and whether the attribute is mappable.
-- Mapping target: CPU tensor, linear CUDA memory, or a bound attribute reused for repeated map/unmap cycles.
+- Mapping API, target device, and required synchronization.
 - Synchronization and lifetime requirements: stream/event, map duration, whether data must outlive the mapping, and whether array attributes are involved.
 - Repository source snippets referenced below. Treat these snippets as the API source of truth.
 
@@ -47,7 +46,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 - Use an ovrtx checkout that contains the referenced examples and docs tests.
 - Read the relevant `> **Source:**` snippet before writing or explaining API usage.
-- Array attributes such as `float3[] points` are not mappable; use `writing-attributes` or `attribute-bindings` for array writes.
+- For ragged array attributes such as `float3[] points`, provide one `element_sizes` entry per queried prim. Omit `element_sizes` for fixed-size attributes.
 - Use `attribute-bindings` first when the user wants repeated updates but does not need zero-copy direct buffer access.
 
 ## Instructions
@@ -56,7 +55,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 2. Read the matching source snippet and copy its map/write/unmap lifecycle rather than inventing equivalent calls.
 3. Validate dtype, shape, semantic, mappability, and ownership rules before proposing or editing code.
 4. Keep mapped tensor views alive only until unmap, and copy anything that must outlive the mapping.
-5. For repeated map/unmap cycles, create a persistent binding first and map through it to avoid recreating the descriptor.
+5. For repeated map/unmap cycles, retain and reuse the ovstage query.
 6. When changing code, run the narrow docs test or example that owns the snippet whenever practical.
 
 ## Output Format
@@ -70,12 +69,12 @@ This skill has no scripts.
 
 ## Limitations
 
-- Array attributes such as `float3[] points` are not supported for map/unmap because their lengths vary per prim.
+- Ragged array mappings require `element_sizes`; its length must match the number of prims selected by the query.
 - The referenced snippets remain the source of truth; update or add tested snippets before documenting new API usage.
 
 ## Overview
 
-Mapping gives you direct access to RTX's internal Fabric buffer for an attribute. Instead of copying data in (like `write_attribute`), you write directly into the buffer, then unmap to apply changes. This is the most efficient path for per-frame updates, especially with GPU compute (e.g., Warp kernels).
+Mapping gives you direct access to an ovstage attribute buffer. Instead of copying data in, write through each fetched group, then unmap and advance the write floor.
 
 The pattern is: **map -> write into tensor -> unmap**.
 
@@ -89,15 +88,15 @@ The pattern is: **map -> write into tensor -> unmap**.
 
 > **Source:** `tests/docs/python/test_attribute_bindings.py` snippet `doc-map-attribute-cpu`
 
-### GPU mapping with Warp
+### Deprecated renderer API: GPU mapping with Warp
 
 From the planet-system example -- map on CUDA, compute with a Warp kernel, unmap with stream sync:
 
 > **Source:** `tests/docs/python/test_attribute_bindings.py` snippet `doc-map-attribute-cuda`
 
-### Using a persistent binding for mapping
+### Reusing a query for mapping
 
-More efficient for repeated map/unmap cycles (avoids recreating the binding descriptor):
+Reuse the query across map/unmap cycles:
 
 > **Source:** `tests/docs/python/test_attribute_bindings.py` snippet `doc-map-bound-attribute`
 
@@ -115,30 +114,29 @@ More efficient for repeated map/unmap cycles (avoids recreating the binding desc
 
 | Python | C |
 |--------|---|
-| `renderer.map_attribute(...)` | `ovrtx_map_attribute(renderer, &binding, desc, &out)` |
-| `renderer.unmap_attribute(mapping)` | `ovrtx_unmap_attribute(renderer, handle, sync)` |
-| `binding.map(device=...)` | same, with binding handle |
-| `mapping.tensor` | `out_mapping.dl` (DLTensor) |
-| `mapping.unmap(stream=...)` | `ovrtx_unmap_attribute` with `cuda_sync.stream` |
-| `mapping.unmap(event=...)` | `ovrtx_unmap_attribute` with `cuda_sync.wait_event` |
-| `renderer.unmap_attribute_async(mapping, ...)` | `ovrtx_unmap_attribute` (always async in C) |
+| `stage.map_attribute(query, attr, ordinal=..., element_sizes=...)` | `ovrtx_map_attribute(renderer, &binding, desc, &out)` |
+| `mapping.fetch_next()` | `out_mapping.dl` (DLTensor) |
+| `mapping.unmap()` | `ovrtx_unmap_attribute(renderer, handle, sync)` |
 
-Tensor layout follows the API-specific attribute rules (see the `writing-attributes` skill for the full table):
-- Python mapping tensors are NumPy-style: `dtype="float64", shape=(4, 4)` returns a tensor with shape `(N, 4, 4)` and scalar lanes.
-- C mapping tensors are lane-based: a 4x4 double matrix attribute maps as `shape=[N]`, `dtype={kDLFloat, 64, 16}`.
-- The Python `semantic=` path reshapes automatically: `Semantic.XFORM_MAT4x4` → `(N, 4, 4)`, points → `(N, 3)`, colors → `(N, 4)` for RGBA or `(N, 3)` for RGB.
+Tensor layout follows the lane-based attribute rules in the `writing-attributes` skill. DLPack consumers expose lane components as trailing dimensions, so a lane-16 matrix group can be reshaped to `(N, 4, 4)`.
 
 > **Source:** `tests/docs/python/test_attribute_shapes.py` snippets `doc-shape-scalar-int32`, `doc-shape-float3-array`, `doc-shape-mat4-array`.
 
 ## Troubleshooting
 
-- **Tensor lifetime:** The tensor from `mapping.tensor` is only valid while the mapping is active (inside the `with` block in Python, or before `unmap` in C). All reads, writes, and kernel launches that access the tensor **must** happen before the mapping is released. Accessing it after the `with` block exits is undefined behavior. If you need data to outlive the mapping, copy it while still inside the block.
+- **Tensor lifetime:** A tensor fetched from an ovstage mapping group is valid only while the mapping is active. Copy data that must outlive unmap.
 - The canonical transform attribute name is `"omni:xform"`. The legacy name `"omni:fabric:localMatrix"` (used in examples above) is also accepted. New code should prefer `"omni:xform"`.
-- Array attributes (e.g., `float3[] points`) are **not supported** for mapping because they have variable lengths per prim. Use `write_array_attribute()` instead.
-- Data must be fully written before calling `unmap()`. For CUDA, pass `stream` or `event` so ovrtx knows when the GPU write is complete.
-- `event` and `stream` are mutually exclusive on unmap -- use one or the other.
-- Providing `event`/`stream` for a CPU-mapped attribute raises an error.
-- Multiple mappings can be outstanding on the same attribute. The logical order of application depends on the order of `unmap()` calls.
+- For ragged array mappings, pass the per-prim element counts through `element_sizes`. The number of entries must match the query's prim count; omit it for fixed-size attributes.
+- Data must be fully written before calling `unmap()`, and the write floor must advance before rendering that ordinal.
+- Deprecated renderer CUDA mappings require stream or event synchronization on unmap.
+
+## Deprecated Standalone APIs
+
+The ovrtx attribute map/unmap APIs are deprecated in 0.4 and retained for
+compatibility. New code should map through ovstage, iterate writable groups, unmap
+the mapping, and advance the write floor.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
 
 ## References
 

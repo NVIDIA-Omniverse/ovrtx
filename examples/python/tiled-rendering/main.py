@@ -31,6 +31,7 @@ import colorsys
 
 import numpy as np
 import ovrtx
+import ovstage
 from PIL import Image
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -123,20 +124,41 @@ def main():
 
     print("Creating renderer...", file=sys.stderr)
     renderer = ovrtx.Renderer()
+    stage = ovstage.Stage("ovrtx.example.tiled-rendering")
+    renderer.attach_ovstage(stage)
 
     print(f"Loading tiled scene ({GRID_SIZE}x{GRID_SIZE} grid)...", file=sys.stderr)
-    renderer.open_usd(scene_path)
+    ovstage.population.open_usd(stage, scene_path, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
 
     # Give each instance's logo a unique color.
     # The material shader prim for the logo in each referenced scene is at:
     #   /World/Scene_R_C/Looks/srf_green_plastic/Shader
     num_instances = GRID_SIZE * GRID_SIZE
+    shader_paths = []
+    colors = []
     for idx, (row, col) in enumerate((r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE)):
         hue = idx / num_instances
         rgb = colorsys.hsv_to_rgb(hue, 0.9, 0.5)
-        shader_path = f"/World/Scene_{row}_{col}/Looks/srf_green_plastic/Shader"
-        color = np.array([rgb], dtype=np.float32)
-        renderer.write_attribute([shader_path], "inputs:diffuse_color_constant", color)
+        shader_paths.append(f"/World/Scene_{row}_{col}/Looks/srf_green_plastic/Shader")
+        colors.append(rgb)
+
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(shader_paths)
+        with stage.query_from_path_list(path_list) as query:
+            color_values = np.asarray(colors, dtype=np.float32)
+            color_dtype = ovstage.numpy_to_dldatatype(color_values.dtype, lanes=3)
+            color_tensor = ovstage.make_dltensor(color_values, dtype=color_dtype, shape=[num_instances], ndim=1)
+            stage.write_attribute(
+                query,
+                "inputs:diffuse_color_constant",
+                ordinal=2,
+                tensors=color_tensor,
+                is_array=False,
+                semantic=ovstage.AttributeSemantic.COLOR,
+            ).wait()
+            stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        paths.destroy_path_list(path_list)
 
     # Warm up for 40 frames so texture streaming has finished loading highest quality mips and
     # path tracing converges to a good quality image.
@@ -146,19 +168,25 @@ def main():
         renderer.step(
             render_products={"/Render/TiledCameras"},
             delta_time=1.0 / 60,
+            ordinal=2,
         )
 
     print("Rendering final frame...", file=sys.stderr)
     products = renderer.step(
         render_products={"/Render/TiledCameras"},
         delta_time=1.0 / 60,
+        ordinal=2,
     )
 
     print("Fetching results...", file=sys.stderr)
     for _product_name, product in products.items():
         for frame in product.frames:
             var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
-            pixels = np.from_dlpack(var)
+            view = np.from_dlpack(var)
+            pixels = view.copy()
+            del view
+            var.unmap()
+            del var
             img = Image.fromarray(pixels)
             if args.png:
                 output_dir = SCRIPT_DIR / "_output"
@@ -169,6 +197,10 @@ def main():
                 img.show()
 
     print("Done.", file=sys.stderr)
+    del frame, product, products
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
 
 
 if __name__ == "__main__":

@@ -11,6 +11,20 @@
 Cloning Prims
 =============
 
+.. note::
+
+   Python uses ovstage cloning. ``Renderer.clone_usd*`` and
+   :c:func:`ovrtx_clone_usd` are deprecated compatibility APIs. Refer to
+   ``skills/update-0_3-0_4-python/SKILL.md``. Ovstage cloning differs from the
+   compatibility API:
+
+   - An ordinal is assigned to the clone operation for change tracking.
+   - The ``_usd`` suffix is dropped from clone destination paths.
+   - A missing source prim returns ``OVSTAGE_ERROR_NOT_FOUND`` rather than a
+     generic error.
+
+   Refer to :doc:`/core/ovstage_integration` for the attached-stage workflow.
+
 Cloning copies a USD subtree already present on the runtime stage to a new prim
 path. Use it for making additional copies of loaded geometry, sensors, or other
 stage content without re-authoring the original USD.
@@ -57,4 +71,3 @@ Notes
   externally supplied scenes.
 - Use :doc:`loading_usd` references when the content should remain removable by
   handle or when it has not yet been loaded onto the stage.
-

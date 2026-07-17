@@ -69,6 +69,17 @@ This skill has no scripts.
 
 After loading USD content, you render frames by calling `step()`. Each step advances the simulation by `delta_time` and produces output for the specified render products (cameras/sensors). The result contains a hierarchy of products, frames, and render variables that can be mapped to access pixel data.
 
+## Simulation time vs. USD time
+
+ovrtx tracks **two independent clocks** — a frequent point of confusion:
+
+| Clock | Unit | Advanced by | Drives |
+|-------|------|-------------|--------|
+| **Simulation time** | seconds | `step(products, delta_time)` (accumulates); `reset(time)` | sensor timing — motion blur, lidar/radar scan, `TimeOffsetNs` |
+| **USD time** | **timecodes** (converted from seconds via `timeCodesPerSecond`) | `update_from_usd_time(seconds)` (see `loading-usd`) | time-sampled attributes — animated transforms, visibility, ... |
+
+`step()` does **not** advance USD animation, and `update_from_usd_time()` does **not** advance the simulation/sensor clock. To render an animated frame at time *t*: call `update_from_usd_time(t)` first, then `step(...)`. `reset(time)` resets simulation time only (not USD time, and distinct from `reset_stage()`). Remember `update_from_usd_time` takes **seconds**, not timecodes — see `loading-usd` for the `timeCodesPerSecond` conversion.
+
 ## Python
 
 ### Single frame
@@ -123,10 +134,24 @@ RenderProductSetOutputs
 
 ## Troubleshooting
 
+- The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure; later runs should be faster once the shader cache is populated.
 - In C, you must call `ovrtx_destroy_results()` after processing to free resources. ovrtx will warn if results are leaked.
 - `delta_time` controls sensor simulation timing. A camera without motion blur produces one frame per step regardless of delta.
 - The render product paths must match actual RenderProduct prims in the USD stage.
 - In Python, `RenderProductSetOutputs` auto-destroys on garbage collection. Step result metadata is released when `products` falls out of scope; live render-var mappings and their DLPack views are unaffected (they have their own independent lifetime).
+
+## In Attached Mode (ovrtx 0.4+)
+
+When ovrtx is attached to ovstage, step through
+``ovrtx_step_with_stage(renderer, products, delta_time, ordinal, ...)``
+(Python: ``renderer.step(products, dt, ordinal=n)``). The ``ordinal`` is a
+committed-publication gate — the renderer observes ovstage state at or above
+that ordinal. Call ``ovrtx_update_from_stage(ordinal)`` first to pull committed
+prim/attribute state into ovrtx's Fabric, then step. See
+``docs/core/ovstage_integration.rst`` "Ordinals and Write-Floor Gates" for the
+ordinal model.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
 
 ## References
 

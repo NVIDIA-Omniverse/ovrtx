@@ -63,7 +63,10 @@ add_executable(material-editor
 target_link_libraries(material-editor PRIVATE
     Qt6::Widgets
     QtNodes
-    ovrtx::ovrtx
+    # Static-loader model: link the static ovrtx loader. ovrtx_engine.cpp hands the
+    # loader its package root at runtime (a side-by-side `ovrtx/` link beside the
+    # exe, created by ovrtx_setup_runtime) instead of replicating the package.
+    ovrtx::ovrtx_static
     usd
     usdShade
     sdf
@@ -75,6 +78,9 @@ target_include_directories(material-editor PRIVATE src)
 
 if(MSVC)
     target_compile_definitions(material-editor PRIVATE NOMINMAX)
+    # The ovrtx package ships a release-only static loader (compiled /MD). Force
+    # the release CRT so the Debug config links cleanly.
+    set_target_properties(material-editor PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 endif()
 
 # Setup runtime dependencies (DLL copying, junctions, rpath)

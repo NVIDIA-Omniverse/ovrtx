@@ -15,17 +15,17 @@ Path Tracing mode uses progressive sampling to converge towards
 ground-truth-quality images. In ovrtx, a render step accumulates towards the
 ``omni:rtx:pt:samplesPerPixel`` limit before returning output, so application
 code usually captures Path Tracing output with a single step rather than the
-multi-frame warmup loop used for Real-Time Path-Tracing convergence. Best suited
+multi-frame warm-up loop used for Real-Time Path-Tracing convergence. Path Tracing is best suited
 for offline or reference-quality workflows where convergence time is acceptable.
 
 .. code-block:: usda
 
    token omni:rtx:rendermode = "PathTracing"
 
-Warmup
-------
+Warm-Up
+-------
 
-PathTracing mode does not need the same warmup loop for path-tracing convergence
+PathTracing mode does not need the same warm-up loop for path-tracing convergence
 that Real-Time Path-Tracing uses. Texture availability can still matter if an
 application requires high-resolution mips in the first captured frame.
 
@@ -51,7 +51,7 @@ Path Tracing
      - ``512``
    * - ``omni:rtx:pt:samplesPerIteration``
 
-       Number of samples per pixel, per iteration. Multiple iterations may be run per launch to reduce kernel launch overhead.
+       Number of samples per pixel, per iteration. Multiple iterations can be run per launch to reduce kernel launch overhead.
      - ``int``
      - ``1``
    * - ``omni:rtx:pt:adaptiveSampling:enabled``
@@ -110,7 +110,7 @@ Denoising
      - ``0.0``
    * - ``omni:rtx:pt:denoising:optix:denoiseAOVs``
 
-       If enabled, the OptiX Denoiser will also denoise additional render variables alongside the color output.
+       If enabled, the OptiX Denoiser also denoises additional render variables alongside the color output.
      - ``bool``
      - ``true``
 
@@ -164,17 +164,17 @@ Firefly Filter
      - ``true``
    * - ``omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSample``
 
-       Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but may result in energy loss. Automatically scaled with exposure.
+       Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
      - ``float``
      - ``3200.0``
    * - ``omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse``
 
-       Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but may result in energy loss. Automatically scaled with exposure.
+       Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
      - ``float``
      - ``3200.0``
    * - ``omni:rtx:pt:fireflyFilter:maxPerEmissiveUnexposedIntensity``
 
-       Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but may result in energy loss. Automatically scaled with exposure.
+       Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
      - ``float``
      - ``3200.0``
 
@@ -305,7 +305,7 @@ Global Volumetric Effects
      - Default
    * - ``omni:rtx:pt:ptvol:raySky``
 
-       Enables an additional medium of Rayleigh-scattering particles to simulate a physically-based sky.
+       Enables an additional medium of Rayleigh-scattering particles to simulate a physically based sky.
      - ``bool``
      - ``false``
    * - ``omni:rtx:pt:ptvol:raySkyScale``
@@ -333,7 +333,7 @@ Anti-Aliasing
      - Default
    * - ``omni:rtx:pt:pixelFilter:filter``
 
-       Sampling pattern used for anti-aliasing. Select between Box, Triangle, Gaussian and Uniform.
+       Sampling pattern used for anti-aliasing. Select from Box, Triangle, Gaussian, and Uniform.
      - ``int``
      - ``Triangle``
    * - ``omni:rtx:pt:pixelFilter:radius``

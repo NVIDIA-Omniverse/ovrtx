@@ -14,9 +14,11 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 from PIL import Image
 
 USD_URL = "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Samples/Robot-OVRTX/robot-ovrtx.usda"
+
 
 def main():
     parser = argparse.ArgumentParser(description="Minimal ovrtx Python example")
@@ -24,15 +26,19 @@ def main():
     args = parser.parse_args()
 
     # [snippet:create-renderer]
-    # Create the Renderer and load a USD layer into it
+    # Create the Renderer and attach the stage that owns scene data.
     print("Creating renderer. The first run of the application will take some time as shaders are compiled and cached...", file=sys.stderr)
     renderer = ovrtx.Renderer()
+    stage = ovstage.Stage("ovrtx.example.minimal")
+    renderer.attach_ovstage(stage)
     print("Renderer created.", file=sys.stderr)
     # [/snippet:create-renderer]
 
     # [snippet:add-usd]
     print(f"Opening {USD_URL}...", file=sys.stderr)
-    renderer.open_usd(USD_URL)
+    ordinal = 1
+    ovstage.population.open_usd(stage, USD_URL, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
     print("USD loaded.", file=sys.stderr)
     # [/snippet:add-usd]
 
@@ -40,8 +46,9 @@ def main():
     # Step the renderer to simulate the Camera at 60Hz
     print("Stepping renderer...", file=sys.stderr)
     products = renderer.step(
-        render_products = {"/Render/Camera"},
-        delta_time = 1.0 / 60
+        render_products={"/Render/Camera"},
+        delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
     print("Stepped renderer.", file=sys.stderr)
     # [/snippet:step]
@@ -52,7 +59,11 @@ def main():
     for _product_name, product in products.items():
         for frame in product.frames:
             var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
-            pixels = np.from_dlpack(var)
+            view = np.from_dlpack(var)
+            pixels = view.copy()
+            del view
+            var.unmap()
+            del var
             img = Image.fromarray(pixels)
             if args.png:
                 output_dir = Path("_output")
@@ -63,6 +74,12 @@ def main():
                 img.show()
     print("Fetched results.", file=sys.stderr)
     # [/snippet:read-render-output]
+
+    del frame, product, products
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
+
 
 if __name__ == "__main__":
     main()

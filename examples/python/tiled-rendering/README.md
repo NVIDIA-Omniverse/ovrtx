@@ -1,6 +1,6 @@
 # Tiled Rendering
 
-Renders a 3x3 grid of scene instances through a single RenderProduct with multiple cameras. Demonstrates tiled multi-camera rendering, USD reference composition with per-instance transforms, and runtime material color writes.
+Renders a 3x3 grid of scene instances through a single RenderProduct with multiple cameras. Demonstrates tiled multi-camera rendering, ovstage population of USD reference composition, and ordinal-keyed material color writes.
 
 Each grid cell references the same base scene but gets a unique logo color generated from evenly spaced HSV hues. A single 1024x1024 RenderProduct targets all nine cameras, and RTX tiles them into a grid in the output image.
 

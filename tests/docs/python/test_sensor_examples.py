@@ -10,55 +10,45 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import math
-import os
 import re
-import shutil
-import subprocess
+import sys
 from pathlib import Path
 
-import pytest
-
 PUBLIC_ROOT = Path(__file__).resolve().parents[3]
-PYTHON_SENSOR_EXAMPLES = PUBLIC_ROOT / "examples" / "python" / "sensors"
-RENDERING_ROOT = PUBLIC_ROOT.parents[1]
-LOCAL_OVRTX_BINARY_DIR = RENDERING_ROOT / "_build" / "linux-x86_64" / "release"
+PYTHON_EXAMPLES = PUBLIC_ROOT / "examples" / "python"
+
+if str(PYTHON_EXAMPLES) not in sys.path:
+    sys.path.insert(0, str(PYTHON_EXAMPLES))
+
+from lidar.main import main as run_lidar_example  # noqa: E402
+from radar.main import main as run_radar_example  # noqa: E402
 
 
-def run_python_example(example_name: str, tmp_path: Path) -> str:
-    """Run a public Python sensor example headless and return combined output."""
-    uv = shutil.which("uv")
-    if uv is None:
-        pytest.skip("uv is required to run public Python examples")
+def run_python_example(
+    example_name: str,
+    example_main: Callable[[list[str]], None],
+    capsys,
+    output_dir: Path,
+) -> str:
+    """Run a public Python sensor example headless in the docs test process."""
+    log_file_path = output_dir / f"python-doc-tests-{example_name}-example.log"
+    example_main(["--no-rr", "--log", str(log_file_path)])
 
-    example_dir = PYTHON_SENSOR_EXAMPLES / example_name
-    env = os.environ.copy()
-    env["UV_PROJECT_ENVIRONMENT"] = str(tmp_path / f"{example_name}-venv")
-
-    if LOCAL_OVRTX_BINARY_DIR.exists():
-        existing_library_path = env.get("LD_LIBRARY_PATH")
-        if existing_library_path:
-            env["LD_LIBRARY_PATH"] = f"{LOCAL_OVRTX_BINARY_DIR}:{existing_library_path}"
-        else:
-            env["LD_LIBRARY_PATH"] = str(LOCAL_OVRTX_BINARY_DIR)
-
-    result = subprocess.run(
-        [uv, "run", "--frozen", "main.py", "--no-rr"],
-        cwd=example_dir,
-        env=env,
-        text=True,
-        capture_output=True,
-        timeout=600,
-        check=False,
-    )
-    output = result.stdout + result.stderr
-    assert result.returncode == 0, output
-    return output
+    captured = capsys.readouterr()
+    return captured.out + captured.err
 
 
-def test_python_lidar_example_reports_valid_pointcloud(tmp_path):
+def test_python_lidar_example_reports_valid_pointcloud(capsys, output_dir):
     """Run the lidar example and sanity-check the printed PointCloud summary."""
-    output = run_python_example("lidar", tmp_path)
+    # [snippet:python-lidar-example-reports-valid-pointcloud]
+    output = run_python_example(
+        "lidar",
+        run_lidar_example,
+        capsys,
+        output_dir,
+    )
 
     match = re.search(
         r"valid points=(\d+), mean intensity=([-+0-9.eE]+), "
@@ -75,11 +65,18 @@ def test_python_lidar_example_reports_valid_pointcloud(tmp_path):
     assert math.isfinite(mean_intensity)
     assert mean_intensity >= 0.0
     assert max_time_offset_ns > 0
+    # [/snippet:python-lidar-example-reports-valid-pointcloud]
 
 
-def test_python_radar_example_reports_moving_detections(tmp_path):
+def test_python_radar_example_reports_moving_detections(capsys, output_dir):
     """Run the radar example and sanity-check per-step radial velocity output."""
-    output = run_python_example("radar", tmp_path)
+    # [snippet:python-radar-example-reports-moving-detections]
+    output = run_python_example(
+        "radar",
+        run_radar_example,
+        capsys,
+        output_dir,
+    )
 
     step_matches = re.findall(
         r"step (\d+): valid points=(\d+), "
@@ -104,3 +101,4 @@ def test_python_radar_example_reports_moving_detections(tmp_path):
         )
 
     assert max_abs_radial_velocity > 0.1
+    # [/snippet:python-radar-example-reports-moving-detections]

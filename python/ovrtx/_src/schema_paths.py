@@ -58,17 +58,19 @@ _RTX_SETTINGS_ENV_KEY: str = "OMNI_USD_RTX_SETTINGS_PATH"
 # C-side body writes to ``OV_OPENUSD_PLUGINPATH`` (build-time-configured —
 # currently ``OV_PXR_PLUGINPATH_2511`` for the bundled OpenUSD 25.11; see
 # ``OV_OPENUSD_PLUGINPATH`` in ``rendering/premake5.lua`` and ``_BUNDLED_USD_VERSION``
-# in ``bindings.py``) AND to the OpenUSD upstream default ``PXR_PLUGINPATH_NAME``
-# for any non-renamed peer USD that may also be co-loaded into the process.
+# in ``bindings.py``) and, only when ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1`` is
+# set, also to the OpenUSD upstream default ``PXR_PLUGINPATH_NAME`` for any
+# non-renamed peer USD that may also be co-loaded into the process.
 # Surfaced here so tests / integrators that want to snapshot env state don't
 # have to know which renamed key the C macro currently points at.
 #
 # Drift guard: the test
 # ``test.ovrtx.python/test_schema_auto_register.py::test_every_advertised_key_is_actually_written``
-# asserts that every key in this tuple gets populated by the C body, so a
-# USD version bump that changes ``OV_OPENUSD_PLUGINPATH`` (or otherwise
-# stops the C side from writing to one of these keys) without updating
-# this list will fail in CI.
+# asserts (with the ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1`` opt-in set) that
+# every key in this tuple gets populated by the C body, so a USD version
+# bump that changes ``OV_OPENUSD_PLUGINPATH`` (or otherwise stops the C side
+# from writing to one of these keys) without updating this list will fail
+# in CI.
 _PXR_PLUGINPATH_ENV_KEYS: Tuple[str, ...] = (
     "OV_PXR_PLUGINPATH_2511",
     "PXR_PLUGINPATH_NAME",
@@ -123,8 +125,9 @@ def _load_loader_lib() -> ctypes.CDLL:
         return _loaded_lib
 
     # Read the hint via the module attribute (not a `from .bindings import HINT`
-    # capture) so an integrator that sets `OVRTX_SKIP_SCHEMA_AUTO_REGISTER=1`,
-    # mutates `bindings.OVRTX_LIBRARY_PATH_HINT`, and then calls
+    # capture) so an integrator that leaves `OVRTX_PXR_SCHEMA_AUTO_REGISTER`
+    # unset (the default — no import-time registration), mutates
+    # `bindings.OVRTX_LIBRARY_PATH_HINT`, and then calls
     # `register_schema_paths()` manually picks up the new value — matching how
     # `_LibraryLoader.create_bindings` reads it for the renderer init load.
     #

@@ -4,6 +4,98 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-17
+
+# ovrtx 0.4.0 Release Notes
+
+## Summary
+
+ovrtx 0.4 introduces integration with the new [ovstage](https://github.com/nvidia-omniverse/ovstage) 0.1 library. Applications can attach an externally owned ovstage instance and render its scene data.
+
+Existing ovrtx APIs for loading USD and reading or writing stage attributes remain available for compatibility but are deprecated and will be removed in a future release.
+
+This release also includes breaking C API changes, improved DLSS Ray Reconstruction quality under motion, and numerous rendering, sensor, and stability fixes.
+
+## Highlights
+
+### ovstage integration
+
+New C APIs support attached-stage workflows:
+
+- `ovrtx_attach_ovstage()` and `ovrtx_detach_ovstage()`
+- `ovrtx_step_with_stage()`
+- `ovrtx_update_from_stage()`
+
+While attached, ovrtx stage-building, write, and map APIs return `OVRTX_API_ERROR`. Read-only `ovrtx_query_prims()` remains available.
+
+### Motion BVH configuration
+
+`OVRTX_CONFIG_MOTION_BVH` replaces the former Boolean option:
+
+- `Disable` — off and now the default
+- `Enable` — enabled when the renderer is created
+- `Auto` — enabled when required by sensors or motion-sensitive cameras
+
+Applications that relied on implicit auto-detection must explicitly select `Auto`.
+
+### Schema registration
+
+Automatic registration in `PXR_PLUGINPATH_NAME` is now disabled by default. Register schemas by setting `OVRTX_PXR_SCHEMA_AUTO_REGISTER` or calling `ovrtx_register_schema_paths()` before OpenUSD initializes.
+
+Standalone applications using `ovrtx_initialize()` or `ovrtx_create_renderer()` continue to register paths automatically. `OVRTX_SKIP_SCHEMA_AUTO_REGISTER` has been removed.
+
+### Other additions
+
+- NDC-based picking, pickability controls, and configurable selection outlines
+- Geometry streaming configuration
+- Rolling-shutter, RenderVar channel, physical-camera responsivity, and light-shaping schemas
+- Render Output Compression, LPE labels for AOVs, and multiple dome lights
+- Gaussian splats and scene partitioning in RTX Minimal
+- SPG output fanout, multiple descriptor sets, structured buffers, and large array inputs
+- Updated DLSS Ray Reconstruction with better quality under motion
+
+## Breaking Changes
+
+All C consumers must be recompiled.
+
+- `ovrtx_release_read_result()` now accepts the original `ovrtx_read_handle_t`.
+- `ovrtx_read_map_handle_t` and `ovrtx_read_output_t::map_handle` were removed.
+- Picking rectangles now use NDC coordinates.
+- SPG parameters are now authored as shader inputs.
+- `ovx_string_t::str` and `::len` became `::ptr` and `::length`.
+- RT1 `DirectLightingSampled` and `DirectLightingLtc` modes were removed.
+
+## Notable Fixes
+
+- Corrected HDR color, illuminance, motion-vector, and dome-light AOV behavior
+- Fixed rect, sphere, distant, and dome-light rendering issues
+- Fixed OmniSurface volume coefficients
+- Fixed lidar direction handling, beams-mode crashes, and mixed sensor tick-rate crashes
+- Improved motion transforms, velocity estimation, and semantic-label determinism
+- Fixed VRAM accounting and scene-partitioning out-of-memory failures
+- Added DLPack v1.2-compliant row-major strides
+- Enabled SPG by default
+
+## Known Issues
+
+- Multi-GPU viewport picking is limited to GPU 0; set RenderProduct `deviceIds = [0]`.
+- Repeated renderer creation on headless Linux may crash in `libEGL.so`. Use `keep_system_alive = true` with early `ovrtx_initialize()`, or set `VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1`.
+- ovrtx must initialize before ovphysx.
+- ovstage 0.1 does not support USD-active reads.
+- The material-editor C example has not yet been migrated to ovstage or validated.
+
+## Upgrading from ovrtx 0.3.x
+
+1. Recompile C consumers and update read-result, picking, string, and SPG APIs.
+2. Enable schema registration explicitly if your application depends on it.
+3. Select Motion BVH `Auto` if you relied on the former implicit behavior.
+4. Migrate deprecated scene, attribute, query, and USD population APIs to ovstage.
+5. Commit at least one ovstage write before calling `ovrtx_step_with_stage()`.
+6. Replace removed RT1 direct-lighting modes.
+
+The repository includes agent-assisted `update-0_3-0_4-c` and `update-0_3-0_4-python` migration skills.
+
+
 ## [0.3.0] - 2026-05-15
 
 ### Added
@@ -16,7 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Expanded attribute write and mapping APIs. Python writes now accept CPU or GPU DLPack-compatible tensors directly, support synchronous or asynchronous data access with CUDA stream/event synchronization, and can use persistent `AttributeBinding` handles or direct `Renderer.map_attribute()` / `AttributeMapping.unmap_async()` workflows for repeated updates and caller-managed lifetimes.
 - `ovrtx_get_path_dictionary()` to obtain the renderer's path dictionary for converting between tokens/path handles and strings, and for pre-resolving filter names for repeated queries.
 - Lidar and radar sensor support, including composite `PointCloud` render variables with named tensors for channels such as coordinates, intensity, velocity, radar cross section, flags, and counts; see the new C/Python lidar and radar sensor examples.
-- Viewport picking and selection outline support. Applications can enqueue RenderProduct-space pick rectangles with `ovrtx_enqueue_pick_query()` / `Renderer.enqueue_pick_query_async()`, read the synthetic pick-hit render var, resolve picked prim paths through the path dictionary, and draw selection outlines by writing selection outline group attributes. The C API also adds `ovrtx_set_selection_group_styles()`, `ovrtx_set_selection_outline_group()`, and `ovrtx_set_pickable()`; Python adds `SelectionGroupStyle`, `SelectionFillMode`, and `Renderer.set_selection_group_styles()`. The Vulkan interop example now demonstrates click picking, marquee selection with a Vulkan overlay rectangle, selected-prim path printing, and styled ovrtx selection outlines with translucent fill.
+- Viewport picking and selection outline support. Applications can enqueue RenderProduct-space pick rectangles with `ovrtx_enqueue_pick_query()` / `Renderer.enqueue_pick_query_async()`, read the synthetic pick-hit render var, resolve picked prim paths through the path dictionary, and draw selection outlines with `ovrtx_set_selection_outline_group()` / `Renderer.set_selection_outline_group()`. The C API also adds `ovrtx_set_selection_group_styles()` and `ovrtx_set_pickable()`; Python adds `SelectionGroupStyle`, `SelectionFillMode`, `Renderer.set_selection_group_styles()`, and `Renderer.set_pickable()`. The Vulkan interop example now demonstrates click picking, marquee selection with a Vulkan overlay rectangle, selected-prim path printing, and styled ovrtx selection outlines with translucent fill.
 - New renderer configuration controls: `OVRTX_CONFIG_SELECTION_OUTLINE_ENABLED`, `OVRTX_CONFIG_SELECTION_OUTLINE_WIDTH`, `OVRTX_CONFIG_SELECTION_FILL_MODE`, `OVRTX_CONFIG_ENABLE_GEOMETRY_STREAMING`, `OVRTX_CONFIG_ENABLE_GEOMETRY_STREAMING_LOD`, and experimental `OVRTX_CONFIG_ENABLE_SPG`, plus matching C helper functions and `RendererConfig` fields. `ovrtx_config.h` also includes typed config-entry constructors such as `ovrtx_config_entry_bool()`, `ovrtx_config_entry_string()`, `ovrtx_config_entry_int()`, and `ovrtx_config_entry_binary_package_root_path()`.
 - Windows ovrtx binaries are now Authenticode-signed so Windows deployments can verify the publisher and avoid unsigned-binary trust warnings.
 - ovrtx packages can connect to DDCS servers through the renderer-plugin version of GRPCDataStore, enabling DDCS-backed workflows such as IsaacLab and Windows deployments.
@@ -24,7 +116,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Python: `Renderer.update_from_usd_time_async()` to schedule a stage-time update asynchronously, `Operation.query_status()` for polling operation progress, and `AttributeMapping.unmap_async()` for asynchronous attribute-map commits.
 - Python public surface expanded in `ovrtx.__init__`: `AttributeFilterMode`, `FilterKind`, `BindingFlag`, `EventStatus`, `SelectionFillMode`, `SelectionGroupStyle`, `AttributeInfo`, `AttributeBinding`, `AttributeMapping`, `FrameOutput`, `ProductOutput`, `RenderProductSetOutputs`, `RenderVarOutput`, `RenderVarParam`, `RenderVarTensor`, `Operation`, `OperationCounter`, `OperationStatus`, `PendingFetch`, `MappedRenderVar`, and `ManagedDLTensor`.
 - New examples: C Material Editor, C/Python status queries, Python tiled rendering, Python semantic segmentation, and C/Python lidar and radar sensor examples.
-- Expanded documentation and skills for camera RenderVars, render modes, render settings, sensor configuration, render output interpretation, lidar/radar point clouds, semantic labels, material binding, viewport picking/selection, stage queries, attribute reads, and status queries. 
+- Expanded documentation and skills for camera RenderVars, render modes, render settings, sensor configuration, render output interpretation, lidar/radar point clouds, semantic labels, material binding, viewport picking/selection, stage queries, attribute reads, and status queries.
 
 
 ### Changed

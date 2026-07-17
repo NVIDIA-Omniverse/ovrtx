@@ -16,7 +16,7 @@ for USD loading and rendering.
 
 It demonstrates:
 
-1. Loading a USD layer with ``ovrtx_open_usd_from_file()``
+1. Loading a USD layer from a remote S3 scene URL with ``ovrtx_open_usd_from_file()``
 2. Polling ``ovrtx_query_op_status()`` while waiting
 3. Running one shader-cache warm-up step with shader compilation progress
 4. Stepping the renderer with ``ovrtx_step()``
@@ -28,7 +28,7 @@ Renderer logs are written to ``_output/status-queries-ovrtx.log``.
 
    *“Create a C/C++ rendering example that demonstrates operation status queries, including logging, asynchronous scene loading, progress and counter polling while waiting, shader warmup feedback, final image output, and both API and asynchronous operation error checks.”*
 
-.. image:: ../../img/out.jpg
+.. image:: ../../img/example-minimal.jpg
    :alt: Status queries example output
    :align: center
 
@@ -43,9 +43,11 @@ Build and Run
 
       .. code-block:: bash
 
-         sudo apt install build-essential cmake
+         sudo apt-get install build-essential cmake
 
-      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available via ``CMAKE_PREFIX_PATH``, the local installation is used instead.
+      Runtime requires an NVIDIA RTX-capable GPU, a supported NVIDIA driver, internet access to download the remote S3 scene asset, and unsandboxed execution.
+
+      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available through ``CMAKE_PREFIX_PATH``, the local installation is used instead.
 
       **Building**
 
@@ -65,8 +67,12 @@ Build and Run
       **Prerequisites**
 
       - `Visual Studio 2017+ <https://visualstudio.microsoft.com/downloads/>`_
+      - NVIDIA RTX-capable GPU
+      - Supported NVIDIA driver
+      - Internet access to download the remote S3 scene asset
+      - Unsandboxed runtime execution
 
-      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available via ``CMAKE_PREFIX_PATH``, the local installation is used instead.
+      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available through ``CMAKE_PREFIX_PATH``, the local installation is used instead.
 
       **Building**
 
@@ -79,7 +85,7 @@ Build and Run
 
       .. code-block:: pwsh
 
-         .\build\Release\status-queries
+         .\build\Release\status-queries.exe
 
 Licensing
 ---------

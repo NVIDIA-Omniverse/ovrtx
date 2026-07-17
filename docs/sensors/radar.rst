@@ -13,7 +13,7 @@ Radar Sensors
 
 An ovrtx radar scene needs an ``OmniRadar`` sensor prim and a RenderProduct
 whose ``PointCloud`` RenderVar requests the detection channels the application
-will read. The same USDA pattern is used by C and Python.
+will read. C and Python use the same USDA pattern.
 
 Configure the Radar Prim
 ------------------------
@@ -22,14 +22,14 @@ Configure the Radar Prim
 
    .. tab-item:: Python Example Scene
 
-      .. literalinclude:: ../../examples/python/sensors/radar/radar_example.usda
+      .. literalinclude:: ../../examples/python/radar/radar_example.usda
          :language: usda
          :start-after: # [snippet:configure-radar-sensor]
          :end-before: # [/snippet:configure-radar-sensor]
 
    .. tab-item:: C Example Scene
 
-      .. literalinclude:: ../../examples/c/sensors/radar/radar_example.usda
+      .. literalinclude:: ../../examples/c/radar/radar_example.usda
          :language: usda
          :start-after: # [snippet:configure-radar-sensor]
          :end-before: # [/snippet:configure-radar-sensor]
@@ -69,14 +69,14 @@ Configure PointCloud Output
 
    .. tab-item:: Python Example Scene
 
-      .. literalinclude:: ../../examples/python/sensors/radar/radar_example.usda
+      .. literalinclude:: ../../examples/python/radar/radar_example.usda
          :language: usda
          :start-after: # [snippet:configure-radar-pointcloud-output]
          :end-before: # [/snippet:configure-radar-pointcloud-output]
 
    .. tab-item:: C Example Scene
 
-      .. literalinclude:: ../../examples/c/sensors/radar/radar_example.usda
+      .. literalinclude:: ../../examples/c/radar/radar_example.usda
          :language: usda
          :start-after: # [snippet:configure-radar-pointcloud-output]
          :end-before: # [/snippet:configure-radar-pointcloud-output]
@@ -113,6 +113,5 @@ Within the first ``Counts[0]`` entries, a detection is valid when
 detections can be negative, so use absolute value when checking only for
 motion.
 
-For map/read code, see :doc:`pointclouds`. For material behavior that affects
-radar returns, see :doc:`nonvisual_materials`.
-
+For map/read code, refer to :doc:`pointclouds`. For material behavior that affects
+radar returns, refer to :doc:`nonvisual_materials`.

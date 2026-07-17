@@ -8,166 +8,170 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// Tests for ovrtx_read_attribute / ovrtx_fetch_read_result / ovrtx_release_read_result.
-// Scalar test: write-then-read omni:rtx:rtpt:maxBounces on /Render/Camera.
-// Array test: read the authored "points" attribute from /World/Plane.
+// Tests for ovstage attribute reads used with an attached renderer. Mirrors
+// tests/docs/python/test_attribute_read.py.
+// - Scalar test: write-then-read omni:rtx:rtpt:maxBounces on /Render/Camera.
+// - Array test: read the authored "points" attribute from /World/Plane.
 
 #include <gtest/gtest.h>
 #include "helpers.h"
-
-#include <ovrtx/ovrtx_attributes.h>
 
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
-class AttributeReadTest : public ::testing::Test {
+class AttributeReadTest : public DocsOvstageTestBase {
 protected:
-    static void SetUpTestSuite() {
-        TestConfig tc("AttributeReadTest");
-        ovrtx_result_t result = ovrtx_create_renderer(&tc.config, &renderer_);
-        ASSERT_API_SUCCESS(result.status);
-    }
-
-    static void TearDownTestSuite() {
-        if (renderer_) {
-            ovrtx_destroy_renderer(renderer_);
-            renderer_ = nullptr;
-        }
-    }
-
-    static void load_base() {
-        ovrtx_op_wait_result_t wait_result;
-        ovrtx_enqueue_result_t eq;
-
-        eq = ovrtx_reset_stage(renderer_);
-        ASSERT_API_SUCCESS(eq.status);
-        ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-        ASSERT_NO_OP_ERRORS(wait_result);
-
-        std::string scene = get_docs_test_data_dir() + "/ovrtx-test-base.usda";
-        eq = ovrtx_open_usd_from_file(renderer_, {scene.c_str(), scene.size()});
-        ASSERT_API_SUCCESS(eq.status);
-        ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-        ASSERT_NO_OP_ERRORS(wait_result);
-
-        eq = ovrtx_reset(renderer_, 0.0);
-        ASSERT_API_SUCCESS(eq.status);
-        ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-        ASSERT_NO_OP_ERRORS(wait_result);
-    }
-
-    // Write a single int32 value to the given prim/attribute so the subsequent
-    // read has a deterministic value to observe.
-    static void write_int32(char const* prim, char const* attribute, int32_t value) {
-        ovx_string_t p = ovx_str(prim);
-        size_t count = 1;
-        DLDataType int32_type = {kDLInt, 32, 1};
-        DLTensor tensor = ovrtx_make_write_cpu_tensor(&value, &count, int32_type);
-
-        ovrtx_input_buffer_t buffer{};
-        buffer.tensors = &tensor;
-        buffer.tensor_count = 1;
-
-        ovrtx_binding_desc_or_handle_t binding = ovrtx_make_binding_desc(
-            &p, 1, ovx_str(attribute), OVRTX_SEMANTIC_NONE, int32_type);
-
-        ovrtx_enqueue_result_t eq =
-            ovrtx_write_attribute(renderer_, &binding, &buffer, OVRTX_DATA_ACCESS_SYNC);
-        ASSERT_API_SUCCESS(eq.status);
-        ovrtx_op_wait_result_t wait_result;
-        ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-        ASSERT_NO_OP_ERRORS(wait_result);
-    }
-
-    static ovrtx_renderer_t* renderer_;
+    DOCS_OVSTAGE_TEST_SUITE(AttributeReadTest)
 };
 
-ovrtx_renderer_t* AttributeReadTest::renderer_ = nullptr;
-
 TEST_F(AttributeReadTest, ReadScalarAttribute) {
-    load_base();
-    write_int32("/Render/Camera", "omni:rtx:rtpt:maxBounces", 17);
+    docs_load_base();
+    if (HasFatalFailure()) return;
+
+    // Setup a single-prim query on /Render/Camera and intern the attribute
+    // token. Both are kept alive across the write and the read.
+    path_dictionary_instance_t* pd = ovstage_get_path_dictionary(stage_);
+    ASSERT_NE(pd, nullptr);
+
+    ovx_string_t prim_path = ovx_str("/Render/Camera");
+    ovx_primpath_list_t path_list{};
+    ASSERT_EQ(path_dictionary_create_path_list_from_strings(pd, &prim_path, 1, &path_list).status,
+              OVX_API_SUCCESS);
+
+    ovstage_query_handle_t query_handle = OVSTAGE_INVALID_QUERY_HANDLE;
+    ASSERT_EQ(ovstage_query_from_path_list(stage_, path_list, &query_handle), OVSTAGE_OK)
+        << format_ovstage_last_error();
+
+    ovx_string_t attr_name = ovx_str("omni:rtx:rtpt:maxBounces");
+    ovx_token_t attr_token{};
+    ASSERT_EQ(path_dictionary_create_tokens_from_strings(pd, &attr_name, 1, &attr_token).status,
+              OVX_API_SUCCESS);
+
+    // Write 17 to maxBounces at ordinal 2, then seal so a subsequent read at
+    // latest(2) has committed data to observe.
+    uint32_t write_value = 17;
+    int64_t write_shape[1] = {1};
+    DLTensor write_tensor{};
+    write_tensor.data = &write_value;
+    write_tensor.device = {kDLCPU, 0};
+    write_tensor.ndim = 1;
+    write_tensor.dtype = {kDLUInt, 32, 1};
+    write_tensor.shape = write_shape;
+    write_tensor.strides = nullptr;
+    write_tensor.byte_offset = 0;
+
+    ovstage_write_data_t write_data{};
+    write_data.tensors = &write_tensor;
+    write_data.tensor_count = 1;
+    write_data.is_array = false;
+
+    ovx_string_or_token_t attr_ref{};
+    attr_ref.token = attr_token;
+
+    ovstage_enqueue_result_t wq = ovstage_write_attribute(
+        stage_, query_handle, attr_ref, /*ordinal=*/2, write_data, OVSTAGE_PRIM_MODE_UPSERT);
+    ASSERT_EQ(wq.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, wq.op_index);
+    docs_ovstage_advance_write_floor(stage_, 2);
 
     // [snippet:doc-read-attribute-scalar-c]
-    // Describe the attribute to read: one prim, name, element type matching
-    // how the runtime stores it (maxBounces is a 32-bit unsigned integer).
-    ovx_string_t rp = ovx_str("/Render/Camera");
-    DLDataType uint32_type = {kDLUInt, 32, 1};
-    ovrtx_binding_desc_or_handle_t binding = ovrtx_make_binding_desc(
-        &rp, 1, ovx_str("omni:rtx:rtpt:maxBounces"), OVRTX_SEMANTIC_NONE, uint32_type);
+    // Enqueue a read for a schema-known attribute over one prim, at latest(2).
+    // The read handle is reserved synchronously — pass it to fetch_read_next
+    // once the returned op_index completes.
+    ovstage_ordinal_range_t range{};
+    range.has_start_ordinal = false;
+    range.end_ordinal = 2;
 
-    // Enqueue the read. Pass NULL for read_dest so ovrtx allocates internal storage.
-    ovrtx_read_handle_t read_handle = 0;
-    ovrtx_enqueue_result_t eq = ovrtx_read_attribute(renderer_, &binding, nullptr, &read_handle);
-    ASSERT_API_SUCCESS(eq.status);
+    ovstage_read_handle_t read_handle = OVSTAGE_INVALID_READ_HANDLE;
+    ovstage_enqueue_result_t eq = ovstage_read_attributes(
+        stage_, query_handle, &attr_token, 1, range, &read_handle);
+    ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    // Fetch the first (and, for a single-prim scalar read, only) group. The
+    // group's tensor is a DLPack view into the sealed attribute storage —
+    // valid until release_group.
+    ovstage_read_group_t group{};
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+              OVSTAGE_OK)
+        << format_ovstage_last_error();
+    ASSERT_GT(group.data.tensor_count, 0u);
+    uint32_t value = *static_cast<uint32_t const*>(group.data.tensors[0].data);
 
-    // Fetch the DLPack tensor(s). Scalar reads produce buffer_count == 1 with
-    // shape [prim_count].
-    ovrtx_read_output_t output{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_read_result(renderer_, read_handle, ovrtx_timeout_infinite, &output).status);
-    ASSERT_EQ(output.buffer_count, 1u);
-    ASSERT_EQ(output.prim_count, 1u);
-
-    DLTensor const& t = output.buffers[0].dl;
-    uint32_t value = *static_cast<uint32_t const*>(t.data);
-
-    // Release the read result when done. The output pointers are invalidated.
-    ovrtx_cuda_sync_t no_sync{};
-    ASSERT_API_SUCCESS(ovrtx_release_read_result(renderer_, output.map_handle, no_sync).status);
+    // Release the fetched storage (synchronous) then the read handle (async;
+    // the release is per-handle-ordered so any in-flight fetch drains first).
+    ovstage_release_group(stage_, &group);
+    ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-read-attribute-scalar-c]
 
     EXPECT_EQ(value, 17u);
+
+    ovstage_release_query(stage_, query_handle);
+    path_dictionary_release_path_list_reference(pd, path_list);
 }
 
 TEST_F(AttributeReadTest, ReadArrayAttribute) {
-    load_base();
+    docs_load_base();
+    if (HasFatalFailure()) return;
+
+    // Setup: single-prim query on /World/Plane and the "points" token.
+    path_dictionary_instance_t* pd = ovstage_get_path_dictionary(stage_);
+    ASSERT_NE(pd, nullptr);
+
+    ovx_string_t prim_path = ovx_str("/World/Plane");
+    ovx_primpath_list_t path_list{};
+    ASSERT_EQ(path_dictionary_create_path_list_from_strings(pd, &prim_path, 1, &path_list).status,
+              OVX_API_SUCCESS);
+
+    ovstage_query_handle_t query_handle = OVSTAGE_INVALID_QUERY_HANDLE;
+    ASSERT_EQ(ovstage_query_from_path_list(stage_, path_list, &query_handle), OVSTAGE_OK)
+        << format_ovstage_last_error();
+
+    ovx_string_t attr_name = ovx_str("points");
+    ovx_token_t attr_token{};
+    ASSERT_EQ(path_dictionary_create_tokens_from_strings(pd, &attr_name, 1, &attr_token).status,
+              OVX_API_SUCCESS);
 
     // [snippet:doc-read-array-attribute-c]
-    // Array attributes are variable-length per prim. The dtype in the binding
-    // is (code, bits, lanes) — lanes expresses multi-component element types.
-    // `points` is float3[], so request float32 with lanes=3: one element per
-    // point, three lanes per point. Override is_array=true (the helper default
-    // is false).
-    ovx_string_t prim = ovx_str("/World/Plane");
-    DLDataType point3f_type = {kDLFloat, 32, 3};
-    ovrtx_binding_desc_or_handle_t binding = ovrtx_make_binding_desc(
-        &prim, 1, ovx_str("points"), OVRTX_SEMANTIC_NONE, point3f_type);
-    binding.binding_desc.attribute_type.is_array = true;
+    // Array attributes are variable-length per prim. Read semantics are the
+    // same as for scalars — enqueue, wait, fetch — but the DLTensor's shape
+    // reflects the per-prim element count; for `points` (float3 array) the
+    // dtype.lanes carries the tuple width and the leading shape dim carries
+    // the element (point) count.
+    ovstage_ordinal_range_t range{};
+    range.has_start_ordinal = false;
+    range.end_ordinal = 1;
 
-    ovrtx_read_handle_t read_handle = 0;
-    ovrtx_enqueue_result_t eq = ovrtx_read_attribute(renderer_, &binding, nullptr, &read_handle);
-    ASSERT_API_SUCCESS(eq.status);
+    ovstage_read_handle_t read_handle = OVSTAGE_INVALID_READ_HANDLE;
+    ovstage_enqueue_result_t eq = ovstage_read_attributes(
+        stage_, query_handle, &attr_token, 1, range, &read_handle);
+    ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    ovstage_read_group_t group{};
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+              OVSTAGE_OK)
+        << format_ovstage_last_error();
+    ASSERT_GT(group.data.tensor_count, 0u);
+    ASSERT_TRUE(group.is_array);
 
-    // For arrays the output has one tensor per prim (buffer_count == prim_count).
-    ovrtx_read_output_t output{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_read_result(renderer_, read_handle, ovrtx_timeout_infinite, &output).status);
-    ASSERT_TRUE(output.is_array);
-    ASSERT_EQ(output.prim_count, 1u);
-    ASSERT_EQ(output.buffer_count, 1u);
-
-    DLTensor const& t = output.buffers[0].dl;
-    // The Plane has 4 float3 points. The C API returns lane-based attribute
-    // tensors, so this is shape=[4], dtype={kDLFloat, 32, 3}.
-    ASSERT_EQ(t.ndim, 1);
-    ASSERT_EQ(t.shape[0], 4);
+    DLTensor const& t = group.data.tensors[0];
+    // ovrtx-test-base-geometry.usda authors 4 float3 points on the Plane.
     ASSERT_EQ(t.dtype.code, kDLFloat);
     ASSERT_EQ(t.dtype.bits, 32u);
     ASSERT_EQ(t.dtype.lanes, 3u);
+    ASSERT_EQ(t.ndim, 1);
+    ASSERT_EQ(t.shape[0], 4);
     int64_t element_count = t.shape[0] * t.dtype.lanes;
 
-    ovrtx_cuda_sync_t no_sync{};
-    ASSERT_API_SUCCESS(ovrtx_release_read_result(renderer_, output.map_handle, no_sync).status);
+    ovstage_release_group(stage_, &group);
+    ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-read-array-attribute-c]
 
     EXPECT_EQ(element_count, 12);
+
+    ovstage_release_query(stage_, query_handle);
+    path_dictionary_release_path_list_reference(pd, path_list);
 }

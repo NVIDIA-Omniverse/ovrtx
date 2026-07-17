@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 
 TEST_BASE_PATH = str((Path(__file__).parent / "../data/ovrtx-test-base.usda").resolve())
 SEMANTIC_LABELS_PATH = str(
@@ -89,14 +90,16 @@ def _decode_semantic_id_map(tensor: np.ndarray) -> dict[int, str]:
     return labels_by_id
 
 
-def test_semantic_class_labels_are_rendered(renderer):
+def test_semantic_class_labels_are_rendered(renderer, stage):
     """Set semantic class labels and verify their rendered semantic IDs."""
-    renderer.open_usd_from_string(SEMANTIC_CLASS_USDA)
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, SEMANTIC_CLASS_USDA, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     for _ in range(5):
-        renderer.step(render_products={RENDER_PRODUCT_PATH}, delta_time=1.0 / 60.0)
+        renderer.step(render_products={RENDER_PRODUCT_PATH}, delta_time=1.0 / 60.0, ordinal=ordinal)
 
-    products = renderer.step(render_products={RENDER_PRODUCT_PATH}, delta_time=1.0 / 60.0)
+    products = renderer.step(render_products={RENDER_PRODUCT_PATH}, delta_time=1.0 / 60.0, ordinal=ordinal)
     frame = products[RENDER_PRODUCT_PATH].frames[0]
 
     semantic_id_map = _decode_semantic_id_map(_map_render_var(frame, "SemanticIdMap"))

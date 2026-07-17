@@ -41,7 +41,7 @@ Click any example image to enlarge it.
            - RGBA
            - uint8
            - ``(H, W, 4)``
-           - Tone-mapped color in sRGB space. Standard "final image" output suitable for display or saving as PNG/JPEG.
+           - Tone-mapped color in sRGB space. Standard final image output suitable for display or saving as PNG/JPEG.
            - .. image:: ../../img/aovs/rt2/LdrColor.avif
                 :width: 100%
          * - ``HdrColor``

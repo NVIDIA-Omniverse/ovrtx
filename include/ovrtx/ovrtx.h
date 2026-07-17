@@ -10,7 +10,32 @@
 #ifndef OVRTX_H
 #define OVRTX_H
 
+#ifndef OVRTX_DEPRECATED
+#    if defined(__cplusplus) && __cplusplus >= 201402L
+#        define OVRTX_DEPRECATED(msg) [[deprecated(msg)]]
+#    elif defined(__GNUC__) || defined(__clang__)
+#        define OVRTX_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#    elif defined(_MSC_VER)
+#        define OVRTX_DEPRECATED(msg) __declspec(deprecated(msg))
+#    else
+#        define OVRTX_DEPRECATED(msg)
+#    endif
+#endif
+
 #include "ovrtx_types.h"
+
+/* Opaque forward declarations for ovstage interop parameters. Full definitions
+ * live in <ovstage/ovstage_api/ovstage_api_types.h> (included transitively
+ * from <ovstage/ovstage.h>). Token-identical to those definitions so both
+ * headers can coexist in the same translation unit in either include order. */
+#ifndef OVSTAGE_ORDINAL_T_DECLARED
+#define OVSTAGE_ORDINAL_T_DECLARED
+typedef uint64_t ovstage_ordinal_t;
+#endif
+#ifndef OVSTAGE_INSTANCE_T_DECLARED
+#define OVSTAGE_INSTANCE_T_DECLARED
+typedef struct ovstage_instance_t ovstage_instance_t;
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -69,21 +94,23 @@ extern "C"
      */
 
     /**
-     * Register ovrtx's USD schema and plugin discovery paths with the process's USD plugin
-     * search environment, without loading USD or initializing the renderer.
+     * Register ovrtx's USD schema/plugin discovery paths and lightweight USD/MDL
+     * environment, without loading USD or initializing the renderer.
      *
      * This is intended for applications that share an OpenUSD runtime between multiple
-     * subsystems (for example ovrtx and ovphysx). USD's schema registry is populated only
-     * once for the process, so every subsystem that contributes schema/plugin paths must
-     * have published them before the registry is first consulted (typically when the first
-     * stage is opened). Each subsystem calls its own equivalent (e.g.
+     * subsystems (for example ovrtx and ovphysx). USD's schema registry and several
+     * TfEnvSettings are populated only once for the process, so every subsystem that
+     * contributes schema/plugin paths or USD-facing path environment must publish them
+     * before the registry is first consulted (typically when the first stage is opened).
+     * Each subsystem calls its own equivalent (e.g.
      * `ovphysx_prepare_usd_plugins()`, `ovrtx_register_schema_paths(...)`) before any of
      * them initialize, after which the order of initialize calls no longer matters.
      *
      * Binary package root resolution (highest precedence first):
      *  1. The `OMNI_USD_PLUGINS_BASE_PATH` environment variable, if set.
      *  2. `OVRTX_CONFIG_BINARY_PACKAGE_ROOT_PATH` from @p config, if @p config is non-null
-     *     and contains that entry.
+     *     and contains that entry. The path may include @ref OVX_CONFIG_EXECUTABLE_DIR_TOKEN,
+     *     which the loader substitutes with the absolute directory of the running executable.
      *  3. The directory of the loaded ovrtx loader library (default).
      *
      * @param config Optional configuration (may be NULL). When non-null, the
@@ -94,6 +121,11 @@ extern "C"
      *
      * Notes:
      * - Safe to call before @ref ovrtx_initialize() and before @ref ovrtx_create_renderer().
+     * - Also publishes the same process environment that the ovrtx loader sets before
+     *   loading ovrtx.dylib (Hydra/USD toggles, MDL search paths, MaterialX search
+     *   paths, and resolver MDL-bypass env). If dev/test settings were queued via
+     *   `OVRTX_EXTENSION_APPLY_SETTINGS`, only the path settings needed for this
+     *   lightweight USD environment are consumed here.
      * - Idempotent for matching roots: the first call performs registration; subsequent
      *   calls with the same effective root are no-ops.
      * - **First-call wins.** Once schema/plugin paths have been registered against an
@@ -104,8 +136,9 @@ extern "C"
      *   system reads it once during static initialization).
      * - Calling this after USD has already been loaded and the schema registry populated
      *   has no retroactive effect on previously-discovered schemas.
-     * - This function does not allocate the ovrtx system; it only adjusts process-global
-     *   environment used by USD's plugin discovery.
+     * - This function does not allocate the ovrtx system, start Carbonite, load renderer
+     *   plugins, or apply general Carb settings; it only adjusts process-global
+     *   environment used by USD discovery and USD-facing MDL/MaterialX setup.
      *
      * @return Always **OVRTX_API_SUCCESS**. This API does not surface failure through
      *         the return code or @ref ovrtx_get_last_error(); a mismatched root logs a
@@ -168,6 +201,62 @@ extern "C"
      */
     ovrtx_result_t ovrtx_destroy_renderer(ovrtx_renderer_t* renderer);
 
+    /**
+     * Attach an externally-owned ovstage instance to this renderer. While
+     * attached, the renderer renders the scene held by that ovstage instead of
+     * one it builds itself.
+     *
+     * Must be called before the first step, and matched by ovrtx_detach_ovstage()
+     * before either the renderer or the stage is destroyed. Re-attaching or
+     * swapping the attached stage is not currently supported.
+     *
+     * Use ovrtx_update_from_stage() after ovstage population work and
+     * ovrtx_step_with_stage() to render a committed stage state.
+     *
+     * @param renderer Renderer instance from ovrtx_create_renderer().
+     * @param stage ovstage instance to attach. Must be initialized.
+     * @return
+     * - **OVRTX_API_SUCCESS** if the renderer was attached successfully,
+     * - **OVRTX_API_ERROR** if the renderer is already attached, the stage is
+     *   invalid, or the attach failed.
+     */
+    ovrtx_result_t ovrtx_attach_ovstage(ovrtx_renderer_t* renderer,
+                                         ovstage_instance_t* stage);
+
+    /**
+     * Detach a previously-attached ovstage instance from this renderer.
+     *
+     * The renderer returns to standalone mode and no longer renders data from
+     * the detached stage.
+     *
+     * Attaching a different stage after detach is not currently supported.
+     *
+     * @param renderer Renderer instance previously passed to ovrtx_attach_ovstage().
+     * @return
+     * - **OVRTX_API_SUCCESS** if the renderer was detached successfully,
+     * - **OVRTX_API_ERROR** if the renderer is not currently attached, or the
+     *   detach failed.
+     */
+    ovrtx_result_t ovrtx_detach_ovstage(ovrtx_renderer_t* renderer);
+
+    /**
+     * Enqueue an update of the renderer's internal state from the attached
+     * ovstage at the given ordinal. Only valid while attached.
+     *
+     * The stage must have committed at least once and stage_ordinal must not
+     * exceed its write floor. Call this before ovrtx_step_with_stage() so the
+     * renderer observes a stable committed snapshot.
+     *
+     * @param renderer Renderer instance.
+     * @param stage_ordinal Ordinal on the attached stage to update from. Must
+     *                      be <= the attached stage's write floor.
+     * @return
+     * - **OVRTX_API_SUCCESS** if the update was enqueued.
+     * - **OVRTX_API_ERROR** if no stage is attached or the enqueue failed.
+     */
+    ovrtx_enqueue_result_t ovrtx_update_from_stage(ovrtx_renderer_t* renderer,
+                                                   ovstage_ordinal_t stage_ordinal);
+
     /** @} */ // end of ovrtx_creation
 
     /** @defgroup ovrtx_stage_building Stage building operations
@@ -189,6 +278,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the operation was enqueued successfully.
      * - **OVRTX_API_ERROR** if the operation was not enqueued successfully.
      */
+    OVRTX_DEPRECATED("Use ovstage_population_open_usd_from_file and render via ovrtx_attach_ovstage / ovrtx_step_with_stage.")
     ovrtx_enqueue_result_t ovrtx_open_usd_from_file(ovrtx_renderer_t* instance,
                                                      ovx_string_t file_name);
 
@@ -204,6 +294,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the operation was enqueued successfully.
      * - **OVRTX_API_ERROR** if the operation was not enqueued successfully.
      */
+    OVRTX_DEPRECATED("Use ovstage_population_open_usd_from_string and render via ovrtx_attach_ovstage / ovrtx_step_with_stage.")
     ovrtx_enqueue_result_t ovrtx_open_usd_from_string(ovrtx_renderer_t* instance,
                                                        ovx_string_t root_layer_content);
 
@@ -227,6 +318,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the operation was enqueued successfully.
      * - **OVRTX_API_ERROR** if the operation was not enqueued successfully, or if an execution error occurs in sync mode.
      */
+    OVRTX_DEPRECATED("Use ovstage_population_add_usd_reference_from_file followed by ovstage_population_apply_usd_changes.")
     ovrtx_enqueue_result_t ovrtx_add_usd_reference_from_file(ovrtx_renderer_t* instance,
                                                               ovx_string_t layer_file,
                                                               ovx_string_t prefix_path,
@@ -252,6 +344,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the operation was enqueued successfully.
      * - **OVRTX_API_ERROR** if the operation was not enqueued successfully, or if an execution error occurs in sync mode.
      */
+    OVRTX_DEPRECATED("Use ovstage_population_add_usd_reference_from_string followed by ovstage_population_apply_usd_changes.")
     ovrtx_enqueue_result_t ovrtx_add_usd_reference_from_string(ovrtx_renderer_t* instance,
                                                                 ovx_string_t layer_content,
                                                                 ovx_string_t prefix_path,
@@ -266,6 +359,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the usd file was removed successfully,
      * - **OVRTX_API_ERROR** if the usd file removal failed.
      */
+    OVRTX_DEPRECATED("Use ovstage_population_remove_usd_reference followed by ovstage_population_apply_usd_changes.")
     ovrtx_enqueue_result_t ovrtx_remove_usd(ovrtx_renderer_t* instance,
                                             ovrtx_usd_handle_t add_usd_handle);
 
@@ -282,6 +376,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the path was cloned successfully,
      * - **OVRTX_API_ERROR** if the path cloning failed.
      */
+    OVRTX_DEPRECATED("Use ovstage_clone(instance, source_path, target_paths, num_target_paths, ordinal) on the attached ovstage instance, then advance the write floor and render via ovrtx_update_from_stage / ovrtx_step_with_stage.")
     ovrtx_enqueue_result_t ovrtx_clone_usd(ovrtx_renderer_t* instance,
                                            ovx_string_t source_path_in_usd,
                                            const ovx_string_t* target_paths,
@@ -294,6 +389,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the stage was reset successfully,
      * - **OVRTX_API_ERROR** if the stage reset failed.
      */
+    OVRTX_DEPRECATED("Use ovstage_population_reset_usd followed by ovstage_population_apply_usd_changes.")
     ovrtx_enqueue_result_t ovrtx_reset_stage(ovrtx_renderer_t* instance);
 
     /**
@@ -305,6 +401,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the stage was updated from the USD time successfully,
      * - **OVRTX_API_ERROR** if the stage update from USD time failed.
      */
+    OVRTX_DEPRECATED("Use ovstage_population_apply_usd_time.")
     ovrtx_enqueue_result_t ovrtx_update_stage_from_usd_time(ovrtx_renderer_t* instance, double usd_time);
 
     /** @} */ // end of ovrtx_stage_building
@@ -338,6 +435,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the attribute was written successfully,
      * - **OVRTX_API_ERROR** if the attribute write failed.
      */
+    OVRTX_DEPRECATED("Attribute writes should now be performed on an ovstage instance via ovstage_write_attribute; first obtain a query handle with ovstage_query or ovstage_query_from_path_list.")
     ovrtx_enqueue_result_t ovrtx_write_attribute(ovrtx_renderer_t* instance,
                                                 const ovrtx_binding_desc_or_handle_t* binding_handle_or_desc,
                                                 const ovrtx_input_buffer_t* data_array,
@@ -358,6 +456,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the attribute was mapped successfully,
      * - **OVRTX_API_ERROR** if the attribute mapping failed.
      */
+    OVRTX_DEPRECATED("Attribute mapping should now be performed on an ovstage instance via ovstage_map_attribute and ovstage_fetch_map_next; first obtain a query handle with ovstage_query or ovstage_query_from_path_list.")
     ovrtx_result_t ovrtx_map_attribute(ovrtx_renderer_t* instance,
                                         const ovrtx_binding_desc_or_handle_t* binding_handle_or_desc,
                                         ovrtx_mapping_desc_t mapping_desc,
@@ -380,6 +479,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the attribute was unmapped successfully,
      * - **OVRTX_API_ERROR** if the attribute unmap failed.
      */
+    OVRTX_DEPRECATED("Unmap committed attribute writes on an ovstage instance via ovstage_unmap_attribute or ovstage_unmap_group.")
     ovrtx_enqueue_result_t ovrtx_unmap_attribute(ovrtx_renderer_t* instance,
                                                 ovrtx_map_handle_t map_handle,
                                                 ovrtx_cuda_sync_t cuda_sync);
@@ -396,6 +496,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the attribute binding was created successfully,
      * - **OVRTX_API_ERROR** if the attribute binding creation failed.
      */
+    OVRTX_DEPRECATED("Persistent attribute bindings have no direct ovstage equivalent; obtain a reusable query handle with ovstage_query or ovstage_query_from_path_list instead.")
     ovrtx_enqueue_result_t ovrtx_create_attribute_binding(ovrtx_renderer_t* instance,
                                                             const ovrtx_binding_desc_t* description,
                                                             ovrtx_attribute_binding_handle_t* out_attribute_binding_handle);
@@ -408,6 +509,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the attribute binding was destroyed successfully,
      * - **OVRTX_API_ERROR** if the attribute binding destruction failed.
      */
+    OVRTX_DEPRECATED("Release a query handle on an ovstage instance via ovstage_release_query.")
     ovrtx_enqueue_result_t ovrtx_destroy_attribute_binding(ovrtx_renderer_t* instance,
                                                         ovrtx_attribute_binding_handle_t binding_handle);
 
@@ -443,6 +545,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the read was enqueued successfully,
      * - **OVRTX_API_ERROR** if the read failed to enqueue.
      */
+    OVRTX_DEPRECATED("Attribute reads should now be performed on an ovstage instance via ovstage_read_attributes; first obtain a query handle with ovstage_query or ovstage_query_from_path_list.")
     ovrtx_enqueue_result_t ovrtx_read_attribute(ovrtx_renderer_t* instance,
                                                 const ovrtx_binding_desc_or_handle_t* binding_handle_or_desc,
                                                 const ovrtx_read_dest_t* read_dest,
@@ -461,7 +564,8 @@ extern "C"
      * a 4x4 double matrix attribute for N prims is shape [N] with lanes=16.
      * When a destination tensor was provided to @ref ovrtx_read_attribute(), buffer_count is 0.
      *
-     * All pointers in the output are valid until @ref ovrtx_release_read_result() is called.
+     * All pointers in the output are valid until @ref ovrtx_release_read_result() is called
+     * with the same read handle.
      *
      * @param instance Renderer instance
      * @param read_handle Handle obtained from @ref ovrtx_read_attribute()
@@ -472,27 +576,31 @@ extern "C"
      * - **OVRTX_API_ERROR** if the fetch failed,
      * - **OVRTX_API_TIMEOUT** if the result could not be obtained within the timeout.
      */
+    OVRTX_DEPRECATED("Fetch read results on an ovstage instance via ovstage_fetch_read_next; release each group with ovstage_release_group.")
     ovrtx_result_t ovrtx_fetch_read_result(ovrtx_renderer_t* instance,
                                            ovrtx_read_handle_t read_handle,
                                            ovrtx_timeout_t timeout,
                                            ovrtx_read_output_t* out_read_output);
 
     /**
-     * Release resources from a prior @ref ovrtx_fetch_read_result().
+     * Release resources associated with a prior @ref ovrtx_read_attribute().
      *
-     * After this call all pointers in the previously returned @ref ovrtx_read_output_t
+     * Safe to call whether or not @ref ovrtx_fetch_read_result() was invoked first;
+     * use this to clean up after errors or when the fetched output is no longer needed.
+     * After this call all pointers in any previously returned @ref ovrtx_read_output_t
      * become invalid.
      *
      * @param instance Renderer instance
-     * @param map_handle Handle from @ref ovrtx_read_output_t::map_handle
+     * @param read_handle Handle from @ref ovrtx_read_attribute()
      * @param before_destroy_cuda_sync Optional CUDA synchronization to wait for before
      *                                  freeing GPU resources (zero-initialized = no sync)
      * @return
      * - **OVRTX_API_SUCCESS** if the result was released successfully,
      * - **OVRTX_API_ERROR** if the release failed.
      */
+    OVRTX_DEPRECATED("Release read resources on an ovstage instance via ovstage_release_read; also call ovstage_release_group for any groups previously fetched with ovstage_fetch_read_next.")
     ovrtx_result_t ovrtx_release_read_result(ovrtx_renderer_t* instance,
-                                             ovrtx_read_map_handle_t map_handle,
+                                             ovrtx_read_handle_t read_handle,
                                              ovrtx_cuda_sync_t before_destroy_cuda_sync);
 
     /** @} */ // end of ovrtx_attribute_read
@@ -515,6 +623,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the query was enqueued successfully,
      * - **OVRTX_API_ERROR** if the query failed to enqueue.
      */
+    OVRTX_DEPRECATED("Stage queries should now be performed on an ovstage instance via ovstage_query.")
     ovrtx_enqueue_result_t ovrtx_query_prims(ovrtx_renderer_t* instance,
                                              const ovrtx_query_desc_t* query_desc,
                                              ovrtx_query_handle_t* out_query_handle);
@@ -541,6 +650,7 @@ extern "C"
      * - **OVRTX_API_ERROR** if the retrieval failed,
      * - **OVRTX_API_TIMEOUT** if the result could not be obtained within the timeout.
      */
+    OVRTX_DEPRECATED("Fetch query results on an ovstage instance via ovstage_fetch_query_result.")
     ovrtx_result_t ovrtx_fetch_query_results(ovrtx_renderer_t* instance,
                                              ovrtx_query_handle_t query_handle,
                                              ovrtx_timeout_t timeout,
@@ -561,6 +671,7 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the results were released successfully,
      * - **OVRTX_API_ERROR** if the release failed.
      */
+    OVRTX_DEPRECATED("Release query results on an ovstage instance via ovstage_release_query_result and ovstage_release_query.")
     ovrtx_result_t ovrtx_release_query_results(ovrtx_renderer_t* instance,
                                                ovrtx_query_handle_t query_handle);
 
@@ -617,22 +728,120 @@ extern "C"
                                     ovrtx_step_result_handle_t* out_step_result_handle);
 
     /**
-     * Enqueue a pick query for the next @ref ovrtx_step() that renders the given RenderProduct.
+     * Attached-mode counterpart of @ref ovrtx_step(). Use this while the renderer
+     * is attached to an ovstage via @ref ovrtx_attach_ovstage(): `ordinal` selects
+     * which committed state of the attached instance to render. Selecting a state
+     * that has not been committed yet (i.e. ordinal > the attached stage's write
+     * floor) is rejected.
+     *
+     * @param instance Renderer instance (must be attached to an ovstage).
+     * @param render_products Render products to simulate during this step.
+     * @param delta_time Time step to simulate.
+     * @param ordinal ovstage ordinal selecting the committed state to render.
+     * @param out_step_result_handle [out] Handle to the step result.
+     * @return
+     * - **OVRTX_API_SUCCESS** if the step was enqueued successfully,
+     * - **OVRTX_API_ERROR** if the renderer is not attached, the ordinal is not
+     *   committed, or the enqueue failed.
+     */
+    ovrtx_enqueue_result_t ovrtx_step_with_stage(
+        ovrtx_renderer_t* instance,
+        ovrtx_render_product_set_t render_products,
+        double delta_time,
+        ovstage_ordinal_t ordinal,
+        ovrtx_step_result_handle_t* out_step_result_handle);
+
+    /**
+     * Enqueue an NDC-space pick query for the next @ref ovrtx_step() that renders the given RenderProduct.
      * Results appear as the multi-tensor render variable @ref OVRTX_RENDER_VAR_PICK_HIT, with
      * named CPU tensors (``primPath``, ``objectType``, ``geometryInstanceId``, ``worldPositionM``,
      * ``worldNormal``) and ``uint32`` params (``magic`` = @ref OVRTX_PICK_HIT_MAGIC, ``version`` =
      * @ref OVRTX_PICK_HIT_VERSION, ``hitCount``). The ``primPath`` column stores @ref ovx_primpath_t
-     * ids; resolve strings via @ref ovrtx_get_path_dictionary() if needed. If multiple queries are
-     * enqueued for the same RenderProduct before a step, the last one wins.
+     * ids; resolve strings via @ref ovrtx_get_path_dictionary() if needed. The query rectangle is
+     * specified in normalized RenderProduct coordinates using [0, 1] top-left-origin NDC. It uses the same
+     * convention as the old pixel API: right/bottom mark the edge just past the last included pixel. For
+     * example, pixel (x, y) on a width x height RenderProduct is [x / width, y / height, (x + 1) / width,
+     * (y + 1) / height]; the full RenderProduct is [0, 0, 1, 1]. Out-of-bounds values are rejected
+     * (boundary values may be clamped to the valid range to account for floating-point roundoff). If
+     * multiple queries are enqueued for the same RenderProduct before a step, the last one wins.
      */
     ovrtx_enqueue_result_t ovrtx_enqueue_pick_query(ovrtx_renderer_t* instance,
                                                     const ovrtx_pick_query_desc_t* desc);
 
     /**
+     * Set per-prim selection outline group ids for renderer-side outline drawing.
+     *
+     * Group ids are uint8 (0..255). Group 0 clears selection outline state for a prim;
+     * non-zero group ids select the style configured by @ref ovrtx_set_selection_group_styles.
+     * @p prim_path_ids must be @ref ovx_primpath_t values from this renderer's
+     * own path dictionary, as returned by @ref ovrtx_get_path_dictionary(), or
+     * from this renderer's pick-hit results. Path ids from any other path
+     * dictionary are invalid. @p prim_path_ids and @p group_ids are parallel
+     * arrays of length @p path_count.
+     * Duplicate prim path ids are allowed; the last occurrence wins.
+     *
+     * The operation is renderer-only and stream-ordered: it does not write to Fabric
+     * or an attached ovstage, and it takes effect on the next @ref ovrtx_step or
+     * @ref ovrtx_step_with_stage that occurs after this op completes.
+     */
+    ovrtx_enqueue_result_t ovrtx_set_selection_outline_group(ovrtx_renderer_t* instance,
+                                                             const ovx_primpath_t* prim_path_ids,
+                                                             size_t path_count,
+                                                             const uint8_t* group_ids);
+
+    /**
+     * Set per-prim selection outline group ids using string prim paths.
+     *
+     * This is a convenience wrapper for callers that do not already have renderer path ids.
+     * @p prim_paths and @p group_ids are parallel arrays of length @p path_count.
+     * Duplicate prim paths are allowed; the last occurrence wins.
+     *
+     * Group ids, stream ordering, and renderer-only state semantics match
+     * @ref ovrtx_set_selection_outline_group.
+     */
+    ovrtx_enqueue_result_t ovrtx_set_selection_outline_group_strings(ovrtx_renderer_t* instance,
+                                                                     const ovx_string_t* prim_paths,
+                                                                     size_t path_count,
+                                                                     const uint8_t* group_ids);
+
+    /**
+     * Set per-prim pickability for renderer viewport picking.
+     *
+     * @p prim_path_ids must be @ref ovx_primpath_t values from this renderer's
+     * own path dictionary, as returned by @ref ovrtx_get_path_dictionary(), or
+     * from this renderer's pick-hit results. Path ids from any other path
+     * dictionary are invalid. @p prim_path_ids and @p pickable are parallel
+     * arrays of length @p path_count.
+     * False excludes a prim from viewport picking where supported.
+     *
+     * The operation is renderer-only and stream-ordered: it does not write to Fabric
+     * or an attached ovstage, and it takes effect on the next @ref ovrtx_step or
+     * @ref ovrtx_step_with_stage that occurs after this op completes.
+     */
+    ovrtx_enqueue_result_t ovrtx_set_pickable(ovrtx_renderer_t* instance,
+                                              const ovx_primpath_t* prim_path_ids,
+                                              size_t path_count,
+                                              const bool* pickable);
+
+    /**
+     * Set per-prim pickability using string prim paths.
+     *
+     * This is a convenience wrapper for callers that do not already have renderer path ids.
+     * @p prim_paths and @p pickable are parallel arrays of length @p path_count.
+     *
+     * Pickability, stream ordering, and renderer-only state semantics match
+     * @ref ovrtx_set_pickable.
+     */
+    ovrtx_enqueue_result_t ovrtx_set_pickable_strings(ovrtx_renderer_t* instance,
+                                                      const ovx_string_t* prim_paths,
+                                                      size_t path_count,
+                                                      const bool* pickable);
+
+    /**
      * Set per-group visual styling (outline color and fill color) for one or more selection groups.
      *
-     * Group ids are uint8 (0..255) and match the value written to a prim's
-     * @c omni:selectionOutlineGroup attribute (see @ref OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP).
+     * Group ids are uint8 (0..255) and match the per-prim group id passed to
+     * @ref ovrtx_set_selection_outline_group.
      * @p group_ids and @p styles are parallel arrays of length @p count.
      *
      * The operation is stream-ordered: it takes effect on the next @ref ovrtx_step that occurs

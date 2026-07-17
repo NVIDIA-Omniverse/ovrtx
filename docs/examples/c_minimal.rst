@@ -11,17 +11,17 @@
 C: Minimal Example
 ==================
 
-This example shows basic initialization of the renderer, rendering a single frame from an RGB camera, mapping the output and writing the result to disk as a PNG.
+This example shows basic initialization of the renderer, rendering a single frame from an RGB camera, mapping the output, and writing the result to disk as a PNG.
 
-The example loads an example scene from S3 and writes the resulting image to ``out.png``.
+The example loads a remote S3 scene asset and writes the resulting image to ``out.png``. Runtime validation requires internet access to download that scene asset.
 
-The first time you run the example, the driver compiles and caches shaders. Subsequent runs are much faster.
+The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
 
 .. pull-quote::
 
    *“Create the smallest useful C/C++ example that initializes ovrtx, loads a USD scene asynchronously, waits for it, renders one camera frame, fetches and CPU-maps the color output, writes it to an image file, and releases all ovrtx resources explicitly.”*
 
-.. image:: ../../img/out.jpg
+.. image:: ../../img/example-minimal.jpg
    :alt: Minimal example output
    :align: center
 
@@ -36,9 +36,11 @@ Build and Run
 
       .. code-block:: bash
 
-         sudo apt install build-essential cmake
+         sudo apt-get install build-essential cmake
 
-      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available via ``CMAKE_PREFIX_PATH``, the local installation is used instead.
+      Runtime requires an NVIDIA RTX-capable GPU, a supported NVIDIA driver, internet access to download the remote S3 scene asset, and unsandboxed execution.
+
+      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available through ``CMAKE_PREFIX_PATH``, the local installation is used instead.
 
       **Building**
 
@@ -58,8 +60,12 @@ Build and Run
       **Prerequisites**
 
       - `Visual Studio 2017+ <https://visualstudio.microsoft.com/downloads/>`_
+      - NVIDIA RTX-capable GPU
+      - Supported NVIDIA driver
+      - Internet access to download the remote S3 scene asset
+      - Unsandboxed runtime execution
 
-      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available via ``CMAKE_PREFIX_PATH``, the local installation is used instead.
+      The ovrtx library is downloaded automatically at configure time. If ovrtx is already installed and available through ``CMAKE_PREFIX_PATH``, the local installation is used instead.
 
       **Building**
 
@@ -72,7 +78,7 @@ Build and Run
 
       .. code-block:: pwsh
 
-         .\build\Release\minimal
+         .\build\Release\minimal.exe
 
 Licensing
 ---------

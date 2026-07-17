@@ -43,6 +43,10 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 - Use an ovrtx checkout that contains the referenced examples and docs tests.
 - Read the relevant `> **Source:**` snippet before writing or explaining API usage.
+- Validate ovrtx workflows only on a machine with an NVIDIA RTX-capable GPU, a supported NVIDIA driver listed in `docs/driver_requirements.rst`, and unsandboxed runtime execution.
+- If NVIDIA driver detection fails, the driver is inaccessible, or the detected version is older than the relevant baseline in `docs/driver_requirements.rst`, rerun validation outside the sandbox. If the driver is still missing or incompatible, stop runtime validation and tell the user they need a supported NVIDIA driver.
+- For the repository minimal examples, require internet access because the scene is loaded from S3.
+- Python 3.10-3.13 are supported.
 - For code changes, preserve renderer lifecycle ordering and cleanup semantics for the selected language.
 
 ## Instructions
@@ -69,6 +73,18 @@ This skill has no scripts.
 ## Overview
 
 Every ovrtx application follows the same core lifecycle, whether in Python or C. This skill gives the high-level sequence and points to the detailed skill for each step.
+
+## Runtime Verification
+
+Run the minimal example first when validating an ovrtx environment:
+
+| Path | Command | Success signal |
+|------|---------|----------------|
+| Python minimal | `cd examples/python/minimal && uv run main.py --png` | Writes `_output/render.png`; compare it to `img/example-minimal.jpg`. |
+| C minimal (Linux) | `cd examples/c/minimal && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ./build/minimal` | Writes `out.png`; compare it to `img/example-minimal.jpg`. |
+| C minimal (Windows) | `cd examples/c/minimal && cmake -B build && cmake --build build --config Release && .\build\Release\minimal.exe` | Writes `out.png`; compare it to `img/example-minimal.jpg`. |
+
+Do not claim runtime validation from parse-only checks, docs-only checks, or execution on a host without a supported RTX GPU and driver.
 
 ## Key Concepts
 
@@ -150,6 +166,15 @@ Key implications for agents:
 - In Python, the synchronous API (`open_usd`, `step`, `clone_usd`) handles waiting internally. Use the `_async` variants for explicit control.
 - For best performance in animation loops, use **attribute bindings** (see `attribute-bindings` skill) or **mapping** (see `mapping-attributes` skill) instead of per-frame `write_attribute` calls.
 - See `error-handling` skill for robust error checking patterns in both languages.
+
+## In Attached Mode (ovrtx 0.4+)
+
+The renderer-owned scene operations described for standalone mode are deprecated in
+0.4. For current code, manage scene data with ovstage, advance its write floor, attach
+it to ovrtx, and call Python `step(..., ordinal=...)` (or the C attached update/step
+pair). Keep the standalone flow only for compatibility work.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
 
 ## References
 

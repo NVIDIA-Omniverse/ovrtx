@@ -9,6 +9,9 @@
 // its affiliates is strictly prohibited.
 
 // Tests for C support APIs that do not naturally fit a workflow-specific test.
+// Loosely mirrors tests/docs/python/test_support_api.py (the Python file also
+// covers async ovstage / renderer-config APIs; C snippets here focus on
+// version + config, ovrtx op-status polling, and get_last_error).
 
 #include <gtest/gtest.h>
 #include "helpers.h"
@@ -16,25 +19,10 @@
 #include <cstdint>
 #include <string>
 
-class SupportApiTest : public ::testing::Test {
+class SupportApiTest : public DocsOvstageTestBase {
 protected:
-    static void SetUpTestSuite() {
-        TestConfig tc("SupportApiTest");
-        ovrtx_result_t result = ovrtx_create_renderer(&tc.config, &renderer_);
-        ASSERT_API_SUCCESS(result.status);
-    }
-
-    static void TearDownTestSuite() {
-        if (renderer_) {
-            ovrtx_destroy_renderer(renderer_);
-            renderer_ = nullptr;
-        }
-    }
-
-    static ovrtx_renderer_t* renderer_;
+    DOCS_OVSTAGE_TEST_SUITE(SupportApiTest)
 };
-
-ovrtx_renderer_t* SupportApiTest::renderer_ = nullptr;
 
 TEST_F(SupportApiTest, VersionAndConfigConstruction) {
     // [snippet:doc-version-and-config-c]
@@ -61,9 +49,13 @@ TEST_F(SupportApiTest, VersionAndConfigConstruction) {
 }
 
 TEST_F(SupportApiTest, QueryOperationStatus) {
-    std::string scene = get_docs_test_data_dir() + "/ovrtx-test-base.usda";
-    ovrtx_enqueue_result_t eq =
-        ovrtx_open_usd_from_file(renderer_, {scene.c_str(), scene.size()});
+    // Populate + seal so ovrtx_update_from_stage has a valid ordinal to
+    // consume. The update enqueues on ovrtx (returning an ovrtx_op_id_t) —
+    // which is what ovrtx_query_op_status accepts.
+    docs_load_base();
+    if (HasFatalFailure()) return;
+
+    ovrtx_enqueue_result_t eq = ovrtx_update_from_stage(renderer_, /*stage_ordinal=*/1);
     ASSERT_API_SUCCESS(eq.status);
 
     // [snippet:doc-query-op-status-c]

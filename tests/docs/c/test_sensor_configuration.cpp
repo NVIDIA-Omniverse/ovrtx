@@ -8,32 +8,22 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// Tests for C code examples in sensor_configuration.rst
+// Tests for C code examples in sensor_configuration.rst. Uses the ovstage
+// attach path (matches tests/docs/python/test_sensor_configuration.py).
 
 #include <gtest/gtest.h>
 #include "helpers.h"
 
+#include <cmath>
 #include <cstring>
 #include <string>
 
-static void assert_wait_ok(ovrtx_renderer_t* renderer,
-                           ovrtx_op_wait_result_t const& wait_result,
-                           char const* context) {
-    if (wait_result.num_error_ops == 0)
-        return;
-    for (size_t i = 0; i < wait_result.num_error_ops; ++i) {
-        ovx_string_t msg = ovrtx_get_last_op_error(wait_result.error_op_ids[i]);
-        ADD_FAILURE() << context << ": op " << wait_result.error_op_ids[i]
-                      << " failed: " << std::string(msg.ptr, msg.length);
-    }
-}
+class SensorConfigurationTest : public DocsOvstageTestBase {
+protected:
+    DOCS_OVSTAGE_TEST_SUITE(SensorConfigurationTest)
+};
 
-TEST(SensorConfiguration, StepMultipleRenderProducts) {
-    TestConfig tc("SensorConfiguration.StepMultipleRenderProducts");
-    ovrtx_renderer_t* renderer = nullptr;
-    ovrtx_result_t result = ovrtx_create_renderer(&tc.config, &renderer);
-    ASSERT_API_SUCCESS(result.status);
-
+TEST_F(SensorConfigurationTest, StepMultipleRenderProducts) {
     std::string scene_path = get_test_data_dir() + "/simple_camera.usda";
     std::string usda = make_sublayer_usda(scene_path, R"usda(
 def "Render" {
@@ -57,13 +47,10 @@ def "Render" {
 }
 )usda");
 
-    ovrtx_enqueue_result_t enqueue_result = ovrtx_open_usd_from_string(renderer, {usda.c_str(), usda.size()});
-    ASSERT_API_SUCCESS(enqueue_result.status);
+    docs_open_usd_string(usda.c_str(), usda.size());
+    if (HasFatalFailure()) return;
 
-    ovrtx_op_wait_result_t wait_result;
-    result = ovrtx_wait_op(renderer, enqueue_result.op_index, ovrtx_timeout_infinite, &wait_result);
-    ASSERT_API_SUCCESS(result.status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    ovstage_ordinal_t ordinal = 1;
 
     // [snippet:doc-step-multiple-render-products-c]
     ovx_string_t rp_paths[] = {
@@ -75,60 +62,55 @@ def "Render" {
     render_products.num_render_products = 2;
 
     ovrtx_step_result_handle_t step_handle = 0;
-    enqueue_result = ovrtx_step(renderer, render_products, 1.0 / 60.0, &step_handle);
+    ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
+        renderer_, render_products, 1.0 / 60.0, ordinal, &step_handle);
     // [/snippet:doc-step-multiple-render-products-c]
     ASSERT_API_SUCCESS(enqueue_result.status);
+    docs_wait_no_errors(renderer_, enqueue_result.op_index);
+    ovrtx_destroy_results(renderer_, step_handle);
 
-    result = ovrtx_wait_op(renderer, enqueue_result.op_index, ovrtx_timeout_infinite, &wait_result);
-    ASSERT_API_SUCCESS(result.status);
-    ASSERT_NO_OP_ERRORS(wait_result);
-    ovrtx_destroy_results(renderer, step_handle);
-
-    enqueue_result = ovrtx_step(renderer, render_products, 1.0 / 60.0, &step_handle);
+    // Second step for pixel-stability sampling.
+    enqueue_result = ovrtx_step_with_stage(
+        renderer_, render_products, 1.0 / 60.0, ordinal, &step_handle);
     ASSERT_API_SUCCESS(enqueue_result.status);
-    result = ovrtx_wait_op(renderer, enqueue_result.op_index, ovrtx_timeout_infinite, &wait_result);
-    ASSERT_API_SUCCESS(result.status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    docs_wait_no_errors(renderer_, enqueue_result.op_index);
 
-    // Fetch and verify we got outputs for both products
     ovrtx_render_product_set_outputs_t outputs{};
-    result = ovrtx_fetch_results(renderer, step_handle, ovrtx_timeout_infinite, &outputs);
+    ovrtx_result_t result =
+        ovrtx_fetch_results(renderer_, step_handle, ovrtx_timeout_infinite, &outputs);
     ASSERT_API_SUCCESS(result.status);
     EXPECT_EQ(outputs.output_count, 2u);
 
-    // Save LdrColor from each render product
     char const* product_names[] = {"FrontCamera", "RearCamera"};
     ovrtx_map_output_description_t map_desc = {};
     map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
     ovrtx_cuda_sync_t no_sync = {};
     for (size_t i = 0; i < outputs.output_count; ++i) {
-        ovrtx_render_var_output_handle_t ldr_handle = find_product_output(outputs.outputs[i], "LdrColor");
+        ovrtx_render_var_output_handle_t ldr_handle =
+            find_product_output(outputs.outputs[i], "LdrColor");
         if (ldr_handle != OVRTX_INVALID_HANDLE) {
             ovrtx_render_var_output_t ldr_output = {};
-            ovrtx_result_t map_result = ovrtx_map_render_var_output(renderer, ldr_handle, &map_desc,
-                                                                   ovrtx_timeout_infinite, &ldr_output);
+            ovrtx_result_t map_result = ovrtx_map_render_var_output(
+                renderer_, ldr_handle, &map_desc, ovrtx_timeout_infinite, &ldr_output);
             if (map_result.status == OVRTX_API_SUCCESS) {
                 DLTensor const& t = *ldr_output.tensors[0].dl;
                 std::string name = std::string("SensorConfig.") + product_names[i];
                 save_ldr_png(name.c_str(), t.data,
                              static_cast<int>(t.shape[1]),
                              static_cast<int>(t.shape[0]));
-                ovrtx_unmap_render_var_output(renderer, ldr_output.map_handle, no_sync);
+                ovrtx_unmap_render_var_output(renderer_, ldr_output.map_handle, no_sync);
             }
         }
     }
 
-    ovrtx_destroy_results(renderer, step_handle);
-    ovrtx_destroy_renderer(renderer);
+    ovrtx_destroy_results(renderer_, step_handle);
 }
 
-TEST(SensorConfiguration, AddRenderConfigLayer) {
-    TestConfig tc("SensorConfiguration.AddRenderConfigLayer");
-    ovrtx_renderer_t* renderer = nullptr;
-    ovrtx_result_t result = ovrtx_create_renderer(&tc.config, &renderer);
-    ASSERT_API_SUCCESS(result.status);
-
+TEST_F(SensorConfigurationTest, AddRenderConfigLayer) {
     // [snippet:doc-add-render-config-layer-c]
+    // Compose a docs-owned render-config layer on top of a scene layer via
+    // USD sublayers. The composed root gets populated into the attached
+    // ovstage in one call.
     std::string scene_path = get_test_data_dir() + "/simple_camera.usda";
     std::string usda = make_sublayer_usda(scene_path, R"usda(
 def "Render" {
@@ -136,7 +118,7 @@ def "Render" {
         int2 resolution = (640, 480)
         rel camera = </Camera0>
         rel orderedVars = [<LdrColor>, <HdrColor>]
-		
+
         def RenderVar "LdrColor" {
             string sourceName = "LdrColor"
         }
@@ -147,42 +129,42 @@ def "Render" {
     }
 }
 )usda");
-    ovrtx_enqueue_result_t enqueue_result = ovrtx_open_usd_from_string(renderer, {usda.c_str(), usda.size()});
-    ASSERT_API_SUCCESS(enqueue_result.status);
-
-    ovrtx_op_wait_result_t wait_result;
-    result = ovrtx_wait_op(renderer, enqueue_result.op_index,
-                           ovrtx_timeout_infinite, &wait_result);
-    ASSERT_API_SUCCESS(result.status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    ovstage_population_enqueue_result_t pr = ovstage_population_open_usd_from_string(
+        stage_,
+        {usda.c_str(), usda.size()},
+        /*ordinal=*/1,
+        /*time=*/NAN,
+        OVSTAGE_POPULATION_DOMAIN_RENDERING);
+    ASSERT_EQ(pr.status, OVSTAGE_OK) << format_ovstage_population_last_error();
+    docs_wait_ovstage_population_no_errors(stage_, pr.op_index);
+    docs_ovstage_advance_write_floor(stage_, 1);
     // [/snippet:doc-add-render-config-layer-c]
 
-    // Step to verify it works
+    // Verify the composed layer renders.
     ovx_string_t rp_path = ovx_str("/Render/Camera");
     ovrtx_render_product_set_t render_products{};
     render_products.render_products = &rp_path;
     render_products.num_render_products = 1;
 
     ovrtx_step_result_handle_t step_handle = 0;
-    enqueue_result = ovrtx_step(renderer, render_products, 1.0 / 60.0, &step_handle);
+    ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
+        renderer_, render_products, 1.0 / 60.0, /*ordinal=*/1, &step_handle);
     ASSERT_API_SUCCESS(enqueue_result.status);
-    result = ovrtx_wait_op(renderer, enqueue_result.op_index, ovrtx_timeout_infinite, &wait_result);
-    ASSERT_API_SUCCESS(result.status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    docs_wait_no_errors(renderer_, enqueue_result.op_index);
 
     ovrtx_render_product_set_outputs_t outputs{};
-    result = ovrtx_fetch_results(renderer, step_handle, ovrtx_timeout_infinite, &outputs);
+    ovrtx_result_t result =
+        ovrtx_fetch_results(renderer_, step_handle, ovrtx_timeout_infinite, &outputs);
     ASSERT_API_SUCCESS(result.status);
     EXPECT_GE(outputs.output_count, 1u);
 
-    // Save LdrColor
     ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "LdrColor");
     if (ldr_handle != OVRTX_INVALID_HANDLE) {
         ovrtx_map_output_description_t md = {};
         md.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
         ovrtx_render_var_output_t ldr_output = {};
-        ovrtx_result_t mr = ovrtx_map_render_var_output(renderer, ldr_handle, &md,
-                                                       ovrtx_timeout_infinite, &ldr_output);
+        ovrtx_result_t mr = ovrtx_map_render_var_output(
+            renderer_, ldr_handle, &md, ovrtx_timeout_infinite, &ldr_output);
         if (mr.status == OVRTX_API_SUCCESS) {
             DLTensor const& t = *ldr_output.tensors[0].dl;
             save_ldr_png("SensorConfig.AddRenderConfigLayer",
@@ -190,10 +172,9 @@ def "Render" {
                          static_cast<int>(t.shape[1]),
                          static_cast<int>(t.shape[0]));
             ovrtx_cuda_sync_t no_sync = {};
-            ovrtx_unmap_render_var_output(renderer, ldr_output.map_handle, no_sync);
+            ovrtx_unmap_render_var_output(renderer_, ldr_output.map_handle, no_sync);
         }
     }
 
-    ovrtx_destroy_results(renderer, step_handle);
-    ovrtx_destroy_renderer(renderer);
+    ovrtx_destroy_results(renderer_, step_handle);
 }

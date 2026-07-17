@@ -6,8 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-"""Tests for the stage attribute read API (``Renderer.read_attribute`` /
-``read_array_attribute`` and their async variants).
+"""Tests for ovstage attribute reads used with an attached renderer.
 
 Reads target schema-known attributes the runtime exposes to Fabric:
 ``omni:rtx:rtpt:maxBounces`` on the RenderProduct (a 32-bit integer; the
@@ -19,37 +18,49 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
+import pytest
 
 TEST_BASE_PATH = str((Path(__file__).parent / "../data/ovrtx-test-base.usda").resolve())
 
 
-def _load_base(renderer):
+def _load_base(stage):
+    ovstage.population.open_usd(stage, TEST_BASE_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
+
+
+def _load_base_legacy(renderer):
     renderer.open_usd(TEST_BASE_PATH)
     renderer.reset()
 
 
-def test_read_scalar_attribute_cpu(renderer):
+def test_read_scalar_attribute_cpu(stage):
     """Write a schema-known int32 scalar and read it back."""
-    _load_base(renderer)
+    _load_base(stage)
 
-    # Seed a known value so the read has something deterministic to observe.
-    renderer.write_attribute(
-        prim_paths=["/Render/Camera"],
-        attribute_name="omni:rtx:rtpt:maxBounces",
-        tensor=np.array([17], dtype=np.int32),
-    )
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/Render/Camera"])
+        query = stage.query_from_path_list(path_list)
+        attribute = paths.intern_token("omni:rtx:rtpt:maxBounces")
+        stage.write_attribute(
+            query, attribute, ordinal=2, tensors=np.array([17], dtype=np.uint32), is_array=False
+        ).wait()
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
 
-    # [snippet:doc-read-attribute-scalar]
-    # Read a scalar attribute — one value per prim. The returned ManagedDLTensor
-    # is DLPack-compatible; np.from_dlpack() gives a zero-copy numpy view.
-    tensor = renderer.read_attribute(
-        attribute_name="omni:rtx:rtpt:maxBounces",
-        prim_paths=["/Render/Camera"],
-    )
-    values = np.from_dlpack(tensor)
-    # [/snippet:doc-read-attribute-scalar]
+        # [snippet:doc-read-attribute-scalar]
+        read = stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2))
+        read.wait()
+        group = read.fetch_next()
+        tensor = group.dlpack(0)
+        values = np.from_dlpack(tensor).copy()
+        stage.release_group(group)
+        read.release().wait()
+        # [/snippet:doc-read-attribute-scalar]
 
-    assert isinstance(tensor, ovrtx.ManagedDLTensor)
+        query.release().wait()
+        paths.destroy_path_list(path_list)
+
+    assert isinstance(tensor, ovstage.ManagedDLTensor)
     # maxBounces is a 32-bit integer; the runtime may report it as int32 or
     # uint32 depending on the schema — compare the value, not the sign-ness.
     assert values.dtype.itemsize == 4 and values.dtype.kind in ("i", "u")
@@ -57,9 +68,10 @@ def test_read_scalar_attribute_cpu(renderer):
     assert int(values[0]) == 17
 
 
+@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 def test_read_scalar_attribute_into_dest(renderer):
     """Pass a pre-allocated tensor as ``dest``; verify data lands in it."""
-    _load_base(renderer)
+    _load_base_legacy(renderer)
 
     renderer.write_attribute(
         prim_paths=["/Render/Camera"],
@@ -83,61 +95,64 @@ def test_read_scalar_attribute_into_dest(renderer):
     assert int(dest[0]) == 11
 
 
-def test_read_array_attribute(renderer):
+def test_read_array_attribute(stage):
     """Read ``points`` (``float3[]``) from the Plane mesh."""
-    _load_base(renderer)
+    _load_base(stage)
 
-    # [snippet:doc-read-array-attribute]
-    # Arrays are returned as dict[prim_path, ManagedDLTensor]. Iteration order
-    # matches the input prim_paths so you can zip() against the request.
-    tensors = renderer.read_array_attribute(
-        attribute_name="points",
-        prim_paths=["/World/Plane"],
-    )
-    for path, tensor in tensors.items():
-        values = np.from_dlpack(tensor)
-        print(f"{path}: {values.size} elements, dtype={values.dtype}")
-    # [/snippet:doc-read-array-attribute]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/World/Plane"])
+        query = stage.query_from_path_list(path_list)
+        points = paths.intern_token("points")
 
-    assert list(tensors.keys()) == ["/World/Plane"]
-    values = np.from_dlpack(tensors["/World/Plane"])
+        # [snippet:doc-read-array-attribute]
+        with stage.read_attributes(query, [points], ovstage.OrdinalRange.latest(1)) as read:
+            group = read.fetch_next()
+            values = np.from_dlpack(group.dlpack(0)).copy()
+            stage.release_group(group)
+        # [/snippet:doc-read-array-attribute]
+
+        query.release().wait()
+        paths.destroy_path_list(path_list)
+
     # ovrtx-test-base-geometry.usda authors 4 float3 points on the Plane.
     assert values.dtype == np.float32
     assert values.size == 4 * 3
 
 
-def test_read_attribute_async(renderer):
+def test_read_attribute_async(stage):
     """Exercise the two-phase async lifecycle for an attribute read."""
-    _load_base(renderer)
+    _load_base(stage)
 
-    renderer.write_attribute(
-        prim_paths=["/Render/Camera"],
-        attribute_name="omni:rtx:rtpt:maxBounces",
-        tensor=np.array([5], dtype=np.int32),
-    )
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/Render/Camera"])
+        query = stage.query_from_path_list(path_list)
+        attribute = paths.intern_token("omni:rtx:rtpt:maxBounces")
+        stage.write_attribute(
+            query, attribute, ordinal=2, tensors=np.array([5], dtype=np.uint32), is_array=False
+        ).wait()
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
 
-    # [snippet:doc-read-attribute-async]
-    # Two-phase async: wait() → PendingFetch, then fetch() → ManagedDLTensor.
-    op = renderer.read_attribute_async(
-        attribute_name="omni:rtx:rtpt:maxBounces",
-        prim_paths=["/Render/Camera"],
-    )
-    pending = op.wait()
-    tensor = pending.fetch()
-    values = np.from_dlpack(tensor)
-    # [/snippet:doc-read-attribute-async]
+        # [snippet:doc-read-attribute-async]
+        read = stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2))
+        read.wait()
+        group = read.fetch_next()
+        values = np.from_dlpack(group.dlpack(0)).copy()
+        stage.release_group(group)
+        read.release().wait()
+        # [/snippet:doc-read-attribute-async]
 
-    assert isinstance(op, ovrtx.Operation)
-    assert isinstance(pending, ovrtx.PendingFetch)
-    assert isinstance(tensor, ovrtx.ManagedDLTensor)
+        query.release().wait()
+        paths.destroy_path_list(path_list)
+
     assert int(values[0]) == 5
 
 
+@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 def test_read_attribute_cuda_dest(renderer):
     """Read directly into a GPU (CUDA) destination tensor via DLPack."""
     import warp as wp  # via warp-lang; provides DLPack-compatible CUDA arrays
 
-    _load_base(renderer)
+    _load_base_legacy(renderer)
 
     renderer.write_attribute(
         prim_paths=["/Render/Camera"],

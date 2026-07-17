@@ -14,9 +14,9 @@
 #include "vk/vulkan_context.hpp"
 #include <cuda.h>
 #include <ovrtx/ovrtx.h>
-#include <ovrtx/ovrtx_attributes.h>
 #include <ovrtx/ovrtx_config.h>
-#include <ovx/path_dictionary/path_dictionary_utils.h>
+#include <ovstage/ovstage.h>
+#include <ovx/path_dictionary/path_dictionary.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -48,6 +48,10 @@
 // Window dimensions
 constexpr int WINDOW_WIDTH = 1920;
 constexpr int WINDOW_HEIGHT = 1080;
+
+// Selection outline group and its style. Picked prims are assigned to this
+// group; group 0 clears the outline. The style is the per-group outline and
+// translucent fill color registered with the renderer at startup.
 constexpr uint8_t SELECTED_OUTLINE_GROUP = 1;
 constexpr ovrtx_selection_group_style_t SELECTED_OUTLINE_STYLE = {
     {0.462745f, 0.725490f, 0.000000f, 1.0f},
@@ -76,11 +80,11 @@ struct PickDragState {
     double pending_end_y = 0.0;
 };
 
-struct PickQueryPixels {
-    int32_t left = 0;
-    int32_t top = 0;
-    int32_t right = 0;
-    int32_t bottom = 0;
+struct PickQueryNdc {
+    float left_ndc = 0.0f;
+    float top_ndc = 0.0f;
+    float right_ndc = 0.0f;
+    float bottom_ndc = 0.0f;
 };
 
 struct MarqueeOverlay {
@@ -89,6 +93,11 @@ struct MarqueeOverlay {
     float top = 0.0f;
     float right = 0.0f;
     float bottom = 0.0f;
+};
+
+struct PickedPrims {
+    std::vector<ovx_primpath_t> path_ids;
+    std::vector<std::string> paths;
 };
 
 struct OverlayPushConstants {
@@ -108,6 +117,7 @@ static constexpr char const* DEFAULT_USD_FILE_URL =
     "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Samples/"
     "Robot-OVRTX/robot-ovrtx.usda";
 static constexpr char const* DEFAULT_RENDER_PRODUCT_PATH = "/Render/Camera";
+static constexpr char const* DEFAULT_CAMERA_PRIM_PATH = "/World/Camera";
 static constexpr UpAxis DEFAULT_UP_AXIS = UpAxis::Z;
 static constexpr Units DEFAULT_SCENE_UNITS = Units::Meters;
 
@@ -122,9 +132,39 @@ static bool parse_args(int argc,
                        char* argv[],
                        std::string& usd_file,
                        std::string& render_product,
+                       std::string& camera_prim_path,
                        UpAxis& up_axis,
                        Units& units,
                        int& num_frames);
+static bool print_ovstage_error(ovstage_instance_t* stage,
+                                ovstage_api_status_t status,
+                                std::string_view operation);
+static bool wait_ovstage_op(ovstage_instance_t* stage,
+                            ovstage_enqueue_result_t const& enqueue_result,
+                            std::string_view operation);
+static bool wait_population_op(ovstage_instance_t* stage,
+                               ovstage_population_enqueue_result_t const& enqueue_result,
+                               std::string_view operation);
+static bool commit_ovstage_ordinal(ovstage_instance_t* stage,
+                                   ovstage_ordinal_t ordinal);
+static bool create_validated_camera_query(ovstage_instance_t* stage,
+                                          std::string_view camera_prim_path,
+                                          ovstage_query_handle_t* out_query);
+static bool write_camera_transform(ovstage_instance_t* stage,
+                                   ovstage_query_handle_t camera_query,
+                                   ovstage_ordinal_t ordinal,
+                                   double const* transform_data);
+static auto find_accumulation_status(
+    ovrtx_render_product_set_outputs_t const& outputs,
+    std::string_view render_product_path) -> std::optional<ovrtx_accumulation_status_t>;
+static auto format_pt_accumulation_feedback(ovrtx_accumulation_status_t const& accumulation_status)
+    -> std::string;
+static void update_window_title(GLFWwindow* window,
+                                ovrtx_accumulation_status_t const& accumulation_status);
+static void refresh_render_feedback(GLFWwindow* window,
+                                    ovrtx_accumulation_status_t& accumulation_status,
+                                    ovrtx_render_product_set_outputs_t const& outputs,
+                                    std::string_view render_product_path);
 template <typename ResultT>
 static bool check_and_print_error(ResultT const& result,
                                   std::string_view operation);
@@ -154,29 +194,29 @@ static void record_marquee_overlay(CommandBuffer& cmd,
                                    ShaderHandle overlay_frag_shader,
                                    MarqueeOverlay const& marquee);
 static auto current_marquee_overlay(GLFWwindow* window) -> MarqueeOverlay;
-static auto pending_pick_query_pixels(GLFWwindow* window,
-                                      int tex_width,
-                                      int tex_height) -> std::optional<PickQueryPixels>;
+static auto pending_pick_query_ndc(GLFWwindow* window,
+                                   int tex_width,
+                                   int tex_height) -> std::optional<PickQueryNdc>;
 static auto find_render_var_output(ovrtx_render_product_set_outputs_t const& outputs,
                                    std::string_view render_var_name)
     -> ovrtx_render_var_output_handle_t;
 static bool process_pick_output(ovrtx_renderer_t* renderer,
                                 path_dictionary_instance_t* path_dictionary,
                                 ovrtx_render_var_output_handle_t pick_output_handle,
-                                std::vector<std::string>& selected_prim_paths);
+                                std::vector<ovx_primpath_t>& selected_prim_path_ids);
 static bool configure_selection_style(ovrtx_renderer_t* renderer);
-static auto read_pick_paths(ovrtx_renderer_t* renderer,
-                            path_dictionary_instance_t* path_dictionary,
-                            ovrtx_render_var_output_handle_t pick_output_handle)
-    -> std::optional<std::vector<std::string>>;
+static bool update_selection_outline(ovrtx_renderer_t* renderer,
+                                     std::vector<ovx_primpath_t> const& previous_selection,
+                                     std::vector<ovx_primpath_t> const& next_selection);
+static bool write_selection_outline_group(ovrtx_renderer_t* renderer,
+                                          std::vector<ovx_primpath_t> const& prim_path_ids,
+                                          uint8_t group_id);
+static auto read_picked_prims(ovrtx_renderer_t* renderer,
+                              path_dictionary_instance_t* path_dictionary,
+                              ovrtx_render_var_output_handle_t pick_output_handle)
+    -> std::optional<PickedPrims>;
 static auto resolve_primpath(path_dictionary_instance_t* path_dictionary,
                              ovx_primpath_t prim_path) -> std::string;
-static bool update_selection_outline(ovrtx_renderer_t* renderer,
-                                     std::vector<std::string> const& previous_selection,
-                                     std::vector<std::string> const& next_selection);
-static bool write_selection_outline_group(ovrtx_renderer_t* renderer,
-                                          std::vector<std::string> const& prim_paths,
-                                          uint8_t group_id);
 static void print_picked_prims(std::vector<std::string> const& prim_paths);
 static bool ovx_string_equals(ovx_string_t value, std::string_view expected);
 static auto find_render_var_tensor(ovrtx_render_var_output_t const& output,
@@ -194,6 +234,7 @@ int main(int argc, char* argv[]) {
     // Parse command-line arguments
     std::string usd_file_path;
     std::string render_product_path;
+    std::string camera_prim_path;
     UpAxis up_axis;
     Units units;
     int num_frames = 0;
@@ -202,6 +243,7 @@ int main(int argc, char* argv[]) {
                     argv,
                     usd_file_path,
                     render_product_path,
+                    camera_prim_path,
                     up_axis,
                     units,
                     num_frames)) {
@@ -210,6 +252,7 @@ int main(int argc, char* argv[]) {
 
     std::cerr << "USD file: " << usd_file_path << std::endl;
     std::cerr << "Render product: " << render_product_path << std::endl;
+    std::cerr << "Orbit camera prim: " << camera_prim_path << std::endl;
     std::cerr << "Up axis: " << (up_axis == UpAxis::Y ? "Y" : "Z") << std::endl;
     std::cerr << "Units: "
               << (units == Units::Meters ? "meters" : "centimeters") << std::endl;
@@ -220,12 +263,23 @@ int main(int argc, char* argv[]) {
     std::cerr << "Initializing ovrtx..." << std::endl;
 
     ovrtx_renderer_t* renderer = nullptr;
+    ovstage_instance_t* stage = nullptr;
+    bool stage_attached = false;
+    ovstage_ordinal_t stage_ordinal = 1;
+    ovstage_query_handle_t camera_query = OVSTAGE_INVALID_QUERY_HANDLE;
     GLFWwindow* window = nullptr;
 
     // ovrtx owns scene evaluation and rendering; the rest of this sample
     // bridges those results into Vulkan-presentable images.
     // [snippet:initialize-and-create-renderer]
+    // The STATIC ovrtx loader resolves the ${executable_dir} token to the running
+    // executable's directory; ovrtx_setup_runtime() links the package bin beside
+    // the exe as "ovrtx/", which we hand the loader as the binary package root.
+    ovx_string_t ovrtx_package_root = {
+        OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx",
+        sizeof(OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx") - 1};
     ovrtx_config_entry_t ovrtx_config_entries[] = {
+        ovrtx_config_entry_binary_package_root_path(ovrtx_package_root),
         ovrtx_config_entry_selection_outline_enabled(true),
         ovrtx_config_entry_selection_outline_width(4),
         ovrtx_config_entry_selection_fill_mode(OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR),
@@ -234,13 +288,79 @@ int main(int argc, char* argv[]) {
     ovrtx_config.entries = ovrtx_config_entries;
     ovrtx_config.entry_count =
         sizeof(ovrtx_config_entries) / sizeof(ovrtx_config_entries[0]);
-    ovrtx_result_t result = ovrtx_create_renderer(&ovrtx_config, &renderer);
-    if (check_and_print_error(result, "create_renderer")) {
+
+    // Publish OVRTX's USD plugin paths before ovstage initializes the shared USD
+    // runtime. The process-wide USD schema registry only discovers plugins once.
+    ovrtx_result_t result = ovrtx_register_schema_paths(&ovrtx_config);
+    if (check_and_print_error(result, "register_schema_paths")) {
         return 1;
     }
-    if (!configure_selection_style(renderer)) {
-        ovrtx_destroy_renderer(renderer);
+
+    // The STATIC ovstage loader resolves ${executable_dir} the same way ovrtx does.
+    // ovstage_setup_runtime() links the package bin beside the exe as "ovstage/"
+    // (next to "ovrtx/").
+    ovx_string_t ovstage_package_root = {
+        OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovstage",
+        sizeof(OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovstage") - 1};
+    ovstage_config_entry_t stage_config_entries[] = {
+        ovstage_config_entry_binary_package_root_path(ovstage_package_root),
+    };
+    ovstage_config_t stage_config {};
+    stage_config.entries = stage_config_entries;
+    stage_config.entry_count = sizeof(stage_config_entries) / sizeof(stage_config_entries[0]);
+    ovstage_api_status_t stage_init_status = ovstage_initialize(&stage_config);
+    if (stage_init_status != OVSTAGE_OK) {
+        print_ovstage_error(nullptr, stage_init_status, "initialize");
         return 1;
+    }
+
+    result = ovrtx_create_renderer(&ovrtx_config, &renderer);
+    if (check_and_print_error(result, "create_renderer")) {
+        ovstage_shutdown();
+        return 1;
+    }
+
+    auto cleanup = [&](int exit_code) {
+        int result_code = exit_code;
+        if (camera_query != OVSTAGE_INVALID_QUERY_HANDLE) {
+            if (wait_ovstage_op(stage,
+                                ovstage_release_query(stage, camera_query),
+                                "release_query")) {
+                result_code = 1;
+            }
+            camera_query = OVSTAGE_INVALID_QUERY_HANDLE;
+        }
+        if (stage_attached) {
+            result = ovrtx_detach_ovstage(renderer);
+            if (check_and_print_error(result, "detach_ovstage")) {
+                result_code = 1;
+            }
+            stage_attached = false;
+        }
+        if (stage) {
+            ovstage_api_status_t stage_result = ovstage_destroy_instance(stage);
+            if (stage_result != OVSTAGE_OK) {
+                print_ovstage_error(stage, stage_result, "destroy_instance");
+                result_code = 1;
+            }
+            stage = nullptr;
+        }
+        if (renderer) {
+            result = ovrtx_destroy_renderer(renderer);
+            if (check_and_print_error(result, "destroy_renderer")) {
+                result_code = 1;
+            }
+            renderer = nullptr;
+        }
+        // Release the ovstage static loader (unloads ovstage.dll). Safe even if
+        // ovstage_initialize failed or was never reached.
+        ovstage_shutdown();
+        return result_code;
+    };
+
+    // Register the per-group outline/fill style before any picking happens.
+    if (!configure_selection_style(renderer)) {
+        return cleanup(1);
     }
     // [/snippet:initialize-and-create-renderer]
 
@@ -248,58 +368,41 @@ int main(int argc, char* argv[]) {
     path_dictionary_instance_t path_dictionary = {};
     result = ovrtx_get_path_dictionary(renderer, &path_dictionary);
     if (check_and_print_error(result, "get_path_dictionary")) {
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
 
-    // Loading USD is asynchronous in ovrtx, so we enqueue then wait for
-    // completion.
-    ovrtx_enqueue_result_t enqueue_result =
-        ovrtx_open_usd_from_file(renderer, {usd_file_path.c_str(), usd_file_path.size()});
-    if (check_and_print_error(enqueue_result, "open_usd_from_file")) {
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+    ovstage_instance_desc_t stage_desc = {};
+    stage_desc.name = "vulkan-interop";
+    ovstage_api_status_t stage_result = ovstage_create_instance(&stage_desc, &stage);
+    if (stage_result != OVSTAGE_OK) {
+        print_ovstage_error(stage, stage_result, "create_instance");
+        return cleanup(1);
     }
 
-    ovrtx_op_wait_result_t wait_result = {};
-    result = ovrtx_wait_op(renderer,
-                           enqueue_result.op_index,
-                           ovrtx_timeout_infinite,
-                           &wait_result);
-    if (wait_result.num_error_ops > 0) {
-        for (int i = 0; i < wait_result.num_error_ops; ++i) {
-            ovx_string_t error_string =
-                ovrtx_get_last_op_error(wait_result.error_op_ids[i]);
-            std::cerr << "ERROR: "
-                      << std::string_view(error_string.ptr, error_string.length)
-                      << std::endl;
-        }
-
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+    result = ovrtx_attach_ovstage(renderer, stage);
+    if (check_and_print_error(result, "attach_ovstage")) {
+        return cleanup(1);
     }
-    if (check_and_print_error(result, "wait_op (open_usd_from_file)")) {
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+    stage_attached = true;
+
+    ovstage_population_enqueue_result_t populate_result =
+        ovstage_population_open_usd_from_file(
+            stage,
+            {usd_file_path.c_str(), usd_file_path.size()},
+            stage_ordinal,
+            /* time = */ 0.0,
+            OVSTAGE_POPULATION_DOMAIN_RENDERING);
+    if (wait_population_op(stage, populate_result, "population_open_usd_from_file") ||
+        commit_ovstage_ordinal(stage, stage_ordinal)) {
+        return cleanup(1);
+    }
+    if (create_validated_camera_query(stage, camera_prim_path, &camera_query)) {
+        return cleanup(1);
     }
 
     std::cerr << "USD scene loaded successfully" << std::endl;
     std::cerr << "Render product path: " << render_product_path << std::endl;
 
-    // ovrtx creates/uses CUDA internally; we query that context so Vulkan can
-    // be created on the exact same physical device for interop safety.
-    CUuuid cuda_uuid;
-    if (!cuda_init(&cuda_uuid)) {
-        std::cerr << "Failed to get CUDA context" << std::endl;
-        ovrtx_destroy_renderer(renderer);
-        return 1;
-    }
-
-    // =========================================================================
-    // Do an initial ovrtx step to get render dimensions
-    // =========================================================================
-    // We need output dimensions and format before allocating shared Vulkan
-    // images.
     ovx_string_t render_product_str = {};
     render_product_str.ptr = render_product_path.c_str();
     render_product_str.length = render_product_path.size();
@@ -308,12 +411,28 @@ int main(int argc, char* argv[]) {
     render_products.render_products = &render_product_str;
     render_products.num_render_products = 1;
 
+    // ovrtx creates/uses CUDA internally; we query that context so Vulkan can
+    // be created on the exact same physical device for interop safety.
+    CUuuid cuda_uuid;
+    if (!cuda_init(&cuda_uuid)) {
+        std::cerr << "Failed to get CUDA context" << std::endl;
+        return cleanup(1);
+    }
+
+    // =========================================================================
+    // Do an initial ovrtx step to get render dimensions
+    // =========================================================================
+    // We need output dimensions and format before allocating shared Vulkan
+    // images.
     ovrtx_step_result_handle_t step_result_handle = 0;
-    enqueue_result =
-        ovrtx_step(renderer, render_products, 0.0, &step_result_handle);
+    ovrtx_enqueue_result_t enqueue_result =
+        ovrtx_step_with_stage(renderer,
+                              render_products,
+                              0.0,
+                              stage_ordinal,
+                              &step_result_handle);
     if (check_and_print_error(enqueue_result, "step")) {
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
 
     ovrtx_render_product_set_outputs_t outputs = {};
@@ -321,16 +440,14 @@ int main(int argc, char* argv[]) {
         renderer, step_result_handle, ovrtx_timeout_infinite, &outputs);
     if (check_and_print_error(result, "fetch_results")) {
         ovrtx_destroy_results(renderer, step_result_handle);
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
 
     if (outputs.status != OVRTX_EVENT_COMPLETED || outputs.output_count == 0) {
         std::cerr << "Could not get dimensions for RenderProduct \""
                   << render_product_path << "\"" << std::endl;
         ovrtx_destroy_results(renderer, step_result_handle);
-        ovrtx_destroy_renderer(renderer);
-        return 3;
+        return cleanup(3);
     }
 
     // Find color output (prefer HdrColor, fall back to LdrColor)
@@ -340,8 +457,7 @@ int main(int argc, char* argv[]) {
     if (color_output_handle == 0) {
         std::cerr << "No color output found (HdrColor or LdrColor)" << std::endl;
         ovrtx_destroy_results(renderer, step_result_handle);
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
     std::cerr << "Using " << output_type_name(output_type) << " output" << std::endl;
 
@@ -359,16 +475,14 @@ int main(int argc, char* argv[]) {
                                        &rendered_output);
     if (check_and_print_error(result, "map_render_var_output")) {
         ovrtx_destroy_results(renderer, step_result_handle);
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
 
     if (rendered_output.num_tensors == 0) {
         std::cerr << "color render variable produced no tensors" << std::endl;
         ovrtx_unmap_render_var_output(renderer, rendered_output.map_handle, ovrtx_cuda_sync_t{});
         ovrtx_destroy_results(renderer, step_result_handle);
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
     DLTensor const& dl = *rendered_output.tensors[0].dl;
     int tex_width = static_cast<int>(dl.shape[1]);
@@ -379,13 +493,11 @@ int main(int argc, char* argv[]) {
         renderer, rendered_output.map_handle, ovrtx_cuda_sync_t{});
     if (check_and_print_error(result, "unmap_render_var_output")) {
         ovrtx_destroy_results(renderer, step_result_handle);
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
     result = ovrtx_destroy_results(renderer, step_result_handle);
     if (check_and_print_error(result, "destroy_results")) {
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
 
     std::cerr << "Render output dimensions: " << tex_width << " x "
@@ -396,8 +508,7 @@ int main(int argc, char* argv[]) {
     // =========================================================================
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -408,9 +519,10 @@ int main(int argc, char* argv[]) {
     if (!window) {
         std::cerr << "Failed to create window" << std::endl;
         glfwTerminate();
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
+
+    update_window_title(window, ovrtx_accumulation_status_t{});
 
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
@@ -508,8 +620,7 @@ int main(int argc, char* argv[]) {
                 cuda_cleanup();
                 glfwDestroyWindow(window);
                 glfwTerminate();
-                ovrtx_destroy_renderer(renderer);
-                return 1;
+                return cleanup(1);
             }
         }
 
@@ -544,20 +655,24 @@ int main(int argc, char* argv[]) {
         ovrtx_render_var_output_map_handle_t current_map_handle = 0;
         bool has_mapped_output = false;
 
+        ovrtx_accumulation_status_t accumulation_status{};
+
         // =====================================================================
         // Prime the first buffer so Vulkan has valid content before
         // steady-state async producer/consumer overlap begins.
         // =====================================================================
         std::cerr << "Priming first frame..." << std::endl;
         {
-            enqueue_result = ovrtx_step(
-                renderer, render_products, 0.0, &current_step_result);
+            enqueue_result = ovrtx_step_with_stage(renderer,
+                                                   render_products,
+                                                   0.0,
+                                                   stage_ordinal,
+                                                   &current_step_result);
             if (check_and_print_error(enqueue_result, "step")) {
                 cuda_cleanup();
                 glfwDestroyWindow(window);
                 glfwTerminate();
-                ovrtx_destroy_renderer(renderer);
-                return 1;
+                return cleanup(1);
             }
 
             result = ovrtx_fetch_results(renderer,
@@ -568,9 +683,11 @@ int main(int argc, char* argv[]) {
                 cuda_cleanup();
                 glfwDestroyWindow(window);
                 glfwTerminate();
-                ovrtx_destroy_renderer(renderer);
-                return 1;
+                return cleanup(1);
             }
+
+            refresh_render_feedback(
+                window, accumulation_status, outputs, render_product_path);
 
             // Find color output (same type as detected initially)
             OutputType frame_output_type;
@@ -582,8 +699,7 @@ int main(int argc, char* argv[]) {
                 cuda_cleanup();
                 glfwDestroyWindow(window);
                 glfwTerminate();
-                ovrtx_destroy_renderer(renderer);
-                return 2;
+                return cleanup(2);
             }
 
             result = ovrtx_map_render_var_output(renderer,
@@ -596,8 +712,7 @@ int main(int argc, char* argv[]) {
                 cuda_cleanup();
                 glfwDestroyWindow(window);
                 glfwTerminate();
-                ovrtx_destroy_renderer(renderer);
-                return 1;
+                return cleanup(1);
             }
 
             current_map_handle = rendered_output.map_handle;
@@ -634,16 +749,14 @@ int main(int argc, char* argv[]) {
                 cuda_cleanup();
                 glfwDestroyWindow(window);
                 glfwTerminate();
-                ovrtx_destroy_renderer(renderer);
-                return 1;
+                return cleanup(1);
             }
             result = ovrtx_destroy_results(renderer, current_step_result);
             if (check_and_print_error(result, "destroy_results")) {
                 cuda_cleanup();
                 glfwDestroyWindow(window);
                 glfwTerminate();
-                ovrtx_destroy_renderer(renderer);
-                return 1;
+                return cleanup(1);
             }
             has_mapped_output = false;
 
@@ -666,7 +779,6 @@ int main(int argc, char* argv[]) {
         std::vector<double> all_cpu_times_ms;
         std::vector<double> all_vulkan_times_ms;
         std::vector<double> all_cuda_times_ms;
-        std::vector<std::string> selected_prim_paths;
 
         if (num_frames > 0) {
             all_cpu_times_ms.reserve(num_frames);
@@ -681,6 +793,9 @@ int main(int argc, char* argv[]) {
         }
 
         int total_frames = 0;
+
+        // Persisted viewport selection; the outline follows the latest pick.
+        std::vector<ovx_primpath_t> selected_prim_path_ids;
 
         // =====================================================================
         // Main loop
@@ -759,42 +874,10 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            // Camera edits are sent to ovrtx as a transform attribute update so
-            // the next ovrtx_step renders from the new viewpoint.
+            // Camera edits are authored into ovstage so the next attached step
+            // renders from the new viewpoint.
             if (g_camera_dirty) {
                 // [snippet:write-camera-transform]
-                // Write transform to ovrtx
-                ovx_string_t prim_path_str = {};
-                prim_path_str.ptr = "/World/Camera";
-                prim_path_str.length = strlen("/World/Camera");
-
-                ovrtx_prim_list_t prim_list = {};
-                prim_list.prim_paths = &prim_path_str;
-                prim_list.num_paths = 1;
-
-                ovrtx_attribute_type_t attr_type = {};
-                attr_type.dtype.code = kDLFloat;
-                attr_type.dtype.bits = 64;
-                attr_type.dtype.lanes = 16;
-                attr_type.is_array = false;
-                attr_type.semantic = OVRTX_SEMANTIC_XFORM_MAT4x4;
-
-                ovrtx_binding_desc_t binding = {};
-                binding.prim_list = prim_list;
-                binding.prims_list_handle = 0;
-                binding.attribute_name.token = 0;
-                char const* attr_xform = "omni:xform";
-                binding.attribute_name.string.ptr = attr_xform;
-                binding.attribute_name.string.length =
-                    strlen(attr_xform);
-                binding.attribute_type = attr_type;
-                binding.prim_mode = OVRTX_BINDING_PRIM_MODE_EXISTING_ONLY;
-                binding.flags = OVRTX_BINDING_FLAG_NONE;
-
-                ovrtx_binding_desc_or_handle_t binding_desc_or_handle = {};
-                binding_desc_or_handle.binding_desc = binding;
-                binding_desc_or_handle.binding_handle = 0;
-
                 glm::mat4 transform = orbit_camera.transform_matrix();
                 double transform_data[16];
                 float const* src = glm::value_ptr(transform);
@@ -802,35 +885,16 @@ int main(int argc, char* argv[]) {
                     transform_data[i] = static_cast<double>(src[i]);
                 }
 
-                DLTensor transform_dl = {};
-                transform_dl.data = transform_data;
-                transform_dl.device.device_type = kDLCPU;
-                transform_dl.device.device_id = 0;
-                transform_dl.ndim = 1;
-                int64_t shape[1] = {1};
-                transform_dl.shape = shape;
-                transform_dl.strides = nullptr;
-                transform_dl.byte_offset = 0;
-                transform_dl.dtype.code = kDLFloat;
-                transform_dl.dtype.bits = 64;
-                transform_dl.dtype.lanes = 16;
-
-                ovrtx_input_buffer_t input_buffer = {};
-                input_buffer.tensors = &transform_dl;
-                input_buffer.tensor_count = 1;
-                input_buffer.dirty_bits = nullptr;
-                input_buffer.dirty_bits_size = 0;
-
-                enqueue_result = ovrtx_write_attribute(renderer,
-                                                       &binding_desc_or_handle,
-                                                       &input_buffer,
-                                                       OVRTX_DATA_ACCESS_SYNC);
-                if (check_and_print_error(enqueue_result, "write_attribute")) {
+                ++stage_ordinal;
+                if (write_camera_transform(stage,
+                                           camera_query,
+                                           stage_ordinal,
+                                           transform_data) ||
+                    commit_ovstage_ordinal(stage, stage_ordinal)) {
                     cuda_cleanup();
                     glfwDestroyWindow(window);
                     glfwTerminate();
-                    ovrtx_destroy_renderer(renderer);
-                    return 1;
+                    return cleanup(1);
                 }
                 // [/snippet:write-camera-transform]
 
@@ -842,15 +906,15 @@ int main(int argc, char* argv[]) {
             if (!cuda_work_pending) {
                 cuEventRecord(cuda_start_event, cuda_stream);
                 bool pick_query_submitted = false;
-                std::optional<PickQueryPixels> pick_query =
-                    pending_pick_query_pixels(window, tex_width, tex_height);
+                std::optional<PickQueryNdc> pick_query =
+                    pending_pick_query_ndc(window, tex_width, tex_height);
                 if (pick_query) {
                     ovrtx_pick_query_desc_t pick_desc = {};
                     pick_desc.render_product_path = render_product_str;
-                    pick_desc.left = pick_query->left;
-                    pick_desc.top = pick_query->top;
-                    pick_desc.right = pick_query->right;
-                    pick_desc.bottom = pick_query->bottom;
+                    pick_desc.left_ndc = pick_query->left_ndc;
+                    pick_desc.top_ndc = pick_query->top_ndc;
+                    pick_desc.right_ndc = pick_query->right_ndc;
+                    pick_desc.bottom_ndc = pick_query->bottom_ndc;
                     pick_desc.flags = 0;
 
                     enqueue_result =
@@ -860,8 +924,7 @@ int main(int argc, char* argv[]) {
                         cuda_cleanup();
                         glfwDestroyWindow(window);
                         glfwTerminate();
-                        ovrtx_destroy_renderer(renderer);
-                        return 1;
+                        return cleanup(1);
                     }
                     pick_query_submitted = true;
                 }
@@ -870,19 +933,19 @@ int main(int argc, char* argv[]) {
                 // matches interactive frame pacing.
                 auto now = std::chrono::steady_clock::now();
                 double delta_time =
-                    std::chrono::duration<double>(now - last_step_time).count();
+                        std::chrono::duration<double>(now - last_step_time).count();
                 last_step_time = now;
 
-                enqueue_result = ovrtx_step(renderer,
-                                            render_products,
-                                            delta_time,
-                                            &current_step_result);
+                enqueue_result = ovrtx_step_with_stage(renderer,
+                                                       render_products,
+                                                       delta_time,
+                                                       stage_ordinal,
+                                                       &current_step_result);
                 if (check_and_print_error(enqueue_result, "step")) {
                     cuda_cleanup();
                     glfwDestroyWindow(window);
                     glfwTerminate();
-                    ovrtx_destroy_renderer(renderer);
-                    return 1;
+                    return cleanup(1);
                 }
 
                 result = ovrtx_fetch_results(renderer,
@@ -893,9 +956,11 @@ int main(int argc, char* argv[]) {
                     cuda_cleanup();
                     glfwDestroyWindow(window);
                     glfwTerminate();
-                    ovrtx_destroy_renderer(renderer);
-                    return 1;
+                    return cleanup(1);
                 }
+
+                refresh_render_feedback(
+                    window, accumulation_status, outputs, render_product_path);
 
                 if (pick_query_submitted) {
                     ovrtx_render_var_output_handle_t pick_output_handle =
@@ -903,13 +968,12 @@ int main(int argc, char* argv[]) {
                     if (!process_pick_output(renderer,
                                              &path_dictionary,
                                              pick_output_handle,
-                                             selected_prim_paths)) {
+                                             selected_prim_path_ids)) {
                         ovrtx_destroy_results(renderer, current_step_result);
                         cuda_cleanup();
                         glfwDestroyWindow(window);
                         glfwTerminate();
-                        ovrtx_destroy_renderer(renderer);
-                        return 1;
+                        return cleanup(1);
                     }
                 }
 
@@ -929,8 +993,7 @@ int main(int argc, char* argv[]) {
                     cuda_cleanup();
                     glfwDestroyWindow(window);
                     glfwTerminate();
-                    ovrtx_destroy_renderer(renderer);
-                    return 1;
+                    return cleanup(1);
                 }
 
                 current_map_handle = rendered_output.map_handle;
@@ -972,16 +1035,14 @@ int main(int argc, char* argv[]) {
                     cuda_cleanup();
                     glfwDestroyWindow(window);
                     glfwTerminate();
-                    ovrtx_destroy_renderer(renderer);
-                    return 1;
+                    return cleanup(1);
                 }
                 result = ovrtx_destroy_results(renderer, current_step_result);
                 if (check_and_print_error(result, "destroy_results")) {
                     cuda_cleanup();
                     glfwDestroyWindow(window);
                     glfwTerminate();
-                    ovrtx_destroy_renderer(renderer);
-                    return 1;
+                    return cleanup(1);
                 }
                 has_mapped_output = false;
 
@@ -1099,6 +1160,7 @@ int main(int argc, char* argv[]) {
                           << "  Vulkan=" << avg_vulkan_ms
                           << "  CUDA=" << avg_cuda_ms
                           << "  FPS=" << (frame_count / elapsed_seconds)
+                          << " | " << format_pt_accumulation_feedback(accumulation_status)
                           << std::endl;
 
                 accumulated_cpu_ms = 0.0;
@@ -1159,15 +1221,17 @@ int main(int argc, char* argv[]) {
         g_orbit_camera = nullptr;
         glfwDestroyWindow(window);
         glfwTerminate();
-        ovrtx_destroy_renderer(renderer);
-        return 1;
+        return cleanup(1);
     }
 
     g_orbit_camera = nullptr;
 
     glfwDestroyWindow(window);
     glfwTerminate();
-    ovrtx_destroy_renderer(renderer);
+    int cleanup_result = cleanup(0);
+    if (cleanup_result != 0) {
+        return cleanup_result;
+    }
 
     std::cerr << "Done!" << std::endl;
     return 0;
@@ -1275,6 +1339,235 @@ scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     }
 }
 
+static bool print_ovstage_error(ovstage_instance_t* stage,
+                                ovstage_api_status_t status,
+                                std::string_view operation)
+{
+    ovx_string_t error = ovstage_population_get_last_error();
+    if ((!error.ptr || error.length == 0) && stage) {
+        error = ovstage_get_last_error();
+    }
+
+    std::cerr << "ovstage " << operation << " failed ("
+              << static_cast<int>(status) << ")";
+    if (error.ptr && error.length > 0) {
+        std::cerr << ": " << std::string_view(error.ptr, error.length);
+    }
+    std::cerr << std::endl;
+    return true;
+}
+
+static bool wait_ovstage_op(ovstage_instance_t* stage,
+                            ovstage_enqueue_result_t const& enqueue_result,
+                            std::string_view operation)
+{
+    if (enqueue_result.status != OVSTAGE_OK) {
+        return print_ovstage_error(stage, enqueue_result.status, operation);
+    }
+
+    ovstage_op_wait_result_t wait_result = {};
+    ovstage_api_status_t status = ovstage_wait_op(stage,
+                                                  enqueue_result.op_index,
+                                                  OVSTAGE_TIMEOUT_INFINITE,
+                                                  &wait_result);
+    if (status != OVSTAGE_OK) {
+        return print_ovstage_error(stage, status, operation);
+    }
+    for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
+        ovstage_op_id_t op_id = wait_result.error_op_ids[i];
+        ovx_string_t error = ovstage_get_last_op_error(stage, op_id);
+        std::cerr << "ovstage " << operation << ": op " << op_id << " failed";
+        if (error.ptr && error.length > 0) {
+            std::cerr << ": " << std::string_view(error.ptr, error.length);
+        }
+        std::cerr << std::endl;
+    }
+    return wait_result.error_op_id_count != 0;
+}
+
+static bool wait_population_op(ovstage_instance_t* stage,
+                               ovstage_population_enqueue_result_t const& enqueue_result,
+                               std::string_view operation)
+{
+    if (enqueue_result.status != OVSTAGE_OK) {
+        return print_ovstage_error(stage, enqueue_result.status, operation);
+    }
+
+    ovstage_population_op_wait_result_t wait_result = {};
+    ovstage_api_status_t status = ovstage_population_wait_op(stage,
+                                                             enqueue_result.op_index,
+                                                             OVSTAGE_TIMEOUT_INFINITE,
+                                                             &wait_result);
+    if (status != OVSTAGE_OK) {
+        return print_ovstage_error(stage, status, operation);
+    }
+    for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
+        ovstage_population_op_id_t op_id = wait_result.error_op_ids[i];
+        ovx_string_t error = ovstage_population_get_last_op_error(op_id);
+        std::cerr << "ovstage " << operation << ": op " << op_id << " failed";
+        if (error.ptr && error.length > 0) {
+            std::cerr << ": " << std::string_view(error.ptr, error.length);
+        }
+        std::cerr << std::endl;
+    }
+    return wait_result.error_op_id_count != 0;
+}
+
+static bool commit_ovstage_ordinal(ovstage_instance_t* stage,
+                                   ovstage_ordinal_t ordinal)
+{
+    ovstage_write_floor_desc_t write_floor = {};
+    write_floor.ordinal = ordinal;
+    write_floor.scope = OVSTAGE_SCOPE_ALL;
+    return wait_ovstage_op(stage,
+                           ovstage_advance_write_floor(stage, &write_floor),
+                           "advance_write_floor");
+}
+
+static bool create_validated_camera_query(ovstage_instance_t* stage,
+                                          std::string_view camera_prim_path,
+                                          ovstage_query_handle_t* out_query)
+{
+    ovx_string_t camera_path = {camera_prim_path.data(),
+                                camera_prim_path.size()};
+    ovstage_predicate_t predicate = {};
+    predicate.attribute.string = literal_to_ovx_string("usd-path");
+    predicate.op = OVSTAGE_FILTER_OP_IN;
+    predicate.values = &camera_path;
+    predicate.value_count = 1;
+
+    ovstage_filter_t filter = {};
+    filter.predicates = &predicate;
+    filter.count = 1;
+
+    ovstage_enqueue_result_t query_result =
+        ovstage_query(stage, &filter, nullptr, 0, out_query);
+    if (wait_ovstage_op(stage, query_result, "query_camera_prim")) {
+        if (*out_query != OVSTAGE_INVALID_QUERY_HANDLE) {
+            wait_ovstage_op(stage, ovstage_release_query(stage, *out_query), "release_query");
+            *out_query = OVSTAGE_INVALID_QUERY_HANDLE;
+        }
+        return true;
+    }
+
+    ovstage_query_result_t fetched = {};
+    ovstage_api_status_t status =
+        ovstage_fetch_query_result(stage, *out_query, OVSTAGE_TIMEOUT_INFINITE, &fetched);
+    if (status != OVSTAGE_OK) {
+        wait_ovstage_op(stage, ovstage_release_query(stage, *out_query), "release_query");
+        *out_query = OVSTAGE_INVALID_QUERY_HANDLE;
+        return print_ovstage_error(stage, status, "fetch_camera_query_result");
+    }
+
+    bool failed = false;
+    if (fetched.total_prim_count != 1) {
+        std::cerr << "Camera prim '" << camera_prim_path
+                  << "' was not found in the populated ovstage scene" << std::endl;
+        failed = true;
+    }
+
+    status = ovstage_release_query_result(stage, &fetched);
+    if (status != OVSTAGE_OK) {
+        print_ovstage_error(stage, status, "release_query_result");
+        failed = true;
+    }
+
+    if (failed &&
+        wait_ovstage_op(stage, ovstage_release_query(stage, *out_query), "release_query")) {
+        failed = true;
+    }
+    if (failed) {
+        *out_query = OVSTAGE_INVALID_QUERY_HANDLE;
+    }
+    return failed;
+}
+
+static bool write_camera_transform(ovstage_instance_t* stage,
+                                   ovstage_query_handle_t camera_query,
+                                   ovstage_ordinal_t ordinal,
+                                   double const* transform_data)
+{
+    DLTensor transform_dl = {};
+    transform_dl.data = const_cast<double*>(transform_data);
+    transform_dl.device.device_type = kDLCPU;
+    transform_dl.device.device_id = 0;
+    transform_dl.ndim = 1;
+    int64_t shape[1] = {1};
+    transform_dl.shape = shape;
+    transform_dl.strides = nullptr;
+    transform_dl.byte_offset = 0;
+    transform_dl.dtype.code = kDLFloat;
+    transform_dl.dtype.bits = 64;
+    transform_dl.dtype.lanes = 16;
+
+    ovstage_write_data_t write_data = {};
+    write_data.tensors = &transform_dl;
+    write_data.tensor_count = 1;
+    write_data.semantic = OVSTAGE_SEMANTIC_MATRIX;
+
+    ovx_string_or_token_t attribute = {};
+    attribute.string = literal_to_ovx_string("omni:xform");
+
+    return wait_ovstage_op(
+        stage,
+        ovstage_write_attribute(stage,
+                                camera_query,
+                                attribute,
+                                ordinal,
+                                write_data,
+                                OVSTAGE_PRIM_MODE_UPSERT),
+        "write_camera_transform");
+}
+
+static auto find_accumulation_status(
+    ovrtx_render_product_set_outputs_t const& outputs,
+    std::string_view render_product_path) -> std::optional<ovrtx_accumulation_status_t> {
+    for (size_t i = 0; i < outputs.output_count; ++i) {
+        ovrtx_render_product_output_t const& product_output = outputs.outputs[i];
+        if (product_output.output_frame_count == 0) {
+            continue;
+        }
+        std::string_view const path(product_output.render_product_path.ptr,
+                                    product_output.render_product_path.length);
+        if (path != render_product_path) {
+            continue;
+        }
+        return product_output.output_frames[0].accumulation_status;
+    }
+    return std::nullopt;
+}
+
+static auto format_pt_accumulation_feedback(
+    ovrtx_accumulation_status_t const& accumulation_status) -> std::string {
+    std::string feedback = "Progression: " + std::to_string(accumulation_status.progression);
+    if (accumulation_status.converged) {
+        feedback += " (converged)";
+    }
+    return feedback;
+}
+
+static void update_window_title(GLFWwindow* window,
+                                ovrtx_accumulation_status_t const& accumulation_status) {
+    if (!window) {
+        return;
+    }
+
+    const std::string title =
+        "ovrtx-Vulkan Interop | " + format_pt_accumulation_feedback(accumulation_status);
+    glfwSetWindowTitle(window, title.c_str());
+}
+
+static void refresh_render_feedback(GLFWwindow* window,
+                                    ovrtx_accumulation_status_t& accumulation_status,
+                                    ovrtx_render_product_set_outputs_t const& outputs,
+                                    std::string_view render_product_path) {
+    if (auto const acc = find_accumulation_status(outputs, render_product_path)) {
+        accumulation_status = *acc;
+    }
+
+    update_window_title(window, accumulation_status);
+}
+
 static void print_usage(char const* program_name) {
     std::cerr << "Usage: " << program_name << " [options]" << std::endl;
     std::cerr << std::endl << "Options:" << std::endl;
@@ -1289,6 +1582,8 @@ static void print_usage(char const* program_name) {
     std::cerr
         << "  --num-frames, -n <N>      Render N frames then save out.png "
            "and exit" << std::endl;
+    std::cerr << "  --camera, -c <path>       Orbit camera prim (default: "
+              << DEFAULT_CAMERA_PRIM_PATH << ")" << std::endl;
     std::cerr << "  --help, -h                Show this help message" << std::endl;
 }
 
@@ -1296,12 +1591,14 @@ static bool parse_args(int argc,
                        char* argv[],
                        std::string& usd_file,
                        std::string& render_product,
+                       std::string& camera_prim_path,
                        UpAxis& up_axis,
                        Units& units,
                        int& num_frames) {
     // Set defaults
     usd_file = DEFAULT_USD_FILE_URL;
     render_product = DEFAULT_RENDER_PRODUCT_PATH;
+    camera_prim_path = DEFAULT_CAMERA_PRIM_PATH;
     up_axis = DEFAULT_UP_AXIS;
     units = DEFAULT_SCENE_UNITS;
     num_frames = 0;
@@ -1324,6 +1621,17 @@ static bool parse_args(int argc,
                 return false;
             }
             render_product = argv[++i];
+        } else if (arg == "--camera" || arg == "-c") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument" << std::endl;
+                return false;
+            }
+            camera_prim_path = argv[++i];
+            if (camera_prim_path.empty() || camera_prim_path.front() != '/') {
+                std::cerr << "Error: camera path must be absolute (e.g. /World/Camera)"
+                          << std::endl;
+                return false;
+            }
         } else if (arg == "--up-axis" || arg == "-a") {
             if (i + 1 >= argc) {
                 std::cerr << "Error: " << arg << " requires an argument" << std::endl;
@@ -1617,10 +1925,10 @@ static auto current_marquee_overlay(GLFWwindow* window) -> MarqueeOverlay {
     return marquee;
 }
 
-static auto pending_pick_query_pixels(GLFWwindow* window,
-                                      int tex_width,
-                                      int tex_height)
-    -> std::optional<PickQueryPixels> {
+static auto pending_pick_query_ndc(GLFWwindow* window,
+                                   int tex_width,
+                                   int tex_height)
+    -> std::optional<PickQueryNdc> {
     if (!g_pick_drag.pending_query || tex_width <= 0 || tex_height <= 0) {
         return std::nullopt;
     }
@@ -1653,13 +1961,15 @@ static auto pending_pick_query_pixels(GLFWwindow* window,
         to_pixel(g_pick_drag.pending_start_x, g_pick_drag.pending_start_y);
     auto [x1, y1] = to_pixel(end_x, end_y);
 
-    PickQueryPixels query = {};
-    query.left = std::min(x0, x1);
-    query.top = std::min(y0, y1);
-    query.right =
-        std::min(std::max(x0, x1) + 1, static_cast<int32_t>(tex_width));
-    query.bottom =
-        std::min(std::max(y0, y1) + 1, static_cast<int32_t>(tex_height));
+    PickQueryNdc query = {};
+    query.left_ndc = static_cast<float>(std::min(x0, x1)) / static_cast<float>(tex_width);
+    query.top_ndc = static_cast<float>(std::min(y0, y1)) / static_cast<float>(tex_height);
+    query.right_ndc =
+        static_cast<float>(std::min(std::max(x0, x1) + 1, static_cast<int32_t>(tex_width))) /
+        static_cast<float>(tex_width);
+    query.bottom_ndc =
+        static_cast<float>(std::min(std::max(y0, y1) + 1, static_cast<int32_t>(tex_height))) /
+        static_cast<float>(tex_height);
     g_pick_drag.pending_query = false;
     return query;
 }
@@ -1689,28 +1999,62 @@ static auto find_render_var_output(ovrtx_render_product_set_outputs_t const& out
 static bool process_pick_output(ovrtx_renderer_t* renderer,
                                 path_dictionary_instance_t* path_dictionary,
                                 ovrtx_render_var_output_handle_t pick_output_handle,
-                                std::vector<std::string>& selected_prim_paths) {
-    std::optional<std::vector<std::string>> picked_paths =
-        read_pick_paths(renderer, path_dictionary, pick_output_handle);
-    if (!picked_paths) {
+                                std::vector<ovx_primpath_t>& selected_prim_path_ids) {
+    std::optional<PickedPrims> picked_prims =
+        read_picked_prims(renderer, path_dictionary, pick_output_handle);
+    if (!picked_prims) {
         return false;
     }
 
-    print_picked_prims(*picked_paths);
-    std::vector<std::string> previous_selection = selected_prim_paths;
+    print_picked_prims(picked_prims->paths);
     if (!update_selection_outline(
-            renderer, previous_selection, *picked_paths)) {
+            renderer, selected_prim_path_ids, picked_prims->path_ids)) {
         return false;
     }
 
-    selected_prim_paths = *picked_paths;
+    selected_prim_path_ids = picked_prims->path_ids;
     return true;
 }
 
-static auto read_pick_paths(ovrtx_renderer_t* renderer,
-                            path_dictionary_instance_t* path_dictionary,
-                            ovrtx_render_var_output_handle_t pick_output_handle)
-    -> std::optional<std::vector<std::string>> {
+static bool configure_selection_style(ovrtx_renderer_t* renderer) {
+    const uint8_t group_ids[] = {SELECTED_OUTLINE_GROUP};
+    const ovrtx_selection_group_style_t styles[] = {SELECTED_OUTLINE_STYLE};
+    ovrtx_enqueue_result_t result =
+        ovrtx_set_selection_group_styles(renderer, group_ids, styles, 1);
+    return !check_and_print_error(result, "set_selection_group_styles");
+}
+
+static bool update_selection_outline(ovrtx_renderer_t* renderer,
+                                     std::vector<ovx_primpath_t> const& previous_selection,
+                                     std::vector<ovx_primpath_t> const& next_selection) {
+    // Clear the previous selection first so prims dropped from the selection
+    // lose their outline, then assign the new selection to the outline group.
+    if (!write_selection_outline_group(renderer, previous_selection, 0)) {
+        return false;
+    }
+    return write_selection_outline_group(renderer, next_selection, SELECTED_OUTLINE_GROUP);
+}
+
+static bool write_selection_outline_group(ovrtx_renderer_t* renderer,
+                                          std::vector<ovx_primpath_t> const& prim_path_ids,
+                                          uint8_t group_id) {
+    if (prim_path_ids.empty()) {
+        return true;
+    }
+
+    std::vector<uint8_t> group_ids(prim_path_ids.size(), group_id);
+    ovrtx_enqueue_result_t result =
+        ovrtx_set_selection_outline_group(renderer,
+                                          prim_path_ids.data(),
+                                          prim_path_ids.size(),
+                                          group_ids.data());
+    return !check_and_print_error(result, "set_selection_outline_group");
+}
+
+static auto read_picked_prims(ovrtx_renderer_t* renderer,
+                              path_dictionary_instance_t* path_dictionary,
+                              ovrtx_render_var_output_handle_t pick_output_handle)
+    -> std::optional<PickedPrims> {
     if (pick_output_handle == OVRTX_INVALID_HANDLE) {
         std::cerr << "ERROR: pick query produced no "
                   << OVRTX_RENDER_VAR_PICK_HIT << " output\n";
@@ -1730,8 +2074,7 @@ static auto read_pick_paths(ovrtx_renderer_t* renderer,
         return std::nullopt;
     }
 
-    std::optional<std::vector<std::string>> picked_paths =
-        std::vector<std::string>{};
+    std::optional<PickedPrims> picked_prims = PickedPrims{};
     DLTensor const* prim_path_tensor =
         find_render_var_tensor(pick_output, "primPath");
     DLTensor const* magic_param = find_render_var_param(pick_output, "magic");
@@ -1752,22 +2095,43 @@ static auto read_pick_paths(ovrtx_renderer_t* renderer,
         std::cerr << "ERROR: unexpected pick hit schema"
                   << " magic=0x" << std::hex << magic << std::dec
                   << " version=" << version << "\n";
-        picked_paths = std::nullopt;
-    } else if (!prim_path_tensor || !prim_path_tensor->data ||
+        picked_prims = std::nullopt;
+    } else if (hit_count == 0) {
+        // Miss (sky/background): primPath column is length 0 and data may be null.
+        picked_prims = PickedPrims{};
+    } else if (!prim_path_tensor || !prim_path_tensor->shape ||
                prim_path_tensor->ndim != 1 ||
-               static_cast<uint32_t>(prim_path_tensor->shape[0]) < hit_count) {
-        std::cerr << "ERROR: unexpected pick hit primPath tensor layout\n";
-        picked_paths = std::nullopt;
+               prim_path_tensor->shape[0] < static_cast<int64_t>(hit_count) ||
+               !prim_path_tensor->data) {
+        std::cerr << "ERROR: unexpected pick hit primPath tensor layout"
+                  << " ndim=" << (prim_path_tensor ? prim_path_tensor->ndim : -1)
+                  << " shape0="
+                  << (prim_path_tensor && prim_path_tensor->shape
+                          ? prim_path_tensor->shape[0]
+                          : -1)
+                  << " hit_count=" << hit_count
+                  << " data="
+                  << (prim_path_tensor && prim_path_tensor->data ? "set" : "null")
+                  << "\n";
+        picked_prims = std::nullopt;
     } else {
-        auto const* prim_paths =
-            static_cast<ovx_primpath_t const*>(prim_path_tensor->data);
+        auto const* prim_paths = reinterpret_cast<ovx_primpath_t const*>(
+            reinterpret_cast<uint8_t const*>(prim_path_tensor->data) +
+            prim_path_tensor->byte_offset);
         for (uint32_t i = 0; i < hit_count; ++i) {
+            if (prim_paths[i] == 0) {
+                continue;
+            }
+            if (std::find(picked_prims->path_ids.begin(),
+                          picked_prims->path_ids.end(),
+                          prim_paths[i]) != picked_prims->path_ids.end()) {
+                continue;
+            }
             std::string path =
                 resolve_primpath(path_dictionary, prim_paths[i]);
-            if (!path.empty() &&
-                std::find(picked_paths->begin(), picked_paths->end(), path) ==
-                    picked_paths->end()) {
-                picked_paths->push_back(path);
+            if (!path.empty()) {
+                picked_prims->path_ids.push_back(prim_paths[i]);
+                picked_prims->paths.push_back(path);
             }
         }
     }
@@ -1779,7 +2143,7 @@ static auto read_pick_paths(ovrtx_renderer_t* renderer,
         return std::nullopt;
     }
 
-    return picked_paths;
+    return picked_prims;
 }
 
 static auto resolve_primpath(path_dictionary_instance_t* path_dictionary,
@@ -1822,45 +2186,6 @@ static auto resolve_primpath(path_dictionary_instance_t* path_dictionary,
     }
 
     return path;
-}
-
-static bool configure_selection_style(ovrtx_renderer_t* renderer) {
-    const uint8_t group_ids[] = {SELECTED_OUTLINE_GROUP};
-    const ovrtx_selection_group_style_t styles[] = {SELECTED_OUTLINE_STYLE};
-    ovrtx_enqueue_result_t result =
-        ovrtx_set_selection_group_styles(renderer, group_ids, styles, 1);
-    return !check_and_print_error(result, "set_selection_group_styles");
-}
-
-static bool update_selection_outline(ovrtx_renderer_t* renderer,
-                                     std::vector<std::string> const& previous_selection,
-                                     std::vector<std::string> const& next_selection) {
-    if (!write_selection_outline_group(renderer, previous_selection, 0)) {
-        return false;
-    }
-    return write_selection_outline_group(renderer, next_selection, SELECTED_OUTLINE_GROUP);
-}
-
-static bool write_selection_outline_group(ovrtx_renderer_t* renderer,
-                                          std::vector<std::string> const& prim_paths,
-                                          uint8_t group_id) {
-    if (prim_paths.empty()) {
-        return true;
-    }
-
-    std::vector<ovx_string_t> path_views;
-    path_views.reserve(prim_paths.size());
-    for (std::string const& path : prim_paths) {
-        path_views.push_back({path.c_str(), path.size()});
-    }
-
-    std::vector<uint8_t> group_ids(prim_paths.size(), group_id);
-    ovrtx_enqueue_result_t result =
-        ovrtx_set_selection_outline_group(renderer,
-                                          path_views.data(),
-                                          path_views.size(),
-                                          group_ids.data());
-    return !check_and_print_error(result, "set_selection_outline_group");
 }
 
 static void print_picked_prims(std::vector<std::string> const& prim_paths) {

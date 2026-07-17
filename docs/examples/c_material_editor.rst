@@ -13,6 +13,10 @@ C: Material Editor
 
 An interactive Qt desktop application that demonstrates how to use the ovrtx C API to build a material editing workflow. The application loads a USD scene, renders it with ovrtx, and provides a GUI for browsing materials, inspecting shader graphs, and editing shader parameters with live-rendered feedback.
 
+This example uses deprecated standalone renderer population and attribute-write
+APIs for its live material-editing workflow. Use the 0.3-to-0.4 migration skill
+when moving scene management and edits to ovstage.
+
 This example supports **MaterialX materials only**. The OpenUSD installation used to build the example must be built with **MaterialX support enabled** so MaterialX shader definitions are available through Sdr.
 
 .. pull-quote::
@@ -78,10 +82,10 @@ If no path is provided, the app loads ``data/material-editor-ball.usda``.
 UI Panels
 ---------
 
-- **Material list** -- select which material is bound to the scene geometry.
-- **Viewport** -- live path-traced render from ovrtx.
-- **Node graph** -- read-only visualization of the selected material's UsdShade shader graph.
-- **Property panel** -- shader inputs from the USD Sdr registry, grouped into collapsible sections.
+- **Material list** - select which material is bound to the scene geometry.
+- **Viewport** - live path-traced render from ovrtx.
+- **Node graph** - read-only visualization of the selected material's UsdShade shader graph.
+- **Property panel** - shader inputs from the USD Sdr registry, grouped into collapsible sections.
 
 USD Scene Requirements
 ----------------------

@@ -83,7 +83,12 @@ Cleanup is automatic -- the renderer is destroyed when it goes out of scope.
 
 ## C
 
-Create a renderer with no configuration:
+All public C examples and doc tests link the **static** ovrtx loader
+(`ovrtx::ovrtx_static`) and hand `ovrtx_create_renderer()` a
+`binary_package_root_path` built from `OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx"`.
+`ovrtx_setup_runtime()` stages a side-by-side `ovrtx/` link next to the
+executable, and the token resolves to the running executable's directory at
+runtime, so the loader finds the package without hard-coding an install path:
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `create-renderer`
 

@@ -8,10 +8,17 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// Tests for the 0.3.0 ovrtx_wait_op error-retrieval semantics:
+// Tests for the ovrtx_wait_op error-retrieval semantics:
 // the wait result returns the list of op ids that errored plus the lowest
 // still-pending op id; per-op error strings are fetched via
-// ovrtx_get_last_op_error(). The old ovrtx_release_errors() cleanup step is gone.
+// ovrtx_get_last_op_error().
+//
+// The renderer runs in STANDALONE mode (no ovstage attach) so we can use a
+// deprecated ovrtx_open_usd_from_file call with a nonexistent path as the
+// guaranteed failure trigger. ovrtx_wait_op itself is not deprecated in 0.4
+// and its error-retrieval semantics apply identically to ops enqueued via
+// ovrtx_step_with_stage / ovrtx_update_from_stage; the snippet story is the
+// same either way, only the trigger changes.
 
 #include <gtest/gtest.h>
 #include "helpers.h"

@@ -169,8 +169,18 @@ OvrtxEngine::~OvrtxEngine()
 
 bool OvrtxEngine::initialize(const std::string &usda_path)
 {
-    // Create renderer
-    ovrtx_config_t config{};
+    // Create renderer.
+    //
+    // The STATIC ovrtx loader resolves the ${executable_dir} token to the running
+    // executable's directory; ovrtx_setup_runtime() links the package bin beside
+    // the exe as "ovrtx/", which we hand the loader as the binary package root.
+    ovx_string_t ovrtx_package_root = {
+        OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx",
+        sizeof(OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx") - 1};
+    ovrtx_config_entry_t config_entries[] = {
+        ovrtx_config_entry_binary_package_root_path(ovrtx_package_root),
+    };
+    ovrtx_config_t config{config_entries, 1};
     std::cerr << "Creating renderer...\n";
     ovrtx_result_t result = ovrtx_create_renderer(&config, &renderer_);
     if (check_error(result, "create_renderer")) {

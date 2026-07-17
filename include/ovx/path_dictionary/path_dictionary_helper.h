@@ -13,5 +13,16 @@
 #include "path_dictionary_types.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
+
+static inline bool ovx_string_contains_embedded_nul(const ovx_string_t* string)
+{
+    return string && string->ptr && memchr(string->ptr, '\0', string->length) != NULL;
+}
+
+static inline bool ovx_string_has_null_data(const ovx_string_t* string)
+{
+    return string && !string->ptr && string->length != 0;
+}
 
 #endif /* PATH_DICTIONARY_HELPER_H */

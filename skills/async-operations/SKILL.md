@@ -168,6 +168,18 @@ C wait result fields:
 - In C, release each successful `ovrtx_query_op_status()` result with `ovrtx_release_op_status()`.
 - Error strings from `ovrtx_get_last_op_error()` are valid only until the next `ovrtx_wait_op` call on the same thread.
 
+## In Attached Mode (ovrtx 0.4+)
+
+When ovrtx is attached to ovstage, the write side of the async model moves to
+ovstage's ordinal-keyed submit/observe: ovstage enqueues return an ``op_index``
+immediately, and ordinal sealing (``ovstage_advance_write_floor``) is what makes
+writes observable. ovrtx observes the sealed state by passing the same ordinal
+to ``ovrtx_step_with_stage(..., ordinal)`` and
+``ovrtx_update_from_stage(ordinal)``. See ovstage
+``skills/cpu-ahead-gpu-async/SKILL.md`` for the authoritative async model.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
+
 ## References
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.

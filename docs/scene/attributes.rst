@@ -11,16 +11,23 @@
 Attribute Reads and Writes
 ==========================
 
-ovrtx reads and writes runtime stage attributes using DLPack tensors. The dtype
-and shape must match the USD attribute schema. Scalar APIs operate on one value
-per prim. Array APIs operate on variable-length arrays such as mesh points or
-relationships.
+.. note::
+
+   Python examples query, read, and write through ovstage. The renderer
+   read/write wrappers and their destination-buffer and CUDA forms are
+   deprecated compatibility APIs. Refer to ``skills/update-0_3-0_4-python/SKILL.md``.
+
+Ovstage reads and writes runtime stage attributes using DLPack tensors. The
+dtype and shape must match the USD attribute schema. Scalar attributes contain
+one value per prim. Array attributes contain variable-length values such as mesh
+points or relationships.
 
 Tensor Layout
 -------------
 
-Python uses NumPy-style trailing dimensions for vectors and matrices. C uses
-``DLDataType::lanes`` for multi-component values.
+Ovstage and C attribute tensors use ``DLDataType::lanes`` for multi-component
+values. NumPy backing arrays and DLPack consumers expose lane components as
+trailing dimensions:
 
 .. list-table::
    :header-rows: 1
@@ -81,8 +88,8 @@ Reading Attributes
          :end-before: // [/snippet:doc-read-array-attribute-c]
          :dedent:
 
-Python reads can also write directly into a caller-provided DLPack destination,
-including CUDA destinations:
+The deprecated renderer read wrappers can write directly into caller-provided
+CPU or CUDA DLPack destinations:
 
 .. tab-set::
 
@@ -131,32 +138,33 @@ Writing Attributes
          :end-before: // [/snippet:doc-write-bound-attribute-c]
          :dedent:
 
-Data Access
------------
+Compatibility Data Access
+-------------------------
 
-Synchronous writes copy data before the call returns. Asynchronous writes may
+Synchronous writes copy data before the call returns. Asynchronous writes can
 access the caller's memory later during stream execution, so the source tensor
 must remain alive until the operation completes. String data supports only
 synchronous access.
 
-Python exposes this through ``DataAccess.SYNC`` and ``DataAccess.ASYNC``. C uses
-the access mode argument to :c:func:`ovrtx_write_attribute`.
+The deprecated Python wrappers expose this through ``DataAccess.SYNC`` and
+``DataAccess.ASYNC``. C uses the access mode argument to
+:c:func:`ovrtx_write_attribute`.
 
 Type Notes
 ----------
 
-- Use ``read_array_attribute`` / ``write_array_attribute`` for USD array
-  attributes and relationships.
-- Semantics are write-side conversion hints. Attribute reads use raw storage
-  layout and ``OVRTX_SEMANTIC_NONE``.
+- Pass ``is_array=True`` to ovstage writes for USD array attributes and
+  relationships.
+- Ovstage writes use ``AttributeSemantic`` to preserve authored interpretation.
+  Deprecated ovrtx reads use raw storage layout and ``OVRTX_SEMANTIC_NONE``.
 - Quaternion tensor order is ``(i, j, k, real)`` even though USDA authors values
   as ``(real, i, j, k)``.
 - ``string`` attributes are represented as UTF-8 byte arrays. String arrays are
   not supported; use ``token[]`` for string-like arrays.
-- Python can write token strings directly. C can create and resolve token ids
-  through the path dictionary.
-- Scalar ``asset`` values are supported as token pairs in C. Asset arrays and
-  timecode attributes are not supported as runtime attributes.
+- Python ovstage code interns token and relationship values through
+  ``ovstage.PathDictionary``.
+- Ovstage asset values use byte rows with ``AttributeSemantic.ASSET_STRING``.
+  Deprecated C compatibility writes represent scalar assets as token pairs.
 
 C Convenience Helpers
 ---------------------
@@ -174,11 +182,10 @@ Troubleshooting
 ---------------
 
 - Match the runtime dtype, not the Python or C default numeric type.
-- Array writes in Python take one tensor per prim.
-- ``PrimMode.EXISTING_ONLY`` skips missing prims; use ``MUST_EXIST`` when a
-  missing prim should be an error.
+- Ovstage array writes use lane-aware DLTensors and ``is_array=True``.
+- ``PrimMode.UPSERT`` creates absent prims and updates existing prims;
+  ``PrimMode.INSERT`` is create-only.
 - In C, binding descriptors borrow path storage. Keep the strings and arrays
   alive until the operation that uses the descriptor has completed.
 - Generic authored USD attributes require
   ``customLayerData.populateAllAuthoredAttributes = true`` on the root layer.
-

@@ -36,7 +36,7 @@ Use this skill when implementing click picking, drag selection, printing picked 
 Resolve inputs in this order: existing repository files and referenced snippets, explicit user request, then broader agent context.
 
 - Target API surface: Python, C/C++, USD, or a combination.
-- RenderProduct path and resolution, plus the UI click or marquee coordinates in RenderProduct pixel space.
+- RenderProduct path, plus the UI click or marquee coordinates converted to normalized RenderProduct coordinates.
 - Desired pick result handling: path ID decoding, picked prim names, pickability filtering, or selected-path storage.
 - Selection outline requirements: group IDs, colors, fill mode, and whether the picking RenderProduct must be pinned to CUDA-visible GPU 0.
 - Repository source snippets referenced below. Treat these snippets as the API source of truth.
@@ -77,6 +77,23 @@ Picking is a RenderProduct-space query consumed by the next renderer step. The
 result is a synthetic render var named `ovrtx_pick_hit` / `OVRTX_RENDER_VAR_PICK_HIT`.
 Each hit stores a path-dictionary id, not a string.
 
+Picking coordinates are normalized RenderProduct coordinates, not window or
+pixel coordinates. Use [0, 1] top-left-origin semantics:
+- x = 0 is the left edge, and x = 1 is the right edge.
+- y = 0 is the top edge, and y = 1 is the bottom edge.
+- The rectangle uses the same convention as the old pixel API: `right_ndc` and
+  `bottom_ndc` mark the edge just past the last included pixel.
+- The old one-pixel rectangle [50, 50, 51, 51] on a 100 x 100 RenderProduct is
+  [0.50, 0.50, 0.51, 0.51] in NDC.
+- The full RenderProduct is [0, 0, 1, 1].
+- A one-pixel pick at pixel (px, py) on a width x height RenderProduct is:
+  left_ndc = px / width, top_ndc = py / height,
+  right_ndc = (px + 1) / width, bottom_ndc = (py + 1) / height.
+- Callers should clamp UI drags to [0, 1]. The API rejects out-of-bounds
+  coordinates, but old pixel-space values that already fall inside [0, 1] are
+  valid NDC and can be ambiguous during migration (boundary values may be
+  clamped to the valid range to account for floating-point roundoff).
+
 Current limitation: picking only works for RenderProducts running on
 CUDA-visible GPU 0. In multi-GPU scenes, restrict picking RenderProducts to
 CUDA-visible GPU 0 by authoring `uint[] deviceIds = [0]`. `deviceIds` is an
@@ -84,13 +101,14 @@ allow-list of indices into `CUDA_VISIBLE_DEVICES`; ovrtx may choose any
 CUDA-visible GPU from the list.
 
 Selection drawing is separate from picking. Enable the selection outline pass at
-renderer creation, then write non-zero `omni:selectionOutlineGroup` values to the
-prims that should be outlined. Write group `0` to clear an outline.
+renderer creation, then set non-zero selection outline group ids on the prims
+that should be outlined. Write group `0` to clear an outline.
 
 Selection styling has two layers:
 - Global renderer-creation state controls outline width and fill mode.
 - Runtime per-group state controls outline and fill colors. Prims opt into a
-  style by writing that group's id to `omni:selectionOutlineGroup`.
+  style by passing that group's id to `Renderer.set_selection_outline_group()` /
+  `ovrtx_set_selection_outline_group()`.
 
 Fill colors are visible only when the renderer is created with a fill mode that
 uses per-group fill color, such as `GROUP_FILL_COLOR` /
@@ -99,14 +117,14 @@ uses per-group fill color, such as `GROUP_FILL_COLOR` /
 ## Workflow
 
 1. Load the stage and identify the RenderProduct path. For picking, ensure that RenderProduct is restricted to CUDA-visible GPU 0 in USD.
-2. Convert UI/window input into RenderProduct pixel coordinates.
-3. Queue a pick query before the next step. Use a 1x1 rectangle for click picking and a larger rectangle for marquee selection.
+2. Convert UI/window input into normalized RenderProduct coordinates.
+3. Queue a pick query before the next step. Use a one-pixel-equivalent NDC rectangle for click picking and a larger rectangle for marquee selection.
 4. Step the renderer for the same RenderProduct.
 5. Find and CPU-map the synthetic pick-hit render var.
 6. Validate the `magic` / `version` params and read named tensors such as `primPath`.
-7. Resolve each `primPath` id through the renderer path dictionary.
-8. Deduplicate resolved paths, then print or otherwise report the picked prim names.
-9. Optionally write group `0` to clear the previous selection and group `1` to outline the new selection.
+7. Resolve `primPath` ids through the renderer path dictionary when reporting picked prim names.
+8. Print or otherwise report the resolved prim names.
+9. Optionally set group `0` to clear the previous selection and group `1` to outline the new selection.
 
 ## Python
 
@@ -126,8 +144,9 @@ uses per-group fill color, such as `GROUP_FILL_COLOR` /
 
 > **Source:** `tests/docs/python/test_picking_selection.py` snippet `doc-resolve-picked-prim-paths-python`
 
-After resolving path ids, deduplicate them before printing names or writing
-selection outline groups. Print the resolved strings, not the numeric path ids.
+Resolve path ids before printing names. Selection outline calls accept duplicate
+path ids or strings; the last occurrence wins. Print the resolved strings, not
+the numeric path ids.
 
 ### Mark prims pickable or unpickable
 
@@ -164,8 +183,8 @@ steps. Later writes to the same group id win.
 
 > **Source:** `tests/docs/python/test_picking_selection.py` snippet `doc-assign-selection-style-groups-python`
 
-Write `OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP` per prim to choose which styled
-selection group that prim uses. This is the per-prim part of selection styling.
+Use `Renderer.set_selection_outline_group()` to choose which styled selection
+group each prim uses. This is the per-prim part of selection styling.
 
 ## C
 
@@ -223,9 +242,8 @@ Later writes to the same group id win.
 
 > **Source:** `tests/docs/c/test_picking_selection.cpp` snippet `doc-assign-selection-style-groups-c`
 
-Use `ovrtx_set_selection_outline_group()` to write each prim's
-`omni:selectionOutlineGroup` value. The group id selects which per-group style
-that prim uses.
+Use `ovrtx_set_selection_outline_group()` to set each prim's outline group id.
+The group id selects which per-group style that prim uses.
 
 ## Key Types / Functions
 
@@ -238,8 +256,8 @@ that prim uses.
 | `RendererConfig(selection_fill_mode=SelectionFillMode.GROUP_FILL_COLOR)` | `ovrtx_config_entry_selection_fill_mode(OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR)` |
 | `Renderer.set_selection_group_styles()` | `ovrtx_set_selection_group_styles()` |
 | `SelectionGroupStyle` | `ovrtx_selection_group_style_t` |
-| `Renderer.write_attribute(..., OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP, uint8)` | `ovrtx_set_selection_outline_group()` |
-| `Renderer.write_attribute(..., OVRTX_ATTR_NAME_PICKABLE, uint8)` | `ovrtx_set_pickable()` |
+| `Renderer.set_selection_outline_group()` | `ovrtx_set_selection_outline_group()` |
+| `Renderer.set_pickable()` | `ovrtx_set_pickable()` |
 | `OVRTX_RENDER_VAR_PICK_HIT` | `OVRTX_RENDER_VAR_PICK_HIT` |
 | `OVRTX_PICK_FLAG_GIZMO`, `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` | `OVRTX_PICK_FLAG_GIZMO`, `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` |
 
@@ -247,25 +265,32 @@ Pick-hit render-var layout:
 - Params: `magic`, `version`, `hitCount`.
 - Tensors: `primPath`, `objectType`, `geometryInstanceId`, `worldPositionM`, `worldNormal`.
 - Validate `OVRTX_PICK_HIT_MAGIC` and `OVRTX_PICK_HIT_VERSION` before reading tensors.
-- C path resolution needs `ovx/path_dictionary/path_dictionary_utils.h`; selection and pickability helpers need `ovrtx/ovrtx_attributes.h`.
+- C path resolution needs `ovx/path_dictionary/path_dictionary_utils.h`; selection and pickability APIs are declared in `ovrtx/ovrtx.h`.
+
+Pick query flags:
+- `OVRTX_PICK_FLAG_GIZMO` also requests gizmo picking.
+- `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` requests tracked hit metadata such as
+  object type, geometry instance id, world position, and world normal when
+  available.
 
 ## UI Integration Notes
 
-- Convert from window or framebuffer coordinates to RenderProduct pixel coordinates before enqueueing a query. Do not pass raw window pixels unless the RenderProduct exactly matches the window.
-- `left` and `top` are inclusive. `right` and `bottom` are exclusive, so a click uses `right = left + 1` and `bottom = top + 1`.
+- Convert from window or framebuffer coordinates to normalized RenderProduct coordinates before enqueueing a query. Do not pass raw window pixels.
+- NDC values use [0, 1] top-left-origin semantics: x increases left-to-right and y increases top-to-bottom.
+- For a RenderProduct of size `width` by `height`, pixel `(px, py)` is `left_ndc = px / width`, `top_ndc = py / height`, `right_ndc = (px + 1) / width`, and `bottom_ndc = (py + 1) / height`.
 - Use a small drag threshold so tiny mouse movement is still treated as a click.
-- For drag selection, clamp both endpoints to the RenderProduct extent, then use the min values as `left/top` and `max + 1` as `right/bottom`.
+- For drag selection, clamp both endpoints to [0, 1], then use the min values as `left_ndc/top_ndc` and max values as `right_ndc/bottom_ndc`.
 - Keep camera controls on a non-picking mouse button when adding click or marquee selection to an interactive viewport.
 
 ## Troubleshooting
 
-- The pick rectangle is in RenderProduct pixel coordinates, not window coordinates. UI integrations must convert from window or framebuffer coordinates before enqueueing.
+- The pick rectangle is in normalized RenderProduct coordinates, not window coordinates. UI integrations must convert from window or framebuffer coordinates before enqueueing.
 - Enqueue the pick query before the step that should produce pick results.
 - Picking currently requires the target RenderProduct to run on CUDA-visible GPU 0. Use the `render-product-device-pinning` skill to author a CUDA-visible GPU 0-only `deviceIds` allow-list on picking RenderProducts.
 - If multiple pick queries target the same RenderProduct before one step, the last query wins.
 - The synthetic pick-hit render var appears only on a step that consumed a pick query.
 - `ovrtx_pick_hit` can only be mapped on CPU/default. Always unmap the output and destroy the step result after use.
-- Hit records contain path ids. Resolve them before printing names or writing selection groups.
+- Hit records contain path ids. Resolve them before printing names or setting selection groups.
 - Selection drawing requires both renderer config and non-zero per-prim group ids. Write group `0` to prims from the previous selection before writing group `1` to the next selection.
 - Selection fill color has no visible effect unless the renderer's fill mode uses per-group fill color.
 - Outline dashing/stippling is not supported by the underlying RTX outline pipeline.

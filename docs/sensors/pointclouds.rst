@@ -16,8 +16,8 @@ one output exposes one named tensor per requested channel plus CPU params that
 describe the output. Use ``Counts`` to bound per-point or per-detection tensors
 before reading channel values.
 
-For the output container format, see :doc:`sensor_outputs`. For sensor-specific
-channel meanings, see :doc:`lidar` and :doc:`radar`.
+For the output container format, refer to :doc:`sensor_outputs`. For sensor-specific
+channel meanings, refer to :doc:`lidar` and :doc:`radar`.
 
 Python
 ------
@@ -26,7 +26,7 @@ Python
 
    .. tab-item:: Lidar
 
-      .. literalinclude:: ../../examples/python/sensors/lidar/main.py
+      .. literalinclude:: ../../examples/python/lidar/main.py
          :language: python
          :start-after: # [snippet:read-lidar-pointcloud]
          :end-before: # [/snippet:read-lidar-pointcloud]
@@ -34,7 +34,7 @@ Python
 
    .. tab-item:: Radar
 
-      .. literalinclude:: ../../examples/python/sensors/radar/main.py
+      .. literalinclude:: ../../examples/python/radar/main.py
          :language: python
          :start-after: # [snippet:read-radar-pointcloud]
          :end-before: # [/snippet:read-radar-pointcloud]
@@ -42,8 +42,9 @@ Python
 
 In Python, ``frame.render_vars["PointCloud"].map(device=ovrtx.Device.CPU)``
 returns a mapped composite output. Index by exact channel name, then pass the
-channel object to a DLPack consumer such as NumPy. Copy arrays before leaving
-the ``with`` block when later code needs to keep the data.
+channel object to a DLPack consumer such as NumPy. The mapping is
+consumer-owned: a held DLPack view keeps the data valid past ``unmap``, so copy
+only when data must outlive the last held view.
 
 C
 -
@@ -52,7 +53,7 @@ C
 
    .. tab-item:: Lidar
 
-      .. literalinclude:: ../../examples/c/sensors/lidar/main.cpp
+      .. literalinclude:: ../../examples/c/lidar/main.cpp
          :language: cpp
          :start-after: // [snippet:read-lidar-pointcloud]
          :end-before: // [/snippet:read-lidar-pointcloud]
@@ -60,7 +61,7 @@ C
 
    .. tab-item:: Radar
 
-      .. literalinclude:: ../../examples/c/sensors/radar/main.cpp
+      .. literalinclude:: ../../examples/c/radar/main.cpp
          :language: cpp
          :start-after: // [snippet:read-radar-pointcloud]
          :end-before: // [/snippet:read-radar-pointcloud]
@@ -92,9 +93,11 @@ Rules
   ``channels`` authored on the ``PointCloud`` RenderVar.
 - ``Counts`` and ``Flags`` are auto-enabled by lidar and radar models.
 - Other payload channels are present only when requested.
-- Mapped tensor pointers are valid only until unmap.
-- Copy CPU data, or synchronize and copy GPU data, if it must outlive the
-  mapping.
+- In Python the mapping is consumer-owned: a held DLPack consumer view (for example, a NumPy array) keeps the
+  buffer valid even after unmap, so lifetime is not a manual concern — copy only if
+  you need data beyond the last view.
+- In C, mapped tensor pointers are valid only until unmap; copy CPU data, or
+  synchronize and copy GPU data, before unmapping if it must outlive the mapping.
 
 
 .. note::

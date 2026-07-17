@@ -342,4 +342,3 @@ over "OmniverseKit_Top" (
     double3 xformOp:translate = (0, 0, 50000)
     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
 }
-

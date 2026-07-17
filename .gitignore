@@ -5,6 +5,7 @@ _*/
 
 # Python virtual environments.
 .venv/
+python/uv.lock
 
 # Pytest cache.
 .pytest_cache/

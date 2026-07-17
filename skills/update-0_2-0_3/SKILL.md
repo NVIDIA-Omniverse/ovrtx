@@ -53,7 +53,7 @@ Resolve inputs in this order: the user's repository, its dependency files, then 
 
 ## Instructions
 
-1. Find version pins first. Search package and lock files for `ovrtx==0.2`, `ovrtx~=0.2`, or equivalent C package references. Update to the user's requested 0.3 build; in this repo's examples the packaged Python pin is `ovrtx==0.3.0.312258`.
+1. Find version pins first. Search package and lock files for `ovrtx==0.2`, `ovrtx~=0.2`, or equivalent C package references. Update to the user's requested 0.3 build; in this repo's examples the packaged Python pin is `ovrtx==0.3.0`.
 2. Scan for 0.2-only Python symbols: `RendererResult`, `add_usd`, `add_usd_layer`, `add_usd_async`, `add_usd_layer_async`, `output_partial_frames`, `step_async`, and `MappedRenderVar.tensor`.
 3. Scan for 0.2-only C symbols: `ovrtx_add_usd`, `ovrtx_usd_input_t`, `ovrtx_rendered_output_t`, `ovrtx_map_rendered_output`, `ovrtx_unmap_rendered_output`, `ovrtx_rendered_output_handle_t`, `ovrtx_rendered_output_map_handle_t`, `OVRTX_CONFIG_OUTPUT_PARTIAL_FRAMES`, `ovrtx_release_errors`, `ovrtx_flush_op_log`, and old renderer-scoped `ovrtx_set_log_callback` calls.
 4. Rewrite USD loading by intent:
@@ -143,6 +143,7 @@ Use transient per-thread wait error data and process-global logging callbacks.
 
 ## References
 
+- `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md` for the subsequent migration from renderer-owned scene APIs to ovstage.
 - `CHANGELOG.md` 0.3.0 `Added`, `Changed`, and `Removed` sections for release-level migration notes.
 - `skills/loading-usd/SKILL.md` for current root-stage and reference composition patterns.
 - `skills/stepping-and-rendering/SKILL.md` for current step lifecycle.

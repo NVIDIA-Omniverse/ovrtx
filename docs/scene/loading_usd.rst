@@ -11,8 +11,15 @@
 Loading USD
 ===========
 
-Before rendering, load USD content into the renderer's runtime stage. ovrtx
-supports three composition patterns:
+.. note::
+
+   Python examples populate an attached ovstage. The ``Renderer.open_usd*``,
+   reference, remove, reset, and USD-time wrappers are deprecated compatibility
+   APIs. Refer to ``skills/update-0_3-0_4-python/SKILL.md``. The C tabs retain the
+   corresponding standalone APIs.
+
+Before rendering, load USD content into the application-owned ovstage. The
+population layer supports three composition patterns:
 
 - Open a file path, URL, or inline USDA string as the root layer.
 - Compose a new inline root layer that sublayers an existing scene and authors
@@ -41,8 +48,9 @@ Opening a Root Layer
          :end-before: // [/snippet:load-usd-and-wait]
          :dedent:
 
-Python ``open_usd`` blocks. Python ``open_usd_async`` and all C open calls are
-asynchronous and must be waited before using the loaded stage.
+Python population assigns an ordinal; advance the ovstage write floor before
+rendering that ordinal. C compatibility open calls are asynchronous and must be
+waited before using the loaded stage.
 
 Inline Composition
 ------------------
@@ -107,14 +115,38 @@ composed below the requested path prefix.
 Time-Sampled USD
 ----------------
 
-For animated USD scenes, re-evaluate time-sampled attributes at a stage time.
-The API takes seconds and converts to USD time codes using the stage metadata.
+For animated USD scenes, re-evaluate time-sampled attributes through
+``ovstage.population.update_from_usd_time`` (Python) or
+``ovstage_population_apply_usd_time`` (attached-mode C) and publish the
+changes at a new ordinal.
 
-.. literalinclude:: ../../tests/docs/python/test_base.py
-   :language: python
-   :start-after: # [snippet:doc-update-from-usd-time-async]
-   :end-before: # [/snippet:doc-update-from-usd-time-async]
-   :dedent:
+USD authors time samples in **timecodes** (frame-like units), but the runtime time APIs take
+**seconds**. Convert using the stage's ``timeCodesPerSecond`` metadata:
+``seconds = timecode / timeCodesPerSecond``. For example, with ``timeCodesPerSecond = 24``,
+a sample at timecode ``48`` is at ``2.0`` seconds. Despite its name, the ``usd_time``
+parameter is in seconds, not timecodes.
+
+This is distinct from the *simulation time* advanced by ``step(delta_time)`` — the two
+clocks are independent (refer to the stepping-and-rendering skill). ``step()`` does not move USD
+animation; ``update_from_usd_time()`` does not advance the simulation/sensor clock.
+
+.. tab-set::
+
+   .. tab-item:: Python
+
+      .. literalinclude:: ../../tests/docs/python/test_base.py
+         :language: python
+         :start-after: # [snippet:doc-update-from-usd-time-async]
+         :end-before: # [/snippet:doc-update-from-usd-time-async]
+         :dedent:
+
+   .. tab-item:: C
+
+      .. literalinclude:: ../../tests/docs/c/test_base.cpp
+         :language: cpp
+         :start-after: // [snippet:doc-update-from-usd-time-async-c]
+         :end-before: // [/snippet:doc-update-from-usd-time-async-c]
+         :dedent:
 
 Resetting the Stage
 -------------------
@@ -129,6 +161,5 @@ Authored Attribute Population
 By default, the runtime populates supported schema attributes. To read or write
 generic custom authored attributes, an inline root layer can set
 ``customLayerData.populateAllAuthoredAttributes = true``. Use this only when
-needed: large assets may contain many authored properties that the application
+needed: large assets can contain many authored properties that the application
 will never use.
-

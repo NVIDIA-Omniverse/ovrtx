@@ -1,0 +1,148 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    startTimeCode = 0
+    endTimeCode = 10
+    timeCodesPerSecond = 10
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    # [snippet:configure-radar-sensor]
+    def OmniRadar "Radar" (
+        prepend apiSchemas = ["OmniSensorGenericRadarWpmDmatAPI"]
+    )
+    {
+        token omni:sensor:WpmDmat:elementsCoordsType = "CARTESIAN"
+        double2 omni:sensor:frameRate = (10, 1)
+
+        double3 xformOp:translate = (0, 0, 1)
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+    # [/snippet:configure-radar-sensor]
+
+    def Mesh "GroundPlane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-200, -200, 0), (200, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Asphalt>
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-200, -200, 0), (200, -200, 0), (200, 200, 0), (-200, 200, 0)]
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.05)]
+    }
+
+    def Cube "RightSteelCube" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1.5
+        color3f[] primvars:displayColor = [(0.55, 0.55, 0.60)]
+        rel material:binding = </World/Materials/Steel>
+        double3 xformOp:translate.timeSamples = {
+            0: (30, 4, 0.75),
+            1: (29, 4, 0.75),
+            2: (28, 4, 0.75),
+            3: (27, 4, 0.75),
+            4: (26, 4, 0.75),
+            5: (25, 4, 0.75),
+            6: (24, 4, 0.75),
+            7: (23, 4, 0.75),
+            8: (22, 4, 0.75),
+            9: (21, 4, 0.75),
+            10: (20, 4, 0.75)
+        }
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Cube "LeftConcreteCube" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1.5
+        color3f[] primvars:displayColor = [(0.45, 0.43, 0.39)]
+        rel material:binding = </World/Materials/Concrete>
+        double3 xformOp:translate = (30, -4, 0.75)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def DistantLight "DistantLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float intensity = 2500
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    # [snippet:configure-radar-pointcloud-output]
+    def "Render"
+    {
+        def "Products"
+        {
+            def RenderProduct "RadarProduct"
+            {
+                rel camera = </World/Radar>
+                rel orderedVars = [<../../Vars/PointCloud>]
+            }
+        }
+
+        def "Vars"
+        {
+            def RenderVar "PointCloud"
+            {
+                uniform string sourceName = "PointCloud"
+                token[] channels = [
+                    "Coordinates",
+                    "Counts",
+                    "RadialVelocityMs"
+                ]
+            }
+        }
+    }
+    # [/snippet:configure-radar-pointcloud-output]
+
+    # [snippet:configure-nonvisual-materials]
+    def Xform "Materials"
+    {
+        # These materials intentionally omit visual shaders. The sensor return
+        # behavior comes from the nonvisual attributes on the bound Material.
+        def Material "Asphalt"
+        {
+            token omni:simready:nonvisual:base = "asphalt"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            custom string inputs:nonvisual:base = "asphalt"
+            custom string inputs:nonvisual:coating = "none"
+            custom string inputs:nonvisual:attributes = "none"
+        }
+
+        def Material "Steel"
+        {
+            token omni:simready:nonvisual:base = "steel"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            custom string inputs:nonvisual:base = "steel"
+            custom string inputs:nonvisual:coating = "none"
+            custom string inputs:nonvisual:attributes = "none"
+        }
+
+        def Material "Concrete"
+        {
+            token omni:simready:nonvisual:base = "concrete"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            custom string inputs:nonvisual:base = "concrete"
+            custom string inputs:nonvisual:coating = "none"
+            custom string inputs:nonvisual:attributes = "none"
+        }
+    }
+    # [/snippet:configure-nonvisual-materials]
+}

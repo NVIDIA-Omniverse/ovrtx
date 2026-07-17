@@ -16,11 +16,15 @@ queries for USD loading and rendering.
 
 It demonstrates:
 
-1. Loading a USD layer with ``open_usd_async()``
+1. Loading a USD layer from a remote S3 scene URL with ``open_usd_async()``
 2. Polling ``Operation.query_status()`` while waiting
 3. Running one shader-cache warm-up step with shader compilation progress
 4. Stepping the renderer with ``step_async()``
 5. Fetching and mapping the rendered output
+
+This compatibility example intentionally retains deprecated renderer population
+operations because ovstage population does not expose equivalent progress
+counters. New applications should otherwise use the attached ovstage workflow.
 
 Renderer logs are written to ``_output/status-queries-ovrtx.log``.
 
@@ -37,6 +41,10 @@ Prerequisites
 
 - Python 3.10-3.13
 - `uv <https://docs.astral.sh/uv/>`_
+- NVIDIA RTX-capable GPU
+- Supported NVIDIA driver
+- Internet access to download the remote S3 scene asset
+- Unsandboxed runtime execution
 
 Running
 -------

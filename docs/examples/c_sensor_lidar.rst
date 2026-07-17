@@ -11,21 +11,22 @@
 C: Lidar Sensor
 ===============
 
-This example loads ``lidar_example.usda``, renders a lidar ``PointCloud``
-output, maps the composite render variable to CPU memory, and reads the named
-tensor channels.
+This example populates an ovstage instance from ``lidar_example.usda``, attaches
+it to the renderer, renders a lidar ``PointCloud`` output through
+``ovrtx_step_with_stage``, maps the composite render variable to CPU memory, and
+reads the named tensor channels. ovstage owns scene ingest and stepping; sensor
+output fetch/map stays a renderer-side concern on the ovrtx APIs.
 
 The scene is Z-up and contains a lidar at ``(0, 0, 1)`` rotated to look along
 world +X, an asphalt ground plane, and a concrete cube. The USD requests
 ``Coordinates``, ``Intensity``, ``Counts``, and ``TimeOffsetNs`` channels.
 
-The executable applies the runtime setting
-``--/renderer/raytracingMotion/enabled=true`` because MotionBVH is required by
-the lidar sensor pipeline.
+The executable enables MotionBVH through ``ovrtx_config_t`` at renderer
+creation because it is required by the lidar sensor pipeline.
 
 .. pull-quote::
 
-   *“Create a C/C++ lidar sensor example that applies required sensor runtime settings before renderer creation, loads a lidar scene, warms up the sensor pipeline, renders one point-cloud output, reads valid point data safely through the count channel, prints summary statistics, and cleans up all results and mappings.”*
+   *“Create a C/C++ lidar sensor example that configures the renderer for sensor output, loads a lidar scene, warms up the sensor pipeline, renders one point-cloud output, reads valid point data safely through the count channel, prints summary statistics, and cleans up all results and mappings.”*
 
 .. image:: ../../img/example-sensor-lidar.avif
    :alt: Lidar sensor example output
@@ -48,7 +49,7 @@ Build and Run
 
       .. code-block:: bash
 
-         cd examples/c/sensors/lidar
+         cd examples/c/lidar
          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
          cmake --build build
 
@@ -74,7 +75,7 @@ Build and Run
 
       .. code-block:: pwsh
 
-         cd examples/c/sensors/lidar
+         cd examples/c/lidar
          cmake -S . -B build
          cmake --build build --config Release
 

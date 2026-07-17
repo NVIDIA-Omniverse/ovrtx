@@ -11,7 +11,7 @@
 C: Vulkan Interop
 ==================
 
-Demonstrates how to integrate ovrtx with Vulkan by sharing renders on the GPU.
+This example demonstrates how to integrate ovrtx with Vulkan by sharing renders on the GPU.
 
 The example maps ovrtx outputs to CUDA arrays every frame, then copies them to CUDA-exported VkImage memory. A fullscreen quad samples the resulting textures to display the render in real time in a GLFW window. Memory access between CUDA and Vulkan is synchronized using timeline semaphores.
 
@@ -39,8 +39,12 @@ Build and Run
       - ``sudo apt install build-essential cmake``
       - `Vulkan SDK 1.3.250+ <https://vulkan.lunarg.com/sdk/home>`_
       - `CUDA Toolkit 12.0+ <https://developer.nvidia.com/cuda-downloads>`_
+      - NVIDIA RTX-capable GPU
+      - Supported NVIDIA driver
+      - Internet access to download the default remote S3 scene asset
+      - Unsandboxed runtime execution
 
-      If ovrtx or glfw3 are already installed and available via ``CMAKE_PREFIX_PATH``, the local installations are used. Otherwise they are downloaded automatically at configure time. Other dependencies (GLM, volk, unordered_dense) are always downloaded via FetchContent.
+      If ovrtx or glfw3 are already installed and available through ``CMAKE_PREFIX_PATH``, the local installations are used. Otherwise they are downloaded automatically at configure time. Other dependencies (GLM, volk, unordered_dense) are always downloaded using FetchContent.
 
       **Building**
 
@@ -62,8 +66,12 @@ Build and Run
       - `Visual Studio 2017+ <https://visualstudio.microsoft.com/downloads/>`_
       - `Vulkan SDK 1.3.250+ <https://vulkan.lunarg.com/sdk/home>`_
       - `CUDA Toolkit 12.0+ <https://developer.nvidia.com/cuda-downloads>`_
+      - NVIDIA RTX-capable GPU
+      - Supported NVIDIA driver
+      - Internet access to download the default remote S3 scene asset
+      - Unsandboxed runtime execution
 
-      If ovrtx or glfw3 are already installed and available via ``CMAKE_PREFIX_PATH``, the local installations are used. Otherwise they are downloaded automatically at configure time. Other dependencies (GLM, volk, unordered_dense) are always downloaded via FetchContent.
+      If ovrtx or glfw3 are already installed and available through ``CMAKE_PREFIX_PATH``, the local installations are used. Otherwise they are downloaded automatically at configure time. Other dependencies (GLM, volk, unordered_dense) are always downloaded using FetchContent.
 
       **Building**
 
@@ -81,7 +89,7 @@ Build and Run
 Scene Configuration
 -------------------
 
-The example is configured to load the robot scene from Omniverse:
+The example is configured to load the robot scene from Omniverse. Running the default configuration requires internet access to download this remote S3 scene asset:
 
 .. list-table::
    :header-rows: 1

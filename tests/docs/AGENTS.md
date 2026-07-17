@@ -20,6 +20,12 @@ The split is primarily about separation of concerns: `usd/` tests demonstrate US
 
 Python and USD suites each have their own `pyproject.toml` and run via `uv run pytest`. The C suite uses CMake + GoogleTest and runs via `ctest`.
 
+### ovrtx 0.4 port status
+
+- Stage-owning tests in `python/` request the attached ovstage fixture. Focused compatibility tests still exercise deprecated renderer wrappers in `test_all_attributes.py`, `test_attribute_bindings.py`, `test_attribute_read.py`, `test_base.py`, `test_picking_selection.py`, and `test_stage_query.py`.
+- `c/` has not been ported to attached ovstage and remains compatibility coverage for deprecated standalone renderer stage APIs.
+- `usd/` validates USD content directly and does not exercise either stage-ownership model.
+
 ### Data flow: test -> snippet -> skill -> doc
 
 ```
@@ -204,8 +210,8 @@ See `skills/adding-doc-snippets/SKILL.md` for the step-by-step workflow.
 | `doc-read-attribute-cuda-dest` | `python/test_attribute_read.py` | _(skill only)_ |
 | `doc-read-attribute-scalar-c` | `c/test_attribute_read.cpp` | _(skill only)_ |
 | `doc-read-array-attribute-c` | `c/test_attribute_read.cpp` | _(skill only)_ |
-| `doc-update-from-usd-time-async` | `python/test_base.py` | _(skill only)_ |
-| `doc-update-from-usd-time-async-c` | `c/test_base.cpp` | _(skill only)_ |
+| `doc-update-from-usd-time-async` | `python/test_base.py` | `scene/loading_usd.rst` |
+| `doc-update-from-usd-time-async-c` | `c/test_base.cpp` | `scene/loading_usd.rst` |
 | `doc-operation-status` | `python/test_base.py` | _(skill only)_ |
 | `doc-python-sync-runtime-error` | `python/test_error_handling.py` | _(skill only)_ |
 | `doc-python-async-operation-error` | `python/test_error_handling.py` | _(skill only)_ |
@@ -226,6 +232,7 @@ See `skills/adding-doc-snippets/SKILL.md` for the step-by-step workflow.
 | `doc-clone-usd` | `python/test_stage_mutation.py` | _(skill only)_ |
 | `doc-clone-usd-async` | `python/test_stage_mutation.py` | _(skill only)_ |
 | `doc-clone-usd-c` | `c/test_stage_mutation.cpp` | _(skill only)_ |
+| `doc-clone-usd-async-c` | `c/test_stage_mutation.cpp` | _(skill only)_ |
 | `doc-bind-attribute-write` | `python/test_attribute_bindings.py` | _(skill only)_ |
 | `doc-bind-attribute-async` | `python/test_attribute_bindings.py` | _(skill only)_ |
 | `doc-binding-write-async` | `python/test_attribute_bindings.py` | _(skill only)_ |

@@ -11,17 +11,22 @@
 Attribute Bindings
 ==================
 
-Attribute bindings are persistent descriptors for writing the same attribute on
-the same set of prims repeatedly. They are useful for animation loops and other
-hot paths where rebuilding the prim list, attribute name, dtype, and semantic on
-every write would add overhead.
+.. note::
+
+   Python examples replace persistent bindings with reusable ovstage queries.
+   Persistent renderer bindings remain deprecated compatibility APIs. Refer to
+   ``skills/update-0_3-0_4-python/SKILL.md``.
+
+For repeated Python writes or maps, retain one ovstage query for the target prims
+and reuse it at successive ordinals. C compatibility code can retain a binding
+descriptor for the same purpose.
 
 Use regular writes from :doc:`attributes` for one-shot edits. Use
 :doc:`attribute_mapping` when the hot path needs zero-copy writes into
 ovrtx-owned buffers.
 
-Create and Write
-----------------
+Create a Reusable Target and Write
+----------------------------------
 
 .. tab-set::
 
@@ -53,10 +58,10 @@ Create and Write
          :end-before: // [/snippet:doc-destroy-attribute-binding-c]
          :dedent:
 
-Async Creation and Writes
--------------------------
+Async Queries and Writes
+------------------------
 
-Python exposes async binding creation and async writes for non-blocking update
+Ovstage query and write handles can be waited explicitly for non-blocking update
 pipelines.
 
 .. literalinclude:: ../../tests/docs/python/test_attribute_bindings.py
@@ -74,8 +79,8 @@ pipelines.
 Array Attributes
 ----------------
 
-Use array bindings for variable-length USD array attributes such as mesh
-``points``. Array writes take one tensor per prim.
+Use ``is_array=True`` for variable-length USD array attributes such as mesh
+``points``.
 
 .. literalinclude:: ../../tests/docs/python/test_attribute_bindings.py
    :language: python
@@ -83,11 +88,10 @@ Use array bindings for variable-length USD array attributes such as mesh
    :end-before: # [/snippet:doc-bind-array-attribute]
    :dedent:
 
-Mapping Through a Binding
--------------------------
+Mapping Through a Query
+-----------------------
 
-Persistent bindings can also be mapped, which avoids recreating the descriptor
-before each map/unmap cycle.
+The same ovstage query can be reused for repeated map/unmap cycles.
 
 .. literalinclude:: ../../tests/docs/python/test_attribute_bindings.py
    :language: python
@@ -98,9 +102,7 @@ before each map/unmap cycle.
 Lifetime Rules
 --------------
 
-- Explicitly unbind or destroy bindings when the hot path is done.
-- A binding fixes the prim list, attribute name, dtype, shape, and semantic.
+- Release reusable ovstage queries when the hot path is done.
 - In C, keep strings and descriptor arrays alive until binding creation has
   completed.
 - ``OVRTX_BINDING_FLAG_OPTIMIZE`` is intended for frequent high-volume writes.
-  In Python, the equivalent is ``BindingFlag.OPTIMIZE``.

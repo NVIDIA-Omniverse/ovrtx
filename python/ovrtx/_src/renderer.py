@@ -8,6 +8,7 @@
 
 import ctypes
 import math
+import operator
 import sys
 import threading
 import warnings
@@ -16,6 +17,7 @@ from typing import Any, List, Optional
 
 from . import bindings
 from .dlpack import DLDataType, DLDataTypeCode, DLDevice, DLDeviceType, DLTensor, ManagedDLTensor
+from .helpers import deprecated
 from .types import (
     _VOID_RESULT,
     AttributeBinding,
@@ -38,6 +40,18 @@ from .types import (
     SelectionGroupStyle,
     Semantic,
 )
+
+_OVSTAGE_POPULATION_REPLACEMENT = (
+    "Use ovstage.population with an ovstage.Stage, attach it with Renderer.attach_ovstage(), "
+    "and render with Renderer.step(..., ordinal=...)."
+)
+_OVSTAGE_CLONE_REPLACEMENT = "Use ovstage.Stage.clone() or clone_async(), then advance the write floor."
+_OVSTAGE_QUERY_REPLACEMENT = "Use ovstage.Stage.query() or query_from_path_list() instead."
+_OVSTAGE_READ_REPLACEMENT = "Use ovstage.Stage.read_attributes() and fetch read groups from ovstage instead."
+_OVSTAGE_WRITE_REPLACEMENT = "Use ovstage.Stage.write_attribute() with an ordinal and reusable query instead."
+_OVSTAGE_BINDING_REPLACEMENT = "Use a reusable ovstage query with ovstage.Stage read, write, or map operations instead."
+_OVSTAGE_MAP_REPLACEMENT = "Use ovstage.Stage.map_attribute() with an ordinal and reusable query instead."
+_OVSTAGE_UNMAP_REPLACEMENT = "Use ovstage.Map.unmap() or ovstage.Stage.unmap_attribute() instead."
 
 
 @dataclass
@@ -255,6 +269,7 @@ class Renderer:
             RuntimeError: If the renderer cannot be created.
         """
         self._handle: Any = None
+        self._attached_ovstage: Optional[Any] = None
 
         # Use default config if none provided, otherwise copy to avoid mutating user's object
         if config is None:
@@ -292,27 +307,48 @@ class Renderer:
         # Cached path dictionary for token/path resolution (valid for renderer lifetime).
         self._path_dict: Optional[bindings.path_dictionary_instance_t] = None
 
-    def __del__(self):
-        """Automatically clean up renderer resources on destruction."""
-        if self._handle is not None:
-            try:
-                self._force_unbind_all()
-                self._force_unmap_all()
-                result = self._bindings.destroy_renderer(self._handle)
+    def destroy(self) -> None:
+        """Explicitly release the renderer's native resources.
 
-                # Report failure (raise so it's caught and reported below)
+        Idempotent: safe to call multiple times. Prefer calling this (e.g. in a fixture finalizer
+        or ``try/finally``) for deterministic teardown: the Python wrapper can be kept alive past
+        its last use by reference cycles, which would otherwise defer native cleanup to a GC pass.
+
+        Raises:
+            RuntimeError: If detaching an attached ovstage or destroying the renderer fails.
+        """
+        if self._handle is None:
+            return
+        cleanup_errors = []
+        try:
+            self._force_unbind_all()
+            self._force_unmap_all()
+            if self._attached_ovstage is not None:
+                result = self._bindings.detach_ovstage(self._handle)
                 if result.status != bindings.OVRTX_API_SUCCESS:
                     error_msg = self._bindings.get_last_error() or "Unknown error"
-                    raise RuntimeError(f"Failed to destroy renderer: {error_msg}")
-            except Exception as e:
-                # Report any exceptions to stderr (can't raise from __del__)
-                print(f"Warning: Exception during renderer cleanup in __del__: {e}", file=sys.stderr)
-            finally:
-                # Always clear references to prevent double-cleanup attempts
-                self._handle = None
-                self._bindings = None
-                self._config = None
-                self._path_dict = None
+                    cleanup_errors.append(f"Failed to detach ovstage: {error_msg}")
+            result = self._bindings.destroy_renderer(self._handle)
+
+            if result.status != bindings.OVRTX_API_SUCCESS:
+                error_msg = self._bindings.get_last_error() or "Unknown error"
+                cleanup_errors.append(f"Failed to destroy renderer: {error_msg}")
+            if cleanup_errors:
+                raise RuntimeError("; ".join(cleanup_errors))
+        finally:
+            # Always clear references to prevent double-cleanup attempts
+            self._handle = None
+            self._bindings = None
+            self._config = None
+            self._path_dict = None
+            self._attached_ovstage = None
+
+    def __del__(self):
+        """Automatically clean up renderer resources on destruction."""
+        try:
+            self.destroy()
+        except Exception as e:
+            print(f"Warning: Exception during renderer cleanup in __del__: {e}", file=sys.stderr)
 
     def _register_mapping(self, handle: int, state: Any) -> None:
         """Register an active mapping's shared state for force-unmap on renderer destruction."""
@@ -344,7 +380,7 @@ class Renderer:
                 if not state.unmapped:
                     state.unmapped = True
                     try:
-                        state.unmap_fn(handle, state.cuda_sync)
+                        self._unmap_output(handle, state.cuda_sync)
                     except Exception:
                         pass
 
@@ -370,6 +406,105 @@ class Renderer:
         """Runtime library version as a (major, minor, patch) tuple."""
         return self._bindings.version
 
+    def attach_ovstage(self, stage: Any) -> None:
+        """Attach an externally owned ``ovstage.Stage`` to this renderer.
+
+        The renderer borrows the Stage's native instance and retains the Python
+        object until detach or renderer destruction. Do not explicitly destroy
+        the Stage while it is attached.
+
+        Args:
+            stage: A live ``ovstage.Stage`` instance.
+
+        Raises:
+            RuntimeError: If the renderer is invalid, is already attached, or
+                the native attach fails.
+            TypeError: If ``stage`` does not expose a compatible native handle.
+            ValueError: If the Stage has already been destroyed.
+        """
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+        if self._attached_ovstage is not None:
+            raise RuntimeError("Renderer already has an ovstage attached")
+
+        stage_handle = getattr(stage, "_inst", None)
+        if stage_handle is None:
+            raise TypeError("stage must be a live ovstage.Stage instance")
+        try:
+            stage_pointer = ctypes.cast(stage_handle, bindings.ovstage_instance_p)
+        except (ctypes.ArgumentError, TypeError, ValueError) as e:
+            raise TypeError("stage must be a live ovstage.Stage instance") from e
+        if not stage_pointer:
+            raise ValueError("Cannot attach a destroyed ovstage.Stage")
+
+        result = self._bindings.attach_ovstage(self._handle, stage_pointer)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to attach ovstage: {error_msg}")
+        self._attached_ovstage = stage
+
+    def detach_ovstage(self) -> None:
+        """Detach the attached ovstage and return the renderer to standalone mode."""
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+        if self._attached_ovstage is None:
+            raise RuntimeError("Renderer has no ovstage attached")
+
+        result = self._bindings.detach_ovstage(self._handle)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to detach ovstage: {error_msg}")
+        self._attached_ovstage = None
+
+    def update_from_stage(self, ordinal: int) -> None:
+        """Update from the attached ovstage through at least ``ordinal``.
+
+        In BORROW mode this synchronizes the renderer's scene state with committed
+        population changes while attribute values remain shared with ovstage. In
+        REPLICATE mode it copies committed Stage data into the renderer-owned stage.
+        Normal calls to :meth:`step` perform this update automatically in both modes.
+        """
+        self.update_from_stage_async(ordinal).wait()
+
+    def update_from_stage_async(self, ordinal: int) -> Operation[bool]:
+        """Enqueue an update from the attached ovstage through at least ``ordinal``.
+
+        BORROW synchronizes the renderer's scene state with committed population
+        changes without copying shared attribute values. REPLICATE copies committed
+        Stage data into the renderer-owned stage. :meth:`step_async` performs this
+        update automatically in both modes.
+
+        Args:
+            ordinal: Minimum committed ovstage publication to update through.
+
+        Returns:
+            Operation that completes when the update has been applied.
+
+        Raises:
+            RuntimeError: If the renderer is invalid, no Stage is attached, or the
+                update cannot be enqueued.
+            TypeError: If ``ordinal`` is not an integer.
+            ValueError: If ``ordinal`` is outside the uint64 range.
+        """
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+        if self._attached_ovstage is None:
+            raise RuntimeError("Renderer has no ovstage attached")
+
+        ordinal_value = self._normalize_ordinal(ordinal)
+        result = self._bindings.update_from_stage(self._handle, ordinal_value)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to enqueue update_from_stage: {error_msg}")
+
+        return Operation(
+            renderer=self,
+            op_id=result.op_index.value,
+            handle=_VOID_RESULT,
+            operation_name=f"update_from_stage(ordinal={ordinal_value})",
+        )
+
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def open_usd(self, usd_file_path: str) -> None:
         """Open a USD file as the root layer (synchronous).
 
@@ -389,6 +524,7 @@ class Renderer:
         """
         self.open_usd_async(usd_file_path).wait()
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def open_usd_async(self, usd_file_path: str) -> Operation[bool]:
         """Open a USD file as the root layer (asynchronous).
 
@@ -423,6 +559,7 @@ class Renderer:
             renderer=self, op_id=result.op_index.value, handle=_VOID_RESULT, operation_name=f"open_usd({usd_file_path})"
         )
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def open_usd_from_string(self, root_layer_content: str) -> None:
         """Open a USD stage from inline USDA content (synchronous).
 
@@ -447,6 +584,7 @@ class Renderer:
         """
         self.open_usd_from_string_async(root_layer_content).wait()
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def open_usd_from_string_async(self, root_layer_content: str) -> Operation[bool]:
         """Open a USD stage from inline USDA content (asynchronous).
 
@@ -482,6 +620,7 @@ class Renderer:
             operation_name="open_usd_from_string(<inline>)",
         )
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def add_usd_reference(self, layer_file: str, prefix_path: str) -> Any:
         """Add a USD file as a reference at a prim path (synchronous).
 
@@ -504,6 +643,7 @@ class Renderer:
         """
         return self.add_usd_reference_async(layer_file, prefix_path).wait()
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def add_usd_reference_async(self, layer_file: str, prefix_path: str) -> Operation[Any]:
         """Add a USD file as a reference at a prim path (asynchronous).
 
@@ -534,6 +674,7 @@ class Renderer:
             operation_name=f"add_usd_reference({layer_file})",
         )
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def add_usd_reference_from_string(self, layer_content: str, prefix_path: str) -> Any:
         """Add inline USDA content as a reference at a prim path (synchronous).
 
@@ -551,6 +692,13 @@ class Renderer:
             RuntimeError: If renderer is invalid, enqueue fails, or loading fails.
             ValueError: If layer_content is empty.
 
+        Note:
+            A USD reference is namespace-encapsulated: any relationship or path
+            target that points outside ``prefix_path`` is dropped during
+            composition. Keep targets self-contained within the reference layer,
+            for example a ``RenderProduct`` whose ``rel camera`` points at a
+            ``Camera`` defined in the same layer.
+
         Example:
             ```python
             renderer.open_usd("/path/to/scene.usda")
@@ -558,13 +706,15 @@ class Renderer:
             #usda 1.0
             (defaultPrim = "Render")
             def Scope "Render" {
-                def RenderProduct "Camera" { rel camera = </World/Camera> }
+                def Camera "Camera" {}
+                def RenderProduct "Product" { rel camera = </Render/Camera> }
             }
             ''', prefix_path="/Render")
             ```
         """
         return self.add_usd_reference_from_string_async(layer_content, prefix_path).wait()
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def add_usd_reference_from_string_async(self, layer_content: str, prefix_path: str) -> Operation[Any]:
         """Add inline USDA content as a reference at a prim path (asynchronous).
 
@@ -600,6 +750,7 @@ class Renderer:
             operation_name="add_usd_reference_from_string(<inline>)",
         )
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def remove_usd(self, usd_handle: Any) -> None:
         """Remove a previously added USD from the runtime stage.
 
@@ -611,6 +762,7 @@ class Renderer:
         """
         self.remove_usd_async(usd_handle).wait()
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def remove_usd_async(self, usd_handle: Any) -> Operation[bool]:
         """Remove a previously added USD (async).
 
@@ -633,26 +785,30 @@ class Renderer:
 
         return Operation(renderer=self, op_id=result.op_index.value, handle=_VOID_RESULT, operation_name="remove_usd")
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def update_from_usd_time(self, usd_time: float) -> None:
         """Update runtime stage to a specific USD time (synchronous).
 
         Blocks until all time-sampled attributes are re-evaluated.
 
         Args:
-            usd_time: USD time to update the stage to.
+            usd_time: Stage time in **seconds** (not USD timecodes). The runtime
+                converts to timecodes via the stage's ``timeCodesPerSecond`` metadata.
 
         Raises:
             RuntimeError: If the update fails.
         """
         self.update_from_usd_time_async(usd_time).wait()
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def update_from_usd_time_async(self, usd_time: float) -> Operation[bool]:
         """Update runtime stage to a specific USD time (asynchronous).
 
         Returns immediately with an Operation for manual control.
 
         Args:
-            usd_time: USD time to update the stage to.
+            usd_time: Stage time in **seconds** (not USD timecodes). The runtime
+                converts to timecodes via the stage's ``timeCodesPerSecond`` metadata.
 
         Returns:
             Operation that completes when the update finishes.
@@ -672,6 +828,7 @@ class Renderer:
             renderer=self, op_id=result.op_index.value, handle=_VOID_RESULT, operation_name="update_from_usd_time"
         )
 
+    @deprecated(_OVSTAGE_CLONE_REPLACEMENT)
     def clone_usd(self, source_path: str, target_paths: List[str]) -> None:
         """Clone a USD subtree to one or more target paths.
 
@@ -687,6 +844,7 @@ class Renderer:
         """
         self.clone_usd_async(source_path, target_paths).wait()
 
+    @deprecated(_OVSTAGE_CLONE_REPLACEMENT)
     def clone_usd_async(self, source_path: str, target_paths: List[str]) -> Operation[bool]:
         """Clone a USD subtree (async).
 
@@ -796,31 +954,44 @@ class Renderer:
 
         return status
 
-    def step(self, render_products: set[str], delta_time: float) -> RenderProductSetOutputs[Any]:
+    def step(
+        self, render_products: set[str], delta_time: float, *, ordinal: Optional[int] = None
+    ) -> RenderProductSetOutputs[Any]:
         """Step the renderer (synchronous - blocks until complete).
 
         Enqueues a step operation, waits for rendering to complete, and returns results.
         Equivalent to ``step_async(...).wait().fetch()`` with infinite
         timeouts for both the operation wait and the result fetch.
 
+        When an ovstage is attached, the step first synchronizes the renderer with
+        committed Stage changes through ``ordinal``. BORROW keeps attribute values
+        shared; REPLICATE copies committed data into the renderer-owned stage.
+
         Args:
             render_products: Set of render product paths to step.
             delta_time: Time delta for the simulation step.
+            ordinal: Minimum committed publication required from the attached
+                ovstage. Execution may observe that publication or a later one.
+                Required in attached mode and invalid in standalone mode.
 
         Returns:
             :class:`RenderProductSetOutputs` with rendering results.
 
         Raises:
             RuntimeError: If renderer is invalid, enqueue fails, step fails,
-                or fetch fails.
-            ValueError: If no valid render products provided.
+                fetch fails, or ordinal use does not match attachment state.
+            TypeError: If ``ordinal`` is not an integer.
+            ValueError: If no valid render products are provided or ``ordinal``
+                is outside the uint64 range.
         """
-        return self.step_async(render_products, delta_time).wait().fetch()
+        return self.step_async(render_products, delta_time, ordinal=ordinal).wait().fetch()
 
     def step_async(
         self,
         render_products: set[str],
         delta_time: float,
+        *,
+        ordinal: Optional[int] = None,
     ) -> "Operation[PendingFetch[RenderProductSetOutputs]]":
         """Step the renderer (asynchronous - returns immediately).
 
@@ -828,19 +999,36 @@ class Renderer:
         ``.wait()`` to get a :class:`PendingFetch`, then ``.fetch()``
         to retrieve the :class:`RenderProductSetOutputs`.
 
+        When an ovstage is attached, the step first enqueues synchronization with
+        committed Stage changes through ``ordinal``. BORROW keeps attribute values
+        shared; REPLICATE copies committed data into the renderer-owned stage.
+
         Args:
             render_products: Set of render product paths to step.
             delta_time: Time delta for the simulation step.
+            ordinal: Minimum committed publication required from the attached
+                ovstage. Execution may observe that publication or a later one.
+                Required in attached mode and invalid in standalone mode.
 
         Returns:
             ``Operation[PendingFetch[RenderProductSetOutputs]]``
 
         Raises:
-            RuntimeError: If renderer is invalid or enqueue fails.
-            ValueError: If no valid render products provided.
+            RuntimeError: If renderer is invalid, enqueue fails, or ordinal use
+                does not match attachment state.
+            TypeError: If ``ordinal`` is not an integer.
+            ValueError: If no valid render products are provided or ``ordinal``
+                is outside the uint64 range.
         """
         if self._handle is None:
             raise RuntimeError("Renderer is not valid")
+
+        attached = self._attached_ovstage is not None
+        if attached and ordinal is None:
+            raise RuntimeError("ordinal is required while an ovstage is attached")
+        if not attached and ordinal is not None:
+            raise RuntimeError("ordinal is only valid while an ovstage is attached")
+        ordinal_value = self._normalize_ordinal(ordinal) if ordinal is not None else None
 
         if delta_time < 0:
             raise ValueError(f"delta_time must be non-negative, got {delta_time}")
@@ -857,10 +1045,32 @@ class Renderer:
             render_products=render_products_array, num_render_products=len(render_products_strings)
         )
 
-        result, step_result_handle = self._bindings.step(self._handle, render_product_set, delta_time)
+        update_op_id = None
+        if ordinal_value is None:
+            result, step_result_handle = self._bindings.step(self._handle, render_product_set, delta_time)
+            operation_name = f"step(dt={delta_time})"
+        else:
+            update_result = self._bindings.update_from_stage(self._handle, ordinal_value)
+            if update_result.status != bindings.OVRTX_API_SUCCESS:
+                error_msg = self._bindings.get_last_error() or "Unknown error"
+                raise RuntimeError(f"Failed to enqueue update_from_stage: {error_msg}")
+            update_op_id = update_result.op_index.value
+            result, step_result_handle = self._bindings.step_with_stage(
+                self._handle, render_product_set, delta_time, ordinal_value
+            )
+            operation_name = f"step(dt={delta_time}, ordinal={ordinal_value})"
 
         if result.status != bindings.OVRTX_API_SUCCESS:
             error_msg = self._bindings.get_last_error() or "Unknown error"
+            if update_op_id is not None:
+                # The Stage update was already accepted; drain it before raising
+                # so an enqueue rejection does not leave an unobserved operation.
+                try:
+                    self._bindings.wait_op(
+                        self._handle, bindings.ovrtx_op_id_t(update_op_id), bindings.OVRTX_TIMEOUT_INFINITE
+                    )
+                except Exception:
+                    pass
             raise RuntimeError(f"Failed to enqueue step: {error_msg}")
 
         def _fetch_step(timeout_ns: Optional[int] = None) -> Optional[RenderProductSetOutputs]:
@@ -881,7 +1091,7 @@ class Renderer:
             renderer=self,
             op_id=result.op_index.value,
             handle=step_result_handle,
-            operation_name=f"step(dt={delta_time})",
+            operation_name=operation_name,
             fetch_fn=_fetch_step,
             cleanup_fn=lambda: self._bindings.destroy_results(self._handle, step_result_handle),
         )
@@ -925,14 +1135,14 @@ class Renderer:
     def enqueue_pick_query_async(
         self,
         render_product_path: str,
-        left: int,
-        top: int,
-        right: int,
-        bottom: int,
+        left_ndc: float,
+        top_ndc: float,
+        right_ndc: float,
+        bottom_ndc: float,
         *,
         flags: int = 0,
     ) -> Operation[bool]:
-        """Enqueue a viewport pick rectangle for the next ``step()`` on this RenderProduct (async).
+        """Enqueue an NDC viewport pick rectangle for the next ``step()`` on this RenderProduct (async).
 
         Results appear on the next ``step()`` as the multi-tensor render variable
         ``OVRTX_RENDER_VAR_PICK_HIT``. If multiple queries target the same
@@ -940,7 +1150,14 @@ class Renderer:
 
         Args:
             render_product_path: Target RenderProduct path.
-            left, top, right, bottom: Pick rectangle in RenderProduct pixel space.
+            left_ndc, top_ndc, right_ndc, bottom_ndc: Pick rectangle in normalized RenderProduct
+                coordinates. Values use [0, 1] top-left-origin NDC: x increases left-to-right and
+                y increases top-to-bottom. The rectangle uses the same convention as the old pixel API:
+                right_ndc and bottom_ndc mark the edge just past the last included pixel. For pixel
+                (x, y) on a width x height RenderProduct, use [x / width, y / height, (x + 1) / width,
+                (y + 1) / height]. Use [0, 0, 1, 1] for the full RenderProduct. Out-of-bounds values are
+                rejected; boundary values may be clamped to the valid range to account for floating-point
+                roundoff.
             flags: Combination of ``OVRTX_PICK_FLAG_*``.
 
         Returns:
@@ -958,38 +1175,40 @@ class Renderer:
         rp = bindings.ovx_string_t(path)
         desc = bindings.ovrtx_pick_query_desc_t()
         desc.render_product_path = rp
-        desc.left = int(left)
-        desc.top = int(top)
-        desc.right = int(right)
-        desc.bottom = int(bottom)
+        desc.left_ndc = float(left_ndc)
+        desc.top_ndc = float(top_ndc)
+        desc.right_ndc = float(right_ndc)
+        desc.bottom_ndc = float(bottom_ndc)
         desc.flags = int(flags)
         result = self._bindings.enqueue_pick_query(self._handle, desc)
         if result.status != bindings.OVRTX_API_SUCCESS:
             error_msg = self._bindings.get_last_error() or "Unknown error"
             raise RuntimeError(f"Failed to enqueue pick query: {error_msg}")
-        return Operation(
+        op = Operation(
             renderer=self,
             op_id=result.op_index.value,
             handle=_VOID_RESULT,
             operation_name=f"enqueue_pick_query({path!r})",
         )
+        op._storage_refs = [rp, desc]
+        return op
 
     def enqueue_pick_query(
         self,
         render_product_path: str,
-        left: int,
-        top: int,
-        right: int,
-        bottom: int,
+        left_ndc: float,
+        top_ndc: float,
+        right_ndc: float,
+        bottom_ndc: float,
         *,
         flags: int = 0,
     ) -> None:
-        """Enqueue a viewport pick rectangle for the next ``step()`` on this RenderProduct (blocking).
+        """Enqueue an NDC viewport pick rectangle for the next ``step()`` on this RenderProduct (blocking).
 
         Equivalent to ``enqueue_pick_query_async(...).wait()``.
         See :meth:`enqueue_pick_query_async` for argument details.
         """
-        self.enqueue_pick_query_async(render_product_path, left, top, right, bottom, flags=flags).wait()
+        self.enqueue_pick_query_async(render_product_path, left_ndc, top_ndc, right_ndc, bottom_ndc, flags=flags).wait()
 
     def set_selection_group_styles(self, styles: dict[int, SelectionGroupStyle]) -> None:
         """Set per-group outline and fill colors for selection groups (blocking).
@@ -1010,9 +1229,8 @@ class Renderer:
 
         Args:
             styles: Mapping from group id (``0..255``) to a :class:`SelectionGroupStyle`.
-                Group ids match the value written to a prim's
-                ``omni:selectionOutlineGroup`` attribute. An empty mapping enqueues
-                a no-op.
+                Group ids match the per-prim id passed to
+                :meth:`set_selection_outline_group`. An empty mapping enqueues a no-op.
 
         Returns:
             Operation that completes once the styling state has been applied.
@@ -1045,13 +1263,211 @@ class Renderer:
             error_msg = self._bindings.get_last_error() or "Unknown error"
             raise RuntimeError(f"Failed to enqueue set_selection_group_styles: {error_msg}")
 
-        return Operation(
+        op = Operation(
             renderer=self,
             op_id=result.op_index.value,
             handle=_VOID_RESULT,
             operation_name=f"set_selection_group_styles({count} group(s))",
         )
+        op._storage_refs = [ids_array, styles_array]
+        return op
 
+    @staticmethod
+    def _normalize_prim_path_ids(prim_path_ids: list[int]) -> list[int]:
+        ids = []
+        for prim_path_id in prim_path_ids:
+            if isinstance(prim_path_id, bool):
+                raise ValueError("prim path id must be a non-zero uint64 integer, not bool")
+            value = int(prim_path_id)
+            if value <= 0 or value > 0xFFFFFFFFFFFFFFFF:
+                raise ValueError(f"prim path id {value} out of range; expected non-zero uint64")
+            ids.append(value)
+        return ids
+
+    @staticmethod
+    def _normalize_selection_group_ids(group_ids: int | list[int], count: int) -> list[int]:
+        if isinstance(group_ids, bool):
+            raise ValueError("selection group id must be an integer in 0..255, not bool")
+        if isinstance(group_ids, int):
+            groups = [int(group_ids)] * count
+        else:
+            groups = []
+            for group_id in group_ids:
+                if isinstance(group_id, bool):
+                    raise ValueError("selection group id must be an integer in 0..255, not bool")
+                groups.append(int(group_id))
+        if len(groups) != count:
+            raise ValueError(f"group_ids length ({len(groups)}) must match prim path count ({count})")
+        for group_id in groups:
+            if not 0 <= group_id <= 255:
+                raise ValueError(f"selection group id {group_id} out of range; expected 0..255")
+        return groups
+
+    def set_selection_outline_group(self, prim_path_ids: list[int], group_ids: int | list[int]) -> None:
+        """Set each prim's selection outline group by path id (blocking).
+
+        Equivalent to ``set_selection_outline_group_async(...).wait()``.
+        See :meth:`set_selection_outline_group_async` for argument details.
+        """
+        self.set_selection_outline_group_async(prim_path_ids, group_ids).wait()
+
+    def set_selection_outline_group_async(self, prim_path_ids: list[int], group_ids: int | list[int]) -> Operation[bool]:
+        """Set each prim's selection outline group by path id (async).
+
+        Stream-ordered: takes effect on the next ``step()`` after it completes.
+        Pass group ``0`` to clear a prim's selection outline. A scalar group id
+        applies to every path; a list must have one group id per path.
+        Duplicate path ids are allowed; the last occurrence wins.
+
+        Args:
+            prim_path_ids: Path ids from this renderer's pick-hit ``primPath`` tensor or own path dictionary.
+            group_ids: Group id or parallel list of group ids, each in ``0..255``.
+
+        Returns:
+            Operation that completes once the renderer selection state has been applied.
+
+        Raises:
+            RuntimeError: If renderer is invalid or enqueue fails.
+            ValueError: If any group id is outside ``0..255`` or list lengths differ.
+        """
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+
+        path_ids = self._normalize_prim_path_ids(prim_path_ids)
+        count = len(path_ids)
+        groups = self._normalize_selection_group_ids(group_ids, count)
+
+        path_array = (ctypes.c_uint64 * count)(*path_ids)
+        group_array = (ctypes.c_uint8 * count)(*groups)
+        result = self._bindings.set_selection_outline_group(self._handle, path_array, count, group_array)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to enqueue set_selection_outline_group: {error_msg}")
+
+        return Operation(
+            renderer=self,
+            op_id=result.op_index.value,
+            handle=_VOID_RESULT,
+            operation_name=f"set_selection_outline_group({count} prim(s))",
+        )
+
+    def set_selection_outline_group_strings(self, prim_paths: list[str], group_ids: int | list[int]) -> None:
+        """Set each prim's selection outline group by string path (blocking).
+
+        Duplicate paths are allowed; the last occurrence wins.
+        """
+        self.set_selection_outline_group_strings_async(prim_paths, group_ids).wait()
+
+    def set_selection_outline_group_strings_async(
+        self, prim_paths: list[str], group_ids: int | list[int]
+    ) -> Operation[bool]:
+        """Set each prim's selection outline group by string path (async).
+
+        Duplicate paths are allowed; the last occurrence wins.
+        """
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+        if any(not path or not path.strip() for path in prim_paths):
+            raise ValueError(f"all prim_paths must not be empty, got: {prim_paths}")
+
+        count = len(prim_paths)
+        groups = self._normalize_selection_group_ids(group_ids, count)
+
+        path_strings = [bindings.ovx_string_t(path) for path in prim_paths]
+        path_array = (bindings.ovx_string_t * count)(*path_strings)
+        group_array = (ctypes.c_uint8 * count)(*groups)
+        result = self._bindings.set_selection_outline_group_strings(self._handle, path_array, count, group_array)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to enqueue set_selection_outline_group_strings: {error_msg}")
+
+        return Operation(
+            renderer=self,
+            op_id=result.op_index.value,
+            handle=_VOID_RESULT,
+            operation_name=f"set_selection_outline_group_strings({count} prim(s))",
+        )
+
+    def set_pickable(self, prim_path_ids: list[int], pickable: bool | list[bool]) -> None:
+        """Set viewport pickability for prims by path id (blocking).
+
+        Equivalent to ``set_pickable_async(...).wait()``.
+        See :meth:`set_pickable_async` for argument details.
+        """
+        self.set_pickable_async(prim_path_ids, pickable).wait()
+
+    def set_pickable_async(self, prim_path_ids: list[int], pickable: bool | list[bool]) -> Operation[bool]:
+        """Set viewport pickability for prims by path id (async).
+
+        Stream-ordered: takes effect on the next ``step()`` after it completes.
+        A scalar value applies to every path; a list must have one value per path.
+
+        Args:
+            prim_path_ids: Path ids from this renderer's pick-hit ``primPath`` tensor or own path dictionary.
+            pickable: Pickability value or parallel list of values.
+
+        Returns:
+            Operation that completes once the renderer pickability state has been applied.
+
+        Raises:
+            RuntimeError: If renderer is invalid or enqueue fails.
+            ValueError: If list lengths differ.
+        """
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+
+        path_ids = self._normalize_prim_path_ids(prim_path_ids)
+        count = len(path_ids)
+        values = [bool(pickable)] * count if isinstance(pickable, bool) else [bool(value) for value in pickable]
+        if len(values) != count:
+            raise ValueError(f"pickable length ({len(values)}) must match prim path count ({count})")
+
+        path_array = (ctypes.c_uint64 * count)(*path_ids)
+        pickable_array = (ctypes.c_bool * count)(*values)
+        result = self._bindings.set_pickable(self._handle, path_array, count, pickable_array)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to enqueue set_pickable: {error_msg}")
+
+        return Operation(
+            renderer=self,
+            op_id=result.op_index.value,
+            handle=_VOID_RESULT,
+            operation_name=f"set_pickable({count} prim(s))",
+        )
+
+    def set_pickable_strings(self, prim_paths: list[str], pickable: bool | list[bool]) -> None:
+        """Set viewport pickability for prims by string path (blocking)."""
+        self.set_pickable_strings_async(prim_paths, pickable).wait()
+
+    def set_pickable_strings_async(self, prim_paths: list[str], pickable: bool | list[bool]) -> Operation[bool]:
+        """Set viewport pickability for prims by string path (async)."""
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+        if any(not path or not path.strip() for path in prim_paths):
+            raise ValueError(f"all prim_paths must not be empty, got: {prim_paths}")
+
+        count = len(prim_paths)
+        values = [bool(pickable)] * count if isinstance(pickable, bool) else [bool(value) for value in pickable]
+        if len(values) != count:
+            raise ValueError(f"pickable length ({len(values)}) must match prim_paths length ({count})")
+
+        path_strings = [bindings.ovx_string_t(path) for path in prim_paths]
+        path_array = (bindings.ovx_string_t * count)(*path_strings)
+        pickable_array = (ctypes.c_bool * count)(*values)
+        result = self._bindings.set_pickable_strings(self._handle, path_array, count, pickable_array)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to enqueue set_pickable_strings: {error_msg}")
+
+        return Operation(
+            renderer=self,
+            op_id=result.op_index.value,
+            handle=_VOID_RESULT,
+            operation_name=f"set_pickable_strings({count} prim(s))",
+        )
+
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def reset_stage(self) -> None:
         """Reset stage to empty state.
 
@@ -1063,6 +1479,7 @@ class Renderer:
         """
         self.reset_stage_async().wait()
 
+    @deprecated(_OVSTAGE_POPULATION_REPLACEMENT)
     def reset_stage_async(self) -> Operation[bool]:
         """Reset stage to empty state (async).
 
@@ -1086,6 +1503,7 @@ class Renderer:
     # Stage query and attribute read operations
     # ========================================================================
 
+    @deprecated(_OVSTAGE_QUERY_REPLACEMENT)
     def query_prims(
         self,
         require_all: Optional[list[tuple[int, str]]] = None,
@@ -1149,6 +1567,7 @@ class Renderer:
             .fetch()
         )
 
+    @deprecated(_OVSTAGE_QUERY_REPLACEMENT)
     def query_prims_async(
         self,
         require_all: Optional[list[tuple[int, str]]] = None,
@@ -1310,6 +1729,7 @@ class Renderer:
         """
         return self._get_path_dict().prim_path_to_string(int(prim_path_id))
 
+    @deprecated(_OVSTAGE_READ_REPLACEMENT)
     def read_attribute(
         self,
         attribute_name: str,
@@ -1370,6 +1790,7 @@ class Renderer:
             .fetch()
         )
 
+    @deprecated(_OVSTAGE_READ_REPLACEMENT)
     def read_attribute_async(
         self,
         attribute_name: str,
@@ -1435,6 +1856,7 @@ class Renderer:
             result_fn=_result_fn_scalar,
         )
 
+    @deprecated(_OVSTAGE_READ_REPLACEMENT)
     def read_array_attribute(
         self,
         attribute_name: str,
@@ -1475,6 +1897,7 @@ class Renderer:
             .fetch()
         )
 
+    @deprecated(_OVSTAGE_READ_REPLACEMENT)
     def read_array_attribute_async(
         self,
         attribute_name: str,
@@ -1567,25 +1990,37 @@ class Renderer:
             error_msg = self._bindings.get_last_error() or "Unknown error"
             raise RuntimeError(f"Failed to enqueue read_attribute: {error_msg}")
 
+        # Idempotent release shared by fetch-error paths, _Guard.__del__ (success), and
+        # Operation.cleanup_fn (never-waited). The sentinel prevents PendingFetch.__del__
+        # from re-running a failed fetch and calling release_read_result a second time.
+        released = False
+
+        def _release_once() -> None:
+            nonlocal released
+            if released:
+                return
+            released = True
+            self._bindings.release_read_result(self._handle, read_handle)
+
         def _fetch_read(timeout_ns: Optional[int] = None):
-            # Fetch C read output, create guard + ManagedDLTensors, apply result_fn.
-            # Guard.__del__ releases the C buffer when all DLPack consumers are gone.
+            if released:
+                raise RuntimeError("Read result has already been released after a prior fetch failure")
+
             timeout = bindings.OVRTX_TIMEOUT_INFINITE if timeout_ns is None else timeout_ns
             result, c_output = self._bindings.fetch_read_result(self._handle, read_handle, timeout)
             if result.status == bindings.OVRTX_API_TIMEOUT:
                 return None
             if result.status != bindings.OVRTX_API_SUCCESS:
-                self._bindings.release_read_result(self._handle, read_handle)
+                _release_once()
                 error_msg = self._bindings.get_last_error() or "Unknown error"
                 raise RuntimeError(f"Failed to fetch read result: {error_msg}")
 
             if c_output.prim_count == 0:
-                self._bindings.release_read_result(self._handle, read_handle)
+                _release_once()
                 raise RuntimeError(
                     f"Read returned no data for '{attribute_name}' (attribute may not exist on the given prims)"
                 )
 
-            map_handle = c_output.map_handle
             dl_tensors = [c_output.buffers[i].dl for i in range(c_output.buffer_count)]
 
             class _Guard:
@@ -1594,8 +2029,8 @@ class Renderer:
                     self._refs = (c_output, dl_tensors)  # ctypes keepalive
 
                 def __del__(self):
-                    if self._renderer._handle is not None and map_handle:
-                        self._renderer._bindings.release_read_result(self._renderer._handle, map_handle)
+                    if self._renderer._handle is not None:
+                        _release_once()
 
             guard = _Guard(self)
 
@@ -1610,7 +2045,7 @@ class Renderer:
             handle=read_handle,
             operation_name="read_attribute",
             fetch_fn=_fetch_read,
-            cleanup_fn=lambda: self._bindings.release_read_result(self._handle, read_handle),
+            cleanup_fn=_release_once,
         )
         op._storage_refs = [_string_refs]
         return op
@@ -1658,6 +2093,8 @@ class Renderer:
                         start_time=c_frame.frame_start_time,
                         end_time=c_frame.frame_end_time,
                         render_vars={var.name: var for var in render_vars},
+                        progression=int(c_frame.accumulation_status.progression),
+                        converged=bool(c_frame.accumulation_status.converged),
                     )
                 )
             product_name = str(c_product.render_product_path)
@@ -1839,16 +2276,63 @@ class Renderer:
                 bindings.ConfigBoolKey.ENABLE_GEOMETRY_STREAMING_LOD,
             ),
             "enable_spg": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.ENABLE_SPG),
-            "enable_motion_bvh": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.ENABLE_MOTION_BVH),
+            "motion_bvh": (bindings.ovrtx_config_entry_int, bindings.ConfigInt64Key.MOTION_BVH),
+            "_attach_mode": (bindings.ovrtx_config_entry_int, bindings.ConfigInt64Key._ATTACH_MODE),
         }
 
         entries: List[bindings.ovrtx_config_entry_t] = []
         for field_name, (factory, key) in WHITELIST.items():
             value = getattr(config, field_name, None)
             if value is not None:
+                if field_name == "motion_bvh":
+                    value = int(Renderer._normalize_motion_bvh(value))
+                elif field_name == "_attach_mode":
+                    value = int(Renderer._normalize_attach_mode(value))
                 entries.append(factory(key, value))
 
         return bindings.ovrtx_config_t(entries)
+
+    @staticmethod
+    def _normalize_motion_bvh(value: bindings.MotionBvh | int | str) -> bindings.MotionBvh:
+        if isinstance(value, bindings.MotionBvh):
+            return value
+        if isinstance(value, int):
+            return bindings.MotionBvh(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            try:
+                return bindings.MotionBvh[normalized.upper()]
+            except KeyError:
+                return bindings.MotionBvh(int(normalized))
+        raise ValueError(
+            f"Invalid motion_bvh value {value!r}; expected MotionBvh, int 0..2, or 'disable'/'enable'/'auto'"
+        )
+
+    @staticmethod
+    def _normalize_attach_mode(value: bindings._AttachMode | int | str) -> bindings._AttachMode:
+        if isinstance(value, bindings._AttachMode):
+            return value
+        if isinstance(value, int):
+            return bindings._AttachMode(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            try:
+                return bindings._AttachMode[normalized.upper()]
+            except KeyError:
+                return bindings._AttachMode(int(normalized))
+        raise ValueError(f"Invalid _attach_mode value {value!r}; expected _AttachMode, int 0..1, or 'borrow'/'replicate'")
+
+    @staticmethod
+    def _normalize_ordinal(value: Any, *, name: str = "ordinal") -> int:
+        if isinstance(value, bool):
+            raise TypeError(f"{name} must be an integer ordinal, not bool")
+        try:
+            ordinal = operator.index(value)
+        except TypeError as e:
+            raise TypeError(f"{name} must be an integer ordinal, got {type(value).__name__}") from e
+        if not 0 <= ordinal <= 0xFFFFFFFFFFFFFFFF:
+            raise ValueError(f"{name} must be in the uint64 range, got {ordinal}")
+        return ordinal
 
     @staticmethod
     def _normalize_tensor_for_write(semantic_constant: int, tensor: DLTensor) -> DLTensor:
@@ -2129,42 +2613,38 @@ class Renderer:
         N = original_dl_tensor.shape[0]
         lanes = original_dl_tensor.dtype.lanes
 
-        # New path: reshape using stored element_shape
         if element_shape is not None and lanes > 1:
             new_dims = (N, *element_shape)
-            ndim = len(new_dims)
-            reshaped = DLTensor()
-            reshaped.data = original_dl_tensor.data
-            reshaped.device = original_dl_tensor.device
-            reshaped.byte_offset = original_dl_tensor.byte_offset
-            reshaped.strides = None
-            reshaped.ndim = ndim
-            shape_array = (ctypes.c_int64 * ndim)(*new_dims)
-            reshaped.shape = ctypes.cast(shape_array, ctypes.POINTER(ctypes.c_int64))
-            reshaped.dtype.code = original_dl_tensor.dtype.code
-            reshaped.dtype.bits = original_dl_tensor.dtype.bits
-            reshaped.dtype.lanes = 1
-            reshaped._shape_storage = shape_array
-            return reshaped
+        elif semantic == bindings.Semantic.XFORM_MAT4x4 and lanes == 16:
+            new_dims = (N, 4, 4)
+        else:
+            return original_dl_tensor
 
-        # Semantic-specific path: XFORM_MAT4x4 reshape (N,) lanes=16 to (N, 4, 4) lanes=1
-        if semantic == bindings.Semantic.XFORM_MAT4x4 and lanes == 16:
-            reshaped = DLTensor()
-            reshaped.data = original_dl_tensor.data
-            reshaped.device = original_dl_tensor.device
-            reshaped.byte_offset = original_dl_tensor.byte_offset
-            reshaped.strides = None
-            reshaped.ndim = 3
-            shape_array = (ctypes.c_int64 * 3)(N, 4, 4)
-            reshaped.shape = ctypes.cast(shape_array, ctypes.POINTER(ctypes.c_int64))
-            reshaped.dtype.code = original_dl_tensor.dtype.code
-            reshaped.dtype.bits = original_dl_tensor.dtype.bits
-            reshaped.dtype.lanes = 1
-            reshaped._shape_storage = shape_array
-            return reshaped
+        ndim = len(new_dims)
+        shape_array = (ctypes.c_int64 * ndim)(*new_dims)
+        # Row-major contiguous strides: strides[i] = product(new_dims[i+1:]).
+        # DLPack v1.2 requires strides != NULL whenever ndim != 0.
+        strides_array = (ctypes.c_int64 * ndim)()
+        running = 1
+        for i in range(ndim - 1, -1, -1):
+            strides_array[i] = running
+            running *= int(new_dims[i])
 
-        return original_dl_tensor
+        reshaped = DLTensor()
+        reshaped.data = original_dl_tensor.data
+        reshaped.device = original_dl_tensor.device
+        reshaped.byte_offset = original_dl_tensor.byte_offset
+        reshaped.ndim = ndim
+        reshaped.shape = ctypes.cast(shape_array, ctypes.POINTER(ctypes.c_int64))
+        reshaped.strides = ctypes.cast(strides_array, ctypes.POINTER(ctypes.c_int64))
+        reshaped.dtype.code = original_dl_tensor.dtype.code
+        reshaped.dtype.bits = original_dl_tensor.dtype.bits
+        reshaped.dtype.lanes = 1
+        reshaped._shape_storage = shape_array
+        reshaped._strides_storage = strides_array
+        return reshaped
 
+    @deprecated(_OVSTAGE_WRITE_REPLACEMENT)
     def write_attribute(
         self,
         prim_paths: List[str],
@@ -2250,6 +2730,7 @@ class Renderer:
             cuda_event=cuda_event,
         ).wait()
 
+    @deprecated(_OVSTAGE_WRITE_REPLACEMENT)
     def write_array_attribute(
         self,
         prim_paths: List[str],
@@ -2363,6 +2844,7 @@ class Renderer:
             cuda_event=cuda_event,
         ).wait()
 
+    @deprecated(_OVSTAGE_WRITE_REPLACEMENT)
     def write_attribute_async(
         self,
         prim_paths: List[str],
@@ -2395,6 +2877,7 @@ class Renderer:
             cuda_event=cuda_event,
         )
 
+    @deprecated(_OVSTAGE_WRITE_REPLACEMENT)
     def write_array_attribute_async(
         self,
         prim_paths: List[str],
@@ -2720,6 +3203,7 @@ class Renderer:
 
         return op
 
+    @deprecated(_OVSTAGE_BINDING_REPLACEMENT)
     def bind_attribute(
         self,
         prim_paths: List[str],
@@ -2789,6 +3273,7 @@ class Renderer:
             flags=flags,
         ).wait()
 
+    @deprecated(_OVSTAGE_BINDING_REPLACEMENT)
     def bind_attribute_async(
         self,
         prim_paths: List[str],
@@ -2814,6 +3299,7 @@ class Renderer:
             is_array=False,
         )
 
+    @deprecated(_OVSTAGE_BINDING_REPLACEMENT)
     def bind_array_attribute(
         self,
         prim_paths: List[str],
@@ -2873,6 +3359,7 @@ class Renderer:
             flags=flags,
         ).wait()
 
+    @deprecated(_OVSTAGE_BINDING_REPLACEMENT)
     def bind_array_attribute_async(
         self,
         prim_paths: List[str],
@@ -3019,6 +3506,7 @@ class Renderer:
 
         return op
 
+    @deprecated(_OVSTAGE_MAP_REPLACEMENT)
     def map_attribute(
         self,
         prim_paths: List[str],
@@ -3240,6 +3728,7 @@ class Renderer:
 
         return mapping
 
+    @deprecated(_OVSTAGE_UNMAP_REPLACEMENT)
     def unmap_attribute(
         self, mapping: AttributeMapping, event: Optional[int] = None, stream: Optional[int] = None
     ) -> None:
@@ -3259,6 +3748,7 @@ class Renderer:
         """
         mapping.unmap(event=event, stream=stream)
 
+    @deprecated(_OVSTAGE_UNMAP_REPLACEMENT)
     def unmap_attribute_async(
         self, mapping: AttributeMapping, event: Optional[int] = None, stream: Optional[int] = None
     ) -> Operation[bool]:

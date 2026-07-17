@@ -27,10 +27,6 @@ Version and Constants
 
 .. autodata:: ovrtx.OVRTX_LIBRARY_PATH_HINT
 
-.. autodata:: ovrtx.OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP
-
-.. autodata:: ovrtx.OVRTX_ATTR_NAME_PICKABLE
-
 .. autodata:: ovrtx.OVRTX_RENDER_VAR_PICK_HIT
 
 .. autodata:: ovrtx.OVRTX_PICK_FLAG_GIZMO
@@ -59,7 +55,7 @@ Renderer
 
    .. note::
       Enums are also available as class attributes for convenience
-      (e.g. ``Renderer.Semantic.NONE``). See :ref:`enums` below for details.
+      (for example, ``Renderer.Semantic.NONE``). Refer to :ref:`enums` below for details.
 
 Configuration
 ^^^^^^^^^^^^^

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 from PIL import Image
 import pytest
 
@@ -28,6 +29,11 @@ RENDER_HEIGHT = 320
 CENTER_X = RENDER_WIDTH // 2
 CENTER_Y = RENDER_HEIGHT // 2
 MARQUEE_RIGHT = RENDER_WIDTH * 150 // 256
+CENTER_LEFT_NDC = CENTER_X / RENDER_WIDTH
+CENTER_TOP_NDC = CENTER_Y / RENDER_HEIGHT
+CENTER_RIGHT_NDC = (CENTER_X + 1) / RENDER_WIDTH
+CENTER_BOTTOM_NDC = (CENTER_Y + 1) / RENDER_HEIGHT
+MARQUEE_RIGHT_NDC = MARQUEE_RIGHT / RENDER_WIDTH
 
 
 @pytest.fixture()
@@ -40,9 +46,13 @@ def picking_renderer(output_dir):
         log_file_path=log_file_path,
     )
     renderer = ovrtx.Renderer(config=config)
+    stage = ovstage.Stage("ovrtx.docs.picking")
+    renderer.attach_ovstage(stage)
     # [/snippet:doc-create-selection-outline-renderer-python]
-    yield renderer
-    del renderer
+    yield renderer, stage
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
 
 
 @pytest.fixture()
@@ -57,35 +67,41 @@ def styled_selection_renderer(output_dir):
         log_file_path=log_file_path,
     )
     renderer = ovrtx.Renderer(config=config)
+    stage = ovstage.Stage("ovrtx.docs.picking-styled")
+    renderer.attach_ovstage(stage)
     # [/snippet:doc-create-styled-selection-renderer-python]
-    yield renderer
+    yield renderer, stage
     renderer.set_selection_group_styles({
         1: DEFAULT_SELECTION_STYLE,
         2: DEFAULT_SELECTION_STYLE,
     })
-    del renderer
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
 
 
-def _load_scene(renderer):
-    renderer.reset_stage()
-    renderer.open_usd(TEST_PICKING_PATH)
+def _load_scene(renderer, stage):
+    ovstage.population.open_usd(stage, TEST_PICKING_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
     renderer.reset()
     for _ in range(2):
-        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60.0)
+        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60.0, ordinal=1)
+    return 1
 
 
-def _pick_paths(renderer, left, top, right, bottom):
+def _pick_hits(renderer, ordinal, left_ndc, top_ndc, right_ndc, bottom_ndc):
     # [snippet:doc-enqueue-pick-query-python]
     renderer.enqueue_pick_query(
         render_product_path="/Render/Camera",
-        left=left,
-        top=top,
-        right=right,
-        bottom=bottom,
+        left_ndc=left_ndc,
+        top_ndc=top_ndc,
+        right_ndc=right_ndc,
+        bottom_ndc=bottom_ndc,
     )
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60.0,
+        ordinal=ordinal,
     )
     # [/snippet:doc-enqueue-pick-query-python]
 
@@ -124,6 +140,10 @@ def _pick_paths(renderer, left, top, right, bottom):
         )
     # [/snippet:doc-read-pick-hit-buffer-python]
 
+    return hits
+
+
+def _resolve_picked_paths(renderer, hits):
     # [snippet:doc-resolve-picked-prim-paths-python]
     picked_paths = {
         renderer.resolve_prim_path_id(hit["prim_path"])
@@ -135,10 +155,15 @@ def _pick_paths(renderer, left, top, right, bottom):
     return picked_paths
 
 
-def _render_ldr(renderer):
+def _pick_paths(renderer, ordinal, left_ndc, top_ndc, right_ndc, bottom_ndc):
+    return _resolve_picked_paths(renderer, _pick_hits(renderer, ordinal, left_ndc, top_ndc, right_ndc, bottom_ndc))
+
+
+def _render_ldr(renderer, ordinal):
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60.0,
+        ordinal=ordinal,
     )
     frame = products["/Render/Camera"].frames[0]
     mapping = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
@@ -166,76 +191,88 @@ def _save_delta_image(output_dir, name, a, b):
 
 
 def test_pick_center_pixel(picking_renderer):
-    _load_scene(picking_renderer)
+    renderer, stage = picking_renderer
+    ordinal = _load_scene(renderer, stage)
 
     picked_paths = _pick_paths(
-        picking_renderer,
-        CENTER_X,
-        CENTER_Y,
-        CENTER_X + 1,
-        CENTER_Y + 1,
+        renderer,
+        ordinal,
+        CENTER_LEFT_NDC,
+        CENTER_TOP_NDC,
+        CENTER_RIGHT_NDC,
+        CENTER_BOTTOM_NDC,
     )
     assert picked_paths == {"/World/CenterCube"}
 
 
 def test_marquee_picks_multiple_prims(picking_renderer):
-    _load_scene(picking_renderer)
+    renderer, stage = picking_renderer
+    ordinal = _load_scene(renderer, stage)
 
-    picked_paths = _pick_paths(picking_renderer, 0, 0, MARQUEE_RIGHT, RENDER_HEIGHT)
+    picked_paths = _pick_paths(renderer, ordinal, 0.0, 0.0, MARQUEE_RIGHT_NDC, 1.0)
     assert "/World/LeftCube" in picked_paths
     assert "/World/CenterCube" in picked_paths
     assert "/World/RightCube" not in picked_paths
 
 
-def test_pickable_false_excludes_prim(picking_renderer):
-    _load_scene(picking_renderer)
-
-    picked_paths = _pick_paths(
-        picking_renderer,
-        CENTER_X,
-        CENTER_Y,
-        CENTER_X + 1,
-        CENTER_Y + 1,
+@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
+def test_pickable_false_excludes_prim(output_dir):
+    renderer = ovrtx.Renderer(
+        ovrtx.RendererConfig(
+            selection_outline_enabled=True,
+            log_file_path=str(output_dir / "picking_selection_pickable.ovrtx.log"),
+        )
     )
+    renderer.open_usd(TEST_PICKING_PATH)
+    renderer.reset()
+    for _ in range(2):
+        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60.0)
+
+    center_hits = _pick_hits(
+        renderer,
+        None,
+        CENTER_LEFT_NDC,
+        CENTER_TOP_NDC,
+        CENTER_RIGHT_NDC,
+        CENTER_BOTTOM_NDC,
+    )
+    picked_paths = _resolve_picked_paths(renderer, center_hits)
     assert picked_paths == {"/World/CenterCube"}
 
     # [snippet:doc-set-pickable-python]
-    picking_renderer.write_attribute(
-        prim_paths=["/World/CenterCube"],
-        attribute_name=ovrtx.OVRTX_ATTR_NAME_PICKABLE,
-        tensor=np.array([0], dtype=np.uint8),
-    )
+    center_path_ids = [hit["prim_path"] for hit in center_hits]
+    renderer.set_pickable(center_path_ids, False)
     # [/snippet:doc-set-pickable-python]
 
-    picked_paths = _pick_paths(picking_renderer, 0, 0, MARQUEE_RIGHT, RENDER_HEIGHT)
+    picked_paths = _pick_paths(renderer, None, 0.0, 0.0, MARQUEE_RIGHT_NDC, 1.0)
     assert "/World/LeftCube" in picked_paths
     assert "/World/CenterCube" not in picked_paths
+    renderer.destroy()
 
 
 def test_selection_outline_group_renders(picking_renderer, output_dir):
-    _load_scene(picking_renderer)
+    renderer, stage = picking_renderer
+    _load_scene(renderer, stage)
 
-    baseline_pixels = _render_ldr(picking_renderer)
-    _save_ldr_image(
-        output_dir,
-        "picking_selection.selection_outline.baseline",
-        baseline_pixels,
+    center_hits = _pick_hits(
+        renderer,
+        1,
+        CENTER_LEFT_NDC,
+        CENTER_TOP_NDC,
+        CENTER_RIGHT_NDC,
+        CENTER_BOTTOM_NDC,
     )
+
+    baseline_pixels = _render_ldr(renderer, 1)
+    _save_ldr_image(output_dir, "picking_selection.selection_outline.baseline", baseline_pixels)
 
     # [snippet:doc-set-selection-outline-group-python]
-    picking_renderer.write_attribute(
-        prim_paths=["/World/CenterCube"],
-        attribute_name=ovrtx.OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP,
-        tensor=np.array([1], dtype=np.uint8),
-    )
+    center_path_ids = [hit["prim_path"] for hit in center_hits]
+    renderer.set_selection_outline_group(center_path_ids, 1)
     # [/snippet:doc-set-selection-outline-group-python]
 
-    selected_pixels = _render_ldr(picking_renderer)
-    _save_ldr_image(
-        output_dir,
-        "picking_selection.selection_outline.selected",
-        selected_pixels,
-    )
+    selected_pixels = _render_ldr(renderer, 1)
+    _save_ldr_image(output_dir, "picking_selection.selection_outline.selected", selected_pixels)
     _save_delta_image(
         output_dir,
         "picking_selection.selection_outline.delta_selected_vs_baseline",
@@ -245,19 +282,11 @@ def test_selection_outline_group_renders(picking_renderer, output_dir):
     assert _num_changed_pixels(selected_pixels, baseline_pixels) > 0
 
     # [snippet:doc-clear-selection-outline-group-python]
-    picking_renderer.write_attribute(
-        prim_paths=["/World/CenterCube"],
-        attribute_name=ovrtx.OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP,
-        tensor=np.array([0], dtype=np.uint8),
-    )
+    renderer.set_selection_outline_group(center_path_ids, 0)
     # [/snippet:doc-clear-selection-outline-group-python]
 
-    cleared_pixels = _render_ldr(picking_renderer)
-    _save_ldr_image(
-        output_dir,
-        "picking_selection.selection_outline.cleared",
-        cleared_pixels,
-    )
+    cleared_pixels = _render_ldr(renderer, 1)
+    _save_ldr_image(output_dir, "picking_selection.selection_outline.cleared", cleared_pixels)
     _save_delta_image(
         output_dir,
         "picking_selection.selection_outline.delta_selected_vs_cleared",
@@ -268,12 +297,13 @@ def test_selection_outline_group_renders(picking_renderer, output_dir):
 
 
 def test_selection_style_groups_control_outline_and_fill(styled_selection_renderer, output_dir):
-    _load_scene(styled_selection_renderer)
+    renderer, stage = styled_selection_renderer
+    _load_scene(renderer, stage)
 
-    baseline_pixels = _render_ldr(styled_selection_renderer)
+    baseline_pixels = _render_ldr(renderer, 1)
 
     # [snippet:doc-set-selection-group-styles-python]
-    styled_selection_renderer.set_selection_group_styles({
+    renderer.set_selection_group_styles({
         1: ovrtx.SelectionGroupStyle(
             outline_color=(1.0, 0.0, 0.0, 1.0),
             fill_color=(0.0, 1.0, 0.0, 1.0),
@@ -286,19 +316,11 @@ def test_selection_style_groups_control_outline_and_fill(styled_selection_render
     # [/snippet:doc-set-selection-group-styles-python]
 
     # [snippet:doc-assign-selection-style-groups-python]
-    styled_selection_renderer.write_attribute(
-        prim_paths=["/World/CenterCube", "/World/LeftCube"],
-        attribute_name=ovrtx.OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP,
-        tensor=np.array([1, 2], dtype=np.uint8),
-    )
+    renderer.set_selection_outline_group_strings(["/World/CenterCube", "/World/LeftCube"], [1, 2])
     # [/snippet:doc-assign-selection-style-groups-python]
 
-    styled_pixels = _render_ldr(styled_selection_renderer)
-    _save_ldr_image(
-        output_dir,
-        "picking_selection.selection_style.group_assignment",
-        styled_pixels,
-    )
+    styled_pixels = _render_ldr(renderer, 1)
+    _save_ldr_image(output_dir, "picking_selection.selection_style.group_assignment", styled_pixels)
     _save_delta_image(
         output_dir,
         "picking_selection.selection_style.delta_group_assignment_vs_baseline",
@@ -307,7 +329,7 @@ def test_selection_style_groups_control_outline_and_fill(styled_selection_render
     )
     assert _num_changed_pixels(styled_pixels, baseline_pixels) > 0
 
-    styled_selection_renderer.set_selection_group_styles({
+    renderer.set_selection_group_styles({
         1: ovrtx.SelectionGroupStyle(
             outline_color=(1.0, 0.0, 0.0, 1.0),
             fill_color=(0.0, 0.0, 1.0, 1.0),
@@ -317,7 +339,7 @@ def test_selection_style_groups_control_outline_and_fill(styled_selection_render
             fill_color=(0.0, 1.0, 0.0, 1.0),
         ),
     })
-    fill_recolored_pixels = _render_ldr(styled_selection_renderer)
+    fill_recolored_pixels = _render_ldr(renderer, 1)
     _save_delta_image(
         output_dir,
         "picking_selection.selection_style.delta_fill_recolor",
@@ -326,12 +348,8 @@ def test_selection_style_groups_control_outline_and_fill(styled_selection_render
     )
     assert _num_changed_pixels(fill_recolored_pixels, styled_pixels) > 0
 
-    styled_selection_renderer.write_attribute(
-        prim_paths=["/World/CenterCube", "/World/LeftCube"],
-        attribute_name=ovrtx.OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP,
-        tensor=np.array([2, 1], dtype=np.uint8),
-    )
-    swapped_pixels = _render_ldr(styled_selection_renderer)
+    renderer.set_selection_outline_group_strings(["/World/CenterCube", "/World/LeftCube"], [2, 1])
+    swapped_pixels = _render_ldr(renderer, 1)
     _save_delta_image(
         output_dir,
         "picking_selection.selection_style.delta_swapped_groups",

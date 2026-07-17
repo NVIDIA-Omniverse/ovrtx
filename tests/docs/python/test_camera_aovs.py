@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 from PIL import Image
 
 SCENE_PATH = str((Path(__file__).parent / "../../../tests/data/simple_camera.usda").resolve())
@@ -51,19 +52,21 @@ def "Render" {{
 # [/snippet:doc-camera-aov-usda]
 
 
-def test_all_camera_aovs(output_dir):
+def test_all_camera_aovs(renderer, stage, output_dir):
     """Test that all documented camera AOVs render with correct shape and non-zero data."""
-    renderer = ovrtx.Renderer()
-    renderer.open_usd_from_string(USDA)
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, USDA, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     # Warm up
     for _ in range(5):
-        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60)
+        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
 
     # [snippet:doc-camera-aov-smoke-test]
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
 
     h, w = RESOLUTION[1], RESOLUTION[0]
@@ -120,5 +123,3 @@ def test_all_camera_aovs(output_dir):
             assert cam_pos.shape == (h, w, 4) and cam_pos.dtype == np.float32
             assert not np.all(cam_pos == 0), "Camera3dPositionSD is all zeros"
     # [/snippet:doc-camera-aov-smoke-test]
-
-    del renderer

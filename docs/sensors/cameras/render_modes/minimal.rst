@@ -17,6 +17,15 @@ Minimal mode uses lightweight rasterization with minimal GPU cost. Use this when
 
    token omni:rtx:rendermode = "Minimal"
 
+Lighting Behavior
+-----------------
+
+Minimal mode only respects the first ``DistantLight`` found in the scene, and shadows from that light are hard shadows. This restriction keeps Minimal mode fast and stable for speed-of-light rendering workloads.
+
+Other light types, such as ``DomeLight``, are not used for Minimal mode lighting. If the scene has no ``DistantLight``, Minimal mode falls back to a single camera light.
+
+For improved visibility without adding scene lights, use ambient lighting through the ``omni:rtx:rt:ambientLight:color`` and ``omni:rtx:rt:ambientLight:intensity`` attributes listed below, or disable shadows with ``omni:rtx:minimal:castShadows``.
+
 Settings
 --------
 
@@ -33,10 +42,10 @@ Settings
 
        Selects the shading mode.
 
-       | 0: No Rendering -- no path tracing will be performed and LdrColor will be black; use when only data outputs such as depth and albedo are required.
+       | 0: No Rendering -- no path tracing is performed and LdrColor is black; use when only data outputs such as depth and albedo are required.
        | 1: Constant Diffuse -- uses a single constant color for all surfaces.
        | 2: Texture Diffuse -- uses diffuse texture colors.
-       | 3: Diffuse/Glossy/Emission -- full material evaluation with diffuse, glossy and emission.
+       | 3: Diffuse/Glossy/Emission -- full material evaluation with diffuse, glossy, and emission.
      - ``int``
      -
    * - ``omni:rtx:minimal:constantColor``
@@ -46,7 +55,7 @@ Settings
      -
    * - ``omni:rtx:minimal:castShadows``
 
-       Global toggle to cast shadows in Minimal render mode.
+       Global toggle to cast hard shadows from the first ``DistantLight`` in Minimal render mode.
      - ``bool``
      -
    * - ``omni:rtx:rt:ambientLight:color``

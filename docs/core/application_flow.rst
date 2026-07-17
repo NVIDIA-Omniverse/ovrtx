@@ -13,11 +13,30 @@ Application Flow
 
 Most ovrtx applications follow the same sequence:
 
+**Standalone mode** (ovrtx owns the stage):
+
+This compatibility path remains functional in 0.4, but its scene population,
+query, read/write, binding, and mapping APIs are deprecated in favor of ovstage.
+
 1. Create a renderer.
 2. Load USD content into the renderer's runtime stage.
 3. Step one or more RenderProducts to produce output.
 4. Map render variables or read stage attributes.
 5. Release mappings, results, bindings, and renderer resources.
+
+**Attached mode** (ovrtx 0.4+, rendering an externally owned ovstage):
+
+1. Create a renderer.
+2. Attach an ``ovstage_instance_t`` through :c:func:`ovrtx_attach_ovstage`.
+3. Advance ovstage's write floor after committed scene mutations.
+4. In C, call :c:func:`ovrtx_update_from_stage`, then step through
+   :c:func:`ovrtx_step_with_stage` at that ordinal. In Python, call
+   ``Renderer.step(..., ordinal=...)``, which performs both operations.
+5. Map render variables and consume outputs as usual.
+6. Detach and release renderer resources.
+
+Refer to :doc:`ovstage_integration` for the full attached-stage lifecycle, including
+ordinals and write-floor gates.
 
 The USD stage normally contains three related kinds of prims:
 
@@ -85,8 +104,9 @@ Python vs. C
 Where to Go Next
 ----------------
 
-- :doc:`renderer_configuration` -- renderer config entries and deployment layout.
-- :doc:`async_status_errors` -- async operation waits, status queries, and errors.
-- :doc:`../scene/loading_usd` -- loading files, URLs, inline USDA, and references.
-- :doc:`../sensors/sensor_outputs` -- mapping rendered output on CPU or CUDA.
-- :doc:`../scene/attributes` -- reading and writing runtime stage attributes.
+- :doc:`renderer_configuration` - renderer config entries and deployment layout.
+- :doc:`ovstage_integration` - ovstage integration, ordinals, and write-floor gates.
+- :doc:`async_status_errors` - async operation waits, status queries, and errors.
+- :doc:`../scene/loading_usd` - loading files, URLs, inline USDA, and references (standalone mode).
+- :doc:`../sensors/sensor_outputs` - mapping rendered output on CPU or CUDA.
+- :doc:`../scene/attributes` - reading and writing runtime stage attributes.

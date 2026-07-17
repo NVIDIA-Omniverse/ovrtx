@@ -12,6 +12,8 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
+import pytest
 import warp as wp
 
 TEST_BASE_PATH = str((Path(__file__).parent / "../data/ovrtx-test-base.usda").resolve())
@@ -39,12 +41,26 @@ def _set_xform_translation_x(transforms: wp.array(dtype=wp.mat44d), x: wp.float6
     )
 
 
-def _load_base(renderer):
+def _load_base(stage):
+    ovstage.population.open_usd(stage, TEST_BASE_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
+
+
+def _load_base_legacy(renderer):
     renderer.open_usd(TEST_BASE_PATH)
     renderer.reset()
 
 
-def _read_xform(renderer, prim="/World/Plane"):
+def _read_xform(stage, paths, query, ordinal):
+    attribute = paths.intern_token("omni:xform")
+    with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+        group = read.fetch_next()
+        values = np.from_dlpack(group.dlpack(0)).copy().reshape(1, 4, 4)
+        stage.release_group(group)
+    return values
+
+
+def _read_xform_legacy(renderer, prim="/World/Plane"):
     tensor = renderer.read_attribute("omni:xform", [prim])
     return np.from_dlpack(tensor).reshape(1, 4, 4)
 
@@ -55,52 +71,56 @@ def _make_xform(x):
     return matrix
 
 
-def test_bind_attribute_write_unbind(renderer):
+def test_bind_attribute_write_unbind(stage):
     """Create a scalar binding, write through it, and read back the result."""
-    _load_base(renderer)
+    _load_base(stage)
     matrix = _make_xform(12.0)
 
-    # [snippet:doc-bind-attribute-write]
-    binding = renderer.bind_attribute(
-        prim_paths=["/World/Plane"],
-        attribute_name="omni:xform",
-        dtype="float64",
-        shape=(4, 4),
-        prim_mode=ovrtx.PrimMode.MUST_EXIST,
-        flags=ovrtx.BindingFlag.OPTIMIZE,
-    )
-    binding.write(matrix)
-    binding.unbind()
-    # [/snippet:doc-bind-attribute-write]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/World/Plane"])
 
-    np.testing.assert_allclose(_read_xform(renderer), matrix)
+        # [snippet:doc-bind-attribute-write]
+        query = stage.query_from_path_list(path_list)
+        attribute = paths.intern_token("omni:xform")
+        matrix_dtype = ovstage.numpy_to_dldatatype(matrix.dtype, lanes=16)
+        matrix_tensor = ovstage.make_dltensor(matrix, dtype=matrix_dtype, shape=[1], ndim=1)
+        stage.write_attribute(query, attribute, ordinal=2, tensors=matrix_tensor, is_array=False).wait()
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        # [/snippet:doc-bind-attribute-write]
+
+        np.testing.assert_allclose(_read_xform(stage, paths, query, 2), matrix)
+        query.release().wait()
+        paths.destroy_path_list(path_list)
 
 
-def test_bind_attribute_async_and_write_async(renderer):
+def test_bind_attribute_async_and_write_async(stage):
     """Create and write a binding asynchronously."""
-    _load_base(renderer)
+    _load_base(stage)
     matrix = _make_xform(13.0)
 
-    # [snippet:doc-bind-attribute-async]
-    op = renderer.bind_attribute_async(
-        ["/World/Plane"], "omni:xform", dtype="float64", shape=(4, 4)
-    )
-    binding = op.wait()
-    assert binding is not None
-    # [/snippet:doc-bind-attribute-async]
+    with ovstage.PathDictionary(stage) as paths:
+        # [snippet:doc-bind-attribute-async]
+        plane_filter = ovstage.Filter([ovstage.Predicate("usd-path", ovstage.FilterOp.IN, ["/World/Plane"])])
+        query = stage.query(filter=plane_filter)
+        query.wait()
+        # [/snippet:doc-bind-attribute-async]
 
-    # [snippet:doc-binding-write-async]
-    write_op = binding.write_async(matrix)
-    assert write_op.wait() is True
-    # [/snippet:doc-binding-write-async]
+        # [snippet:doc-binding-write-async]
+        attribute = paths.intern_token("omni:xform")
+        matrix_dtype = ovstage.numpy_to_dldatatype(matrix.dtype, lanes=16)
+        matrix_tensor = ovstage.make_dltensor(matrix, dtype=matrix_dtype, shape=[1], ndim=1)
+        write_op = stage.write_attribute(query, attribute, ordinal=2, tensors=matrix_tensor, is_array=False)
+        write_op.wait()
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        # [/snippet:doc-binding-write-async]
 
-    np.testing.assert_allclose(_read_xform(renderer), matrix)
-    binding.unbind()
+        np.testing.assert_allclose(_read_xform(stage, paths, query, 2), matrix)
+        query.release().wait()
 
 
-def test_bind_array_attribute(renderer):
+def test_bind_array_attribute(stage):
     """Bind a variable-length array attribute, write through it, and read it back."""
-    _load_base(renderer)
+    _load_base(stage)
     points = np.array(
         [
             [-1.0, 0.0, -1.0],
@@ -111,66 +131,102 @@ def test_bind_array_attribute(renderer):
         dtype=np.float32,
     )
 
-    # [snippet:doc-bind-array-attribute]
-    binding = renderer.bind_array_attribute(
-        ["/World/Plane"], "points", dtype="float32", shape=(3,)
-    )
-    binding.write([points])
-    # [/snippet:doc-bind-array-attribute]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/World/Plane"])
+        query = stage.query_from_path_list(path_list)
 
-    values = np.from_dlpack(renderer.read_array_attribute("points", ["/World/Plane"])["/World/Plane"])
-    np.testing.assert_allclose(values, points)
-    binding.unbind()
+        # [snippet:doc-bind-array-attribute]
+        attribute = paths.intern_token("points")
+        point_dtype = ovstage.numpy_to_dldatatype(points.dtype, lanes=3)
+        point_tensor = ovstage.make_dltensor(points, dtype=point_dtype, shape=[4], ndim=1)
+        stage.write_attribute(query, attribute, ordinal=2, tensors=point_tensor, is_array=True).wait()
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        # [/snippet:doc-bind-array-attribute]
+
+        with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
+            group = read.fetch_next()
+            values = np.from_dlpack(group.dlpack(0)).copy()
+            stage.release_group(group)
+        np.testing.assert_allclose(values, points)
+        query.release().wait()
+        paths.destroy_path_list(path_list)
 
 
-def test_map_attribute_cpu(renderer):
+def test_map_attribute_cpu(stage):
     """Map an attribute by name on CPU and verify the mutation."""
-    _load_base(renderer)
+    _load_base(stage)
 
-    # [snippet:doc-map-attribute-cpu]
-    with renderer.map_attribute(
-        ["/World/Plane"], "omni:xform", dtype="float64", shape=(4, 4)
-    ) as mapping:
-        matrices = np.from_dlpack(mapping.tensor).reshape(1, 4, 4)
-        matrices[0, 3, 0] = 10.0
-    # [/snippet:doc-map-attribute-cpu]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/World/Plane"])
+        query = stage.query_from_path_list(path_list)
+        attribute = paths.intern_token("omni:xform")
 
-    assert _read_xform(renderer)[0, 3, 0] == 10.0
+        # [snippet:doc-map-attribute-cpu]
+        with stage.map_attribute(query, attribute, ordinal=2) as mapping:
+            mapping.wait()
+            group = mapping.fetch_next()
+            matrices = np.from_dlpack(group.dlpack(0)).reshape(1, 4, 4)
+            matrices[0, 3, 0] = 10.0
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        # [/snippet:doc-map-attribute-cpu]
+
+        assert _read_xform(stage, paths, query, 2)[0, 3, 0] == 10.0
+        query.release().wait()
+        paths.destroy_path_list(path_list)
 
 
-def test_map_bound_attribute_cpu(renderer):
+def test_map_bound_attribute_cpu(stage):
     """Map through an AttributeBinding rather than by name."""
-    _load_base(renderer)
+    _load_base(stage)
 
-    # [snippet:doc-map-bound-attribute]
-    binding = renderer.bind_attribute(["/World/Plane"], "omni:xform", dtype="float64", shape=(4, 4))
-    with binding.map(device=ovrtx.Device.CPU) as mapping:
-        matrices = np.from_dlpack(mapping.tensor).reshape(1, 4, 4)
-        matrices[0, 3, 0] = 8.0
-    # [/snippet:doc-map-bound-attribute]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/World/Plane"])
 
-    assert _read_xform(renderer)[0, 3, 0] == 8.0
-    binding.unbind()
+        # [snippet:doc-map-bound-attribute]
+        query = stage.query_from_path_list(path_list)
+        attribute = paths.intern_token("omni:xform")
+        with stage.map_attribute(query, attribute, ordinal=2) as mapping:
+            mapping.wait()
+            group = mapping.fetch_next()
+            matrices = np.from_dlpack(group.dlpack(0)).reshape(1, 4, 4)
+            matrices[0, 3, 0] = 8.0
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        # [/snippet:doc-map-bound-attribute]
+
+        assert _read_xform(stage, paths, query, 2)[0, 3, 0] == 8.0
+        query.release().wait()
+        paths.destroy_path_list(path_list)
 
 
-def test_unmap_attribute_async(renderer):
+def test_unmap_attribute_async(stage):
     """Unmap explicitly through the async API."""
-    _load_base(renderer)
+    _load_base(stage)
 
-    # [snippet:doc-unmap-attribute-async]
-    mapping = renderer.map_attribute(["/World/Plane"], "omni:xform", dtype="float64", shape=(4, 4))
-    matrices = np.from_dlpack(mapping.tensor).reshape(1, 4, 4)
-    matrices[0, 3, 0] = 9.0
-    op = mapping.unmap_async()
-    assert op.wait() is True
-    # [/snippet:doc-unmap-attribute-async]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/World/Plane"])
+        query = stage.query_from_path_list(path_list)
+        attribute = paths.intern_token("omni:xform")
 
-    assert _read_xform(renderer)[0, 3, 0] == 9.0
+        # [snippet:doc-unmap-attribute-async]
+        mapping = stage.map_attribute(query, attribute, ordinal=2)
+        mapping.wait()
+        group = mapping.fetch_next()
+        matrices = np.from_dlpack(group.dlpack(0)).reshape(1, 4, 4)
+        matrices[0, 3, 0] = 9.0
+        op = mapping.unmap()
+        op.wait()
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        # [/snippet:doc-unmap-attribute-async]
+
+        assert _read_xform(stage, paths, query, 2)[0, 3, 0] == 9.0
+        query.release().wait()
+        paths.destroy_path_list(path_list)
 
 
+@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 def test_map_attribute_cuda(renderer):
     """Map an attribute on CUDA, edit it with Warp, and read back on CPU."""
-    _load_base(renderer)
+    _load_base_legacy(renderer)
 
     # [snippet:doc-map-attribute-cuda]
     mapping = renderer.map_attribute(
@@ -186,12 +242,13 @@ def test_map_attribute_cuda(renderer):
     mapping.unmap(stream=stream.cuda_stream)
     # [/snippet:doc-map-attribute-cuda]
 
-    assert _read_xform(renderer)[0, 3, 0] == 6.0
+    assert _read_xform_legacy(renderer)[0, 3, 0] == 6.0
 
 
+@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 def test_write_attribute_async_data_access_cuda(renderer):
     """Write a CUDA tensor with asynchronous data access and stream sync."""
-    _load_base(renderer)
+    _load_base_legacy(renderer)
     cuda_tensor = wp.empty(1, dtype=wp.mat44d, device="cuda:0")
     stream = wp.Stream(device=cuda_tensor.device)
     wp.launch(_set_xform_translation_x, dim=1, inputs=[cuda_tensor, wp.float64(7.0)], stream=stream)
@@ -207,29 +264,36 @@ def test_write_attribute_async_data_access_cuda(renderer):
     assert op.wait() is True
     # [/snippet:doc-write-attribute-async-data-access]
 
-    assert _read_xform(renderer)[0, 3, 0] == 7.0
+    assert _read_xform_legacy(renderer)[0, 3, 0] == 7.0
 
 
-def test_write_token_array_attribute(renderer):
+def test_write_token_array_attribute(stage):
     """Write string data as a token array rather than a path relationship."""
-    _load_base(renderer)
+    _load_base(stage)
 
-    # [snippet:doc-write-token-array]
-    renderer.write_array_attribute(
-        ["/World/Plane"],
-        "omni:docTokens",
-        [["sensor", "validated"]],
-        is_token=True,
-        prim_mode=ovrtx.PrimMode.CREATE_NEW,
-    )
-    # [/snippet:doc-write-token-array]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(["/World/Plane"])
+        query = stage.query_from_path_list(path_list)
 
-    prims = renderer.query_prims(
-        require_all=[(ovrtx.FilterKind.HAS_ATTRIBUTE, "omni:docTokens")],
-        attribute_filter_mode=ovrtx.AttributeFilterMode.SPECIFIC,
-        attribute_names=["omni:docTokens"],
-    )
-    assert "/World/Plane" in prims
-    token_info = prims["/World/Plane"]["omni:docTokens"]
-    assert token_info.is_array is True
-    assert token_info.semantic == ovrtx.Semantic.TOKEN_ID
+        # [snippet:doc-write-token-array]
+        attribute = paths.intern_token("omni:docTokens")
+        token_ids = np.array([paths.intern_token("sensor"), paths.intern_token("validated")], dtype=np.uint64)
+        stage.write_attribute(
+            query,
+            attribute,
+            ordinal=2,
+            tensors=token_ids,
+            is_array=True,
+            semantic=ovstage.AttributeSemantic.TOKEN_ID,
+        ).wait()
+        stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+        # [/snippet:doc-write-token-array]
+
+        with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
+            group = read.fetch_next()
+            assert group.is_array
+            assert group.tensor(0).dtype.lanes == 1
+            assert group.attribute == attribute
+            stage.release_group(group)
+        query.release().wait()
+        paths.destroy_path_list(path_list)

@@ -11,22 +11,23 @@
 from pathlib import Path
 
 import pytest
+import ovstage
 
 MISSING_USD_PATH = str((Path(__file__).parent / "../data/this-file-does-not-exist.usda").resolve())
 
 
-def test_sync_method_raises_runtime_error(renderer):
-    """Synchronous Python APIs surface operation failures as RuntimeError."""
+def test_sync_method_raises_runtime_error(stage):
+    """Synchronous population APIs surface operation failures as OvstageError."""
     # [snippet:doc-python-sync-runtime-error]
-    with pytest.raises(RuntimeError, match="open_usd"):
-        renderer.open_usd(MISSING_USD_PATH)
+    with pytest.raises(ovstage.OvstageError):
+        ovstage.population.open_usd(stage, MISSING_USD_PATH, ordinal=1)
     # [/snippet:doc-python-sync-runtime-error]
 
 
-def test_async_wait_raises_runtime_error(renderer):
+def test_async_wait_raises_runtime_error(stage):
     """Async Python APIs surface operation failures when wait() is called."""
     # [snippet:doc-python-async-operation-error]
-    op = renderer.open_usd_async(MISSING_USD_PATH)
-    with pytest.raises(RuntimeError, match="open_usd"):
+    op = ovstage.population.open_usd_async(stage, MISSING_USD_PATH, ordinal=1)
+    with pytest.raises(ovstage.OvstageError):
         op.wait()
     # [/snippet:doc-python-async-operation-error]

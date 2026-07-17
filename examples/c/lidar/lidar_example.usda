@@ -1,0 +1,114 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    startTimeCode = 0
+    endTimeCode = 1
+    timeCodesPerSecond = 10
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    # [snippet:configure-lidar-sensor]
+    def OmniLidar "Lidar" (
+        prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+    )
+    {
+        token omni:sensor:Core:elementsCoordsType = "CARTESIAN"
+        double2 omni:sensor:frameRate = (10, 1)
+
+        double3 xformOp:translate = (0, 0, 1)
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+    # [/snippet:configure-lidar-sensor]
+
+    def Mesh "GroundPlane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-200, -200, 0), (200, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-200, -200, 0), (200, -200, 0), (200, 200, 0), (-200, 200, 0)]
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.05)]
+        rel material:binding = </World/Materials/Asphalt>
+    }
+
+    def Cube "ConcreteCube" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1.5
+        color3f[] primvars:displayColor = [(0.45, 0.43, 0.39)]
+        rel material:binding = </World/Materials/Concrete>
+        double3 xformOp:translate = (10, 0, 0.75)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def DistantLight "DistantLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float intensity = 2500
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    # [snippet:configure-lidar-pointcloud-output]
+    def "Render"
+    {
+        def "Products"
+        {
+            def RenderProduct "LidarProduct"
+            {
+                rel camera = </World/Lidar>
+                rel orderedVars = [<../../Vars/PointCloud>]
+            }
+        }
+
+        def "Vars"
+        {
+            def RenderVar "PointCloud"
+            {
+                uniform string sourceName = "PointCloud"
+                token[] channels = [
+                    "Coordinates",
+                    "Intensity",
+                    "Counts",
+                    "TimeOffsetNs"
+                ]
+            }
+        }
+    }
+    # [/snippet:configure-lidar-pointcloud-output]
+
+    def Xform "Materials"
+    {
+        # These materials intentionally omit visual shaders. The sensor return
+        # behavior comes from the nonvisual attributes on the bound Material.
+        def Material "Asphalt"
+        {
+            token omni:simready:nonvisual:base = "asphalt"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            custom string inputs:nonvisual:base = "asphalt"
+            custom string inputs:nonvisual:coating = "none"
+            custom string inputs:nonvisual:attributes = "none"
+        }
+
+        def Material "Concrete"
+        {
+            token omni:simready:nonvisual:base = "concrete"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            custom string inputs:nonvisual:base = "concrete"
+            custom string inputs:nonvisual:coating = "none"
+            custom string inputs:nonvisual:attributes = "none"
+        }
+    }
+}

@@ -6,6 +6,6 @@ CompileFlags:
     [
       "-xcuda",
       "--cuda-gpu-arch=sm_86",                # choose your arch
-      "--cuda-path=/home/anders/packages/cuda/12.3.2",          # adjust for your system
-      "-I/home/anders/packages/cuda/12.3.2/include",           # CUDA headers
+      "--cuda-path=/home/<username>/packages/cuda/12.3.2",     # adjust for your system
+      "-I/home/<username>/packages/cuda/12.3.2/include",      # CUDA headers
     ]

@@ -98,4 +98,3 @@ Notes
 - In C, a 4x4 matrix attribute is represented as ``shape=[N]`` with
   ``DLDataType{kDLFloat, 64, 16}``.
 - In Python, a 4x4 matrix attribute is represented as ``shape=(N, 4, 4)``.
-

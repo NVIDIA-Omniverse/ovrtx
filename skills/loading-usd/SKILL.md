@@ -10,7 +10,7 @@
 # its affiliates is strictly prohibited.
 name: loading-usd
 description: >
-  Loading USD scenes into the renderer from files, URLs, or inline USDA strings. Use
+  Loading USD scenes into ovstage for rendering from files, URLs, or inline USDA strings. Use
   when user asks to load a USD scene, compose USD content, add cameras or
   RenderProducts to an existing USD layer, add referenced content, or create runtime
   geometry.
@@ -50,7 +50,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 1. Identify the requested language and lifecycle stage before choosing an example.
 2. Read the referenced snippet that matches the requested stage and language.
-3. Preserve the normal ovrtx order: create or initialize the renderer, load or compose USD, step or wait for work, read outputs when needed, then release C resources explicitly.
+3. For Python, create an ovstage, attach it to the renderer, populate it at an ordinal, advance the write floor, and step at that ordinal. Preserve the standalone C lifecycle when maintaining C code.
 4. Apply the async, status-query, error-handling, and warmup skills when the workflow crosses those concerns.
 5. When changing code, run the narrow example or docs test that owns the snippet whenever practical.
 
@@ -69,7 +69,7 @@ This skill has no scripts.
 
 ## Overview
 
-Before rendering, you must load USD content into the renderer. ovrtx supports three input modes:
+Before rendering, load USD content into an application-owned ovstage. Python supports three input modes through `ovstage.population`:
 
 1. **File path or URL** -- open an existing `.usd`/`.usda`/`.usdc` file as the root layer.
 2. **Inline USDA string** -- open runtime-generated USD content as the root layer. The inline root layer may use USD `subLayers` to compose a base scene and additional authored prims.
@@ -77,8 +77,8 @@ Before rendering, you must load USD content into the renderer. ovrtx supports th
 
 There are two common composition patterns:
 
-- **Inline root with `subLayers`** -- use when an existing scene layer does not contain required prims such as Cameras, RenderProducts, or RenderVars. Build one inline root USDA layer that sublayers the original scene and authors the extra prims, then load it with `open_usd_from_string()` / `ovrtx_open_usd_from_string()`.
-- **Additive references** -- use when a root stage is already open and you need to add removable referenced content at a new prim path. Use `add_usd_reference()` / `add_usd_reference_from_string()`.
+- **Inline root with `subLayers`** -- build one inline root USDA layer that sublayers the original scene and authors the extra prims, then load it with `ovstage.population.open_usd_from_string()` in Python.
+- **Additive references** -- use `ovstage.population.add_usd_reference*()`, apply the USD changes at an ordinal, and advance the write floor.
 
 ## Python
 
@@ -94,7 +94,7 @@ Useful for creating RenderProducts, cameras, or runtime geometry without editing
 
 ### Compose a base scene plus extra prims
 
-When a USD layer has the scene content but lacks render configuration or sensors, compose a new inline root layer: add `subLayers = [@existing_scene.usda@]`, author the missing Camera / RenderProduct / RenderVar prims in that same inline layer, and load it with `open_usd_from_string()`.
+When a USD layer has the scene content but lacks render configuration or sensors, compose a new inline root layer: add `subLayers = [@existing_scene.usda@]`, author the missing Camera / RenderProduct / RenderVar prims in that same inline layer, and populate it with `ovstage.population.open_usd_from_string()`.
 
 > **USDA source:** `tests/docs/usd/data/inline_sublayers_camera_renderproduct.usda` snippet `doc-usda-inline-sublayers-camera-renderproduct`
 >
@@ -104,15 +104,15 @@ When a USD layer has the scene content but lacks render configuration or sensors
 
 ### Add a USD reference with a path prefix
 
-Use `add_usd_reference()` or `add_usd_reference_from_string()` after a root stage is open when you need additive content that can be removed later by handle.
+Use `ovstage.population.add_usd_reference()` or `add_usd_reference_from_string()` after a root stage is open. Call `apply_usd_changes()` at the next ordinal, then advance the write floor.
 
 ### Compose multiple inputs
 
-Use inline `subLayers` for one composed root stage, or reference APIs for incremental additions. See the planet-system example for the reference-addition pattern.
+Use inline `subLayers` for one composed root stage, or ovstage reference APIs for incremental additions.
 
 ### Remove USD
 
-Use `remove_usd(handle)` with handles returned by `add_usd_reference()` / `add_usd_reference_from_string()`. Root layers opened with `open_usd*` are replaced by the next `open_usd*` call or cleared with `reset_stage()`.
+Use `ovstage.population.remove_usd(stage, handle)`, then apply the change at a new ordinal and advance the write floor.
 
 ## C
 
@@ -156,9 +156,22 @@ When a USD layer has the scene content but lacks render configuration or sensors
 
 ### Update time-sampled attributes
 
-For animated USD scenes, re-evaluate every time-sampled attribute at a specific stage time. Time is in **seconds**; the runtime converts to USD timecodes via the stage's `timeCodesPerSecond` metadata.
+For animated USD scenes, re-evaluate time-sampled attributes with `ovstage.population.update_from_usd_time()` (Python) or `ovstage_population_apply_usd_time()` (attached-mode C), apply the changes at a new ordinal, and advance the write floor.
+
+**Timecodes vs. seconds — the common confusion.** USD authors time samples in **timecodes** (frame-like units), but every ovrtx time API takes **seconds**. Convert with the stage's `timeCodesPerSecond` metadata:
+
+- `seconds = timecode / timeCodesPerSecond`
+- `timecode = seconds * timeCodesPerSecond`
+
+Example: with `timeCodesPerSecond = 24`, a sample authored at timecode `48` is at **2.0 seconds** — call `update_from_usd_time(2.0)`, not `update_from_usd_time(48)`.
+
+> ⚠️ The parameter is named `usd_time`, but it is in **seconds**, not timecodes — the runtime converts to timecodes internally via `timeCodesPerSecond`.
+
+This is a **different clock** from the *simulation time* advanced by `step(delta_time)` (see the `stepping-and-rendering` skill): `update_from_usd_time` moves USD animation; `step` advances the simulation/sensor clock. The two are independent — advancing one does not advance the other.
 
 > **Source:** `tests/docs/python/test_base.py` snippet `doc-update-from-usd-time-async`
+>
+> **Source:** `tests/docs/c/test_base.cpp` snippet `doc-update-from-usd-time-async-c`
 
 ### Reset stage to empty
 
@@ -172,25 +185,32 @@ Clear all USD content from the runtime stage:
 
 | Python | C |
 |--------|---|
-| `renderer.open_usd(path)` | `ovrtx_open_usd_from_file(renderer, file)` |
-| `renderer.open_usd_from_string(usda)` | `ovrtx_open_usd_from_string(renderer, content)` |
-| `renderer.add_usd_reference(path, prefix)` | `ovrtx_add_usd_reference_from_file(renderer, file, prefix, &handle)` |
-| `renderer.add_usd_reference_from_string(usda, prefix)` | `ovrtx_add_usd_reference_from_string(renderer, content, prefix, &handle)` |
-| `renderer.remove_usd(handle)` | `ovrtx_remove_usd(renderer, handle)` |
-| `renderer.update_from_usd_time(usd_time)` | `ovrtx_update_stage_from_usd_time(renderer, usd_time)` |
-| `renderer.reset_stage()` / `reset_stage_async()` | `ovrtx_reset_stage(renderer)` |
+| `ovstage.population.open_usd(stage, path, ordinal=...)` | `ovrtx_open_usd_from_file(renderer, file)` |
+| `ovstage.population.open_usd_from_string(stage, usda, ordinal=...)` | `ovrtx_open_usd_from_string(renderer, content)` |
+| `ovstage.population.add_usd_reference(stage, path, prefix)` | `ovrtx_add_usd_reference_from_file(renderer, file, prefix, &handle)` |
+| `ovstage.population.add_usd_reference_from_string(stage, usda, prefix)` | `ovrtx_add_usd_reference_from_string(renderer, content, prefix, &handle)` |
+| `ovstage.population.remove_usd(stage, handle)` | `ovrtx_remove_usd(renderer, handle)` |
+| `ovstage.population.update_from_usd_time(stage, usd_time)` | `ovstage_population_apply_usd_time(stage, ordinal, usd_time)` (attached mode; deprecated standalone: `ovrtx_update_stage_from_usd_time`) |
 
 ## Troubleshooting
 
-- **Only one root layer is allowed.** Calling `open_usd()` followed by `open_usd_from_string()` (or vice versa) replaces the root stage. To combine a scene file with extra prims such as Cameras and RenderProducts, use a single `open_usd_from_string()` root layer with `subLayers`:
+- **Only one root layer is allowed.** Calling an ovstage root population function replaces the root layer. To combine a scene file with extra prims such as Cameras and RenderProducts, use one inline root layer with `subLayers`:
 
   > **Source:** `tests/docs/python/test_sensor_configuration.py` snippet `doc-add-render-config-layer`
 
 - **Reference additions are a separate pattern.** Use `add_usd_reference*` when a root stage is already open and you want to place additional referenced content at a new absolute path. The `prefix_path` must not collide with existing prim paths, and inline reference layers must set `defaultPrim`.
+- **Remote USD/S3 asset failures are environment blockers first.** If an example fails while opening a remote USD or S3 asset, verify internet access, proxy/firewall settings, and direct access to the asset URL. Treat the failure as a network or asset-access blocker unless the same URL is reachable outside ovrtx.
 - Authored attributes that are not part of the normal population schema are ignored unless the root layer sets `customLayerData.populateAllAuthoredAttributes = true`. Use this only for workflows that need generic authored attributes, because populating every authored attribute can dramatically increase memory usage when assets contain many properties the runtime will never read or write.
-- In Python, `open_usd()` blocks until loaded. Use the `_async` variants if you need non-blocking behavior.
 - In C, `ovrtx_open_usd_from_file()` is always asynchronous -- you must poll or wait.
 - Load errors (e.g., file not found) are reported through `ovrtx_op_wait_result_t::error_op_ids`, not the immediate return value.
+
+## Deprecated Standalone APIs
+
+The renderer population APIs in this skill are deprecated in 0.4 and retained for
+standalone compatibility. New code should use `ovstage.population`, publish mutations
+by advancing the ovstage write floor, and render the attached stage with an ordinal.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
 
 ## References
 

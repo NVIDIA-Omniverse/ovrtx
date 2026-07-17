@@ -17,7 +17,7 @@ named tensors such as coordinates, counts, intensity, RCS, radial velocity, and
 time offsets. Non-visual material labels let those sensors model material-facing
 return behavior independently of visual shading.
 
-For shared RenderProduct and RenderVar concepts, see :doc:`configuration` and
+For shared RenderProduct and RenderVar concepts, refer to :doc:`configuration` and
 :doc:`sensor_outputs`.
 
 .. toctree::

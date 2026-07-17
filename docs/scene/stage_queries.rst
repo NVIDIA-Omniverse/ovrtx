@@ -11,16 +11,22 @@
 Stage Queries
 =============
 
+.. note::
+
+   Python examples query ovstage directly. ``Renderer.query_prims*`` and the C
+   renderer query API are deprecated compatibility surfaces. Refer to
+   ``skills/update-0_3-0_4-python/SKILL.md``.
+
 Stage queries discover prims on the runtime stage and optionally report
 attribute schema metadata. A typical workflow is:
 
 1. Query prims by type, attribute existence, or a filter combination.
 2. Inspect returned paths and attribute descriptors.
-3. Reuse the returned prim-list handles in later C reads or writes.
+3. Reuse the Python query handle, or the returned C prim-list handles, in later
+   reads or writes.
 
-Filters combine as AND (``require_all``), OR (``require_any``), and NOT
-(``exclude``). Attribute reporting can be disabled, enabled for all attributes,
-or restricted to a requested name list.
+Ovstage filters use predicates such as ``usd-prim-type`` and ``usd-path``. The
+deprecated renderer query supports its existing AND/OR/NOT compatibility shape.
 
 Python Queries
 --------------
@@ -51,7 +57,7 @@ Python Queries
          :end-before: # [/snippet:doc-query-prims-with-attributes]
          :dedent:
 
-   .. tab-item:: Combined
+   .. tab-item:: Compatibility OR/NOT
 
       .. literalinclude:: ../../tests/docs/python/test_stage_query.py
          :language: python
@@ -99,8 +105,8 @@ C Queries
 Async Queries
 -------------
 
-Python async queries follow the same ``Operation`` / ``PendingFetch`` lifecycle
-as other async APIs:
+Ovstage queries can be waited before reading their result and must be released
+when they are no longer needed:
 
 .. literalinclude:: ../../tests/docs/python/test_stage_query.py
    :language: python
@@ -111,8 +117,16 @@ as other async APIs:
 Path Dictionary
 ---------------
 
-C query results use token and prim-path ids. Resolve them through the renderer's
-path dictionary while the query results are still valid:
+C query results use token and prim-path ids. In standalone mode, resolve them
+through the renderer's path dictionary. In attached mode, obtain the
+owner-provided dictionary with ``ovstage_get_path_dictionary(instance)``. Do not
+free it or assume dictionaries are shared across instances.
+
+Path lists borrowed from ovstage results remain valid only while the producing
+handle owns them. Add a path-list reference before releasing the producer when
+the list must remain usable, and release that reference when finished.
+
+Resolve them while the query results are still valid:
 
 .. literalinclude:: ../../tests/docs/c/test_stage_query.cpp
    :language: cpp
@@ -120,7 +134,8 @@ path dictionary while the query results are still valid:
    :end-before: // [/snippet:doc-path-dictionary-resolve-c]
    :dedent:
 
-Python query results return strings directly for prim paths and attribute names.
+Python uses ``ovstage.PathDictionary`` to intern attribute tokens and create
+path lists.
 
 Troubleshooting
 ---------------
@@ -132,4 +147,3 @@ Troubleshooting
   discovery.
 - Relationship-valued attributes surface as path ids in C. Resolve them through
   the path dictionary before printing or storing string paths.
-

@@ -91,4 +91,3 @@ Notes
 - For sensor material behavior, use :doc:`../sensors/nonvisual_materials`
   instead. Semantic labels and non-visual material labels serve different
   systems.
-

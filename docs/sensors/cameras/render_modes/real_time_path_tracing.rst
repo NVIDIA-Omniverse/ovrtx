@@ -63,17 +63,17 @@ Maximum number of ray bounces for any ray type. Higher values give more accurate
 
    .. grid-item-card:: maxBounces = 2
       :img-top: ../../../img/settings/rtpt/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-2.0001.avif
-      :link: /_images/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-2.0001.avif
+      :link: ../../../_images/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-2.0001.avif
       :link-type: url
 
    .. grid-item-card:: maxBounces = 3
       :img-top: ../../../img/settings/rtpt/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-3.0001.avif
-      :link: /_images/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-3.0001.avif
+      :link: ../../../_images/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-3.0001.avif
       :link-type: url
 
    .. grid-item-card:: maxBounces = 23
       :img-top: ../../../img/settings/rtpt/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-23.0001.avif
-      :link: /_images/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-23.0001.avif
+      :link: ../../../_images/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-23.0001.avif
       :link-type: url
 
 ``omni:rtx:rtpt:maxSpecularAndTransmissionBounces``
@@ -88,17 +88,17 @@ Maximum number of ray bounces for specular and transmission. Affects reflections
 
    .. grid-item-card:: maxSpecularAndTransmissionBounces = 2
       :img-top: ../../../img/settings/rtpt/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-2.0001.avif
-      :link: /_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-2.0001.avif
+      :link: ../../../_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-2.0001.avif
       :link-type: url
 
    .. grid-item-card:: maxSpecularAndTransmissionBounces = 3
       :img-top: ../../../img/settings/rtpt/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-3.0001.avif
-      :link: /_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-3.0001.avif
+      :link: ../../../_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-3.0001.avif
       :link-type: url
 
    .. grid-item-card:: maxSpecularAndTransmissionBounces = 23
       :img-top: ../../../img/settings/rtpt/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-23.0001.avif
-      :link: /_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-23.0001.avif
+      :link: ../../../_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-23.0001.avif
       :link-type: url
 
 Other Ray Bounce and Shading Settings
@@ -135,7 +135,7 @@ Other Ray Bounce and Shading Settings
      - ``0.3``
    * - ``omni:rtx:rtpt:translucency:virtualMotion:enabled``
 
-       Enables motion vectors for translucent (refractive) objects, which can improve temporal rendering such as denoising but may reduce performance.
+       Enables motion vectors for translucent (refractive) objects, which can improve temporal rendering such as denoising but can reduce performance.
      - ``bool``
      - ``true``
 
@@ -156,17 +156,17 @@ Firefly Filter
      - ``true``
    * - ``omni:rtx:rtpt:fireflyFilter:maxUnexposedIntensityPerSample``
 
-       Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but may result in energy loss. Automatically scaled with exposure.
+       Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
      - ``float``
      - ``3200.0``
    * - ``omni:rtx:rtpt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse``
 
-       Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but may result in energy loss. Automatically scaled with exposure.
+       Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
      - ``float``
      - ``3200.0``
    * - ``omni:rtx:rtpt:fireflyFilter:maxPerEmissiveUnexposedIntensity``
 
-       Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but may result in energy loss. Automatically scaled with exposure.
+       Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
      - ``float``
      - ``3200.0``
 
@@ -184,6 +184,16 @@ Gaussian Splatting
      - Default
    * - ``omni:rtx:rtpt:gaussian:accumulatedDepth:enabled``
 
-       Use accumulated depth, which gives more stable denoised results at the cost of some performance.
+       When enabled, gaussian hit depth is opacity-weighted across up to ``maxGaussiansToAccumulate`` hits, producing a more stable depth than the stochastic single-hit depth. Useful for reducing ghosting in DLSS-RR.
      - ``bool``
      - ``true``
+   * - ``omni:rtx:rtpt:gaussian:accumulatedAlbedo:enabled``
+
+       When enabled, gaussian SH0 albedo is opacity-weighted across up to ``maxGaussiansToAccumulate`` hits and the result overrides the GBuffer diffuse albedo, which usually improves image quality.
+     - ``bool``
+     - ``true``
+   * - ``omni:rtx:rtpt:gaussian:maxGaussiansToAccumulate``
+
+       Total hit budget for gaussian depth/albedo accumulation. Values up to 48 use a single pass over the closest N hits. Values above 48 enable a multi-batch traversal that continues until the budget is reached, the 95% opacity threshold is hit, or no more candidates are found. Set to -1 for unlimited accumulation (stops only on opacity threshold or BVH exhaust). Set to 0 to disable accumulation entirely (depth/albedo accumulation settings are ignored).
+     - ``int``
+     - ``48``

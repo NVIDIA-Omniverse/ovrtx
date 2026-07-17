@@ -311,10 +311,8 @@ class DLTensor(ctypes.Structure):
         # Mark capsule as consumed per DLPack protocol (prevents double-consumption)
         PyCapsule_SetName(capsule, b"used_dltensor")
 
-        # Release the managed tensor descriptor. We've deep-copied shape/strides and
-        # keep the source object alive via _source_obj, so the descriptor is no longer
-        # needed. The deleter frees the DLManagedTensor struct and Py_DecRefs the
-        # producer's internal hold on the source object (our _source_obj ref keeps it alive).
+        # Release the managed tensor descriptor. capsule_destructor will no-op via name check
+        # when the consumed capsule is later GC'd (name is now "used_dltensor*").
         if managed.deleter:
             managed.deleter(ptr)
 
@@ -394,6 +392,36 @@ PyCapsule_SetName = ctypes.pythonapi.PyCapsule_SetName
 PyCapsule_SetName.argtypes = [ctypes.py_object, ctypes.c_char_p]
 PyCapsule_SetName.restype = ctypes.c_int
 
+# Separate bindings that accept capsule as c_void_p (raw pointer) rather than py_object,
+# for use inside capsule_destructor where the capsule refcount is already zero.
+_PyCapsule_IsValid_raw = ctypes.pythonapi["PyCapsule_IsValid"]
+_PyCapsule_IsValid_raw.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+_PyCapsule_IsValid_raw.restype = ctypes.c_int
+
+_PyCapsule_GetPointer_raw = ctypes.pythonapi["PyCapsule_GetPointer"]
+_PyCapsule_GetPointer_raw.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+_PyCapsule_GetPointer_raw.restype = ctypes.c_void_p
+
+PyCapsule_SetContext = ctypes.pythonapi.PyCapsule_SetContext
+PyCapsule_SetContext.argtypes = [ctypes.py_object, ctypes.c_void_p]
+PyCapsule_SetContext.restype = ctypes.c_int
+
+_PyCapsule_GetContext_raw = ctypes.pythonapi["PyCapsule_GetContext"]
+_PyCapsule_GetContext_raw.argtypes = [ctypes.c_void_p]
+_PyCapsule_GetContext_raw.restype = ctypes.c_void_p
+
+
+class _CapsuleCtx:
+    """Internal keepalive for DLPack capsule callbacks and the caller's manager_ctx."""
+
+    __slots__ = ("manager_ctx", "deleter_callback", "c_deleter", "capsule_destructor")
+
+    def __init__(self, manager_ctx: Any, deleter_callback: Optional[Callable]) -> None:
+        self.manager_ctx = manager_ctx
+        self.deleter_callback = deleter_callback
+        self.c_deleter = None
+        self.capsule_destructor = None
+
 
 def _to_dlpack_capsule(
     dl_tensor: DLTensor,
@@ -418,8 +446,7 @@ def _to_dlpack_capsule(
     Note:
         Per DLPack spec: Consumer renames capsule to "used_*" after extraction.
         Capsule destructor checks name and calls deleter only if unconsumed.
-        Callbacks are attached to manager_ctx._dlpack_callbacks to tie their
-        lifetime to the manager_ctx (which is kept alive via Py_IncRef).
+        manager_ctx is kept alive for the lifetime of the capsule.
     """
     # Handle vectorized dtypes (lanes > 1) by expanding to an extra shape dimension
     actual_ndim = dl_tensor.ndim + (1 if dl_tensor.dtype.lanes > 1 else 0)
@@ -469,53 +496,47 @@ def _to_dlpack_capsule(
     managed_tensor.dl_tensor.shape = shape_ptr
     managed_tensor.dl_tensor.strides = None
 
-    # Keep Python context alive
-    managed_tensor.manager_ctx = id(manager_ctx)
-    Py_IncRef(manager_ctx)
+    # Two manual refs keep _capsule_ctx (and its CFUNCTYPEs) alive: one for c_deleter,
+    # one for capsule_destructor stored in the capsule context.
+    _capsule_ctx = _CapsuleCtx(manager_ctx, deleter_callback)
+    Py_IncRef(_capsule_ctx)  # held by c_deleter
+    managed_tensor.manager_ctx = id(_capsule_ctx)
 
-    # Mutable container to hold the callback pair for self-removal in c_deleter.
-    # Populated after both closures are defined.
-    callback_pair = [None]
-
-    # C deleter callback
     @DLPACK_DELETER
     def c_deleter(managed_ptr):
         mt = ManagedTensor.from_address(managed_ptr)
         ctx = ctypes.cast(mt.manager_ctx, ctypes.py_object).value
-        if deleter_callback is not None:
-            deleter_callback(ctx)
-        callbacks = getattr(ctx, "_dlpack_callbacks", None)
-        if callbacks is not None and callback_pair[0] is not None:
-            try:
-                callbacks.remove(callback_pair[0])
-            except ValueError:
-                pass
-        callback_pair[0] = None  # sever closure cycle so captured refs are freed by refcount
-        Py_DecRef(ctx)
-        PyMem_Free(managed_ptr)
+        try:
+            if ctx.deleter_callback is not None:
+                ctx.deleter_callback(ctx.manager_ctx)
+        finally:
+            Py_DecRef(ctx)
+            PyMem_Free(managed_ptr)
 
-    managed_tensor.deleter = c_deleter
-
-    # Capsule destructor
     @PyCapsule_Destructor
     def capsule_destructor(capsule_ptr):
-        capsule = ctypes.cast(capsule_ptr, ctypes.py_object)
-        if PyCapsule_IsValid(capsule, capsule_name):
-            managed_ptr = PyCapsule_GetPointer(capsule, capsule_name)
+        ctx_id = _PyCapsule_GetContext_raw(capsule_ptr)
+        if ctx_id:
+            ctx = ctypes.cast(ctx_id, ctypes.py_object).value
+            Py_DecRef(ctx)
+
+        # Use raw c_void_p bindings to avoid incrementing refcount on an object under deallocation.
+        # IsValid check skips the deleter when the capsule was already consumed (renamed by consumer).
+        if not _PyCapsule_IsValid_raw(capsule_ptr, capsule_name):
+            return
+        managed_ptr = _PyCapsule_GetPointer_raw(capsule_ptr, capsule_name)
+        if managed_ptr:
             mt = ManagedTensor.from_address(managed_ptr)
             if mt.deleter:
                 mt.deleter(managed_ptr)
 
+    _capsule_ctx.c_deleter = c_deleter
+    _capsule_ctx.capsule_destructor = capsule_destructor
+    managed_tensor.deleter = c_deleter
+
     capsule = PyCapsule_New(mem_ptr, capsule_name, capsule_destructor)
-
-    # Keep callback references alive by attaching to manager_ctx
-    # (manager_ctx is kept alive via Py_IncRef until c_deleter runs)
-    pair = (c_deleter, capsule_destructor)
-    callback_pair[0] = pair
-    if not hasattr(manager_ctx, "_dlpack_callbacks"):
-        manager_ctx._dlpack_callbacks = []
-    manager_ctx._dlpack_callbacks.append(pair)
-
+    Py_IncRef(_capsule_ctx)  # held by capsule_destructor
+    PyCapsule_SetContext(capsule, id(_capsule_ctx))
     return capsule
 
 

@@ -1,6 +1,6 @@
 # Semantic Segmentation
 
-Renders semantic segmentation from the bundled `ovrtx-robot-lineup.usda` scene through `/World/Camera` and streams the labeled results to Rerun.
+Populates an attached ovstage from the bundled `ovrtx-robot-lineup.usda` scene, renders semantic segmentation through `/World/Camera`, and streams the labeled results to Rerun.
 
 The example uses an inline USDA root layer with a relative `subLayers` arc to the source scene. The inline layer authors semantic-label overrides for each top-level robot payload, `/Render/Camera`, and one `RenderVar` for each requested AOV, so the original USD file is left untouched. Rerun is initialized with an active blueprint that arranges the AOV display images in a grid, and each logged frame is timestamped on the `sim_time` timeline from the same `delta_time` passed to `renderer.step()`.
 
@@ -12,7 +12,10 @@ The example uses an inline USDA root layer with a relative `subLayers` arc to th
 
 - Python 3.10-3.13
 - [uv](https://docs.astral.sh/uv/)
-- Access to the referenced robot-lineup payloads
+- NVIDIA RTX-capable GPU
+- Supported NVIDIA driver
+- Internet access to download the remote payloads referenced by `ovrtx-robot-lineup.usda`
+- Unsandboxed runtime execution
 
 ## Running
 

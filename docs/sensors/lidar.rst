@@ -13,7 +13,7 @@ Lidar Sensors
 
 An ovrtx lidar scene needs an ``OmniLidar`` sensor prim and a RenderProduct
 whose ``PointCloud`` RenderVar requests the channels the application will read.
-The same USDA pattern is used by C and Python; application code loads the scene,
+C and Python use the same USDA pattern: application code loads the scene,
 steps the RenderProduct, and maps the output.
 
 Configure the Lidar Prim
@@ -23,14 +23,14 @@ Configure the Lidar Prim
 
    .. tab-item:: Python Example Scene
 
-      .. literalinclude:: ../../examples/python/sensors/lidar/lidar_example.usda
+      .. literalinclude:: ../../examples/python/lidar/lidar_example.usda
          :language: usda
          :start-after: # [snippet:configure-lidar-sensor]
          :end-before: # [/snippet:configure-lidar-sensor]
 
    .. tab-item:: C Example Scene
 
-      .. literalinclude:: ../../examples/c/sensors/lidar/lidar_example.usda
+      .. literalinclude:: ../../examples/c/lidar/lidar_example.usda
          :language: usda
          :start-after: # [snippet:configure-lidar-sensor]
          :end-before: # [/snippet:configure-lidar-sensor]
@@ -78,14 +78,14 @@ Configure PointCloud Output
 
    .. tab-item:: Python Example Scene
 
-      .. literalinclude:: ../../examples/python/sensors/lidar/lidar_example.usda
+      .. literalinclude:: ../../examples/python/lidar/lidar_example.usda
          :language: usda
          :start-after: # [snippet:configure-lidar-pointcloud-output]
          :end-before: # [/snippet:configure-lidar-pointcloud-output]
 
    .. tab-item:: C Example Scene
 
-      .. literalinclude:: ../../examples/c/sensors/lidar/lidar_example.usda
+      .. literalinclude:: ../../examples/c/lidar/lidar_example.usda
          :language: usda
          :start-after: # [snippet:configure-lidar-pointcloud-output]
          :end-before: # [/snippet:configure-lidar-pointcloud-output]
@@ -132,5 +132,4 @@ With ``includeInvalidPoints = true``, invalid entries can be present inside the
 ``Counts`` range and must be filtered by ``Flags`` before using channels such as
 ``Coordinates``, ``Intensity``, ``HitNormal``, or ``Velocity`` as real returns.
 
-For map/read code, see :doc:`pointclouds`.
-
+For map/read code, refer to :doc:`pointclouds`.

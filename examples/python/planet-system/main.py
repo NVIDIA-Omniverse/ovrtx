@@ -19,12 +19,12 @@ Demonstrates:
 - Hierarchical animation (orbit parent rotation + planet self-spin)
 
 Usage:
-    python anim_planet_system.py                    # CPU mode, streams to rerun.io
-    python anim_planet_system.py --gpu              # CUDA mode
-    python anim_planet_system.py --num-planets 500  # Scale test (1-1000)
-    python anim_planet_system.py --png              # Save frames to _output/
-    python anim_planet_system.py --no-rr            # Disable rerun.io streaming
-    python anim_planet_system.py --log              # Enable carb log file
+    python main.py                    # CPU mode, streams to rerun.io
+    python main.py --gpu              # CUDA mode
+    python main.py --num-planets 500  # Scale test (1-1000)
+    python main.py --png              # Save frames to _output/
+    python main.py --no-rr            # Disable rerun.io streaming
+    python main.py --log              # Enable carb log file
 """
 
 import argparse
@@ -270,12 +270,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python anim_planet_system.py                    # CPU mode, streams to rerun.io
-  python anim_planet_system.py --log              # Enable carb log file
-  python anim_planet_system.py --gpu              # CUDA mode
-  python anim_planet_system.py --num-planets 500  # Scale test (1-1000)
-  python anim_planet_system.py --no-rr            # Disable rerun.io streaming
-  python anim_planet_system.py --png              # Save frames to _output/
+  python main.py                    # CPU mode, streams to rerun.io
+  python main.py --gpu              # CUDA mode
+  python main.py --num-planets 500  # Scale test (1-1000)
+  python main.py --png              # Save frames to _output/
+  python main.py --no-rr            # Disable rerun.io streaming
+  python main.py --log              # Enable carb log file
 
 To create a video from frames:
   ffmpeg -framerate 60 -i _output/planetary_system_%03d.png -c:v libx264 -pix_fmt yuv420p planet.mp4

@@ -11,6 +11,71 @@ This file gives AI coding agents the minimum context needed to work effectively 
 
 Primary use case: OpenUSD-based sensor simulation and rendering workflows (camera, lidar, radar, etc.).
 
+## Relationship to ovstage
+
+Starting with **ovrtx 0.4**, ovrtx can integrate with **ovstage** — an optional
+NVIDIA library that owns the runtime scene, ordinal-keyed writes, and change
+detection. When both libraries are used together:
+
+- **ovstage** is authoritative for: scene data, path dictionary, prim attributes,
+  cloning, stage queries, ordinals, and write-floor gates.
+- **ovrtx** is authoritative for: rendering, sensor simulation, GPU resources,
+  RenderProducts, and sensor outputs.
+
+ovrtx can operate in **standalone compatibility mode** (the renderer-owned scene
+APIs are deprecated in 0.4) or **attached mode** (renders scene state from an
+external ovstage instance via BORROW or REPLICATE attach modes). Scene ownership
+transitions entirely to ovstage in a future release.
+
+Skills that touch ovstage concepts (cloning, attributes, queries, stage loading)
+should cross-reference ovstage as authoritative for scene-data behavior. When
+working in an attached-mode context, also pull ovstage's agent context — its
+`AGENTS.md`.
+
+Key docs: `docs/core/ovstage_integration.rst` (attach modes, ordinals, update
+loop), `CHANGELOG.md` §0.4.
+
+The public C examples consume ovstage as its **own independent package**, symmetric
+with ovrtx: `examples/c/cmake/ovstage.cmake` provides `ovstage_fetch()` (mirrors
+`ovrtx.cmake`) and `ovstage_setup_runtime()`, and the example `CMakeLists.txt`
+files call both `ovrtx_*` and `ovstage_*`. Both packages are consumed **in place**
+(Ulrich's model #1 for ovrtx), so nothing but ovstage's own runtime lands next to
+the exe:
+
+- **ovrtx** links the **static** loader (`ovrtx::ovrtx_static`); the app passes the
+  package binary root to `ovrtx_create_renderer` via
+  `ovrtx_config_entry_binary_package_root_path()`. The loader loads `ovrtx-dynamic`
+  and all of ovrtx's runtime resources from the package in place. To keep the exe
+  directory self-contained without baking an absolute path into the binary,
+  `ovrtx_setup_runtime()` creates a single `ovrtx/` link (junction on Windows, symlink
+  on Linux) beside the exe pointing at the package `bin/`, and `main.cpp` resolves the
+  root at runtime as `<dir of exe>/ovrtx`.
+- **ovstage** is dynamic-only (import lib for `ovstage.dll`, no binary-root config)
+  and self-locates its bundled carb plugins (`omni.fabric`/`usdrt.*`/`gpucompute`/
+  ...) relative to where `ovstage.dll` is loaded from — it needs a sibling
+  `plugins/` tree. This is the ovstage team's own deployment contract (see
+  `rendering/ovstage/examples/smoke/` — `CMakeLists.txt` + `run_smoke_test.py`). So
+  `ovstage_setup_runtime()` copies `ovstage.dll` next to the exe and **junctions**
+  its data-only `ovstage_usd_schemas/` beside it. Its `plugins/` handling depends on
+  the ovrtx model: under model #1 (single `ovrtx/` link) the exe root's `plugins/` is
+  free, so ovstage junctions its own `plugins/` there; under model #2 ovrtx replicates
+  its `plugins/` at the exe root and `ovstage.dll` shares that one tree.
+
+`ovstage.dll` statically imports `usd_ms`/`tbb12`, so it is **delay-loaded**: it
+loads on the first `ovstage_*` call — after `ovrtx_create_renderer` has already
+loaded the single `usd_ms` from the ovrtx package — and binds that module by base
+name. ovrtx and ovstage must therefore be the same release train (matched `usd_ms`
+ABI). One open item: ovrtx (its package) and ovstage (junctioned) each carry a carb
+plugin set; `usd_ms`/`tbb` dedupe by name, but a single `omni.fabric`/USD runtime in
+attach mode still needs on-hardware confirmation. The ovstage version is pinned in
+`deps/ovrtx_deps.yaml` (propagated to `ovstage.cmake` by
+`tools/update_ovrtx_deps.py`).
+
+For codebases still on ovrtx 0.3 that need to move to ovrtx 0.4 + ovstage 0.1
+(the first release where attached mode became the primary user-facing
+workflow), use [`update-0_3-0_4-c`](skills/update-0_3-0_4-c/SKILL.md) for C/C++
+codebase and [`update-0_3-0_4-python`](skills/update-0_3-0_4-python/SKILL.md) for Python codebases.
+
 ## Start Here
 
 - Read `README.md` for top-level product context and quick starts.
@@ -28,19 +93,64 @@ Primary use case: OpenUSD-based sensor simulation and rendering workflows (camer
 
 ## Common Workflows
 
+### Runtime Validation
+
+OVRTX runtime validation requires an NVIDIA RTX-capable GPU, a supported NVIDIA driver listed in `docs/driver_requirements.rst`, internet access for examples that load remote S3 assets, and execution outside sandboxed environments. Do not claim runtime validation from parse-only checks, docs-only checks, or execution on a host without those prerequisites. If a prerequisite is missing, report the missing prerequisite instead of editing around it. If remote USD/S3 loading fails, treat it as an environment/network blocker unless the same URL is reachable outside ovrtx; report internet, proxy, firewall, or asset-access issues explicitly.
+
+Use this validation scope when reporting results:
+
+| Check | RTX GPU + supported driver | Unsandboxed execution | Internet access | Proves ovrtx runtime |
+|-------|----------------------------|-----------------------|-----------------|----------------------|
+| Sphinx/docs build | No | No | Maybe, for dependency install | No |
+| Static USD/docs checks | No | No | Maybe, for dependency install | No |
+| Python minimal example with `--png` | Yes | Yes | Yes, for remote S3 assets | Yes |
+| C minimal example | Yes | Yes | Yes, for package and remote assets | Yes |
+| Python/C runtime docs tests | Yes | Yes | Depends on assets under test | Yes |
+
+Start with the Python minimal example:
+
+```bash
+cd examples/python/minimal
+uv run main.py --png
+```
+
+Success means `_output/render.png` exists and matches the documented minimal reference image. The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+
+Then validate the C minimal example when C coverage is relevant.
+
+Linux:
+
+```bash
+cd examples/c/minimal
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/minimal
+```
+
+Windows:
+
+```powershell
+cd examples/c/minimal
+cmake -B build
+cmake --build build --config Release
+.\build\Release\minimal.exe
+```
+
+Success means `out.png` exists and matches the documented minimal reference image.
+
 ### Python (recommended via uv)
 
 - Use Python 3.10-3.13.
 - Run example:
   - `cd examples/python/minimal`
-  - `uv run main.py`
+  - `uv run main.py --png`
 
 ### C/C++ (CMake)
 
 - Build example:
   - `cd examples/c/minimal`
-  - `cmake -B build`
-  - `cmake --build build --config Release`
+  - `cmake -B build -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build`
 - Run binary on Linux:
   - `./build/minimal`
 
@@ -82,10 +192,13 @@ When a request maps to a known ovrtx workflow, go directly to the relevant skill
 - C project bootstrapping -> `skills/project-setup-c/SKILL.md`
 - Python project bootstrapping -> `skills/project-setup-python/SKILL.md`
 - CUDA interop -> `skills/cuda-interop/SKILL.md`
+- Sensor Processing Graphs (SPG): CUDA/USD/Lua post-processing of AOVs -> `skills/spg-usd-lua-authoring/SKILL.md`
 - App-level lifecycle and ordering -> `skills/application-flow/SKILL.md`
 - Error/reporting patterns -> `skills/error-handling/SKILL.md`
 - String handling (ovx_string_t) -> `skills/string-handling/SKILL.md`
 - 0.2 to 0.3 project upgrades -> `skills/update-0_2-0_3/SKILL.md`
+- 0.3 to 0.4 (+ ovstage 0.1) migration for C codebases -> `skills/update-0_3-0_4-c/SKILL.md`
+- 0.3 to 0.4 (+ ovstage 0.1) migration for Python codebases -> `skills/update-0_3-0_4-python/SKILL.md`
 
 If multiple skills seem relevant, start with `skills/application-flow/SKILL.md`, then layer in specialized skills.
 

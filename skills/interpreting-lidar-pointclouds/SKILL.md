@@ -74,9 +74,8 @@ This skill has no scripts.
 
 Lidar `PointCloud` output is a composite render var with per-point tensors. Use `Counts[0]` to bound the delivered point entries before interpreting any channel, and use the `Flags` `VALID` bit for per-entry validity when invalid points may be present.
 
-> **Source:** `examples/python/sensors/lidar/main.py` snippet `read-lidar-pointcloud`
-
-> **Source:** `examples/c/sensors/lidar/main.cpp` snippet `read-lidar-pointcloud`
+> **Source:** `examples/python/lidar/main.py` snippet `read-lidar-pointcloud`
+> **Source:** `examples/c/lidar/main.cpp` snippet `read-lidar-pointcloud`
 
 The lidar examples demonstrate a minimal interpretation path: read `Coordinates`, `Counts`, `Intensity`, and `TimeOffsetNs`, slice each per-point tensor to the valid range, and summarize or visualize the result.
 
@@ -121,9 +120,8 @@ With the default `omni:sensor:Core:includeInvalidPoints = false`, invalid lidar 
 
 ## Visualization
 
-> **Source:** `examples/python/sensors/lidar/main.py` snippet `intensity-colors`
-
-> **Source:** `examples/python/sensors/lidar/main.py` snippet `log-lidar-points`
+> **Source:** `examples/python/lidar/main.py` snippet `intensity-colors`
+> **Source:** `examples/python/lidar/main.py` snippet `log-lidar-points`
 
 Coloring by `Intensity` is a useful default for public examples. For debugging scan timing, color by `TimeOffsetNs`; for material validation, color or group by `MaterialId`.
 

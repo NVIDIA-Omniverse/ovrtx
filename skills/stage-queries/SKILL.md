@@ -37,8 +37,8 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 - Target API surface: Python, C/C++, or both.
 - Query goal: list all prims, filter by prim type, require/exclude attributes, or inspect attribute schemas before read/write.
-- Filter sets: `require_all`, `require_any`, `exclude`, attribute filter mode, and whether names must be resolved through dictionaries in C.
-- Desired execution mode: Python sync/async query or C async query.
+- Filter predicates, requested attribute tokens, and whether names must be resolved through a path dictionary.
+- Desired execution mode: Python ovstage query or C compatibility query.
 - Repository source snippets referenced below. Treat these snippets as the API source of truth.
 
 ## Prerequisites
@@ -70,18 +70,13 @@ This skill has no scripts.
 
 ## Overview
 
-`query_prims` finds prims on the runtime stage that match a set of filters and returns them grouped by attribute schema. Each group carries a `prim_list_handle` that can be plugged directly into subsequent `read_attribute` / `write_attribute` calls — so a typical workflow is:
+`stage.query` finds prims on ovstage that match a filter. A query handle can be reused by subsequent ovstage read, write, and map calls, so a typical workflow is:
 
 1. Query to discover prims and/or their attribute schemas.
 2. Decide what to read/write based on the result.
-3. Reuse the returned prim list to read or write without re-resolving paths.
+3. Reuse the query handle to read or write without re-resolving paths.
 
-Filters combine as **AND** (`require_all`) × **OR** (`require_any`) × **NOT** (`exclude`). Each filter is a `(kind, name)` pair where `kind` is `FilterKind.PRIM_TYPE` (match by USD type, e.g. `"Mesh"`, `"Camera"`) or `FilterKind.HAS_ATTRIBUTE` (match by attribute existence, e.g. `"points"`).
-
-`AttributeFilterMode` controls how much attribute metadata the query returns:
-- `NONE` — no attribute descriptors, lightweight prim discovery.
-- `ALL` — every attribute on each matched prim.
-- `SPECIFIC` — only the attributes named in `attribute_names`.
+Build an `ovstage.Filter` from predicates such as `usd-prim-type` or `usd-path`. Pass interned attribute tokens through `attrs` when the query should report specific columns. The deprecated renderer query remains useful only for compatibility cases that require its OR/NOT filter shape.
 
 ## Python
 
@@ -95,17 +90,17 @@ Filters combine as **AND** (`require_all`) × **OR** (`require_any`) × **NOT** 
 
 ### Request specific attribute descriptors
 
-`AttributeInfo` exposes `dtype`, `is_array`, and `semantic`. Relationship-valued attributes such as `material:binding` surface with `Semantic.PATH_ID` (a raw path handle); resolve through the renderer's path dictionary when you need the string form.
+Intern requested names through `ovstage.PathDictionary`, then inspect the attribute token ids reported by the result.
 
 > **Source:** `tests/docs/python/test_stage_query.py` snippet `doc-query-prims-with-attributes`
 
-### Combine OR, NOT, and attribute-reporting filters
+### Deprecated compatibility: combine OR and NOT filters
 
 > **Source:** `tests/docs/python/test_stage_query.py` snippet `doc-query-require-any-exclude`
 
 ### Async query
 
-Queries follow the two-phase `Operation` / `PendingFetch` lifecycle: `.wait()` resolves once the enqueued work finishes; `.fetch()` retrieves the result dict.
+An ovstage query can be waited explicitly before calling `.result()`. Release manually created queries when they are no longer needed, or use a context manager.
 
 > **Source:** `tests/docs/python/test_stage_query.py` snippet `doc-query-prims-async`
 
@@ -137,18 +132,15 @@ The renderer's path dictionary resolves `ovx_primpath_t` / `ovx_token_t` handles
 
 > **Source:** `tests/docs/c/test_stage_query.cpp` snippet `doc-path-dictionary-resolve-c`
 
-There is no public Python wrapper for `ovrtx_get_path_dictionary()` today; the Python `query_prims` already returns path strings directly (resolved internally).
+Python ovstage code should use `ovstage.PathDictionary` to intern attribute tokens and create path lists.
 
 ## Key Types / Functions
 
 | Python | C |
 |--------|---|
-| `renderer.query_prims(...)` | `ovrtx_query_prims(renderer, &desc, &query_handle)` + `ovrtx_fetch_query_results(...)` |
-| `renderer.query_prims_async(...)` → `Operation[PendingFetch[...]]` | same C trio; wait + fetch are the two phases |
-| `FilterKind.PRIM_TYPE` / `HAS_ATTRIBUTE` | `OVRTX_FILTER_PRIM_TYPE` / `OVRTX_FILTER_HAS_ATTRIBUTE` |
-| `AttributeFilterMode.NONE` / `ALL` / `SPECIFIC` | `OVRTX_ATTRIBUTE_FILTER_NONE` / `ALL` / `SPECIFIC` |
-| `AttributeInfo(name, dtype, is_array, semantic)` | `ovrtx_attribute_desc_t` |
-| (not exposed) | `ovrtx_get_path_dictionary(renderer, &pd)` |
+| `stage.query(filter=..., attrs=...)` | `ovrtx_query_prims(renderer, &desc, &query_handle)` + `ovrtx_fetch_query_results(...)` |
+| `ovstage.Filter` / `ovstage.Predicate` | `OVRTX_FILTER_*` compatibility filters |
+| `ovstage.PathDictionary(stage)` | `ovrtx_get_path_dictionary(renderer, &pd)` |
 
 C result shape:
 - `ovrtx_query_result_t.groups` — one `ovrtx_query_prim_group_t` per attribute-schema bucket.
@@ -158,10 +150,18 @@ C result shape:
 ## Troubleshooting
 
 - In C, the pointers in `ovrtx_query_result_t` and `ovrtx_query_prim_group_t` become invalid after `ovrtx_release_query_results()`. Copy anything you want to keep.
-- `AttributeFilterMode.SPECIFIC` with an empty `attribute_names` list returns no descriptors. Use `AttributeFilterMode.ALL` to dump everything, or `NONE` for lightweight counting.
-- Relationship-valued attributes (`rel material:binding = ...`) surface with `Semantic.PATH_ID`, not `PATH_STRING`. Resolve through the path dictionary if you need strings.
-- Attribute names in query results are tokens — in Python these are pre-resolved to strings; in C, call `path_dictionary_get_strings_from_tokens` yourself.
-- An empty filter (no `require_all` / `require_any` / `exclude`) matches every prim. Pair with `AttributeFilterMode.NONE` for the cheapest full-stage walk.
+- Deprecated renderer queries use `AttributeFilterMode`; `SPECIFIC` with an empty `attribute_names` list returns no descriptors, while `ALL` returns every descriptor and `NONE` performs lightweight discovery.
+- Deprecated renderer query descriptors report relationship-valued attributes with `Semantic.PATH_ID`, not `PATH_STRING`.
+- Ovstage query results return attribute-name token IDs. Resolve them with `ovstage.PathDictionary.token_to_string()`.
+- An empty deprecated renderer filter matches every prim; pair it with `AttributeFilterMode.NONE` for the cheapest full-stage walk.
+
+## Deprecated Standalone APIs
+
+`query_prims*` is deprecated in 0.4 and retained for compatibility. New code should
+query ovstage directly and use the ovstage-owned path dictionary for path lists and
+token identities.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
 
 ## References
 

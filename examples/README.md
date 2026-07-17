@@ -105,6 +105,37 @@ This directory contains example projects demonstrating various features of ovrtx
       </blockquote>
       <sub>Build &amp; run in: <a href="c/material-editor/">C →</a></sub>
     </td>
-    <td></td>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-grayscale.png" alt="SPG Grayscale Example" width="100%">
+      <br>
+      <b>SPG: Grayscale</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Create the smallest useful SPG example: a CUDA kernel that converts the LdrColor render output to grayscale, wired into a RenderProduct and read back from Python as a new AOV.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-grayscale/">Python →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-pipeline.png" alt="SPG Pipeline Example" width="100%">
+      <br>
+      <b>SPG: Pipeline</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Chain two SPG shaders so the renderer's color output is converted to grayscale and then inverted in a single RenderProduct, reading back only the final result.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-pipeline/">Python →</a></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-builtin-nodes.png" alt="SPG Built-in Nodes Example" width="100%">
+      <br>
+      <b>SPG: Built-in Nodes</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Chain two built-in SPG nodes (no custom CUDA) that brighten the color output and downscale it to half resolution, wired into a RenderProduct via info:id.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-builtin-nodes/">Python →</a></sub>
+    </td>
   </tr>
 </table>

@@ -55,7 +55,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 1. Identify the sensor modality, RenderProduct, PointCloud output, target device, and named tensors to map.
 2. Read the matching Python or C/C++ source snippet before writing API usage.
 3. Map the composite `PointCloud` output, access tensors by exact channel name, and use `Counts[0]` to bound per-point/per-detection tensors.
-4. Copy data before unmapping when later code needs to keep it, and keep CUDA synchronization aligned with the selected mapping target.
+4. Handle lifetime by language: in Python the mapping is consumer-owned — a held DLPack consumer view (e.g. a NumPy array) keeps the buffer valid past `unmap`, so lifetime isn't a manual concern; in C, copy data before unmapping if later code needs it. Keep CUDA synchronization aligned with the selected mapping target.
 5. Combine configuration, reading, and interpretation skills only when the user asks for an end-to-end sensor workflow.
 6. When changing code, run the narrow docs test or example that owns the snippet whenever practical.
 
@@ -82,13 +82,13 @@ CPU mapping is simplest for examples and printing. GPU mapping is also supported
 
 ### Lidar PointCloud
 
-> **Source:** `examples/python/sensors/lidar/main.py` snippet `read-lidar-pointcloud`
+> **Source:** `examples/python/lidar/main.py` snippet `read-lidar-pointcloud`
 
 The lidar example maps `PointCloud` to CPU, reads `Coordinates`, `Counts`, `Intensity`, and `TimeOffsetNs`, then copies the valid range out of the mapping for visualization.
 
 ### Radar PointCloud
 
-> **Source:** `examples/python/sensors/radar/main.py` snippet `read-radar-pointcloud`
+> **Source:** `examples/python/radar/main.py` snippet `read-radar-pointcloud`
 
 The radar example maps `PointCloud` to CPU, reads `Coordinates`, `Counts`, and `RadialVelocityMs`, then slices the valid detections. Approaching radar detections can have negative radial velocity.
 
@@ -96,17 +96,15 @@ The radar example maps `PointCloud` to CPU, reads `Coordinates`, `Counts`, and `
 
 ### Lidar PointCloud
 
-> **Source:** `examples/c/sensors/lidar/main.cpp` snippet `step-lidar-pointcloud`
-
-> **Source:** `examples/c/sensors/lidar/main.cpp` snippet `read-lidar-pointcloud`
+> **Source:** `examples/c/lidar/main.cpp` snippet `step-lidar-pointcloud`
+> **Source:** `examples/c/lidar/main.cpp` snippet `read-lidar-pointcloud`
 
 The lidar C example fetches the stepped render results, finds `PointCloud`, maps it to CPU, reads named tensors, and unmaps after computing summary values.
 
 ### Radar PointCloud
 
-> **Source:** `examples/c/sensors/radar/main.cpp` snippet `step-radar-pointcloud`
-
-> **Source:** `examples/c/sensors/radar/main.cpp` snippet `read-radar-pointcloud`
+> **Source:** `examples/c/radar/main.cpp` snippet `step-radar-pointcloud`
+> **Source:** `examples/c/radar/main.cpp` snippet `read-radar-pointcloud`
 
 The radar C example uses the same map/read/unmap flow and additionally reads radar-specific `RCS` and `RadialVelocityMs` channels.
 
@@ -124,7 +122,7 @@ The model auto-enables `Counts` and `Flags`, and they are delivered as ordinary 
 ## Troubleshooting
 
 - Do not iterate over the full tensor allocation; only the first `Counts[0]` entries are valid.
-- Keep mapped tensor views alive only as long as needed. Copy data if it must outlive the mapping.
+- **Lifetime.** In Python the mapping is consumer-owned: a held DLPack consumer view (e.g. a NumPy array) keeps the buffer valid even after `unmap`, so lifetime is not a manual concern — copy only if you need data beyond the last view. In C, mapped tensors are valid until `unmap` — copy before unmapping if the data must outlive it.
 - CPU examples can use NumPy or raw host pointers. GPU mappings require DLPack-compatible CUDA consumers or custom CUDA code plus correct unmap synchronization.
 - For point-cloud tensors in C, use `OVRTX_MAP_DEVICE_TYPE_CUDA` for linear CUDA memory; `OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY` is intended for image-style outputs.
 - Read channel names exactly as authored in the USDA `PointCloud` `RenderVar`.

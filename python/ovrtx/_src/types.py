@@ -18,11 +18,13 @@ from .bindings import (  # noqa: F401 — re-exported public API
     Device,
     EventStatus,
     FilterKind,
+    MotionBvh,
     PrimMode,
     SelectionFillMode,
     Semantic,
 )
 from .dlpack import DLPACK_MAJOR_VERSION, DLDataType, DLTensor, ManagedDLTensor, _to_dlpack_capsule
+from .helpers import deprecated
 
 if TYPE_CHECKING:
     from .renderer import Renderer
@@ -34,6 +36,12 @@ _VOID_RESULT = True
 """Value returned by :meth:`Operation.wait` on success for void operations
 (operations with no payload, such as ``remove_usd_async`` or ``reset_stage_async``).
 ``None`` still indicates timeout."""
+
+
+_OVSTAGE_WRITE_REPLACEMENT = "Use ovstage.Stage.write_attribute() with a reusable ovstage query instead."
+_OVSTAGE_MAP_REPLACEMENT = "Use ovstage.Stage.map_attribute() with a reusable ovstage query instead."
+_OVSTAGE_UNMAP_REPLACEMENT = "Use ovstage.Map.unmap() or ovstage.Stage.unmap_attribute() instead."
+_OVSTAGE_RELEASE_QUERY_REPLACEMENT = "Release the reusable ovstage query with Query.release() instead."
 
 
 class Operation(Generic[T]):
@@ -282,22 +290,27 @@ class PendingFetch(Generic[T]):
 
 
 class _UnmapState:
-    """Shared state between a mapping and its ManagedDLTensor deleter.
+    """Shared unmap bookkeeping, held by both ``MappedRenderVar`` and ``Renderer._live_mappings``.
 
-    Coordinates three concerns:
-    1. Double-unmap prevention — ``unmapped`` flag checked by both mapping and deleter.
-    2. CUDA sync hint passing — ``unmap(stream=...)`` stores sync params here;
-       the deleter reads them when it eventually calls C unmap.
-    3. C unmap dispatch — ``unmap_fn`` selects the correct C call
-       (render var vs attribute mapping).
+    Holds only plain data and deliberately keeps **no** reference to the ``Renderer``
+    (not even a bound method): this state lives in ``Renderer._live_mappings``, so any
+    renderer reference stored here would close a ``Renderer -> registry -> state ->
+    Renderer`` cycle and, because ``Renderer`` defines ``__del__``, defer its teardown to
+    a cyclic GC pass. ``Renderer._force_unmap_all`` performs the C unmap using the renderer
+    it is already a method of.
+
+    Coordinates two concerns between ``MappedRenderVar.__del__`` and
+    ``Renderer._force_unmap_all`` (whichever fires first):
+    1. Double-unmap prevention — ``unmapped`` flag; the second one to run sees it set and skips.
+    2. CUDA sync hint passing — ``unmap(stream=...)`` records the sync params here so a
+       later force-unmap on renderer teardown honors them.
     """
 
-    __slots__ = ("unmapped", "cuda_sync", "unmap_fn")
+    __slots__ = ("unmapped", "cuda_sync")
 
-    def __init__(self, unmap_fn):
+    def __init__(self):
         self.unmapped = False
         self.cuda_sync = None
-        self.unmap_fn = unmap_fn  # Callable[[map_handle, cuda_sync], None]
 
 
 class MappedRenderVar:
@@ -445,14 +458,12 @@ class MappedRenderVar:
         self._unmapped = False  # set once the user has called unmap() / __exit__
         self._render_var: Optional["RenderVarOutput"] = None  # set by RenderVarOutput.map() post-construction
 
-        # Adapter shared with Renderer._live_mappings (keyed by ``map_handle``). Holds
-        # the cross-cutting "has C unmap fired?" flag plus the unmap callable, so that
-        # ``Renderer._force_unmap_all`` can iterate live mappings and fire C unmap on
-        # teardown without keeping *this* :class:`MappedRenderVar` alive. Registering
-        # ``self`` directly would form a reference cycle between the renderer and this
-        # mapping (renderer holds the registry; the registry would hold self; self
-        # holds the renderer) and prevent ``__del__`` from firing on user release.
-        self._unmap_state = _UnmapState(unmap_fn=renderer._unmap_output)
+        # Cycle-free registry entry shared with Renderer._live_mappings (keyed by
+        # ``map_handle``); see :class:`_UnmapState` for why it stores no renderer reference.
+        # ``self._renderer`` above is an intentional one-way pin (keeps the buffer valid while
+        # any derived view is alive); it does not close a cycle because the renderer registers
+        # this plain state, not this MappedRenderVar.
+        self._unmap_state = _UnmapState()
         renderer._register_mapping(map_handle, self._unmap_state)
 
         # Render variable description fields (plain instance attributes — opaque strings + int).
@@ -979,6 +990,20 @@ class FrameOutput(Generic[T]):
     end_time: float
     """Sensor simulation time at frame end, in seconds (``start_time + delta_time``)."""
     render_vars: dict[str, RenderVarOutput[T]]
+    progression: int = 0
+    """Path-tracing sample accumulation progress for this render product frame.
+
+    Increases with each time an output is rendered to in a call to :meth:`Renderer.step`.
+    Resets after :meth:`Renderer.reset`, or when internal conditions invalidate the current 
+    accumulation state (ex: scene changes, camera movement, etc.)
+    """
+    converged: bool = False
+    """True when the path tracer has reached the ``omni:rtx:pt:samplesPerPixel`` stop criterion.
+
+    Once ``True``, additional :meth:`Renderer.step` calls will not result in additional
+    sample accumulation until :meth:`Renderer.reset` is called or the scene changes. Always ``False`` 
+    for non-PT render modes.
+    """
 
 
 @dataclass
@@ -1170,6 +1195,7 @@ class AttributeBinding(Generic[_BindingTensorT]):
         """Element shape from the dtype/shape API, or None if not specified."""
         return self._shape
 
+    @deprecated(_OVSTAGE_WRITE_REPLACEMENT)
     def write(
         self,
         data: _BindingTensorT,
@@ -1218,6 +1244,7 @@ class AttributeBinding(Generic[_BindingTensorT]):
             cuda_event=cuda_event,
         )
 
+    @deprecated(_OVSTAGE_WRITE_REPLACEMENT)
     def write_async(
         self,
         data: _BindingTensorT,
@@ -1263,6 +1290,7 @@ class AttributeBinding(Generic[_BindingTensorT]):
             self, tensors, dirty_bits, data_access=data_access, cuda_stream=cuda_stream, cuda_event=cuda_event
         )
 
+    @deprecated(_OVSTAGE_MAP_REPLACEMENT)
     def map(self, device: Device = Device.CPU, device_id: int = 0) -> "AttributeMapping":
         """Map attribute buffer for direct memory access using this binding.
 
@@ -1274,9 +1302,17 @@ class AttributeBinding(Generic[_BindingTensorT]):
 
         Returns:
             AttributeMapping for direct buffer access.
+
+        Raises:
+            RuntimeError: If called after unbind().
         """
+        if self._handle is None:
+            raise RuntimeError(
+                "AttributeBinding.map() called after unbind(). Create a new binding with bind_attribute()."
+            )
         return self._get_renderer()._map_attribute_by_binding(self, device, device_id)
 
+    @deprecated(_OVSTAGE_RELEASE_QUERY_REPLACEMENT)
     def unbind(self) -> None:
         """Release this binding.
 
@@ -1459,6 +1495,7 @@ class AttributeMapping:
         self._unmapped = True
         return op
 
+    @deprecated(_OVSTAGE_UNMAP_REPLACEMENT)
     def unmap(self, event: Optional[int] = None, stream: Optional[int] = None) -> None:
         """Commit written data to stage and free the C buffer.
 
@@ -1477,6 +1514,7 @@ class AttributeMapping:
             return
         self._do_unmap(event, stream).wait()
 
+    @deprecated(_OVSTAGE_UNMAP_REPLACEMENT)
     def unmap_async(self, event: Optional[int] = None, stream: Optional[int] = None) -> "Operation[bool]":
         """Enqueue attribute unmap and return an Operation for caller-managed wait.
 
@@ -1515,7 +1553,8 @@ class AttributeMapping:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit — commits data and frees buffer."""
-        self.unmap()
+        if not self._unmapped:
+            self._do_unmap().wait()
         return False
 
     def __del__(self):
@@ -1594,19 +1633,18 @@ class RendererConfig:
     """Geometry streaming LOD opt-in config entry."""
 
     enable_spg: Optional[bool] = None
-    """Experimental: Enable Sensor Processing Graphs (SPG), disabled by default.
-       This is a global setting, applying to all active renderer instances.
-       Known issue: do not enable SPG with content that uses MaterialX material graphs"""
+    """Set to False to disable Sensor Processing Graphs (SPG), enabled by default.
+       This is a global setting, applying to all active renderer instances."""
 
-    enable_motion_bvh: Optional[bool] = None
-    """Enable motion BVH for sensor pipelines (lidar, radar, acoustic).
+    motion_bvh: Optional[MotionBvh] = None
+    """Motion BVH mode for sensor pipelines (lidar, radar, acoustic).
 
-    When ``True``, the renderer builds motion acceleration structures required by
-    non-visual sensor render products. Must be set at renderer creation time;
-    changing the value requires recreating the renderer.
+    Accepts a :class:`MotionBvh` member, the equivalent ``int`` value (``0..2``),
+    or the strings ``"disable"``, ``"enable"``, or ``"auto"``.
 
-    When ``None`` (default), the setting is not applied and sensor auto-detection
-    may activate motion BVH when sensor render products are present."""
+    When ``None`` (default), motion BVH is disabled and no config entry is sent.
+    Sensor workflows should pass :attr:`MotionBvh.AUTO` or :attr:`MotionBvh.ENABLE`.
+    Init-time only; changing requires recreating the renderer."""
 
     def __repr__(self) -> str:
         set_fields = ", ".join(
@@ -1623,9 +1661,8 @@ class SelectionGroupStyle:
     :meth:`Renderer.set_selection_group_styles`. RGBA components are floats
     in ``[0, 1]``.
 
-    Group ids (the dict keys) are uint8 (``0..255``) and match the value
-    written to a prim's ``omni:selectionOutlineGroup`` attribute (see
-    :data:`OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP`).
+    Group ids (the dict keys) are uint8 (``0..255``) and match the per-prim
+    group id assigned through the renderer selection-outline group API.
 
     Note:
         Outline thickness and the fill/interior mode are global init-time

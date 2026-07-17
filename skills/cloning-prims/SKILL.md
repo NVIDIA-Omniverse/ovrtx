@@ -36,7 +36,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 - Target API surface: Python, C/C++, or both.
 - Source prim path to clone and one or more destination prim paths to create.
-- Desired execution mode: Python sync, Python async, or C async clone.
+- Desired execution mode: Python ovstage sync, Python ovstage async, or C ovstage clone (which is inherently async at the C layer — the enqueue returns an op id you wait on).
 - Whether the request is actually a clone, USD reference, instance, or new-geometry authoring workflow.
 - Repository source snippets referenced below. Treat these snippets as the API source of truth.
 
@@ -49,7 +49,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 ## Instructions
 
 1. Identify the source prim path and every destination path the caller wants to create.
-2. Confirm whether the workflow needs a synchronous Python clone, Python async clone, or C async clone.
+2. Confirm whether the workflow needs a synchronous Python ovstage clone, Python async ovstage clone, or C ovstage clone.
 3. Read the matching snippet and preserve its source-path, destination-list, wait, and error-checking pattern.
 4. Do not use cloning when the caller actually needs USD instancing, references, or authoring new geometry from scratch; route to the loading or writing skills instead.
 5. When changing code, run the stage-mutation docs test that owns the clone snippet whenever practical.
@@ -69,7 +69,7 @@ This skill has no scripts.
 
 ## Overview
 
-`clone_usd` creates copies of an existing prim subtree at one or more new target paths in the runtime stage. This is useful for duplicating geometry, creating arrays of objects, or spawning instances from a template.
+`stage.clone` creates copies of an existing prim subtree at one or more new target paths and publishes the change at an ordinal. This is useful for duplicating geometry, creating arrays of objects, or spawning instances from a template.
 
 ## Python
 
@@ -95,20 +95,39 @@ This skill has no scripts.
 
 > **Source:** `tests/docs/c/test_stage_mutation.cpp` snippet `doc-clone-usd-c`
 
+### Async clone
+
+> **Source:** `tests/docs/c/test_stage_mutation.cpp` snippet `doc-clone-usd-async-c`
+
+At the C layer `ovstage_clone` is inherently async — the enqueue returns an
+`ovstage_enqueue_result_t` with an `op_index` you wait on. There is no distinct
+synchronous variant, so the "async" snippet shows the same call as the base
+clone snippet; the two are kept for parity with the Python `clone` /
+`clone_async` split.
+
 ## Key Types / Functions
 
 | Python | C |
 |--------|---|
-| `renderer.clone_usd(source, targets)` | `ovrtx_clone_usd(renderer, source, targets, count)` |
-| `renderer.clone_usd_async(source, targets)` | `ovrtx_clone_usd()` (always async in C) |
+| `stage.clone(source, targets, ordinal=...)` | `ovstage_clone(stage, source, targets, count, ordinal)` |
+| `stage.clone_async(source, targets, ordinal=...)` | `ovstage_clone(...)` (C is always async — wait on the returned `op_index`) |
 
 ## Troubleshooting
 
 - The source path **must exist** in the stage.
 - The target paths **must not already exist** in the stage.
 - Cloning copies the entire subtree under the source path, including all children.
-- In Python, `clone_usd()` blocks until the operation completes. Use `clone_usd_async()` for non-blocking behavior.
-- In C, `ovrtx_clone_usd()` is always asynchronous. You **must** wait on the returned `op_index` with `ovrtx_wait_op()` before using the cloned prims (e.g., writing attributes or stepping).
+- In Python, advance the ovstage write floor after the clone completes and before rendering its ordinal.
+- In C, `ovstage_clone` returns an `ovstage_enqueue_result_t`; wait on the returned `op_index` with `ovstage_wait_op()` before advancing the write floor or using the cloned prims (e.g., writing attributes or stepping).
+
+## Deprecated Standalone APIs
+
+`ovrtx_clone_usd` (C) and `Renderer.clone_usd*` (Python) are deprecated in 0.4
+and retained for standalone compatibility. New code should clone through
+ovstage at an application-owned ordinal, wait for the clone, and advance the
+write floor before rendering it.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
 
 ## References
 

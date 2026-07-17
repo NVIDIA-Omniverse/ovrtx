@@ -11,7 +11,7 @@
 Python: Tiled Rendering
 =======================
 
-Renders a 3×3 grid of scene instances through a single RenderProduct with multiple cameras. Demonstrates tiled multi-camera rendering, USD reference composition with per-instance transforms, and runtime material color writes via ``write_attribute``.
+Renders a 3×3 grid of scene instances through a single RenderProduct with multiple cameras. Demonstrates tiled multi-camera rendering, ovstage USD reference composition, ordinal-keyed transform and color writes, and attached-stage rendering.
 
 Each grid cell references the same base scene but gets a unique logo color generated from evenly spaced HSV hues. A single 1024×1024 ``RenderProduct`` targets all nine cameras, and RTX tiles them into a grid in the output image.
 
@@ -26,7 +26,7 @@ Each grid cell references the same base scene but gets a unique logo color gener
 Prerequisites
 -------------
 
-- Python 3.10–3.13
+- Python 3.10-3.13
 - `uv <https://docs.astral.sh/uv/>`_
 
 Running

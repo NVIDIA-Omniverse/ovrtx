@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 import pytest
 from PIL import Image
 
@@ -42,19 +43,21 @@ def "Render" {{
 """
 
 
-def test_step_and_map_camera_outputs(output_dir):
+def test_step_and_map_camera_outputs(renderer, stage, output_dir):
     """Test stepping and mapping both LdrColor and HdrColor outputs (camera_sensors.rst)."""
-    renderer = ovrtx.Renderer()
-    renderer.open_usd_from_string(USDA)
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, USDA, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     # Warm up
     for _ in range(5):
-        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60)
+        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
 
     # [snippet:doc-step-and-map-camera-outputs]
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
 
     for product_name, product in products.items():
@@ -73,16 +76,14 @@ def test_step_and_map_camera_outputs(output_dir):
             assert hdr_pixels.dtype == np.float16
     # [/snippet:doc-step-and-map-camera-outputs]
 
-    del renderer
-
-
-def test_step_async_returns_operation(output_dir):
+def test_step_async_returns_operation(renderer, stage):
     """``step_async`` returns an ``Operation[PendingFetch[RenderProductSetOutputs]]``.
 
     Replaces the 0.2.0 ``RendererResult`` return type — see CHANGELOG 0.3.0.
     """
-    renderer = ovrtx.Renderer()
-    renderer.open_usd_from_string(USDA)
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, USDA, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     # [snippet:doc-step-async]
     # step_async() returns an Operation. wait() resolves to a PendingFetch,
@@ -91,6 +92,7 @@ def test_step_async_returns_operation(output_dir):
     op = renderer.step_async(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
     pending = op.wait()
     products = pending.fetch()
@@ -100,28 +102,22 @@ def test_step_async_returns_operation(output_dir):
     assert isinstance(pending, ovrtx.PendingFetch)
     assert isinstance(products, ovrtx.RenderProductSetOutputs)
 
-    del renderer
-
-
-def test_map_camera_output_cuda():
+def test_map_camera_output_cuda(renderer, stage):
     """Map a render output as CUDA memory."""
-    renderer = ovrtx.Renderer()
-    renderer.open_usd_from_string(USDA)
-    products = renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60)
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, USDA, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+    products = renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
 
     # [snippet:doc-map-render-output-cuda]
     mapping = products["/Render/Camera"].frames[0].render_vars["LdrColor"].map(
         device=ovrtx.Device.CUDA
     )
     try:
-        tensor = mapping.tensor
-        assert tensor.__dlpack_device__()[0] == 2  # DLPack kDLCUDA
+        assert mapping.__dlpack_device__()[0] == 2  # DLPack kDLCUDA
     finally:
         mapping.unmap()
     # [/snippet:doc-map-render-output-cuda]
-
-    del renderer
-
 
 def test_renderer_result_no_longer_exported():
     """The 0.2.0 ``RendererResult`` export was removed; importing it must fail."""

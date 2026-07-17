@@ -22,14 +22,14 @@ Author Labels
 
    .. tab-item:: Python Example Scene
 
-      .. literalinclude:: ../../examples/python/sensors/radar/radar_example.usda
+      .. literalinclude:: ../../examples/python/radar/radar_example.usda
          :language: usda
          :start-after: # [snippet:configure-nonvisual-materials]
          :end-before: # [/snippet:configure-nonvisual-materials]
 
    .. tab-item:: C Example Scene
 
-      .. literalinclude:: ../../examples/c/sensors/radar/radar_example.usda
+      .. literalinclude:: ../../examples/c/radar/radar_example.usda
          :language: usda
          :start-after: # [snippet:configure-nonvisual-materials]
          :end-before: # [/snippet:configure-nonvisual-materials]
@@ -102,5 +102,4 @@ Troubleshooting
 - ``MaterialId`` lidar channels can be used to debug which material id was
   assigned to a hit.
 - Semantic labels for segmentation are separate from non-visual material labels.
-  See :doc:`../scene/semantic_labels` for semantic class labels.
-
+  Refer to :doc:`../scene/semantic_labels` for semantic class labels.

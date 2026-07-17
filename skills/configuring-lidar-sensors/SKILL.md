@@ -82,11 +82,11 @@ The same USDA scene pattern is used from Python and C; the language-specific cod
 
 ### Python example scene
 
-> **Source:** `examples/python/sensors/lidar/lidar_example.usda` snippet `configure-lidar-sensor`
+> **Source:** `examples/python/lidar/lidar_example.usda` snippet `configure-lidar-sensor`
 
 ### C example scene
 
-> **Source:** `examples/c/sensors/lidar/lidar_example.usda` snippet `configure-lidar-sensor`
+> **Source:** `examples/c/lidar/lidar_example.usda` snippet `configure-lidar-sensor`
 
 Use `OmniSensorGenericLidarCoreAPI` for the generic lidar model. Add emitter-state API schemas only when authoring custom firing patterns with explicit emitter state arrays.
 
@@ -119,11 +119,11 @@ For the full schema-derived attribute list, read `schemas/omni_sensors/schema.us
 
 ### Python example scene
 
-> **Source:** `examples/python/sensors/lidar/lidar_example.usda` snippet `configure-lidar-pointcloud-output`
+> **Source:** `examples/python/lidar/lidar_example.usda` snippet `configure-lidar-pointcloud-output`
 
 ### C example scene
 
-> **Source:** `examples/c/sensors/lidar/lidar_example.usda` snippet `configure-lidar-pointcloud-output`
+> **Source:** `examples/c/lidar/lidar_example.usda` snippet `configure-lidar-pointcloud-output`
 
 For public ovrtx examples, prefer `sourceName = "PointCloud"` when the application only needs selected point-cloud channels. Request only the channels needed by the consumer to keep memory use down.
 
@@ -149,7 +149,7 @@ Use `GenericModelOutput` only when a consumer specifically needs the traditional
 - `PointCloud` only contains requested channels. If a downstream reader expects `Intensity` or `TimeOffsetNs`, include those names in `string[] channels`.
 - `Counts` defines the valid range in per-point tensors. Do not iterate over the full tensor allocation.
 - If `includeInvalidPoints = true`, `Counts` bounds the delivered entries, but entries inside that range can still be invalid; test `Flags[i] & VALID` before consuming point attributes that require a real return.
-- MotionBVH is required for correct lidar motion effects. Static scenes may run without it, but moving objects or motion compensation need the renderer motion setting enabled.
+- MotionBVH is required for correct lidar motion effects. Static scenes may run without it, but moving objects or motion compensation need MBVH enabled through the renderer configuration.
 - Lidar output frame and visualizer frame are separate concerns. If output is in `SENSOR` frame, configure the visualizer to interpret that frame instead of changing the sensor to `WORLD` unless world-frame output is actually desired.
 - The model auto-enables `Flags` and `Counts` even when not requested, and delivers them like ordinary channel tensors.
 

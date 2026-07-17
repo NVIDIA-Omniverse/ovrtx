@@ -112,4 +112,3 @@ logging, CI diagnostics, or routing ovrtx messages into another logging system.
 The channel filter is a comma-separated list of ``channel_prefix=level`` rules.
 Accepted levels are ``verbose``/``debug``, ``info``, ``warn``/``warning``,
 ``error``, and ``fatal``. The longest matching channel prefix wins.
-

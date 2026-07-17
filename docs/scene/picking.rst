@@ -13,12 +13,12 @@ Picking and Selection
 
 ovrtx can perform viewport picking against a RenderProduct and can draw
 selection outlines for prims that the application marks as selected. Picking
-answers the question "which prims are under this RenderProduct pixel region?"
+answers the question "which prims are under this normalized RenderProduct region?"
 Selection drawing answers a separate question: "which prims should the renderer
 outline in future frames?"
 
 The two features are designed to be composed by the application. A viewport UI
-usually turns a click or drag rectangle into a pick query, resolves the picked
+usually turns a click or drag rectangle into an NDC pick query, resolves the picked
 path ids into prim paths, prints or stores those names, and then writes selection
 outline group ids for the next rendered frame.
 
@@ -30,61 +30,72 @@ the next step consumes it and returns a synthetic render var named
 ``OVRTX_RENDER_VAR_PICK_HIT``. The pick result is not a USD-authored RenderVar.
 It appears only for a step that consumed a pick query.
 
-Pick rectangles are always in RenderProduct pixel coordinates, not window
-coordinates. Interactive applications that render into a window, swapchain, or
-scaled framebuffer must convert the UI coordinates to RenderProduct pixels
-before enqueueing the query.
+Pick rectangles are always in normalized RenderProduct coordinates, not window
+coordinates. Values use [0, 1] top-left-origin NDC: x increases left-to-right
+and y increases top-to-bottom. Interactive applications that render into a
+window, swapchain, or scaled framebuffer must convert the UI coordinates to
+RenderProduct NDC before enqueueing the query.
 
 In the current version, picking only works for RenderProducts running on
 CUDA-visible GPU 0. On multi-GPU systems, author
 ``uint[] deviceIds = [0]`` on RenderProducts used for picking. ``deviceIds`` is
-an allow-list of indices into ``CUDA_VISIBLE_DEVICES``; ovrtx may choose any
+an allow-list of indices into ``CUDA_VISIBLE_DEVICES``; ovrtx can choose any
 CUDA-visible GPU from the list, so ``[0]`` is required when picking must run on
 CUDA-visible GPU 0.
 
 Pick hit records contain ``ovx_primpath_t`` handles, not strings. Resolve those
 handles through the renderer path dictionary before printing names, updating UI
-selection state, or writing selection outline groups.
+selection state, or setting selection outline groups.
 
 Selection outlines are persistent renderer state. Enable the outline pass when
-creating the renderer, write a non-zero group id to the prims that should be
-outlined, and write group ``0`` to clear the outline for a prim. Different
+creating the renderer, set a non-zero group id on the prims that should be
+outlined, and set group ``0`` to clear the outline for a prim. Different
 non-zero group ids are distinct outline groups. Global renderer-creation
 settings control outline width and fill mode; runtime per-group settings control
-outline and fill colors. Prims opt into a style by writing that group's id to
-``omni:selectionOutlineGroup``.
+outline and fill colors. Prims opt into a style by passing that group's id to
+:py:meth:`~ovrtx.Renderer.set_selection_outline_group()` /
+:c:func:`ovrtx_set_selection_outline_group()`.
 
 Interactive Viewport Workflow
 -----------------------------
 
-For click selection, use a 1x1 pick rectangle around the clicked RenderProduct
+For click selection, use the NDC rectangle that encloses the clicked RenderProduct
 pixel. For marquee selection, convert the drag start and end points into
-RenderProduct pixels, clamp to the RenderProduct extent, and use the normalized
+normalized RenderProduct coordinates, clamp to [0, 1], and use the normalized
 rectangle as the query bounds.
 
 After fetching the pick-hit output, validate the schema params before reading
-the named tensors. Resolve every ``primPath`` id, deduplicate the resolved paths,
-then print or store the prim names. If the viewport should also show selection
-outlines, clear the previous selection by writing group ``0`` to its prims, then
-write group ``1`` or another non-zero group to the new selection.
+the named tensors. Resolve ``primPath`` ids when printing or storing prim names.
+If the viewport should also show selection outlines, clear the previous selection
+by setting group ``0`` on its prims, then set group ``1`` or another non-zero
+group on the new selection. Duplicate prim paths are allowed when setting
+selection outline groups; the last occurrence wins.
 
 The picking workflow is:
 
-1. Queue a pick rectangle with :c:func:`ovrtx_enqueue_pick_query()` before the next :c:func:`ovrtx_step()`.
+1. Queue an NDC pick rectangle with :c:func:`ovrtx_enqueue_pick_query()` before the next :c:func:`ovrtx_step()`.
 2. Fetch the step results and find the synthetic render var named ``OVRTX_RENDER_VAR_PICK_HIT``.
 3. Map that render var on the CPU with :c:func:`ovrtx_map_render_var_output()`.
 4. Validate the ``magic`` and ``version`` params, read ``hitCount``, then consume the named tensors such as ``primPath`` and ``worldPositionM``.
 5. Resolve each ``primPath`` value through the renderer path dictionary from :c:func:`ovrtx_get_path_dictionary()`.
-6. Optionally write selection outline groups with :c:func:`ovrtx_set_selection_outline_group()` so selected prims are outlined in future rendered frames.
+6. Optionally set selection outline groups with :c:func:`ovrtx_set_selection_outline_group()` so selected prims are outlined in future rendered frames.
 
 Pick Rectangles
 ---------------
 
 Describe a pick region with :c:type:`ovrtx_pick_query_desc_t`.
 
-The rectangle is expressed in RenderProduct pixel coordinates. ``left`` and
-``top`` are inclusive. ``right`` and ``bottom`` are exclusive, so a single
-clicked pixel uses ``right = left + 1`` and ``bottom = top + 1``.
+The rectangle is expressed in normalized RenderProduct coordinates with
+top-left-origin NDC semantics. It uses the same rectangle convention as the old
+pixel API: ``right_ndc`` and ``bottom_ndc`` mark the edge just past the last
+included pixel. For example, the old one-pixel rectangle ``[50, 50, 51, 51]`` on
+a 100 x 100 RenderProduct becomes ``[0.50, 0.50, 0.51, 0.51]``. The full
+RenderProduct is ``[0, 0, 1, 1]``.
+
+Callers should clamp UI drag endpoints to [0, 1] before enqueueing a query. The
+API rejects out-of-bounds rectangles, but old pixel-space values that already
+fall inside [0, 1] are valid NDC and can be ambiguous during migration. Boundary values can be clamped to the valid range to account for
+floating-point roundoff.
 
 .. tab-set::
 
@@ -104,11 +115,20 @@ clicked pixel uses ``right = left + 1`` and ``bottom = top + 1``.
          :end-before: // [/snippet:doc-enqueue-pick-query-c]
          :dedent:
 
-Use a 1x1 rectangle for click picking. For marquee selection, convert window or
-framebuffer coordinates into RenderProduct pixels, clamp to the RenderProduct
-extent, then use ``max + 1`` for the exclusive edge. If multiple pick queries
-are queued for the same RenderProduct before one :c:func:`ovrtx_step()`, the
-last query wins.
+Use a one-pixel-equivalent NDC rectangle for click picking. For a RenderProduct
+of size ``width`` by ``height``, the old pixel rectangle
+``[px, py, px + 1, py + 1]`` is represented by
+``left_ndc = px / width``, ``top_ndc = py / height``,
+``right_ndc = (px + 1) / width``, and ``bottom_ndc = (py + 1) / height``. If
+multiple pick queries are queued for the same RenderProduct before one
+:c:func:`ovrtx_step()`, the last query wins.
+
+Pick query flags:
+
+* ``OVRTX_PICK_FLAG_GIZMO`` also requests gizmo picking.
+* ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`` requests tracked hit metadata such as
+  object type, geometry instance id, world position, and world normal when
+  available.
 
 Pick Results
 ------------
@@ -309,7 +329,7 @@ are not supported by the underlying outline pass.
 Pickable Prims
 --------------
 
-Use :c:func:`ovrtx_set_pickable()` or write ``OVRTX_ATTR_NAME_PICKABLE`` to opt prims out of viewport picking where supported:
+Use :py:meth:`~ovrtx.Renderer.set_pickable()` / :c:func:`ovrtx_set_pickable()` to opt prims out of viewport picking where supported:
 
 .. tab-set::
 
@@ -337,8 +357,9 @@ Primary functions:
 * :py:meth:`~ovrtx.Renderer.enqueue_pick_query()`
 * :py:meth:`~ovrtx.Renderer.resolve_prim_path_id()`
 * :py:meth:`~ovrtx.Renderer.set_selection_group_styles()`
+* :py:meth:`~ovrtx.Renderer.set_selection_outline_group()`
+* :py:meth:`~ovrtx.Renderer.set_pickable()`
 * :py:class:`~ovrtx.RendererConfig`
-* :py:meth:`~ovrtx.Renderer.write_attribute()`
 * :c:func:`ovrtx_enqueue_pick_query()`
 * :c:func:`ovrtx_map_render_var_output()`
 * :c:func:`ovrtx_unmap_render_var_output()`

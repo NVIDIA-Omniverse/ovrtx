@@ -83,11 +83,11 @@ The same USDA scene pattern is used from Python and C; the language-specific cod
 
 ### Python example scene
 
-> **Source:** `examples/python/sensors/radar/radar_example.usda` snippet `configure-radar-sensor`
+> **Source:** `examples/python/radar/radar_example.usda` snippet `configure-radar-sensor`
 
 ### C example scene
 
-> **Source:** `examples/c/sensors/radar/radar_example.usda` snippet `configure-radar-sensor`
+> **Source:** `examples/c/radar/radar_example.usda` snippet `configure-radar-sensor`
 
 Use `OmniSensorGenericRadarWpmDmatAPI` for the generic WPM DMAT radar model. The schema automatically includes scan configuration `s001`; apply `OmniSensorGenericRadarWpmDmatScanCfgAPI:s002`, `s003`, and so on only when authoring additional scan patterns.
 
@@ -118,11 +118,11 @@ For concise examples, keep one scan unless the behavior being demonstrated requi
 
 ### Python example scene
 
-> **Source:** `examples/python/sensors/radar/radar_example.usda` snippet `configure-radar-pointcloud-output`
+> **Source:** `examples/python/radar/radar_example.usda` snippet `configure-radar-pointcloud-output`
 
 ### C example scene
 
-> **Source:** `examples/c/sensors/radar/radar_example.usda` snippet `configure-radar-pointcloud-output`
+> **Source:** `examples/c/radar/radar_example.usda` snippet `configure-radar-pointcloud-output`
 
 For public ovrtx examples, prefer `sourceName = "PointCloud"` when the application only needs selected detection channels. Request only the channels needed by the consumer to keep memory use down.
 

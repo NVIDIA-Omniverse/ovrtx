@@ -1,0 +1,84 @@
+# OVRTX
+
+OVRTX is a lightweight Python and C SDK for NVIDIA Omniverse RTX rendering and sensor simulation. Use it to integrate OpenUSD-based camera, lidar, radar, robotics, synthetic-data, and Physical AI workflows into applications without launching a full Omniverse Kit app.
+
+## ovstage Dependency (ovrtx 0.4+)
+
+ovrtx depends on **ovstage** for runtime scene management. ovstage owns scene
+data, path dictionary, ordinal-keyed writes, and write-floor gates. ovrtx owns
+rendering, GPU resources, and sensor outputs.
+
+- Attached-mode reference: docs/core/ovstage_integration.rst
+- Attach-mode config: docs/core/renderer_configuration.rst (Attached-Mode Configuration section)
+- Changelog: CHANGELOG.md §0.4 (attach/BORROW/REPLICATE, update_from_stage, write-floor gates)
+
+## Primary Docs
+
+- README.md: product overview, package source, runtime verification, quick starts, releases, support
+- AGENTS.md: coding-agent guide, ovstage relationship, runtime validation rules, repo layout, task-to-skill routing
+- docs/core/ovstage_integration.rst: ovstage dependency, attach modes, ordinals, update loop
+- docs/index.rst: Sphinx docs entrypoint
+- docs/driver_requirements.rst: supported NVIDIA driver versions for runtime validation
+- examples/README.md: Python and C example index
+- skills/README.md: task-level agent skills and snippet rules
+
+## Core Workflows
+
+- Python minimal example: examples/python/minimal/README.md
+- C minimal example: examples/c/minimal/README.md
+- Python getting started: docs/python_api/getting_started.rst
+- C getting started: docs/c_api/getting_started.rst
+- Driver requirements: docs/driver_requirements.rst
+- Application lifecycle skill: skills/application-flow/SKILL.md
+- Python project setup skill: skills/project-setup-python/SKILL.md
+- C project setup skill: skills/project-setup-c/SKILL.md
+- Sensor Processing Graphs (SPG) authoring skill: skills/spg-usd-lua-authoring/SKILL.md
+- Sensor Processing Graphs (SPG) docs: docs/spg/index.rst
+
+## Runtime Validation
+
+OVRTX runtime validation requires all of the following:
+
+- NVIDIA RTX-capable GPU
+- Supported NVIDIA driver listed in docs/driver_requirements.rst
+- Execution outside sandboxed environments
+- Internet access for examples that load remote S3 assets
+
+Do not claim runtime validation from parse-only checks, docs-only checks, or execution on a host without the required GPU and driver. If a runtime prerequisite is missing, report that prerequisite as the blocker.
+
+Start with the Python minimal example:
+
+```bash
+cd examples/python/minimal
+uv run main.py --png
+```
+
+Success means `_output/render.png` exists and matches the documented minimal reference image. The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+
+For C validation:
+
+```bash
+cd examples/c/minimal
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/minimal
+```
+
+Success means `out.png` exists and matches the documented minimal reference image.
+
+## Python Package
+
+OVRTX is distributed on PyPI. We recommend using uv for Python project and dependency management:
+
+```bash
+uv add ovrtx
+```
+
+`pip install ovrtx` also works. GitHub Releases also contain Python wheels when a specific release artifact is needed.
+
+## Constraints
+
+- Python 3.10-3.13 are supported.
+- C/C++ examples require CMake and a C++ toolchain.
+- Use the default CMake generator unless a project or platform requires another generator.
+- Preserve snippet markers in examples and tests; skills and docs should reference source snippets rather than duplicate API examples.

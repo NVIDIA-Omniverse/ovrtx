@@ -11,23 +11,25 @@
 C: Radar Sensor
 ===============
 
-This example loads ``radar_example.usda``, renders a radar ``PointCloud``
-output, maps the composite render variable to CPU memory, and reads the named
-tensor channels. The moving target approaches the radar, so its
-``RadialVelocityMs`` values are expected to be negative.
+This example populates an ovstage instance from ``radar_example.usda``,
+attaches it to the renderer, renders a radar ``PointCloud`` output through
+``ovrtx_step_with_stage``, maps the composite render variable to CPU memory,
+and reads the named tensor channels. ovstage owns scene ingest and stepping;
+sensor output fetch/map stays a renderer-side concern on the ovrtx APIs. The
+moving target approaches the radar, so its ``RadialVelocityMs`` values are
+expected to be negative.
 
 The scene is Z-up and contains a radar at ``(0, 0, 1)`` rotated to look along
 world +X, an asphalt ground plane, a moving steel cube, and a fixed concrete
 cube. The USD requests ``Coordinates``, ``Counts``, ``RCS``, and
 ``RadialVelocityMs`` channels.
 
-The executable applies the runtime setting
-``--/renderer/raytracingMotion/enabled=true`` because MotionBVH is required for
-moving-object radial velocity.
+The executable enables MotionBVH through ``ovrtx_config_t`` at renderer
+creation because it is required for moving-object radial velocity.
 
 .. pull-quote::
 
-   *“Create a C/C++ radar sensor example that applies required runtime settings before renderer creation, loads an animated radar scene, advances scene time across several simulation steps, reads valid detection data including signal strength and signed radial velocity, prints per-step summaries, reports moving-target observations, and cleans up all resources.”*
+   *“Create a C/C++ radar sensor example that configures the renderer for sensor output, loads an animated radar scene, advances scene time across several simulation steps, reads valid detection data including signal strength and signed radial velocity, prints per-step summaries, reports moving-target observations, and cleans up all resources.”*
 
 .. image:: ../../img/example-sensor-radar.avif
    :alt: Radar sensor example output
@@ -50,7 +52,7 @@ Build and Run
 
       .. code-block:: bash
 
-         cd examples/c/sensors/radar
+         cd examples/c/radar
          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
          cmake --build build
 
@@ -76,7 +78,7 @@ Build and Run
 
       .. code-block:: pwsh
 
-         cd examples/c/sensors/radar
+         cd examples/c/radar
          cmake -S . -B build
          cmake --build build --config Release
 

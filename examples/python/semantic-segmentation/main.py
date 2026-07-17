@@ -24,6 +24,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 
 EXAMPLE_DIR = Path(__file__).resolve().parent
 DEFAULT_USD = Path("ovrtx-robot-lineup.usda")
@@ -839,12 +840,20 @@ def main() -> None:
     # [snippet:create-renderer]
     print("Creating renderer. First launch can take time while shaders compile...", file=sys.stderr)
     renderer = ovrtx.Renderer()
+    stage = ovstage.Stage("ovrtx.example.semantic-segmentation")
+    renderer.attach_ovstage(stage)
     print("Renderer created.", file=sys.stderr)
     # [/snippet:create-renderer]
 
     # [snippet:open-sublayered-usd]
     print(f"Opening composed scene with sublayer: {scene_asset_path}", file=sys.stderr)
-    renderer.open_usd_from_string(build_render_layer_usda(scene_asset_path, tuple(args.resolution)))
+    ordinal = 1
+    ovstage.population.open_usd_from_string(
+        stage,
+        build_render_layer_usda(scene_asset_path, tuple(args.resolution)),
+        ordinal=ordinal,
+    )
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
     print("USD loaded.", file=sys.stderr)
     # [/snippet:open-sublayered-usd]
 
@@ -855,7 +864,7 @@ def main() -> None:
 
     for frame_index in range(max(args.warmup_frames, 0)):
         print(f"Warming up frame {frame_index + 1}/{args.warmup_frames}...", file=sys.stderr)
-        renderer.step(render_products={render_product_path}, delta_time=step_dt)
+        renderer.step(render_products={render_product_path}, delta_time=step_dt, ordinal=ordinal)
         sim_step += 1
         sim_time = sim_step * step_dt
 
@@ -864,6 +873,7 @@ def main() -> None:
     products = renderer.step(
         render_products={render_product_path},
         delta_time=step_dt,
+        ordinal=ordinal,
     )
     # [/snippet:step-all-aovs]
     sim_step += 1
@@ -881,6 +891,10 @@ def main() -> None:
                 print(f"  Wrote {exported} AOV PNGs to {EXAMPLE_DIR / '_output'}", file=sys.stderr)
 
     print(f"Logged {logged} AOVs to Rerun.", file=sys.stderr)
+    del frame, product, products
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
 
 
 if __name__ == "__main__":

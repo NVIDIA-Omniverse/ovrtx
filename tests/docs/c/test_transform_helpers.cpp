@@ -43,7 +43,7 @@ void read_xform_matrix(ovrtx_renderer_t* renderer, char const* prim_path, double
     }
 
     ovrtx_cuda_sync_t no_sync{};
-    ASSERT_API_SUCCESS(ovrtx_release_read_result(renderer, output.map_handle, no_sync).status);
+    ASSERT_API_SUCCESS(ovrtx_release_read_result(renderer, read_handle, no_sync).status);
 }
 
 void read_reset_xform_stack(ovrtx_renderer_t* renderer, char const* prim_path, bool* out_value) {
@@ -66,7 +66,7 @@ void read_reset_xform_stack(ovrtx_renderer_t* renderer, char const* prim_path, b
     *out_value = values[0] != 0;
 
     ovrtx_cuda_sync_t no_sync{};
-    ASSERT_API_SUCCESS(ovrtx_release_read_result(renderer, output.map_handle, no_sync).status);
+    ASSERT_API_SUCCESS(ovrtx_release_read_result(renderer, read_handle, no_sync).status);
 }
 
 } // namespace

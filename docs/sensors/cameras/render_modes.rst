@@ -48,7 +48,7 @@ Choosing a Mode
 
 Different RenderProducts in the same scene can use different render modes. For example, one camera could use ``Real-Time Path-Tracing`` for RGB output while another uses ``Minimal`` for fast segmentation.
 
-See :doc:`outputs` for the available outputs per render mode.
+Refer to :doc:`outputs` for the available outputs per render mode.
 
 .. toctree::
    :maxdepth: 1

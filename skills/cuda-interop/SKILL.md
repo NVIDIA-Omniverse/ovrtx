@@ -154,6 +154,19 @@ value of `0` means no event wait.
 - In Python, `event` and `stream` on `unmap()` are mutually exclusive — pass one or the other.
 - `write_attribute()`, `write_array_attribute()`, and `binding.write()` also accept `cuda_stream=` and `cuda_event=` for GPU-synchronised writes. When you pass a CUDA Warp/PyTorch/etc. tensor together with `cuda_stream=`, ovrtx forwards the stream to the producer's DLPack sync — the producer bridges its internal stream automatically, so no manual `wp.synchronize_stream` is needed before the call.
 
+## In Attached Mode (ovrtx 0.4+)
+
+Rendered-output mapping (this skill) is unchanged by attached mode — ovrtx still
+owns render products and their DLPack surfaces. What changes is the
+**attribute-side** tensor exchange: when reading or writing ovstage-managed
+attribute data (transforms, materials, cloned columns), the DLTensor path and
+CUDA sync are owned by ovstage. See ovstage
+``skills/dlpack-tensor-exchange/SKILL.md`` for the copy-in / copy-out / zero-copy
+map/unmap model, CPU vs CUDA residency, and ``cuda_sync`` semantics for
+attribute data.
+
+See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
+
 ## References
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.

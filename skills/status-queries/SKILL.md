@@ -130,10 +130,6 @@ are invalid after release, so copy anything that must outlive the query.
 
 > **Source:** `examples/c/status-queries/main.cpp` snippet `wait-operation-with-status-c`
 
-### Load USD with status
-
-> **Source:** `examples/c/status-queries/main.cpp` snippet `load-usd-with-status-c`
-
 ### Shader-cache warm-up with status
 
 > **Source:** `examples/c/status-queries/main.cpp` snippet `compile-shader-cache-with-status-c`

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 from PIL import Image
 
 SCENE_PATH = str((Path(__file__).parent / "../../../tests/data/simple_camera.usda").resolve())
@@ -44,22 +45,25 @@ def "Render" {{
 }}
 """
 
-def test_step_multiple_render_products(output_dir):
+def test_step_multiple_render_products(renderer, stage, output_dir):
     """Test stepping with multiple RenderProduct paths (sensor_configuration.rst)."""
-    renderer = ovrtx.Renderer()
-    renderer.open_usd_from_string(MULTI_RENDER_PRODUCT_USDA)
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, MULTI_RENDER_PRODUCT_USDA, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     # Warm up
     for _ in range(5):
         renderer.step(
             render_products={"/Render/FrontCamera", "/Render/RearCamera"},
             delta_time=1.0 / 60,
+            ordinal=ordinal,
         )
 
     # [snippet:doc-step-multiple-render-products]
     products = renderer.step(
         render_products={"/Render/FrontCamera", "/Render/RearCamera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
     # [/snippet:doc-step-multiple-render-products]
 
@@ -72,16 +76,13 @@ def test_step_multiple_render_products(output_dir):
             cam_name = product_name.rsplit("/", 1)[-1]
             Image.fromarray(ldr).save(output_dir / f"test_sensor_config.{cam_name}.LdrColor.png")
 
-    del renderer
-
-
-def test_add_render_config_layer(output_dir):
+def test_add_render_config_layer(renderer, stage, output_dir):
     """Test adding RenderProducts at runtime via open_usd_from_string (sensor_configuration.rst)."""
-    renderer = ovrtx.Renderer()
     scene_path = SCENE_PATH
+    ordinal = 1
 
     # [snippet:doc-add-render-config-layer]
-    renderer.open_usd_from_string(f'''
+    ovstage.population.open_usd_from_string(stage, f'''
     #usda 1.0
     (
         subLayers = [
@@ -104,11 +105,13 @@ def test_add_render_config_layer(output_dir):
             }}
         }}
     }}
-    ''')
+    ''', ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
     # [/snippet:doc-add-render-config-layer]
 
@@ -120,5 +123,3 @@ def test_add_render_config_layer(output_dir):
             var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
             ldr = np.from_dlpack(var)
             Image.fromarray(ldr).save(output_dir / "test_sensor_config.AddRenderConfigLayer.LdrColor.png")
-
-    del renderer

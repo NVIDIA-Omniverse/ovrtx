@@ -70,7 +70,7 @@ This skill has no scripts.
 
 ## Overview
 
-ovrtx is distributed as a Python package on PyPI. The quickest way to get started is with `uv` (recommended) or `pip`. This skill shows how to scaffold a minimal project.
+ovrtx and ovstage are distributed as Python packages on PyPI. Use `uv` when you want project and dependency management. This skill scaffolds the current attached-stage workflow with both packages. ovstage remains optional for standalone compatibility code.
 
 ## Project Structure
 
@@ -85,7 +85,7 @@ my-ovrtx-app/
 ```bash
 mkdir my-ovrtx-app && cd my-ovrtx-app
 uv init
-uv add ovrtx
+uv add ovrtx ovstage
 ```
 
 This creates a `pyproject.toml` and `uv.lock`. Then add `numpy` (required for array/tensor operations):
@@ -103,6 +103,7 @@ version = "0.1.0"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "ovrtx",
+    "ovstage",
     "numpy",
 ]
 
@@ -134,7 +135,7 @@ uv add rerun-sdk
 ## Setup with pip
 
 ```bash
-pip install ovrtx
+pip install ovrtx ovstage
 ```
 
 ## Minimal main.py
@@ -150,16 +151,19 @@ pip install ovrtx
 ### Run
 
 ```bash
-uv run main.py
-# or with pip-installed ovrtx:
-python main.py
+uv run main.py --png
+# or with pip-installed ovrtx and ovstage:
+python main.py --png
 ```
+
+A successful run writes `_output/render.png`. The output should match the documented minimal reference image.
 
 ## Key Dependencies
 
 | Package | Purpose |
 |---------|---------|
 | `ovrtx` | Core renderer |
+| `ovstage` | Runtime scene ownership for attached rendering |
 | `pillow` | Image I/O (PNG, JPEG) |
 | `numpy` | Array manipulation, DLPack interop |
 | `warp-lang` | GPU compute kernels |
@@ -167,10 +171,32 @@ python main.py
 
 ## Troubleshooting
 
-- ovrtx requires Python 3.10–3.13.
-- ovrtx requires an NVIDIA GPU with up-to-date drivers.
-- The first `Renderer()` call may take several seconds as the runtime initializes.
+- If `uv` is missing (`uv: command not found`), install `uv` before using the recommended setup commands, or translate the dependency steps to an equivalent `pip`/virtualenv workflow. PyPI is still the package source.
+- ovrtx supports Python 3.10-3.13. If install resolution fails, no matching wheel is found, or imports fail on another Python version, recreate the environment with a supported interpreter (`uv python install 3.13` and `uv python pin 3.13`, or a virtualenv using Python 3.10-3.13). Do not work around unsupported interpreters by editing ovrtx dependency constraints.
+- If package installation fails (`uv add ovrtx ovstage` or `pip install ovrtx ovstage` for attached mode), classify the failure before treating it as an ovrtx issue: resolver or `no matching distribution` errors usually indicate an unsupported Python version or platform; connection, TLS, timeout, or index errors usually indicate PyPI/network/proxy access; wheel download or install errors may require checking the target platform tag. PyPI is the recommended package source. GitHub Releases contain Python wheels for explicit release-artifact installs, not normal consumption. Do not edit ovrtx constraints to force unsupported interpreters or platforms. If both PyPI and an explicit release wheel fail, report the exact Python version, OS/architecture, platform tag, command, and full error.
+- If `pytest` fails before test assertions because ovrtx cannot load `libovrtx-dynamic.so`, `ovrtx-dynamic.dll`, or required runtime directories, classify it as a package/runtime layout issue rather than a test failure. If pytest reaches runtime validation and fails because the host lacks an RTX GPU, a supported driver, unsandboxed execution, or internet access for remote S3 assets, report the missing prerequisite explicitly. Do not treat import-only, docs-only, or prerequisite-blocked pytest runs as successful runtime validation.
+- ovrtx runtime validation requires an NVIDIA RTX-capable GPU and a supported NVIDIA driver. If no RTX GPU is visible, rerun validation outside the sandbox. If no RTX GPU is still visible, stop runtime validation and tell the user they need an RTX GPU.
+- Supported NVIDIA driver versions are listed in `docs/driver_requirements.rst`. Use that page as the ovrtx source of truth for runtime validation. If driver detection fails, the driver is inaccessible, or the detected version is older than the listed baseline for the host OS, GPU generation, and GPU type, rerun validation outside the sandbox. If the driver is still missing or incompatible, stop runtime validation and tell the user they need a supported NVIDIA driver.
+- Run ovrtx-related runtime code outside sandboxed environments.
+- Examples that load remote S3 assets require internet access.
+- The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure.
 - USD files can be loaded from local paths, `file://` URIs, or `https://` URLs.
+
+## Standalone Compatibility (ovrtx 0.4)
+
+The scaffold above follows the current attached-stage workflow. ovstage can be
+omitted when maintaining standalone compatibility code, but the renderer-owned
+scene APIs used by that mode are deprecated as scene ownership transitions
+entirely to ovstage in a future release:
+
+```toml
+dependencies = [
+    "ovrtx>=0.4",
+    "ovstage>=0.1",
+]
+```
+
+See `docs/core/ovstage_integration.rst` for the attached-mode overview.
 
 ## References
 

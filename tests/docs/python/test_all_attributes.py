@@ -17,12 +17,16 @@ from typing import Any, Literal
 
 import numpy as np
 import ovrtx
+import ovstage
+import pytest
 from ovrtx._src import bindings
 
 
 ALL_ATTRIBUTES_PATH = str((Path(__file__).parent / "../data/all-attributes.usda").resolve())
 WORLD = "/World"
 EXTENT_LEAF = "/World/ExtentTranslate/ExtentScale/ExtentLeaf"
+
+pytestmark = pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 
 
 @dataclass(frozen=True)
@@ -484,14 +488,10 @@ def test_raw_attribute_read_write_snippets(renderer):
     """Raw snippets for docs/skills: direct ovrtx calls only, assertions outside."""
     _load_all_attributes(renderer)
 
-    # [snippet:doc-read-usd-bool]
     bool_values = np.array(np.from_dlpack(renderer.read_attribute("test:bool", [WORLD])))
-    # [/snippet:doc-read-usd-bool]
     assert bool_values.shape == (1,)
 
-    # [snippet:doc-write-usd-bool]
     renderer.write_attribute([WORLD], "test:bool", np.array([False], dtype=np.bool_))
-    # [/snippet:doc-write-usd-bool]
     _assert_array_close("test:bool", _read_numeric(renderer, CASE_BY_NAME["test:bool"]), np.array([False]))
 
     # [snippet:doc-read-usd-int]
@@ -667,14 +667,67 @@ def test_raw_attribute_read_write_snippets(renderer):
     assert _read_asset_string(renderer, CASE_BY_NAME["test:asset"]) == "updated_asset.usd"
 
 
-def test_extent_and_world_extent_are_readable(renderer):
-    """Local extent stays local; _worldExtent reflects the transform hierarchy."""
-    _load_all_attributes(renderer)
+def test_ovstage_bool_read_write_snippets(stage):
+    """Representative ovstage scalar read/write snippets for authored attributes."""
+    ovstage.population.open_usd(stage, ALL_ATTRIBUTES_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
 
-    # [snippet:doc-extent-world-extent]
-    local_extent = np.array(np.from_dlpack(renderer.read_attribute("extent", [EXTENT_LEAF])))
-    world_extent = np.array(np.from_dlpack(renderer.read_attribute("_worldExtent", [EXTENT_LEAF])))
-    # [/snippet:doc-extent-world-extent]
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings([WORLD])
+        with stage.query_from_path_list(path_list) as query:
+            attribute = paths.intern_token("test:bool")
+
+            # [snippet:doc-read-usd-bool]
+            with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(1)) as read:
+                group = read.fetch_next()
+                bool_values = np.from_dlpack(group.dlpack(0)).copy()
+                stage.release_group(group)
+            # [/snippet:doc-read-usd-bool]
+
+            # [snippet:doc-write-usd-bool]
+            stage.write_attribute(
+                query,
+                attribute,
+                ordinal=2,
+                tensors=np.array([False], dtype=np.bool_),
+                is_array=False,
+            ).wait()
+            stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
+            # [/snippet:doc-write-usd-bool]
+
+            with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
+                group = read.fetch_next()
+                updated = np.from_dlpack(group.dlpack(0)).copy()
+                stage.release_group(group)
+        paths.destroy_path_list(path_list)
+
+    assert bool_values.shape == (1,)
+    assert updated.tolist() == [False]
+
+
+def test_extent_and_world_extent_are_readable(stage):
+    """Local extent stays local; _worldExtent reflects the transform hierarchy."""
+    ovstage.population.open_usd(stage, ALL_ATTRIBUTES_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
+
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings([EXTENT_LEAF])
+        with stage.query_from_path_list(path_list) as query:
+            local_attribute = paths.intern_token("extent")
+            world_attribute = paths.intern_token("_worldExtent")
+
+            # [snippet:doc-extent-world-extent]
+            with stage.read_attributes(
+                query, [local_attribute, world_attribute], ovstage.OrdinalRange.latest(1)
+            ) as read:
+                values = {}
+                for group in read.groups():
+                    values[group.attribute] = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+            local_extent = values[local_attribute]
+            world_extent = values[world_attribute]
+            # [/snippet:doc-extent-world-extent]
+        paths.destroy_path_list(path_list)
 
     expected_local = np.array([[-1, -2, -3, 1, 2, 3]], dtype=np.float64)
     expected_world = np.array([[8, 14, 18, 12, 26, 42]], dtype=np.float64)

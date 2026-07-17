@@ -29,14 +29,13 @@ static bool has_nonzero(void const* data, size_t byte_count) {
     return false;
 }
 
-TEST(CameraAovs, AllRT2Outputs) {
-    // Create renderer
-    TestConfig tc("CameraAovs");
-    ovrtx_renderer_t* renderer = nullptr;
-    ovrtx_result_t result = ovrtx_create_renderer(&tc.config, &renderer);
-    ASSERT_API_SUCCESS(result.status);
+class CameraAovsTest : public DocsOvstageTestBase {
+protected:
+    DOCS_OVSTAGE_TEST_SUITE(CameraAovsTest)
+};
 
-    // Load scene via sublayer with all AOVs
+TEST_F(CameraAovsTest, AllRT2Outputs) {
+    // Load scene via sublayer with all AOVs, populated through ovstage.
     std::string scene_path = get_test_data_dir() + "/simple_camera.usda";
     std::string usda = make_sublayer_usda(scene_path, R"usda(
 def "Render" {
@@ -77,40 +76,34 @@ def "Render" {
 }
 )usda");
 
-    ovrtx_enqueue_result_t enqueue_result = ovrtx_open_usd_from_string(renderer, {usda.c_str(), usda.size()});
-    ASSERT_API_SUCCESS(enqueue_result.status);
+    docs_open_usd_string(usda.c_str(), usda.size());
+    if (HasFatalFailure()) return;
 
-    ovrtx_op_wait_result_t wait_result;
-    result = ovrtx_wait_op(renderer, enqueue_result.op_index, ovrtx_timeout_infinite, &wait_result);
-    ASSERT_API_SUCCESS(result.status);
-    ASSERT_NO_OP_ERRORS(wait_result);
-
-    // Step renderer (warm up)
+    ovstage_ordinal_t ordinal = 1;
     ovx_string_t rp_path = ovx_str("/Render/Camera");
     ovrtx_render_product_set_t render_products{};
     render_products.render_products = &rp_path;
     render_products.num_render_products = 1;
 
+    // Warm up so the path-tracer accumulator converges before we sample outputs.
     for (int i = 0; i < 5; ++i) {
         ovrtx_step_result_handle_t warmup_handle = 0;
-        enqueue_result = ovrtx_step(renderer, render_products, 1.0 / 60.0, &warmup_handle);
-        ASSERT_API_SUCCESS(enqueue_result.status);
-        result = ovrtx_wait_op(renderer, enqueue_result.op_index, ovrtx_timeout_infinite, &wait_result);
-        ASSERT_API_SUCCESS(result.status);
-        ASSERT_NO_OP_ERRORS(wait_result);
-        ovrtx_destroy_results(renderer, warmup_handle);
+        ovrtx_enqueue_result_t warmup_eq = ovrtx_step_with_stage(
+            renderer_, render_products, 1.0 / 60.0, ordinal, &warmup_handle);
+        ASSERT_API_SUCCESS(warmup_eq.status);
+        docs_wait_no_errors(renderer_, warmup_eq.op_index);
+        ovrtx_destroy_results(renderer_, warmup_handle);
     }
 
-    // Step and fetch results
     ovrtx_step_result_handle_t step_handle = 0;
-    enqueue_result = ovrtx_step(renderer, render_products, 1.0 / 60.0, &step_handle);
+    ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
+        renderer_, render_products, 1.0 / 60.0, ordinal, &step_handle);
     ASSERT_API_SUCCESS(enqueue_result.status);
-    result = ovrtx_wait_op(renderer, enqueue_result.op_index, ovrtx_timeout_infinite, &wait_result);
-    ASSERT_API_SUCCESS(result.status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    docs_wait_no_errors(renderer_, enqueue_result.op_index);
 
     ovrtx_render_product_set_outputs_t outputs{};
-    result = ovrtx_fetch_results(renderer, step_handle, ovrtx_timeout_infinite, &outputs);
+    ovrtx_result_t result =
+        ovrtx_fetch_results(renderer_, step_handle, ovrtx_timeout_infinite, &outputs);
     ASSERT_API_SUCCESS(result.status);
 
     ovrtx_map_output_description_t map_desc = {};
@@ -123,7 +116,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "LdrColor");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -136,7 +129,7 @@ def "Render" {
         EXPECT_EQ(t.dtype.lanes, 1);
         EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4));
         save_ldr_png("CameraAovs.LdrColor", t.data, WIDTH, HEIGHT);
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
 
     // HdrColor: RGBA float16 -- shape (H, W, 4), scalar lanes
@@ -144,7 +137,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "HdrColor");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -156,7 +149,7 @@ def "Render" {
         EXPECT_EQ(t.dtype.bits, 16);
         EXPECT_EQ(t.dtype.lanes, 1);
         EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4 * 2));
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
 
     // NormalSD: XYZA float32 -- shape (H, W, 4), scalar lanes
@@ -164,7 +157,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "NormalSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -176,7 +169,7 @@ def "Render" {
         EXPECT_EQ(t.dtype.bits, 32);
         EXPECT_EQ(t.dtype.lanes, 1);
         EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4 * 4));
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
 
     // DepthSD: Z float32 -- shape (H, W, 1), scalar lanes
@@ -184,7 +177,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "DepthSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -197,7 +190,7 @@ def "Render" {
         EXPECT_EQ(t.dtype.lanes, 1);
         // TODO: DepthSD currently returns all zeros (ovrtx bug). Re-enable when fixed.
         // EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4));
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
 
     // DistanceToCameraSD: Z float32 -- shape (H, W, 1), scalar lanes
@@ -205,7 +198,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "DistanceToCameraSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -217,7 +210,7 @@ def "Render" {
         EXPECT_EQ(t.dtype.bits, 32);
         EXPECT_EQ(t.dtype.lanes, 1);
         EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4));
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
 
     // DistanceToImagePlaneSD: Z float32 -- shape (H, W, 1), scalar lanes
@@ -225,7 +218,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "DistanceToImagePlaneSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -237,7 +230,7 @@ def "Render" {
         EXPECT_EQ(t.dtype.bits, 32);
         EXPECT_EQ(t.dtype.lanes, 1);
         EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4));
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
 
     // DiffuseAlbedoSD: RGBA uint8 -- shape (H, W, 4), scalar lanes
@@ -245,7 +238,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "DiffuseAlbedoSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -258,7 +251,7 @@ def "Render" {
         EXPECT_EQ(t.dtype.lanes, 1);
         EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4));
         save_ldr_png("CameraAovs.DiffuseAlbedoSD", t.data, WIDTH, HEIGHT);
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
 
     // Camera3dPositionSD: XYZA float32 -- shape (H, W, 4), scalar lanes
@@ -266,7 +259,7 @@ def "Render" {
         ovrtx_render_var_output_handle_t handle = find_output(outputs, "Camera3dPositionSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
-        result = ovrtx_map_render_var_output(renderer, handle, &map_desc,
+        result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
                                            ovrtx_timeout_infinite, &output);
         ASSERT_API_SUCCESS(result.status);
         DLTensor const& t = *output.tensors[0].dl;
@@ -278,11 +271,9 @@ def "Render" {
         EXPECT_EQ(t.dtype.bits, 32);
         EXPECT_EQ(t.dtype.lanes, 1);
         EXPECT_TRUE(has_nonzero(t.data, HEIGHT * WIDTH * 4 * 4));
-        ovrtx_unmap_render_var_output(renderer, output.map_handle, no_sync);
+        ovrtx_unmap_render_var_output(renderer_, output.map_handle, no_sync);
     }
     // [/snippet:doc-camera-aov-smoke-test-c]
 
-    // Cleanup
-    ovrtx_destroy_results(renderer, step_handle);
-    ovrtx_destroy_renderer(renderer);
+    ovrtx_destroy_results(renderer_, step_handle);
 }

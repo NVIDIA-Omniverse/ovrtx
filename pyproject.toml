@@ -1,9 +1,11 @@
 [project]
 name = "ovrtx"
-version = "0.3.0"
-description = "NVIDIA RTX Rendering Python API"
+version = "0.4.0"
+description = "Physically accurate, real-time, sensor simulation and visualization using NVIDIA Omniverse RTX"
 requires-python = ">=3.10,<3.14"
-dependencies = []
+dependencies = [
+    "ovstage>=0.1.0.343775",
+]
 authors = [{name = "NVIDIA Corporation"}]
 license = "LicenseRef-NvidiaProprietary"
 license-files = ["LICENSE"]
@@ -58,3 +60,4 @@ packages = ["ovrtx"]
 
 [tool.uv]
 managed = true
+

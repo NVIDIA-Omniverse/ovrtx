@@ -15,12 +15,21 @@ Omniverse RTX is the technology that provides real-time, physically accurate sen
 
 In this documentation you will find getting started guides for Python and C, API references, and example projects.
 
-* :doc:`python_api/getting_started`
-* :doc:`c_api/getting_started`
+* :doc:`Getting started in Python <python_api/getting_started>` - Refer to the :doc:`Python minimal example documentation <examples/python_minimal>` for more information on environment setup and prerequisites.
+* :doc:`Getting started in C <c_api/getting_started>` - Refer to the :doc:`C minimal example documentation <examples/c_minimal>` for more information on environment setup and prerequisites.
 
 .. note::
 
    ovrtx is currently **pre-release** software.
+
+.. note::
+
+   Starting with **ovrtx 0.4**, the renderer can attach to **ovstage** — an
+   optional NVIDIA library that manages the runtime scene, ordinal-keyed writes,
+   and change detection. Renderer-owned scene APIs remain available for
+   standalone compatibility in 0.4, but are deprecated as scene ownership
+   transitions entirely to ovstage in a future release. Refer to
+   :doc:`core/ovstage_integration` for the attach-mode reference.
 
 .. image:: ../img/warehouse.jpg
    :alt: Warehouse scene rendered with ovrtx RTX sensor simulation
@@ -31,11 +40,13 @@ Features
 
 * Physically accurate simulation of cameras, lidar, radar, and other sensors.
 * Scalable simulation performance from reinforcement learning in-the-loop with tens of thousands of frames per second, through real-time, photorealistic, interactive viewport and navigation, to offline predictive rendering.
-* `OpenUSD <https://aousd.org/>`_ scene description allowing interchange with a vast ecosystem of content creation, CAD and simulation tools.
+* `OpenUSD <https://aousd.org/>`_ scene description allowing interchange with a vast ecosystem of content creation, CAD, and simulation tools.
 * Easy integration with Python simulation and learning ecosystem.
 
 Support
 -------
+
+Report documentation issues, installation problems, and runtime issues through the NVIDIA Omniverse developer forum.
 
 https://forums.developer.nvidia.com/c/omniverse/300
 
@@ -50,6 +61,7 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
 
    python_api/getting_started
    c_api/getting_started
+   driver_requirements
 
 .. toctree::
    :maxdepth: 2
@@ -58,6 +70,7 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    core/application_flow
    core/renderer_configuration
    core/async_status_errors
+   core/ovstage_integration
 
 .. toctree::
    :maxdepth: 3
@@ -68,6 +81,12 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    sensors/sensor_outputs
    sensors/cameras
    sensors/nonvisual
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Sensor Processing Graphs
+
+   spg/index
 
 .. toctree::
    :maxdepth: 2

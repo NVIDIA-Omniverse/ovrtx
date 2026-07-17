@@ -26,9 +26,12 @@ The example uses an inline USDA root layer with a relative ``subLayers`` arc to 
 Prerequisites
 -------------
 
-- Python 3.10–3.13
+- Python 3.10-3.13
 - `uv <https://docs.astral.sh/uv/>`_
-- Access to the referenced robot-lineup payloads
+- NVIDIA RTX-capable GPU
+- Supported NVIDIA driver
+- Internet access to download the remote payloads referenced by ``ovrtx-robot-lineup.usda``
+- Unsandboxed runtime execution
 
 Running
 -------
@@ -61,4 +64,4 @@ Options
 
 The example decodes ``SemanticIdMap`` before logging ``SemanticSegmentation``. It remaps renderer semantic IDs into compact 16-bit Rerun class IDs, logs an ``AnnotationContext`` with the semantic labels, and displays the segmentation image in the Rerun blueprint grid.
 
-The first time you run the example, the driver compiles and caches shaders. Subsequent runs are much faster.
+The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.

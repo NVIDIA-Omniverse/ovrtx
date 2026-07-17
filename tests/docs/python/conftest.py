@@ -11,7 +11,23 @@
 from pathlib import Path
 
 import ovrtx
+import ovstage
 import pytest
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_teardown(item, nextitem):
+    yield
+
+    # Fix: pytest caches every fixture's return value in ``item.funcargs`` and keeps the Function
+    # item in ``session.items`` for the whole run, so ``item.funcargs["renderer"]`` pins each
+    # ovrtx.Renderer alive until session end. Because Renderer's only teardown path is __del__
+    # (refcount-triggered), destroy_renderer + streaming-status unregister never run between
+    # tests and the busy clients accumulate. All fixtures for this item are finalized by now, so
+    # dropping funcargs lets the renderer's refcount reach zero and __del__ fire promptly.
+    funcargs = getattr(item, "funcargs", None)
+    if funcargs:
+        funcargs.clear()
 
 
 @pytest.fixture(scope="session")
@@ -29,5 +45,22 @@ def renderer(output_dir):
         log_file_path=str(output_dir / "python-doc-tests-ovrtx.log"),
     )
     r = ovrtx.Renderer(config=config)
-    yield r
-    del r
+    try:
+        yield r
+    finally:
+        # Deterministic teardown: the renderer participates in a reference cycle, so relying on
+        # __del__ (refcount) would defer native teardown to a GC pass. 
+        # destroy() is idempotent, so a later __del__ is a no-op.
+        r.destroy()
+
+
+@pytest.fixture
+def stage(renderer, request):
+    """Attach a fresh ovstage instance to the test renderer."""
+    s = ovstage.Stage(f"ovrtx.docs.{request.node.name}")
+    renderer.attach_ovstage(s)
+    try:
+        yield s
+    finally:
+        renderer.detach_ovstage()
+        s.destroy()

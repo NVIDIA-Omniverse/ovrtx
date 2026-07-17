@@ -74,9 +74,8 @@ This skill has no scripts.
 
 Radar `PointCloud` output is a composite render var with one tensor per detection channel. Use `Counts[0]` to bound the delivered detections before interpreting `Coordinates`, `RCS`, `RadialVelocityMs`, `TimeOffsetNs`, or `Flags`, and use the `Flags` `VALID` bit for per-detection validity.
 
-> **Source:** `examples/python/sensors/radar/main.py` snippet `read-radar-pointcloud`
-
-> **Source:** `examples/c/sensors/radar/main.cpp` snippet `read-radar-pointcloud`
+> **Source:** `examples/python/radar/main.py` snippet `read-radar-pointcloud`
+> **Source:** `examples/c/radar/main.cpp` snippet `read-radar-pointcloud`
 
 The radar examples demonstrate the usual interpretation path: slice to valid detections, summarize channel values, and treat radial velocity sign deliberately.
 
@@ -111,9 +110,8 @@ Use `Counts` for tensor bounds and `Flags` for per-detection validity. Status-aw
 
 ## Visualization
 
-> **Source:** `examples/python/sensors/radar/main.py` snippet `radial-velocity-colors`
-
-> **Source:** `examples/python/sensors/radar/main.py` snippet `log-radar-points`
+> **Source:** `examples/python/radar/main.py` snippet `radial-velocity-colors`
+> **Source:** `examples/python/radar/main.py` snippet `log-radar-points`
 
 Coloring by signed `RadialVelocityMs` is a useful default: one color for approaching detections, another for receding detections, and a neutral color near zero. Color by `RCS` when the goal is material or detectability inspection.
 

@@ -41,7 +41,9 @@ option(ENABLE_TESTS "Enable building tests" OFF)
 # Fetch ovrtx package
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake")
 include(ovrtx)
+include(ovstage)
 ovrtx_fetch()
+ovstage_fetch()
 
 # FetchContent for other dependencies
 set(FETCHCONTENT_QUIET FALSE)
@@ -143,8 +145,18 @@ target_link_libraries(ovrtx-interop PRIVATE
     CUDA::nvrtc
     glm::glm
     volk
-    ovrtx::ovrtx
+    # Static-loader model: link the static ovrtx loader. main.cpp hands the loader
+    # its package root at runtime (a side-by-side `ovrtx/` link beside the exe,
+    # created by ovrtx_setup_runtime) instead of replicating the package next to it.
+    ovrtx::ovrtx_static
+    ovstage::ovstage_static
 )
+
+# The ovrtx package ships a release-only static loader (compiled /MD). Force the
+# release CRT so the Debug config links cleanly.
+if(MSVC)
+    set_target_properties(ovrtx-interop PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
 
 # Copy compiled shaders next to the executable so they can be found regardless
 # of working directory. Uses generator expressions to handle both single-config
@@ -159,6 +171,7 @@ add_custom_command(TARGET ovrtx-interop POST_BUILD
 
 # Setup runtime dependencies (DLL copying, junctions, rpath)
 ovrtx_setup_runtime(ovrtx-interop)
+ovstage_setup_runtime(ovrtx-interop)
 
 
 if(ENABLE_TESTS)

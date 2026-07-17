@@ -101,7 +101,6 @@ class ConfigBoolKey(IntEnum):
     ENABLE_GEOMETRY_STREAMING = 6
     ENABLE_GEOMETRY_STREAMING_LOD = 7
     ENABLE_SPG = 8
-    ENABLE_MOTION_BVH = 9
 
 
 # ovrtx_config_string_t
@@ -119,6 +118,8 @@ class ConfigInt64Key(IntEnum):
 
     SELECTION_OUTLINE_WIDTH = 0
     SELECTION_FILL_MODE = 1
+    MOTION_BVH = 2
+    _ATTACH_MODE = 3
 
 
 # ovrtx_config_double_t
@@ -147,6 +148,35 @@ class SelectionFillMode(IntEnum):
     """Interior is filled with each group's outline color."""
     GROUP_FILL_COLOR = 3
     """Interior is filled with each group's dedicated fill/shade color."""
+
+
+# ovrtx_motion_bvh_t
+class MotionBvh(IntEnum):
+    """Motion BVH (ray-traced motion) mode for sensor pipelines.
+
+    Set at renderer creation via :attr:`RendererConfig.motion_bvh` (maps to
+    ``OVRTX_CONFIG_MOTION_BVH``); changing it requires recreating the renderer.
+    """
+
+    DISABLE = 0
+    """Motion BVH off (default when unset)."""
+    ENABLE = 1
+    """Motion BVH enabled from renderer creation."""
+    AUTO = 2
+    """Motion BVH enabled at runtime when a non-visual sensor is rendered."""
+
+
+# ovrtx_attach_mode_t
+class _AttachMode(IntEnum):
+    """How an attached ovstage instance feeds data into the renderer.
+
+    Internal development option fixed for a renderer's lifetime.
+    """
+
+    BORROW = 0
+    """Zero-copy: the renderer renders directly out of ovstage's Fabric (default)."""
+    REPLICATE = 1
+    """The renderer keeps its own UsdStage / Fabric; update_from_stage pulls committed ovstage state into it."""
 
 
 class ovrtx_config_key_type_t(ctypes.c_int):
@@ -273,6 +303,11 @@ class ovrtx_renderer_t(ctypes.Structure):
     pass
 
 
+# Opaque ovstage types used only at the OVRTX C ABI boundary.
+ovstage_instance_p = ctypes.c_void_p
+ovstage_ordinal_t = ctypes.c_uint64
+
+
 # OVRTX API Status Constants
 OVRTX_API_SUCCESS: int = 0
 OVRTX_API_ERROR: int = 1
@@ -381,8 +416,6 @@ class ovrtx_render_product_set_t(ctypes.Structure):
 
 
 # Pick query / pick-hit (multi-tensor render variable ``ovrtx_pick_hit``)
-OVRTX_ATTR_NAME_SELECTION_OUTLINE_GROUP = "omni:selectionOutlineGroup"
-OVRTX_ATTR_NAME_PICKABLE = "omni:pickable"
 OVRTX_RENDER_VAR_PICK_HIT = "ovrtx_pick_hit"
 OVRTX_PICK_FLAG_GIZMO = 1 << 0
 OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO = 1 << 1
@@ -395,14 +428,14 @@ OVRTX_PICK_HIT_VERSION = 1
 
 
 class ovrtx_pick_query_desc_t(ctypes.Structure):
-    """Pick rectangle in RenderProduct pixel space; see ``ovrtx_enqueue_pick_query``."""
+    """Pick rectangle in normalized RenderProduct coordinates; see ``ovrtx_enqueue_pick_query``."""
 
     _fields_ = [
         ("render_product_path", ovx_string_t),
-        ("left", ctypes.c_int32),
-        ("top", ctypes.c_int32),
-        ("right", ctypes.c_int32),
-        ("bottom", ctypes.c_int32),
+        ("left_ndc", ctypes.c_float),
+        ("top_ndc", ctypes.c_float),
+        ("right_ndc", ctypes.c_float),
+        ("bottom_ndc", ctypes.c_float),
         ("flags", ctypes.c_uint32),
     ]
 
@@ -470,6 +503,18 @@ class ovrtx_render_product_render_var_output_t(ctypes.Structure):
     ]
 
 
+class ovrtx_accumulation_status_t(ctypes.Structure):
+    """Path-tracing accumulation status for a rendered frame.
+
+    Matches ovrtx_accumulation_status_t from ovrtx_types.h.
+    """
+
+    _fields_ = [
+        ("progression", ctypes.c_uint32),
+        ("converged", ctypes.c_bool),
+    ]
+
+
 class ovrtx_render_product_frame_output_t(ctypes.Structure):
     """Single frame output with multiple render variables."""
 
@@ -478,6 +523,7 @@ class ovrtx_render_product_frame_output_t(ctypes.Structure):
         ("frame_end_time", ctypes.c_double),
         ("output_render_vars", ctypes.POINTER(ovrtx_render_product_render_var_output_t)),
         ("render_var_count", ctypes.c_size_t),
+        ("accumulation_status", ovrtx_accumulation_status_t),
     ]
 
 
@@ -801,7 +847,6 @@ class ovrtx_attribute_mapping_t(ctypes.Structure):
 # Type aliases for query/read handles
 ovrtx_query_handle_t = ctypes.c_uint64
 ovrtx_read_handle_t = ctypes.c_uint64
-ovrtx_read_map_handle_t = ctypes.c_uint64
 
 
 class FilterKind(IntEnum):
@@ -905,10 +950,9 @@ class ovrtx_query_result_t(ctypes.Structure):
 
 
 class ovrtx_read_output_t(ctypes.Structure):
-    """Mapped read output."""
+    """Attribute read output returned by :func:`fetch_read_result`."""
 
     _fields_ = [
-        ("map_handle", ovrtx_read_map_handle_t),
         ("buffers", ctypes.POINTER(ovrtx_output_buffer_t)),
         ("buffer_count", ctypes.c_size_t),
         ("prim_count", ctypes.c_size_t),
@@ -954,7 +998,8 @@ _FN_create_path_list_from_paths = ctypes.CFUNCTYPE(
 _FN_create_path_list_from_strings = ctypes.CFUNCTYPE(
     ovx_api_result_t, _PD_CTX, ctypes.POINTER(ovx_string_t), ctypes.c_size_t, ctypes.POINTER(_PATHLIST)
 )
-_FN_destroy_path_list = ctypes.CFUNCTYPE(ovx_api_result_t, _PD_CTX, _PATHLIST)
+_FN_add_path_list_reference = ctypes.CFUNCTYPE(ovx_api_result_t, _PD_CTX, _PATHLIST)
+_FN_release_path_list_reference = ctypes.CFUNCTYPE(ovx_api_result_t, _PD_CTX, _PATHLIST)
 _FN_get_strings_from_tokens = ctypes.CFUNCTYPE(
     ovx_api_result_t, _PD_CTX, ctypes.POINTER(_TOKEN), ctypes.c_size_t, ctypes.POINTER(ovx_string_t)
 )
@@ -993,7 +1038,8 @@ class path_dictionary_vtable_t(ctypes.Structure):
         ("create_paths_from_strings", _FN_create_paths_from_strings),
         ("create_path_list_from_paths", _FN_create_path_list_from_paths),
         ("create_path_list_from_strings", _FN_create_path_list_from_strings),
-        ("destroy_path_list", _FN_destroy_path_list),
+        ("add_path_list_reference", _FN_add_path_list_reference),
+        ("release_path_list_reference", _FN_release_path_list_reference),
         ("get_strings_from_tokens", _FN_get_strings_from_tokens),
         ("get_tokens_from_paths", _FN_get_tokens_from_paths),
         ("get_num_paths_from_path_list", _FN_get_num_paths_from_path_list),
@@ -1102,6 +1148,58 @@ class Bindings:
             Result with status.
         """
         return self._lib.ovrtx_destroy_renderer(renderer_handle)
+
+    def attach_ovstage(self, renderer_handle: Any, stage_handle: ovstage_instance_p) -> ovrtx_result_t:
+        """Attach an externally owned ovstage instance to a renderer.
+
+        The renderer must not have stepped or already be attached. The caller
+        retains ownership of the stage and must detach it before destroying
+        either object. The renderer's configured attach mode determines whether
+        it borrows the stage directly or uses it as a source for explicit updates.
+
+        Args:
+            renderer_handle: Renderer handle from create_renderer.
+            stage_handle: Pointer to an initialized ovstage instance. It must
+                remain valid until detached.
+
+        Returns:
+            Result with status.
+        """
+        return self._lib.ovrtx_attach_ovstage(renderer_handle, stage_handle)
+
+    def detach_ovstage(self, renderer_handle: Any) -> ovrtx_result_t:
+        """Detach the ovstage instance currently attached to a renderer.
+
+        The renderer returns to standalone mode with a fresh internal stage.
+        Any data copied in replicate mode is discarded; ownership of the
+        detached ovstage instance remains with the caller. Attaching a different
+        stage after detaching is not currently supported.
+
+        Args:
+            renderer_handle: Renderer handle previously passed to attach_ovstage.
+
+        Returns:
+            Result with status.
+        """
+        return self._lib.ovrtx_detach_ovstage(renderer_handle)
+
+    def update_from_stage(self, renderer_handle: Any, stage_ordinal: int) -> ovrtx_enqueue_result_t:
+        """Enqueue an update from the attached ovstage at a committed ordinal.
+
+        In borrow mode it synchronizes the renderer's scene state with committed
+        population changes while attribute values remain shared with ovstage. In
+        replicate mode it copies committed attribute values at or before
+        ``stage_ordinal`` into the renderer's internal stage. In either mode, the
+        ordinal must not exceed the attached stage's write floor.
+
+        Args:
+            renderer_handle: Renderer handle from create_renderer.
+            stage_ordinal: Committed ovstage ordinal to update through.
+
+        Returns:
+            Enqueue result with operation status and op_index.
+        """
+        return self._lib.ovrtx_update_from_stage(renderer_handle, ovstage_ordinal_t(stage_ordinal))
 
     def get_last_error(self) -> str:
         """Get the error string from the last failed API call on this thread.
@@ -1288,6 +1386,44 @@ class Bindings:
         handle = step_result_handle if result.status == OVRTX_API_SUCCESS else None
         return result, handle
 
+    def step_with_stage(
+        self,
+        renderer_handle: Any,
+        render_product_set: ovrtx_render_product_set_t,
+        delta_time: float,
+        ordinal: int,
+    ) -> tuple[ovrtx_enqueue_result_t, Any]:
+        """Enqueue a simulation step while the renderer is attached to an ovstage.
+
+        ``ordinal`` is a committed-publication gate, not a historical snapshot
+        selector: it must not exceed the stage's write floor, and the step may
+        observe that publication or a later one. This low-level method does not
+        update the renderer from ovstage automatically. Enqueue ``update_from_stage``
+        first in either attach mode, or use high-level ``Renderer.step``, which
+        performs both operations.
+
+        Args:
+            renderer_handle: Renderer handle from create_renderer. It must be
+                attached to an ovstage.
+            render_product_set: Render product set to step.
+            delta_time: Time step for simulation.
+            ordinal: Minimum committed ovstage publication required by the step.
+
+        Returns:
+            Tuple of (enqueue_result, step_result_handle). Handle is None if the
+            step failed to enqueue.
+        """
+        step_result_handle = ovrtx_step_result_handle_t()
+        result = self._lib.ovrtx_step_with_stage(
+            renderer_handle,
+            render_product_set,
+            delta_time,
+            ovstage_ordinal_t(ordinal),
+            ctypes.byref(step_result_handle),
+        )
+        handle = step_result_handle if result.status == OVRTX_API_SUCCESS else None
+        return result, handle
+
     def enqueue_pick_query(self, renderer_handle: Any, desc: ovrtx_pick_query_desc_t) -> ovrtx_enqueue_result_t:
         """Enqueue a pick query for the next step that renders the given RenderProduct."""
         return self._lib.ovrtx_enqueue_pick_query(renderer_handle, ctypes.byref(desc))
@@ -1309,6 +1445,46 @@ class Bindings:
             count: Number of (group_id, style) pairs.
         """
         return self._lib.ovrtx_set_selection_group_styles(renderer_handle, group_ids, styles, count)
+
+    def set_selection_outline_group(
+        self,
+        renderer_handle: Any,
+        prim_path_ids: Any,
+        path_count: int,
+        group_ids: Any,
+    ) -> ovrtx_enqueue_result_t:
+        """Set per-prim selection outline group ids."""
+        return self._lib.ovrtx_set_selection_outline_group(renderer_handle, prim_path_ids, path_count, group_ids)
+
+    def set_selection_outline_group_strings(
+        self,
+        renderer_handle: Any,
+        prim_paths: Any,
+        path_count: int,
+        group_ids: Any,
+    ) -> ovrtx_enqueue_result_t:
+        """Set per-prim selection outline group ids from string prim paths."""
+        return self._lib.ovrtx_set_selection_outline_group_strings(renderer_handle, prim_paths, path_count, group_ids)
+
+    def set_pickable(
+        self,
+        renderer_handle: Any,
+        prim_path_ids: Any,
+        path_count: int,
+        pickable: Any,
+    ) -> ovrtx_enqueue_result_t:
+        """Set per-prim viewport pickability."""
+        return self._lib.ovrtx_set_pickable(renderer_handle, prim_path_ids, path_count, pickable)
+
+    def set_pickable_strings(
+        self,
+        renderer_handle: Any,
+        prim_paths: Any,
+        path_count: int,
+        pickable: Any,
+    ) -> ovrtx_enqueue_result_t:
+        """Set per-prim viewport pickability from string prim paths."""
+        return self._lib.ovrtx_set_pickable_strings(renderer_handle, prim_paths, path_count, pickable)
 
     def fetch_results(
         self,
@@ -1597,21 +1773,23 @@ class Bindings:
     def release_read_result(
         self,
         renderer: Any,
-        map_handle: ovrtx_read_map_handle_t,
+        read_handle: ovrtx_read_handle_t,
         before_destroy_cuda_sync: Optional[ovrtx_cuda_sync_t] = None,
     ) -> ovrtx_result_t:
-        """Release resources from a prior fetch_read_result call.
+        """Release resources associated with a prior read_attribute call.
+
+        Safe to call whether or not ``fetch_read_result`` was invoked first.
 
         Args:
             renderer: Renderer instance pointer.
-            map_handle: Map handle from read_output.
+            read_handle: Handle returned by ``read_attribute``.
             before_destroy_cuda_sync: Optional CUDA sync.
 
         Returns:
             Result status.
         """
         sync = before_destroy_cuda_sync if before_destroy_cuda_sync is not None else ovrtx_cuda_sync_t()
-        return self._lib.ovrtx_release_read_result(renderer, map_handle, sync)
+        return self._lib.ovrtx_release_read_result(renderer, read_handle, sync)
 
     def reset(self, renderer_handle: Any, time: float) -> ovrtx_enqueue_result_t:
         """Reset sensor simulation history to a specific time.
@@ -1637,9 +1815,7 @@ _BUNDLED_USD_VERSION: tuple[int, int] = (25, 11)
 # import-time schema-path shim and ``_LibraryLoader`` can never disagree about which
 # binary to look for (a divergence would mean schema-path registration ran against a
 # different DLL than the one that later powers ``Renderer()``).
-OVRTX_LOADER_LIB_NAME: str = (
-    "ovrtx-dynamic.dll" if sys.platform.startswith("win") else "libovrtx-dynamic.so"
-)
+OVRTX_LOADER_LIB_NAME: str = "ovrtx-dynamic.dll" if sys.platform.startswith("win") else "libovrtx-dynamic.so"
 
 
 def ovrtx_loader_candidate_dirs() -> List[Path]:
@@ -1655,26 +1831,32 @@ def ovrtx_loader_candidate_dirs() -> List[Path]:
     Precedence (preserves the historical ``_LibraryLoader`` ordering, plus a
     last-resort in-tree dev fallback):
       1. ``<package_dir>/bin`` — wheel layout (``<site-packages>/ovrtx/bin``).
-      2. ``Path.cwd()`` — example/test layouts that drop the DLL next to the script.
-      3. ``LD_LIBRARY_PATH`` entries (Linux only).
-      4. ``PATH`` entries.
-      5. ``<package_dir>/../../bin`` — in-tree dev layout
+      2. ``LD_LIBRARY_PATH`` entries (Linux only).
+      3. ``PATH`` entries.
+      4. ``<package_dir>/../../bin`` — in-tree dev layout
          (``<deploy>/python/ovrtx`` paired with ``<deploy>/bin``). Last so an
-         explicit cwd / ``PATH`` override always wins, but present so an
+         explicit ``PATH`` override always wins, but present so an
          in-tree build with the DLL only at ``<deploy>/bin`` and that
          directory absent from ``PATH`` still loads from both
          ``schema_paths`` and ``_LibraryLoader`` (preventing one path
          finding the binary while the other doesn't).
+
+    The current working directory is intentionally **not** searched by default:
+    loading a native library from a CWD an attacker can influence is a DLL/SO
+    hijacking vector (arbitrary native code on import, before any ``Renderer()``
+    call). Opt in explicitly by setting ``OVRTX_ALLOW_CWD_LIBRARY_SEARCH=1`` for
+    example/test layouts that drop the DLL next to the script.
 
     Uses raw ``Path(__file__)`` — never ``.resolve()`` — so symlinks from
     a build tree to the source tree don't strand us at the source root.
     """
     package_dir = Path(__file__).parent.parent
     candidates: List[Path] = [package_dir / "bin"]
-    try:
-        candidates.append(Path.cwd())
-    except OSError:
-        pass
+    if os.environ.get("OVRTX_ALLOW_CWD_LIBRARY_SEARCH", "") not in ("", "0"):
+        try:
+            candidates.append(Path.cwd())
+        except OSError:
+            pass
 
     if not sys.platform.startswith("win"):
         if ld_paths := os.environ.get("LD_LIBRARY_PATH", ""):
@@ -1694,12 +1876,16 @@ class _LibraryLoader:
         self._lib: Optional[ctypes.CDLL] = None
         self._lib_version: Optional[tuple] = None
         self._lib_search_paths: List[Path] = _resolve_existing_dirs(ovrtx_loader_candidate_dirs())
+        self._dll_dir_cookies: List[object] = []
 
     def _cleanup(self):
         """Cleanup function called at interpreter exit."""
         if self._lib is not None:
             try:
-                result = self._lib.ovrtx_shutdown()
+                # Private compatibility hook for the static OVRTX loader. This
+                # symbol is intentionally absent from the public C header.
+                shutdown = getattr(self._lib, "ovrtx_shutdown_process", self._lib.ovrtx_shutdown)
+                result = shutdown()
                 if result.status != OVRTX_API_SUCCESS:
                     error = self._lib.ovrtx_get_last_error()
                     error_msg = str(error) if error.ptr else "Unknown error"
@@ -1722,8 +1908,6 @@ class _LibraryLoader:
         Raises:
             RuntimeError: If library cannot be found or functions cannot be bound.
         """
-        self._check_pxr_not_available()
-
         if self._lib is None:
             lib = None  # Initialize for exception handler
             try:
@@ -1758,6 +1942,10 @@ class _LibraryLoader:
                 lib.ovrtx_shutdown.argtypes = []
                 lib.ovrtx_shutdown.restype = ovrtx_result_t
 
+                if hasattr(lib, "ovrtx_shutdown_process"):
+                    lib.ovrtx_shutdown_process.argtypes = []
+                    lib.ovrtx_shutdown_process.restype = ovrtx_result_t
+
                 lib.ovrtx_create_renderer.argtypes = [
                     ctypes.POINTER(ovrtx_config_t),
                     ctypes.POINTER(ctypes.POINTER(ovrtx_renderer_t)),
@@ -1766,6 +1954,21 @@ class _LibraryLoader:
 
                 lib.ovrtx_destroy_renderer.argtypes = [ctypes.POINTER(ovrtx_renderer_t)]
                 lib.ovrtx_destroy_renderer.restype = ovrtx_result_t
+
+                lib.ovrtx_attach_ovstage.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ovstage_instance_p,
+                ]
+                lib.ovrtx_attach_ovstage.restype = ovrtx_result_t
+
+                lib.ovrtx_detach_ovstage.argtypes = [ctypes.POINTER(ovrtx_renderer_t)]
+                lib.ovrtx_detach_ovstage.restype = ovrtx_result_t
+
+                lib.ovrtx_update_from_stage.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ovstage_ordinal_t,
+                ]
+                lib.ovrtx_update_from_stage.restype = ovrtx_enqueue_result_t
 
                 lib.ovrtx_get_last_error.argtypes = []
                 lib.ovrtx_get_last_error.restype = ovx_string_t
@@ -1850,6 +2053,15 @@ class _LibraryLoader:
                 ]
                 lib.ovrtx_step.restype = ovrtx_enqueue_result_t
 
+                lib.ovrtx_step_with_stage.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ovrtx_render_product_set_t,
+                    ctypes.c_double,
+                    ovstage_ordinal_t,
+                    ctypes.POINTER(ovrtx_step_result_handle_t),
+                ]
+                lib.ovrtx_step_with_stage.restype = ovrtx_enqueue_result_t
+
                 lib.ovrtx_enqueue_pick_query.argtypes = [
                     ctypes.POINTER(ovrtx_renderer_t),
                     ctypes.POINTER(ovrtx_pick_query_desc_t),
@@ -1863,6 +2075,38 @@ class _LibraryLoader:
                     ctypes.c_size_t,
                 ]
                 lib.ovrtx_set_selection_group_styles.restype = ovrtx_enqueue_result_t
+
+                lib.ovrtx_set_selection_outline_group.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ctypes.POINTER(_PRIMPATH),
+                    ctypes.c_size_t,
+                    ctypes.POINTER(ctypes.c_uint8),
+                ]
+                lib.ovrtx_set_selection_outline_group.restype = ovrtx_enqueue_result_t
+
+                lib.ovrtx_set_selection_outline_group_strings.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ctypes.POINTER(ovx_string_t),
+                    ctypes.c_size_t,
+                    ctypes.POINTER(ctypes.c_uint8),
+                ]
+                lib.ovrtx_set_selection_outline_group_strings.restype = ovrtx_enqueue_result_t
+
+                lib.ovrtx_set_pickable.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ctypes.POINTER(_PRIMPATH),
+                    ctypes.c_size_t,
+                    ctypes.POINTER(ctypes.c_bool),
+                ]
+                lib.ovrtx_set_pickable.restype = ovrtx_enqueue_result_t
+
+                lib.ovrtx_set_pickable_strings.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ctypes.POINTER(ovx_string_t),
+                    ctypes.c_size_t,
+                    ctypes.POINTER(ctypes.c_bool),
+                ]
+                lib.ovrtx_set_pickable_strings.restype = ovrtx_enqueue_result_t
 
                 lib.ovrtx_fetch_results.argtypes = [
                     ctypes.POINTER(ovrtx_renderer_t),
@@ -1959,7 +2203,7 @@ class _LibraryLoader:
 
                 lib.ovrtx_release_read_result.argtypes = [
                     ctypes.POINTER(ovrtx_renderer_t),
-                    ovrtx_read_map_handle_t,
+                    ovrtx_read_handle_t,
                     ovrtx_cuda_sync_t,
                 ]
                 lib.ovrtx_release_read_result.restype = ovrtx_result_t
@@ -2005,44 +2249,16 @@ class _LibraryLoader:
 
         return Bindings(self._lib, self._lib_version)
 
-    def _check_pxr_not_available(self) -> None:
-        """Reject usd-core installations whose major.minor matches ovrtx's bundled USD.
-
-        ovrtx bundles its own USD shared libraries. When an installed ``usd-core`` ships
-        libraries with the same major.minor version, USD's plugin discovery co-loads both
-        copies into the process and USD's static debug-symbol registration aborts.
-        Other usd-core versions use distinct native libraries and coexist safely.
-
-        Raises:
-            RuntimeError: If ``usd-core`` is installed with the same major.minor version as ovrtx's bundled USD.
-
-        The check is skipped entirely when ``OVRTX_SKIP_USD_CHECK=1``.
-        """
-        if os.environ.get("OVRTX_SKIP_USD_CHECK", "0") == "1":
+    def _add_dll_directories(self, lib_dir: Path) -> None:
+        """Register package DLL directories for Windows dependency resolution."""
+        if not sys.platform.startswith("win"):
             return
-
-        try:
-            import importlib.metadata
-
-            installed = importlib.metadata.version("usd-core")
-        except importlib.metadata.PackageNotFoundError:
-            return  # usd-core not installed — nothing to collide with
-
-        parts = installed.split(".")
-        if len(parts) < 2:
-            return  # unparseable version — assume safe
-        try:
-            installed_major_minor = (int(parts[0]), int(parts[1]))
-        except ValueError:
-            return  # non-integer components — assume safe
-
-        if installed_major_minor == _BUNDLED_USD_VERSION:
-            raise RuntimeError(
-                f"usd-core {installed} is installed, whose USD major.minor "
-                f"({installed_major_minor[0]}.{installed_major_minor[1]}) matches the USD version "
-                "bundled in ovrtx. Loading both in the same process aborts during USD's native "
-                "library initialization. Uninstall usd-core and install a different major.minor version."
-            )
+        for d in (lib_dir, lib_dir / "plugins"):
+            try:
+                if d.is_dir():
+                    self._dll_dir_cookies.append(os.add_dll_directory(str(d)))
+            except OSError:
+                continue
 
     def _load_library(self, extra_paths: Optional[List[Path]] = None) -> ctypes.CDLL:
         """Load the library from search paths or raise an exception."""
@@ -2065,6 +2281,7 @@ class _LibraryLoader:
                         if "OMNI_USD_PLUGINS_BASE_PATH" not in os.environ:
                             os.environ["OMNI_USD_PLUGINS_BASE_PATH"] = str(lib_path.parent)
 
+                    self._add_dll_directories(lib_path.parent)
                     lib = ctypes.CDLL(str(lib_path))
                     return lib
                 except Exception as e:
@@ -2077,6 +2294,32 @@ class _LibraryLoader:
         if last_error:
             error_msg += f"\nLast error: {last_error}"
         raise RuntimeError(error_msg)
+
+    def register_schema_paths(self) -> None:
+        """Load the loader DLL transiently and call ovrtx_register_schema_paths(NULL).
+
+        Called from ``ovrtx/__init__.py`` so that ``import ovrtx; import ovphysx``
+        publishes both subsystems' USD plugin paths to PXR_PLUGINPATH_NAME before USD's
+        plug registry is consulted. The C side is idempotent for matching effective
+        roots (see ``ovrtx.h``) and Python does not expose a custom binary-package-root
+        config key, so the eager root and the lazy ``create_bindings`` root always agree.
+
+        The loaded handle goes out of scope on return; ``create_bindings`` reloads the
+        DLL when the user actually constructs a Renderer. ``_load_library`` already
+        sets ``OMNI_USD_PLUGINS_BASE_PATH`` on Windows before the load, which the C
+        ``resolveEffectivePluginRoot`` reads as the highest-precedence root.
+        """
+        library_path_hint = [Path(OVRTX_LIBRARY_PATH_HINT)] if OVRTX_LIBRARY_PATH_HINT else None
+        lib = self._load_library(library_path_hint)
+        lib.ovrtx_register_schema_paths.argtypes = [ctypes.POINTER(ovrtx_config_t)]
+        lib.ovrtx_register_schema_paths.restype = ovrtx_result_t
+        lib.ovrtx_get_last_error.argtypes = []
+        lib.ovrtx_get_last_error.restype = ovx_string_t
+        result = lib.ovrtx_register_schema_paths(None)
+        if result.status != OVRTX_API_SUCCESS:
+            error = lib.ovrtx_get_last_error()
+            error_msg = str(error) if error.ptr else "Unknown error"
+            raise RuntimeError(f"Failed to register ovrtx USD schema/plugin paths: {error_msg}")
 
     @property
     def is_loaded(self) -> bool:

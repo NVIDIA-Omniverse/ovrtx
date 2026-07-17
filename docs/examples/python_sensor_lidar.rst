@@ -39,7 +39,7 @@ Running
 
 .. code-block:: bash
 
-   cd examples/python/sensors/lidar
+   cd examples/python/lidar
    uv run main.py
 
 Options

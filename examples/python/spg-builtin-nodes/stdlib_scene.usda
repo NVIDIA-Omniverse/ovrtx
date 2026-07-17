@@ -1,0 +1,166 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Camera "Camera"
+    {
+        float2 clippingRange = (1, 100000)
+        float focalLength = 18
+        float focusDistance = 400
+        double3 xformOp:translate = (0, 200, 700)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 1000
+        token inputs:texture:format = "latlong"
+    }
+
+    def Mesh "Floor"
+    {
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.8)] (
+            interpolation = "constant"
+        )
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        normal3f[] normals = [(0, 1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-200, 0, -200), (200, 0, -200), (200, 0, 200), (-200, 0, 200)]
+        uniform token subdivisionScheme = "none"
+    }
+
+    def Mesh "BackWall"
+    {
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.8)] (
+            interpolation = "constant"
+        )
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-200, 0, -200), (200, 0, -200), (200, 400, -200), (-200, 400, -200)]
+        uniform token subdivisionScheme = "none"
+    }
+
+    def Mesh "LeftWall"
+    {
+        color3f[] primvars:displayColor = [(0.8, 0.1, 0.1)] (
+            interpolation = "constant"
+        )
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        normal3f[] normals = [(1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-200, 0, -200), (-200, 0, 200), (-200, 400, 200), (-200, 400, -200)]
+        uniform token subdivisionScheme = "none"
+    }
+
+    def Mesh "RightWall"
+    {
+        color3f[] primvars:displayColor = [(0.1, 0.8, 0.1)] (
+            interpolation = "constant"
+        )
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        normal3f[] normals = [(-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(200, 0, -200), (200, 0, 200), (200, 400, 200), (200, 400, -200)]
+        uniform token subdivisionScheme = "none"
+    }
+
+    def Mesh "TallBox"
+    {
+        color3f[] primvars:displayColor = [(0.2, 0.2, 0.8)] (
+            interpolation = "constant"
+        )
+        float3[] extent = [(-40, 0, -40), (40, 160, 40)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 6, 2, 3, 7, 4, 5, 1, 0, 4, 0, 2, 6, 5, 7, 3, 1]
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, -1), (0, 0, -1), (0, 0, -1), (0, 0, -1), (0, 1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-40, 0, 40), (40, 0, 40), (-40, 160, 40), (40, 160, 40), (-40, 0, -40), (40, 0, -40), (-40, 160, -40), (40, 160, -40)]
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (-70, 0, -50)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Sphere "Sphere"
+    {
+        color3f[] primvars:displayColor = [(0.9, 0.8, 0.1)] (
+            interpolation = "constant"
+        )
+        double radius = 60
+        double3 xformOp:translate = (80, 60, 50)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+# Built-in SPG factory nodes need no .cu / .cu.lua: author each with
+# info:implementationSource = "id" and info:id = "spg:<plugin>/<node>". This graph
+# chains two stdlib nodes — Add brightens LdrColor by adding it to itself (saturating
+# at 255), then Scale downscales that result to half resolution. The intermediate
+# AddNode output stays internal to the chain; only the final Downscaled AOV is published.
+# [snippet:render-graph]
+def Scope "Render"
+{
+    def RenderProduct "StdlibDemo"
+    {
+        uniform int2 resolution = (1280, 720)
+        rel camera = </World/Camera>
+        rel orderedVars = [ <LdrColor>, <Downscaled> ]
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+            opaque omni:rtx:aov
+        }
+
+        def RenderVar "Downscaled"
+        {
+            uniform string sourceName = "Downscaled"
+            opaque omni:rtx:aov.connect = <../ScaleNode.outputs:Output>
+        }
+
+        def Shader "AddNode"
+        {
+            uniform token info:implementationSource = "id"
+            uniform token info:id = "spg:rtx.spg.stdlib/Add"
+
+            opaque inputs:A.connect = <../LdrColor.omni:rtx:aov>
+            opaque inputs:B.connect = <../LdrColor.omni:rtx:aov>
+            opaque outputs:Result
+        }
+
+        def Shader "ScaleNode"
+        {
+            uniform token info:implementationSource = "id"
+            uniform token info:id = "spg:rtx.spg.stdlib/Scale"
+
+            float inputs:scaleX = 0.5
+            float inputs:scaleY = 0.5
+            opaque inputs:Input.connect = <../AddNode.outputs:Result>
+            opaque outputs:Output
+        }
+    }
+}
+# [/snippet:render-graph]

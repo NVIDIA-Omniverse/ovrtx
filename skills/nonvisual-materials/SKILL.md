@@ -71,17 +71,17 @@ This skill has no scripts.
 
 ## Overview
 
-Non-visual material labels let lidar, radar, and acoustic sensors map USD materials to sensor-return behavior. The visual MDL material can stay ordinary; the sensor semantics come from custom material attributes that encode a base material, coating, and optional attributes into a material ID.
+Non-visual material labels let lidar, radar, and acoustic sensors map USD materials to sensor-return behavior. A visual shader is optional; the sensor semantics come from custom material attributes that encode a base material, coating, and optional attributes into a material ID.
 
 ## USDA Pattern
 
 ### Python example scene
 
-> **Source:** `examples/python/sensors/radar/radar_example.usda` snippet `configure-nonvisual-materials`
+> **Source:** `examples/python/radar/radar_example.usda` snippet `configure-nonvisual-materials`
 
 ### C example scene
 
-> **Source:** `examples/c/sensors/radar/radar_example.usda` snippet `configure-nonvisual-materials`
+> **Source:** `examples/c/radar/radar_example.usda` snippet `configure-nonvisual-materials`
 
 Author the labels on the `Material` prim that geometry binds with `rel material:binding`. The base material is required. Coating and attributes are optional; use `none` for unlabeled surfaces.
 

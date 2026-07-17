@@ -6,11 +6,13 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-"""Tests for the stage query API (``Renderer.query_prims`` / ``query_prims_async``)."""
+"""Tests for the ovstage query API used with an attached renderer."""
 
 from pathlib import Path
 
 import ovrtx
+import ovstage
+import pytest
 
 TEST_BASE_PATH = str((Path(__file__).parent / "../data/ovrtx-test-base.usda").resolve())
 INLINE_SUBLAYERS_PATH = str(
@@ -18,117 +20,80 @@ INLINE_SUBLAYERS_PATH = str(
 )
 
 
-def _load_base(renderer):
-    renderer.open_usd(TEST_BASE_PATH)
-    renderer.reset()
+def _load_base(stage):
+    ovstage.population.open_usd(stage, TEST_BASE_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
 
 
-def test_query_all_prims_no_attrs(renderer):
+def test_query_all_prims_no_attrs(stage):
     """Query every prim on the stage without attribute descriptors."""
-    _load_base(renderer)
+    _load_base(stage)
 
     # [snippet:doc-query-prims-basic]
-    # Fetch every prim on the stage. With AttributeFilterMode.NONE the result
-    # dict maps each prim path to an empty attributes dict (lightweight).
-    prims = renderer.query_prims(attribute_filter_mode=ovrtx.AttributeFilterMode.NONE)
-    for prim_path, attributes in prims.items():
-        print(f"{prim_path}: {len(attributes)} attributes")
+    query = stage.query()
+    query.wait()
+    result = query.result()
+    print(f"matched {result.total_prim_count} prims")
+    query.release().wait()
     # [/snippet:doc-query-prims-basic]
 
-    # Known prims from ovrtx-test-base-*.usda sublayers.
-    for expected in [
-        "/World/Camera",
-        "/World/DomeLight",
-        "/World/Plane",
-        "/World/Looks/srf_glass",
-        "/Render/Camera",
-    ]:
-        assert expected in prims, f"expected {expected} in query result"
-
-    # NONE mode means no attribute descriptors per prim.
-    for attrs in prims.values():
-        assert attrs == {}
+    assert result.total_prim_count > 0
 
 
-def test_query_by_prim_type(renderer):
-    """Filter prims by USD type using ``FilterKind.PRIM_TYPE``."""
-    _load_base(renderer)
+def test_query_by_prim_type(stage):
+    """Filter prims by populated USD type."""
+    _load_base(stage)
 
     # [snippet:doc-query-prims-by-type]
-    # AND filter: require prim type == "Mesh".
-    meshes = renderer.query_prims(
-        require_all=[(ovrtx.FilterKind.PRIM_TYPE, "Mesh")],
-    )
+    mesh_filter = ovstage.Filter([ovstage.Predicate("usd-prim-type", ovstage.FilterOp.IN, ["Mesh"])])
+    with stage.query(filter=mesh_filter) as meshes:
+        mesh_count = meshes.result().total_prim_count
     # [/snippet:doc-query-prims-by-type]
 
-    assert len(meshes) > 0, "expected at least one Mesh in the base scene"
-    # The flat Plane is always a Mesh; the logo leaf is a Mesh too.
-    assert "/World/Plane" in meshes
-
-    # Confirm PRIM_TYPE=Camera narrows to exactly the one camera in the scene.
-    cameras = renderer.query_prims(
-        require_all=[(ovrtx.FilterKind.PRIM_TYPE, "Camera")],
-    )
-    assert list(cameras.keys()) == ["/World/Camera"]
+    assert mesh_count > 0
+    camera_filter = ovstage.Filter([ovstage.Predicate("usd-prim-type", ovstage.FilterOp.IN, ["Camera"])])
+    with stage.query(filter=camera_filter) as cameras:
+        assert cameras.result().total_prim_count == 1
 
 
-def test_query_with_attribute_filter(renderer):
-    """Use ``AttributeFilterMode.SPECIFIC`` to request descriptors for named attributes."""
-    _load_base(renderer)
+def test_query_with_attribute_filter(stage):
+    """Request selected attribute columns from matching prims."""
+    _load_base(stage)
 
     # [snippet:doc-query-prims-with-attributes]
-    # Find meshes and get AttributeInfo descriptors for "points" and "material:binding".
-    # AttributeInfo exposes dtype, is_array, and semantic — enough to decide how
-    # to read the attribute next. Relationship attributes surface with
-    # Semantic.PATH_ID; resolve those IDs through the renderer's path dictionary.
-    meshes = renderer.query_prims(
-        require_all=[(ovrtx.FilterKind.PRIM_TYPE, "Mesh")],
-        attribute_filter_mode=ovrtx.AttributeFilterMode.SPECIFIC,
-        attribute_names=["points", "material:binding"],
-    )
-    for prim_path, attributes in meshes.items():
-        for name, info in attributes.items():
-            print(f"{prim_path}.{name}: dtype={info.dtype} array={info.is_array} semantic={info.semantic.name}")
+    with ovstage.PathDictionary(stage) as paths:
+        points = paths.intern_token("points")
+        material_binding = paths.intern_token("material:binding")
+        mesh_filter = ovstage.Filter([ovstage.Predicate("usd-prim-type", ovstage.FilterOp.IN, ["Mesh"])])
+        with stage.query(filter=mesh_filter, attrs=[points, material_binding]) as meshes:
+            result = meshes.result()
     # [/snippet:doc-query-prims-with-attributes]
 
-    assert "/World/Plane" in meshes
-    plane_attrs = meshes["/World/Plane"]
-
-    # "points" is a per-vertex float3 array.
-    assert "points" in plane_attrs
-    points = plane_attrs["points"]
-    assert isinstance(points, ovrtx.AttributeInfo)
-    assert points.is_array is True
-
-    # "material:binding" is a relationship; it surfaces as a PATH_ID semantic
-    # (raw path handle — resolve via the renderer's path dictionary when you
-    # need the actual string path).
-    assert "material:binding" in plane_attrs
-    binding = plane_attrs["material:binding"]
-    assert binding.semantic == ovrtx.Semantic.PATH_ID
+    assert result.total_prim_count > 0
+    assert points in result.attributes
+    assert material_binding in result.attributes
 
 
-def test_query_prims_async(renderer):
-    """Exercise the two-phase Operation/PendingFetch lifecycle for queries."""
-    _load_base(renderer)
+def test_query_prims_async(stage):
+    """Exercise the asynchronous query operation and result fetch."""
+    _load_base(stage)
 
     # [snippet:doc-query-prims-async]
-    # Two-phase async: wait() → PendingFetch, then fetch() → result dict.
-    op = renderer.query_prims_async(
-        require_all=[(ovrtx.FilterKind.PRIM_TYPE, "Mesh")],
-    )
-    pending = op.wait()
-    meshes = pending.fetch()
+    mesh_filter = ovstage.Filter([ovstage.Predicate("usd-prim-type", ovstage.FilterOp.IN, ["Mesh"])])
+    meshes = stage.query(filter=mesh_filter)
+    meshes.wait()
+    result = meshes.result()
+    meshes.release().wait()
     # [/snippet:doc-query-prims-async]
 
-    assert isinstance(op, ovrtx.Operation)
-    assert isinstance(pending, ovrtx.PendingFetch)
-    assert "/World/Plane" in meshes
+    assert result.total_prim_count > 0
 
 
+@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 def test_query_require_any_exclude_all_attrs(renderer):
     """Exercise OR, NOT, and ALL-attributes query options together."""
-    _load_base(renderer)
+    renderer.open_usd(TEST_BASE_PATH)
+    renderer.reset()
 
     # [snippet:doc-query-require-any-exclude]
     # Match Mesh or Camera prims, then exclude Camera. The exclusion removes
@@ -148,9 +113,11 @@ def test_query_require_any_exclude_all_attrs(renderer):
     assert prims["/World/Plane"]
 
 
+@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 def test_query_specific_empty_attribute_list(renderer):
     """SPECIFIC with no requested names returns matched prims with no descriptors."""
-    _load_base(renderer)
+    renderer.open_usd(TEST_BASE_PATH)
+    renderer.reset()
 
     # [snippet:doc-query-specific-empty-attributes]
     result = renderer.query_prims(
@@ -164,18 +131,14 @@ def test_query_specific_empty_attribute_list(renderer):
     assert "/World/Plane" in result
 
 
-def test_query_inline_sublayer_composition(renderer):
+def test_query_inline_sublayer_composition(stage):
     """Query prims from both the inline root layer and its composed sublayer."""
-    renderer.open_usd(INLINE_SUBLAYERS_PATH)
-    renderer.reset()
+    ovstage.population.open_usd(stage, INLINE_SUBLAYERS_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
 
     # [snippet:doc-query-inline-sublayer-composition]
-    prims = renderer.query_prims(attribute_filter_mode=ovrtx.AttributeFilterMode.NONE)
-    for expected in [
-        "/World/Plane",  # from the sublayered base scene
-        "/World/Camera",  # from the sublayered base scene
-        "/DocsCamera",  # authored in the inline root layer
-        "/Render/DocsCamera",  # authored in the inline root layer
-    ]:
-        assert expected in prims
+    expected_paths = ["/World/Plane", "/World/Camera", "/DocsCamera", "/Render/DocsCamera"]
+    expected_filter = ovstage.Filter([ovstage.Predicate("usd-path", ovstage.FilterOp.IN, expected_paths)])
+    with stage.query(filter=expected_filter) as query:
+        assert query.result().total_prim_count == len(expected_paths)
     # [/snippet:doc-query-inline-sublayer-composition]

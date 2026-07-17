@@ -108,4 +108,3 @@ Resource Cleanup
 - Unmap render-var outputs with :c:func:`ovrtx_unmap_render_var_output`.
 - Destroy attribute bindings with :c:func:`ovrtx_destroy_attribute_binding`.
 - Release operation status snapshots with :c:func:`ovrtx_release_op_status`.
-

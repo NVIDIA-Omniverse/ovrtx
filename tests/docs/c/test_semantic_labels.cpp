@@ -16,6 +16,7 @@
 #include <ovx/dlpack/dlpack.h>
 
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -129,12 +130,12 @@ static std::set<uint32_t> collect_semantic_segmentation_ids(DLTensor const& tens
 }
 // [/snippet:doc-interpret-semantic-segmentation-c]
 
-TEST(SemanticLabels, SemanticClassesAreRendered) {
-    TestConfig tc("SemanticLabels");
-    ovrtx_renderer_t* renderer = nullptr;
-    ovrtx_result_t result = ovrtx_create_renderer(&tc.config, &renderer);
-    ASSERT_API_SUCCESS(result.status);
+class SemanticLabelsTest : public DocsOvstageTestBase {
+protected:
+    DOCS_OVSTAGE_TEST_SUITE(SemanticLabelsTest)
+};
 
+TEST_F(SemanticLabelsTest, SemanticClassesAreRendered) {
     std::string const scene_path = get_docs_test_data_dir() + "/ovrtx-test-base.usda";
     std::string const semantic_labels_path =
         get_docs_test_data_dir() + "/ovrtx-test-base-semantic-labels.usda";
@@ -167,10 +168,15 @@ TEST(SemanticLabels, SemanticClassesAreRendered) {
                        "    }\n"
                        "}\n";
 
-    ovrtx_enqueue_result_t enqueue_result =
-        ovrtx_open_usd_from_string(renderer, {usda.c_str(), usda.size()});
-    ASSERT_API_SUCCESS(enqueue_result.status);
-    docs_wait_no_errors(renderer, enqueue_result.op_index);
+    ovstage_population_enqueue_result_t pr = ovstage_population_open_usd_from_string(
+        stage_,
+        {usda.c_str(), usda.size()},
+        /*ordinal=*/1,
+        /*time=*/NAN,
+        OVSTAGE_POPULATION_DOMAIN_RENDERING);
+    ASSERT_EQ(pr.status, OVSTAGE_OK) << format_ovstage_population_last_error();
+    docs_wait_ovstage_population_no_errors(stage_, pr.op_index);
+    docs_ovstage_advance_write_floor(stage_, 1);
     // [/snippet:doc-semantic-class-overrides-c]
 
     ovx_string_t render_product_path = ovx_str("/Render/SemanticCamera");
@@ -180,19 +186,22 @@ TEST(SemanticLabels, SemanticClassesAreRendered) {
 
     for (int i = 0; i < 5; ++i) {
         ovrtx_step_result_handle_t warmup_handle = 0;
-        enqueue_result = ovrtx_step(renderer, render_products, 1.0 / 60.0, &warmup_handle);
-        ASSERT_API_SUCCESS(enqueue_result.status);
-        docs_wait_no_errors(renderer, enqueue_result.op_index);
-        ovrtx_destroy_results(renderer, warmup_handle);
+        ovrtx_enqueue_result_t warmup_eq = ovrtx_step_with_stage(
+            renderer_, render_products, 1.0 / 60.0, /*ordinal=*/1, &warmup_handle);
+        ASSERT_API_SUCCESS(warmup_eq.status);
+        docs_wait_no_errors(renderer_, warmup_eq.op_index);
+        ovrtx_destroy_results(renderer_, warmup_handle);
     }
 
     ovrtx_step_result_handle_t step_handle = 0;
-    enqueue_result = ovrtx_step(renderer, render_products, 1.0 / 60.0, &step_handle);
+    ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
+        renderer_, render_products, 1.0 / 60.0, /*ordinal=*/1, &step_handle);
     ASSERT_API_SUCCESS(enqueue_result.status);
-    docs_wait_no_errors(renderer, enqueue_result.op_index);
+    docs_wait_no_errors(renderer_, enqueue_result.op_index);
 
     ovrtx_render_product_set_outputs_t outputs{};
-    result = ovrtx_fetch_results(renderer, step_handle, ovrtx_timeout_infinite, &outputs);
+    ovrtx_result_t result =
+        ovrtx_fetch_results(renderer_, step_handle, ovrtx_timeout_infinite, &outputs);
     ASSERT_API_SUCCESS(result.status);
 
     ovrtx_map_output_description_t map_desc = {};
@@ -207,11 +216,11 @@ TEST(SemanticLabels, SemanticClassesAreRendered) {
 
     ovrtx_render_var_output_t id_map_output = {};
     result = ovrtx_map_render_var_output(
-        renderer, id_map_handle, &map_desc, ovrtx_timeout_infinite, &id_map_output);
+        renderer_, id_map_handle, &map_desc, ovrtx_timeout_infinite, &id_map_output);
     ASSERT_API_SUCCESS(result.status);
     std::map<uint32_t, std::string> semantic_id_map =
         decode_semantic_id_map(*id_map_output.tensors[0].dl);
-    ovrtx_unmap_render_var_output(renderer, id_map_output.map_handle, no_sync);
+    ovrtx_unmap_render_var_output(renderer_, id_map_output.map_handle, no_sync);
 
     std::map<std::string, uint32_t> ids_by_label;
     for (auto const& [semantic_id, label] : semantic_id_map) {
@@ -224,18 +233,17 @@ TEST(SemanticLabels, SemanticClassesAreRendered) {
 
     ovrtx_render_var_output_t segmentation_output = {};
     result = ovrtx_map_render_var_output(
-        renderer, segmentation_handle, &map_desc, ovrtx_timeout_infinite, &segmentation_output);
+        renderer_, segmentation_handle, &map_desc, ovrtx_timeout_infinite, &segmentation_output);
     ASSERT_API_SUCCESS(result.status);
     DLTensor const& segmentation_tensor = *segmentation_output.tensors[0].dl;
     EXPECT_EQ(segmentation_tensor.shape[0], HEIGHT);
     EXPECT_EQ(segmentation_tensor.shape[1], WIDTH);
     std::set<uint32_t> semantic_ids_in_image =
         collect_semantic_segmentation_ids(segmentation_tensor);
-    ovrtx_unmap_render_var_output(renderer, segmentation_output.map_handle, no_sync);
+    ovrtx_unmap_render_var_output(renderer_, segmentation_output.map_handle, no_sync);
 
     EXPECT_TRUE(semantic_ids_in_image.count(logo_id));
     EXPECT_TRUE(semantic_ids_in_image.count(ground_id));
 
-    ovrtx_destroy_results(renderer, step_handle);
-    ovrtx_destroy_renderer(renderer);
+    ovrtx_destroy_results(renderer_, step_handle);
 }

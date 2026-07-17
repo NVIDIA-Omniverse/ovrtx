@@ -128,6 +128,7 @@ html_js_files = [
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
+    "ovstage": ("https://nvidia-omniverse.github.io/ovstage", None),
 }
 
 # -- Autosummary settings ----------------------------------------------------

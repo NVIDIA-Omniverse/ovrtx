@@ -8,8 +8,10 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// Tests for ovrtx_query_prims / ovrtx_fetch_query_results / ovrtx_release_query_results
-// and the path dictionary accessor ovrtx_get_path_dictionary.
+// Tests for the ovstage query API used with an attached renderer, plus
+// coverage of the deprecated ovrtx_query_prims OR/NOT/ALL semantics that
+// ovstage's single-conjunction filter cannot yet express. Mirrors
+// tests/docs/python/test_stage_query.py (mixed stage/renderer fixtures).
 
 #include <gtest/gtest.h>
 #include "helpers.h"
@@ -22,61 +24,252 @@
 #include <string>
 #include <vector>
 
-namespace {
+// ────────────────────────────────────────────────────────────────────────────
+// Ovstage-side query tests. Attached-mode; snippets show the ovstage_query /
+// fetch_query_result / release_query lifecycle.
+// ────────────────────────────────────────────────────────────────────────────
 
-// Resolve a single ovx_primpath_t into a "/A/B/C" string via the path dictionary.
-std::string resolve_primpath(path_dictionary_instance_t* pd, ovx_primpath_t p) {
-    ovx_token_t token_buf[64];
-    ovx_token_t* tokens_out = nullptr;
-    size_t num_tokens = 0;
-    size_t num_processed = 0;
-    ovx_api_result_t r = path_dictionary_get_tokens_from_paths(
-        pd, &p, 1, token_buf, 64, &tokens_out, &num_tokens, &num_processed);
-    if (r.status != OVX_API_SUCCESS || num_processed == 0) {
-        return "";
-    }
-    std::string out;
-    for (size_t i = 0; i < num_tokens; ++i) {
-        ovx_string_t s{};
-        if (path_dictionary_get_strings_from_tokens(pd, &tokens_out[i], 1, &s).status ==
-            OVX_API_SUCCESS) {
-            out += "/";
-            out.append(s.ptr, s.length);
-        }
-    }
-    return out;
+class StageQueryTest : public DocsOvstageTestBase {
+protected:
+    DOCS_OVSTAGE_TEST_SUITE(StageQueryTest)
+};
+
+TEST_F(StageQueryTest, QueryAllPrimsBasic) {
+    docs_load_base();
+    if (HasFatalFailure()) return;
+
+    // [snippet:doc-query-prims-basic-c]
+    // Issue a query with no filter — matches every populated prim on the
+    // stage. `query()` is asynchronous; the returned handle is reserved
+    // synchronously and can be used as input to reads/writes immediately.
+    ovstage_query_handle_t query_handle = OVSTAGE_INVALID_QUERY_HANDLE;
+    ovstage_enqueue_result_t eq =
+        ovstage_query(stage_, /*filter=*/nullptr, /*attrs=*/nullptr, 0, &query_handle);
+    ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, eq.op_index);
+
+    ovstage_query_result_t qr{};
+    ASSERT_EQ(ovstage_fetch_query_result(stage_, query_handle, OVSTAGE_TIMEOUT_INFINITE, &qr),
+              OVSTAGE_OK)
+        << format_ovstage_last_error();
+    printf("matched %zu prims\n", qr.total_prim_count);
+
+    // Always release the fetched result then the query handle when done —
+    // the discovered attribute list and the query itself are separate resources.
+    ovstage_release_query_result(stage_, &qr);
+    ovstage_release_query(stage_, query_handle);
+    // [/snippet:doc-query-prims-basic-c]
+
+    EXPECT_GT(qr.total_prim_count, 0u);
 }
 
-std::set<std::string> collect_paths(ovrtx_query_result_t const& qr,
-                                    path_dictionary_instance_t* pd) {
-    std::set<std::string> paths;
-    for (size_t g = 0; g < qr.group_count; ++g) {
-        ovrtx_query_prim_group_t const& group = qr.groups[g];
-        size_t num_paths = 0;
-        if (path_dictionary_get_num_paths_from_path_list(pd, group.prim_list_handle, &num_paths)
-                .status != OVX_API_SUCCESS) {
-            continue;
-        }
-        std::vector<ovx_primpath_t> prim_paths(num_paths);
-        size_t out_num = 0;
-        if (path_dictionary_get_paths_from_path_list(pd, group.prim_list_handle, 0, num_paths,
-                                                     prim_paths.data(), &out_num)
-                .status != OVX_API_SUCCESS) {
-            continue;
-        }
-        for (size_t i = 0; i < out_num; ++i) {
-            paths.insert(resolve_primpath(pd, prim_paths[i]));
-        }
-    }
-    return paths;
+TEST_F(StageQueryTest, QueryByPrimType) {
+    docs_load_base();
+    if (HasFatalFailure()) return;
+
+    // [snippet:doc-query-prims-by-type-c]
+    // Filter prims by their populated USD type (matched against the built-in
+    // usd-prim-type metadata column). ovstage's filter is a conjunction of
+    // predicates; each predicate tests one attribute against one operator +
+    // a value list.
+    ovx_string_t mesh_value = ovx_str("Mesh");
+    ovx_string_t attr_name = ovx_str("usd-prim-type");
+    ovstage_predicate_t predicate{};
+    predicate.attribute.string = attr_name;
+    predicate.op = OVSTAGE_FILTER_OP_IN;
+    predicate.values = &mesh_value;
+    predicate.value_count = 1;
+
+    ovstage_filter_t filter{};
+    filter.predicates = &predicate;
+    filter.count = 1;
+
+    ovstage_query_handle_t query_handle = OVSTAGE_INVALID_QUERY_HANDLE;
+    ovstage_enqueue_result_t eq =
+        ovstage_query(stage_, &filter, /*attrs=*/nullptr, 0, &query_handle);
+    ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, eq.op_index);
+
+    ovstage_query_result_t qr{};
+    ASSERT_EQ(ovstage_fetch_query_result(stage_, query_handle, OVSTAGE_TIMEOUT_INFINITE, &qr),
+              OVSTAGE_OK)
+        << format_ovstage_last_error();
+    // [/snippet:doc-query-prims-by-type-c]
+
+    EXPECT_GT(qr.total_prim_count, 0u) << "expected at least one Mesh prim";
+
+    std::set<std::string> paths = docs_ovstage_collect_paths(stage_, query_handle, /*ordinal=*/1);
+    EXPECT_TRUE(paths.count("/World/Plane") == 1u) << "expected /World/Plane in mesh query";
+
+    ovstage_release_query_result(stage_, &qr);
+    ovstage_release_query(stage_, query_handle);
 }
 
-} // anonymous namespace
+TEST_F(StageQueryTest, QueryHasAttribute) {
+    docs_load_base();
+    if (HasFatalFailure()) return;
 
-class StageQueryTest : public ::testing::Test {
+    // [snippet:doc-query-has-attribute-c]
+    // Match prims that expose an attribute of interest (here "points").
+    // FILTER_OP_HAS is the schema-existence test — values must be NULL.
+    ovx_string_t attr_name = ovx_str("points");
+    ovstage_predicate_t predicate{};
+    predicate.attribute.string = attr_name;
+    predicate.op = OVSTAGE_FILTER_OP_HAS;
+
+    ovstage_filter_t filter{};
+    filter.predicates = &predicate;
+    filter.count = 1;
+    // [/snippet:doc-query-has-attribute-c]
+
+    ovstage_query_handle_t query_handle = OVSTAGE_INVALID_QUERY_HANDLE;
+    ovstage_enqueue_result_t eq =
+        ovstage_query(stage_, &filter, /*attrs=*/nullptr, 0, &query_handle);
+    ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, eq.op_index);
+
+    ovstage_query_result_t qr{};
+    ASSERT_EQ(ovstage_fetch_query_result(stage_, query_handle, OVSTAGE_TIMEOUT_INFINITE, &qr),
+              OVSTAGE_OK)
+        << format_ovstage_last_error();
+
+    std::set<std::string> paths = docs_ovstage_collect_paths(stage_, query_handle, /*ordinal=*/1);
+    EXPECT_TRUE(paths.count("/World/Plane") == 1u);
+
+    ovstage_release_query_result(stage_, &qr);
+    ovstage_release_query(stage_, query_handle);
+}
+
+TEST_F(StageQueryTest, PathDictionaryResolve) {
+    docs_load_base();
+    if (HasFatalFailure()) return;
+
+    // Query the scene's Camera so we have a small, known prim list to resolve.
+    ovx_string_t camera_value = ovx_str("Camera");
+    ovx_string_t attr_name = ovx_str("usd-prim-type");
+    ovstage_predicate_t predicate{};
+    predicate.attribute.string = attr_name;
+    predicate.op = OVSTAGE_FILTER_OP_IN;
+    predicate.values = &camera_value;
+    predicate.value_count = 1;
+
+    ovstage_filter_t filter{};
+    filter.predicates = &predicate;
+    filter.count = 1;
+
+    ovstage_query_handle_t query_handle = OVSTAGE_INVALID_QUERY_HANDLE;
+    ovstage_enqueue_result_t eq =
+        ovstage_query(stage_, &filter, /*attrs=*/nullptr, 0, &query_handle);
+    ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, eq.op_index);
+
+    ovstage_query_result_t qr{};
+    ASSERT_EQ(ovstage_fetch_query_result(stage_, query_handle, OVSTAGE_TIMEOUT_INFINITE, &qr),
+              OVSTAGE_OK)
+        << format_ovstage_last_error();
+
+    // [snippet:doc-path-dictionary-resolve-c]
+    // The stage's path dictionary converts between string paths and internal
+    // handles. It is owned by ovstage and valid for the instance's lifetime —
+    // no release is required.
+    path_dictionary_instance_t* pd = ovstage_get_path_dictionary(stage_);
+    ASSERT_NE(pd, nullptr);
+
+    // 1) Enumerate the prims matched by the query. Read usd-prim-type (any
+    //    schema-known attribute every populated prim carries would work) and
+    //    pull the prim list handle off the returned group.
+    ovx_string_t attr_str = ovx_str("usd-prim-type");
+    ovx_token_t attr_read_token{};
+    ASSERT_EQ(path_dictionary_create_tokens_from_strings(pd, &attr_str, 1, &attr_read_token)
+                  .status,
+              OVX_API_SUCCESS);
+
+    ovstage_ordinal_range_t range{};
+    range.end_ordinal = 1;
+    ovstage_read_handle_t read_handle = OVSTAGE_INVALID_READ_HANDLE;
+    ovstage_enqueue_result_t reads = ovstage_read_attributes(
+        stage_, query_handle, &attr_read_token, 1, range, &read_handle);
+    ASSERT_EQ(reads.status, OVSTAGE_OK) << format_ovstage_last_error();
+    docs_wait_ovstage_no_errors(stage_, reads.op_index);
+
+    ovstage_read_group_t group{};
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+              OVSTAGE_OK);
+
+    // Pull the prim list handle from the group. Each entry is an
+    // ovx_primpath_t handle; decompose to tokens, then to strings.
+    ovx_primpath_list_t list_handle = group.prims.list;
+    size_t num_paths = 0;
+    ASSERT_EQ(path_dictionary_get_num_paths_from_path_list(pd, list_handle, &num_paths).status,
+              OVX_API_SUCCESS);
+    std::vector<ovx_primpath_t> prim_paths(num_paths);
+    size_t out_num = 0;
+    ASSERT_EQ(path_dictionary_get_paths_from_path_list(pd, list_handle, 0, num_paths,
+                                                        prim_paths.data(), &out_num)
+                  .status,
+              OVX_API_SUCCESS);
+
+    std::vector<std::string> path_strings;
+    for (size_t i = 0; i < out_num; ++i) {
+        ovx_token_t token_buf[64];
+        ovx_token_t* tokens_out = nullptr;
+        size_t num_tokens = 0;
+        size_t num_processed = 0;
+        ASSERT_EQ(path_dictionary_get_tokens_from_paths(pd, &prim_paths[i], 1, token_buf, 64,
+                                                        &tokens_out, &num_tokens, &num_processed)
+                      .status,
+                  OVX_API_SUCCESS);
+        std::string s;
+        for (size_t t = 0; t < num_tokens; ++t) {
+            ovx_string_t tok_s{};
+            ASSERT_EQ(path_dictionary_get_strings_from_tokens(pd, &tokens_out[t], 1, &tok_s).status,
+                      OVX_API_SUCCESS);
+            s += "/";
+            s.append(tok_s.ptr, tok_s.length);
+        }
+        path_strings.push_back(s);
+    }
+
+    // 2) Round-trip: rebuild a path list from the resolved strings and
+    //    verify the same count comes back.
+    std::vector<ovx_string_t> str_views(path_strings.size());
+    for (size_t i = 0; i < path_strings.size(); ++i) {
+        str_views[i] = {path_strings[i].c_str(), path_strings[i].size()};
+    }
+    ovx_primpath_list_t rebuilt{};
+    ASSERT_EQ(path_dictionary_create_path_list_from_strings(pd, str_views.data(),
+                                                             str_views.size(), &rebuilt)
+                  .status,
+              OVX_API_SUCCESS);
+    size_t rebuilt_num = 0;
+    ASSERT_EQ(path_dictionary_get_num_paths_from_path_list(pd, rebuilt, &rebuilt_num).status,
+              OVX_API_SUCCESS);
+    EXPECT_EQ(rebuilt_num, out_num);
+    ASSERT_EQ(path_dictionary_release_path_list_reference(pd, rebuilt).status, OVX_API_SUCCESS);
+
+    ovstage_release_group(stage_, &group);
+    ovstage_release_read(stage_, read_handle);
+    // [/snippet:doc-path-dictionary-resolve-c]
+
+    // The single Camera prim in the base scene is /World/Camera.
+    ASSERT_GE(path_strings.size(), 1u);
+    EXPECT_EQ(path_strings[0], "/World/Camera");
+
+    ovstage_release_query_result(stage_, &qr);
+    ovstage_release_query(stage_, query_handle);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Legacy fixture: covers ovrtx_query_prims OR / NOT / ALL semantics that
+// ovstage's single-conjunction filter cannot yet express. Mirrors the Python
+// tests that are decorated with @pytest.mark.filterwarnings for the same
+// reason. The renderer runs in standalone mode here — no ovstage attach.
+// ────────────────────────────────────────────────────────────────────────────
+
+class StageQueryLegacyTest : public ::testing::Test {
 protected:
     static void SetUpTestSuite() {
-        TestConfig tc("StageQueryTest");
+        TestConfig tc("StageQueryLegacyTest");
         ovrtx_result_t result = ovrtx_create_renderer(&tc.config, &renderer_);
         ASSERT_API_SUCCESS(result.status);
     }
@@ -88,144 +281,34 @@ protected:
         }
     }
 
-    // Reset the stage and reload ovrtx-test-base.usda.
-    static void load_base() {
-        ovrtx_op_wait_result_t wait_result;
-        ovrtx_enqueue_result_t eq;
-
-        eq = ovrtx_reset_stage(renderer_);
+    static void load_base_legacy() {
+        ovrtx_enqueue_result_t eq = ovrtx_reset_stage(renderer_);
         ASSERT_API_SUCCESS(eq.status);
-        ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-        ASSERT_NO_OP_ERRORS(wait_result);
+        docs_wait_no_errors(renderer_, eq.op_index);
 
         std::string scene = get_docs_test_data_dir() + "/ovrtx-test-base.usda";
         eq = ovrtx_open_usd_from_file(renderer_, {scene.c_str(), scene.size()});
         ASSERT_API_SUCCESS(eq.status);
-        ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-        ASSERT_NO_OP_ERRORS(wait_result);
+        docs_wait_no_errors(renderer_, eq.op_index);
 
         eq = ovrtx_reset(renderer_, 0.0);
         ASSERT_API_SUCCESS(eq.status);
-        ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-        ASSERT_NO_OP_ERRORS(wait_result);
+        docs_wait_no_errors(renderer_, eq.op_index);
     }
 
     static ovrtx_renderer_t* renderer_;
 };
 
-ovrtx_renderer_t* StageQueryTest::renderer_ = nullptr;
+ovrtx_renderer_t* StageQueryLegacyTest::renderer_ = nullptr;
 
-TEST_F(StageQueryTest, QueryAllPrimsBasic) {
-    load_base();
-
-    // [snippet:doc-query-prims-basic-c]
-    // Issue a query with no filters and no attribute reporting.
-    ovrtx_query_desc_t desc{};
-    desc.attribute_filter.mode = OVRTX_ATTRIBUTE_FILTER_NONE;
-
-    ovrtx_query_handle_t query_handle = 0;
-    ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
-    ASSERT_API_SUCCESS(eq.status);
-
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
-
-    ovrtx_query_result_t qr{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
-
-    // Each group carries a prim_list_handle that can be plugged into
-    // ovrtx_binding_desc_t::prims_list_handle for subsequent reads/writes.
-    for (size_t g = 0; g < qr.group_count; ++g) {
-        printf("group %zu: %zu prims\n", g, qr.groups[g].prim_count);
-    }
-
-    // Always release the query when done — the prim list handles are owned
-    // by this result and become invalid after release.
-    ASSERT_API_SUCCESS(ovrtx_release_query_results(renderer_, query_handle).status);
-    // [/snippet:doc-query-prims-basic-c]
-
-    EXPECT_GT(qr.total_prim_count, 0u);
-}
-
-TEST_F(StageQueryTest, QueryByPrimType) {
-    load_base();
-
-    // [snippet:doc-query-prims-by-type-c]
-    // AND filter: require prim type == "Mesh".
-    ovx_string_t mesh_type = ovx_str("Mesh");
-    ovrtx_filter_t filter{};
-    filter.kind = OVRTX_FILTER_PRIM_TYPE;
-    filter.name.string = mesh_type;
-
-    ovrtx_query_desc_t desc{};
-    desc.require_all = &filter;
-    desc.require_all_count = 1;
-    desc.attribute_filter.mode = OVRTX_ATTRIBUTE_FILTER_NONE;
-
-    ovrtx_query_handle_t query_handle = 0;
-    ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
-    ASSERT_API_SUCCESS(eq.status);
-
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
-
-    ovrtx_query_result_t qr{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
-    // [/snippet:doc-query-prims-by-type-c]
-
-    EXPECT_GT(qr.total_prim_count, 0u) << "expected at least one Mesh prim";
-
-    path_dictionary_instance_t pd{};
-    ASSERT_API_SUCCESS(ovrtx_get_path_dictionary(renderer_, &pd).status);
-    std::set<std::string> paths = collect_paths(qr, &pd);
-    EXPECT_TRUE(paths.count("/World/Plane") == 1u) << "expected /World/Plane in mesh query";
-
-    ASSERT_API_SUCCESS(ovrtx_release_query_results(renderer_, query_handle).status);
-}
-
-TEST_F(StageQueryTest, QueryHasAttribute) {
-    load_base();
-
-    // [snippet:doc-query-has-attribute-c]
-    // Match prims that expose a "points" attribute.
-    ovx_string_t points_attr = ovx_str("points");
-    ovrtx_filter_t filter{};
-    filter.kind = OVRTX_FILTER_HAS_ATTRIBUTE;
-    filter.name.string = points_attr;
-
-    ovrtx_query_desc_t desc{};
-    desc.require_all = &filter;
-    desc.require_all_count = 1;
-    desc.attribute_filter.mode = OVRTX_ATTRIBUTE_FILTER_NONE;
-    // [/snippet:doc-query-has-attribute-c]
-
-    ovrtx_query_handle_t query_handle = 0;
-    ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
-    ASSERT_API_SUCCESS(eq.status);
-
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
-
-    ovrtx_query_result_t qr{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
-
-    path_dictionary_instance_t pd{};
-    ASSERT_API_SUCCESS(ovrtx_get_path_dictionary(renderer_, &pd).status);
-    std::set<std::string> paths = collect_paths(qr, &pd);
-    EXPECT_TRUE(paths.count("/World/Plane") == 1u);
-
-    ASSERT_API_SUCCESS(ovrtx_release_query_results(renderer_, query_handle).status);
-}
-
-TEST_F(StageQueryTest, QueryRequireAnyExcludeAllAttrs) {
-    load_base();
+TEST_F(StageQueryLegacyTest, QueryRequireAnyExcludeAllAttrs) {
+    load_base_legacy();
 
     // [snippet:doc-query-require-any-exclude-c]
     // Match Mesh or Camera prims, then exclude Camera. The exclusion removes
-    // a prim that would otherwise match the OR clause.
+    // a prim that would otherwise match the OR clause. ovrtx_query_prims is
+    // deprecated in 0.4 but retained for OR / NOT / ALL-attributes queries
+    // that ovstage's conjunction-only filter cannot yet express.
     ovx_string_t mesh_type = ovx_str("Mesh");
     ovx_string_t camera_type = ovx_str("Camera");
     ovrtx_filter_t any_filters[2]{};
@@ -249,17 +332,15 @@ TEST_F(StageQueryTest, QueryRequireAnyExcludeAllAttrs) {
     ovrtx_query_handle_t query_handle = 0;
     ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
     ASSERT_API_SUCCESS(eq.status);
-
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    docs_wait_no_errors(renderer_, eq.op_index);
 
     ovrtx_query_result_t qr{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
+    ASSERT_API_SUCCESS(
+        ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
 
     path_dictionary_instance_t pd{};
     ASSERT_API_SUCCESS(ovrtx_get_path_dictionary(renderer_, &pd).status);
-    std::set<std::string> paths = collect_paths(qr, &pd);
+    std::set<std::string> paths = docs_collect_query_paths(qr, &pd);
     EXPECT_TRUE(paths.count("/World/Plane") == 1u);
     EXPECT_FALSE(paths.count("/World/Camera") == 1u);
     ASSERT_GT(qr.group_count, 0u);
@@ -268,12 +349,13 @@ TEST_F(StageQueryTest, QueryRequireAnyExcludeAllAttrs) {
     ASSERT_API_SUCCESS(ovrtx_release_query_results(renderer_, query_handle).status);
 }
 
-TEST_F(StageQueryTest, QuerySpecificEmptyAttributes) {
-    load_base();
+TEST_F(StageQueryLegacyTest, QuerySpecificEmptyAttributes) {
+    load_base_legacy();
 
     // [snippet:doc-query-specific-empty-attributes-c]
     // SPECIFIC with an empty attribute list returns matching prims without
-    // any attribute descriptors.
+    // any attribute descriptors. This attribute-filter mode has no ovstage
+    // counterpart today — ovstage's query slot takes explicit tokens.
     ovx_string_t mesh_type = ovx_str("Mesh");
     ovrtx_filter_t filter{};
     filter.kind = OVRTX_FILTER_PRIM_TYPE;
@@ -290,118 +372,19 @@ TEST_F(StageQueryTest, QuerySpecificEmptyAttributes) {
     ovrtx_query_handle_t query_handle = 0;
     ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
     ASSERT_API_SUCCESS(eq.status);
-
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
+    docs_wait_no_errors(renderer_, eq.op_index);
 
     ovrtx_query_result_t qr{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
+    ASSERT_API_SUCCESS(
+        ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
 
     path_dictionary_instance_t pd{};
     ASSERT_API_SUCCESS(ovrtx_get_path_dictionary(renderer_, &pd).status);
-    std::set<std::string> paths = collect_paths(qr, &pd);
+    std::set<std::string> paths = docs_collect_query_paths(qr, &pd);
     EXPECT_TRUE(paths.count("/World/Plane") == 1u);
     for (size_t g = 0; g < qr.group_count; ++g) {
         EXPECT_EQ(qr.groups[g].attribute_count, 0u);
     }
-
-    ASSERT_API_SUCCESS(ovrtx_release_query_results(renderer_, query_handle).status);
-}
-
-TEST_F(StageQueryTest, PathDictionaryResolve) {
-    load_base();
-
-    // Query the scene's Camera so we have a small, known prim_list_handle to resolve.
-    ovx_string_t camera_type = ovx_str("Camera");
-    ovrtx_filter_t filter{};
-    filter.kind = OVRTX_FILTER_PRIM_TYPE;
-    filter.name.string = camera_type;
-
-    ovrtx_query_desc_t desc{};
-    desc.require_all = &filter;
-    desc.require_all_count = 1;
-    desc.attribute_filter.mode = OVRTX_ATTRIBUTE_FILTER_NONE;
-
-    ovrtx_query_handle_t query_handle = 0;
-    ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
-    ASSERT_API_SUCCESS(eq.status);
-
-    ovrtx_op_wait_result_t wait_result;
-    ASSERT_API_SUCCESS(ovrtx_wait_op(renderer_, eq.op_index, ovrtx_timeout_infinite, &wait_result).status);
-    ASSERT_NO_OP_ERRORS(wait_result);
-
-    ovrtx_query_result_t qr{};
-    ASSERT_API_SUCCESS(ovrtx_fetch_query_results(renderer_, query_handle, ovrtx_timeout_infinite, &qr).status);
-    ASSERT_GE(qr.group_count, 1u);
-
-    // [snippet:doc-path-dictionary-resolve-c]
-    // The renderer's path dictionary converts between string paths and internal
-    // handles. It is valid for the lifetime of the renderer — no release is required.
-    path_dictionary_instance_t pd{};
-    ASSERT_API_SUCCESS(ovrtx_get_path_dictionary(renderer_, &pd).status);
-
-    // 1) Resolve the primpath handles in a query result's prim_list_handle to
-    //    "/A/B/C" string paths.
-    ovx_primpath_list_t handle = qr.groups[0].prim_list_handle;
-    size_t num_paths = 0;
-    ASSERT_EQ(path_dictionary_get_num_paths_from_path_list(&pd, handle, &num_paths).status,
-              OVX_API_SUCCESS);
-
-    std::vector<ovx_primpath_t> prim_paths(num_paths);
-    size_t out_num = 0;
-    ASSERT_EQ(path_dictionary_get_paths_from_path_list(&pd, handle, 0, num_paths,
-                                                       prim_paths.data(), &out_num)
-                  .status,
-              OVX_API_SUCCESS);
-
-    // A primpath decomposes into a sequence of tokens; join them with '/' to get
-    // a full stage path.
-    std::vector<std::string> path_strings;
-    for (size_t i = 0; i < out_num; ++i) {
-        ovx_token_t token_buf[64];
-        ovx_token_t* tokens_out = nullptr;
-        size_t num_tokens = 0;
-        size_t num_processed = 0;
-        ASSERT_EQ(path_dictionary_get_tokens_from_paths(&pd, &prim_paths[i], 1, token_buf, 64,
-                                                        &tokens_out, &num_tokens, &num_processed)
-                      .status,
-                  OVX_API_SUCCESS);
-        std::string s;
-        for (size_t t = 0; t < num_tokens; ++t) {
-            ovx_string_t tok_s{};
-            ASSERT_EQ(path_dictionary_get_strings_from_tokens(&pd, &tokens_out[t], 1, &tok_s)
-                          .status,
-                      OVX_API_SUCCESS);
-            s += "/";
-            s.append(tok_s.ptr, tok_s.length);
-        }
-        path_strings.push_back(s);
-    }
-
-    // 2) Round-trip: rebuild a path list from the resolved strings and verify
-    //    it holds the same number of paths.
-    std::vector<ovx_string_t> str_views(path_strings.size());
-    for (size_t i = 0; i < path_strings.size(); ++i) {
-        str_views[i] = {path_strings[i].c_str(), path_strings[i].size()};
-    }
-    ovx_primpath_list_t rebuilt{};
-    ASSERT_EQ(path_dictionary_create_path_list_from_strings(&pd, str_views.data(),
-                                                            str_views.size(), &rebuilt)
-                  .status,
-              OVX_API_SUCCESS);
-
-    size_t rebuilt_num = 0;
-    ASSERT_EQ(path_dictionary_get_num_paths_from_path_list(&pd, rebuilt, &rebuilt_num).status,
-              OVX_API_SUCCESS);
-    EXPECT_EQ(rebuilt_num, out_num);
-
-    ASSERT_EQ(path_dictionary_destroy_path_list(&pd, rebuilt).status, OVX_API_SUCCESS);
-    // [/snippet:doc-path-dictionary-resolve-c]
-
-    // The single Camera prim in the base scene is /World/Camera.
-    ASSERT_EQ(path_strings.size(), 1u);
-    EXPECT_EQ(path_strings[0], "/World/Camera");
 
     ASSERT_API_SUCCESS(ovrtx_release_query_results(renderer_, query_handle).status);
 }

@@ -13,6 +13,7 @@
 #define OVRTX_CONFIG_H
 
 #include "ovrtx_types.h"
+#include <ovx/config_tokens.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -73,6 +74,9 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_int(ovrtx_config_int64_t k
  * If not provided, the loader chooses a default based on the loader's location.
  *
  * @param path The root directory path. path.ptr must remain valid until the API call that consumes the config returns.
+ *             The path may contain the @ref OVX_CONFIG_EXECUTABLE_DIR_TOKEN token, which the loader
+ *             substitutes with the absolute directory of the running executable
+ *             (e.g. OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx/bin").
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_binary_package_root_path(ovx_string_t path)
 {
@@ -151,8 +155,7 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_enable_geometry_streaming_
 }
 
 /**
- * Build a config entry for enabling/disabling RTX Sensor Processing Graphs (experimental).
- * Known issue: do not enable SPG with content that uses MaterialX material graphs.
+ * Build a config entry for enabling/disabling RTX Sensor Processing Graphs (enabled by default).
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_enable_spg(bool enable_spg)
 {
@@ -160,18 +163,15 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_enable_spg(bool enable_spg
 }
 
 /**
- * Enable motion BVH for sensor pipelines.
+ * Configure motion BVH (ray-traced motion) behavior for sensor pipelines.
  *
- * When enabled, the renderer builds motion acceleration structures required by
- * non-visual sensor render products (lidar, radar, acoustic). Must be set before
- * the first @ref ovrtx_create_renderer call; changing the value requires recreating
- * the renderer.
- *
- * When not provided, defaults to false.
+ * @param mode One of @ref ovrtx_motion_bvh_t. Must be set before the first
+ *             @ref ovrtx_create_renderer call; changing the value requires recreating
+ *             the renderer. When not provided, defaults to @ref OVRTX_MOTION_BVH_DISABLE.
  */
-static inline ovrtx_config_entry_t ovrtx_config_entry_enable_motion_bvh(bool enable_motion_bvh)
+static inline ovrtx_config_entry_t ovrtx_config_entry_motion_bvh(ovrtx_motion_bvh_t mode)
 {
-    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_MOTION_BVH, enable_motion_bvh);
+    return ovrtx_config_entry_int(OVRTX_CONFIG_MOTION_BVH, (int64_t)mode);
 }
 
 /**

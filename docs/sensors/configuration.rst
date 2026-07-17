@@ -14,9 +14,9 @@ Sensor Configuration
 To get rendered output from a sensor in ovrtx, the USD stage must describe *what* to render and *which outputs* to produce. This is done through two USD prim types from the `UsdRender <https://openusd.org/release/api/usd_render_page_front.html>`_ schema:
 
 - **RenderProduct** -- represents a single sensor output configuration (resolution, which sensor to use, which variables to output).
-- **RenderVar** -- declares a named output variable (e.g., ``LdrColor``, ``HdrColor``) that the renderer produces for a RenderProduct.
+- **RenderVar** -- declares a named output variable (for example, ``LdrColor``, ``HdrColor``) that the renderer produces for a RenderProduct.
 
-These prims can either exist in the USD file being loaded, or be injected at runtime using ovrtx's USD composition API.
+These prims can either exist in the USD file being loaded or be injected at runtime using ovrtx's USD composition API.
 
 .. figure:: ../img/render-structure.svg
     :align: center
@@ -27,9 +27,9 @@ RenderProduct
 
 Each sensor that you want output from needs a corresponding ``RenderProduct`` prim in the stage. The RenderProduct ties together:
 
-1. A **sensor** (camera, lidar, etc.) via the ``rel camera`` relationship.
-2. One or more **output variables** via the ``rel orderedVars`` relationship, which points to ``RenderVar`` prims.
-3. Settings controlling the rendering of the sensor, such as the output image resolution for a camera, or the render mode used to render it. For camera render modes and settings, see :doc:`cameras/render_modes`.
+1. A **sensor** (camera, lidar, etc.) through the ``rel camera`` relationship.
+2. One or more **output variables** through the ``rel orderedVars`` relationship, which points to ``RenderVar`` prims.
+3. Settings controlling the rendering of the sensor, such as the output image resolution for a camera, or the render mode used to render it. For camera render modes and settings, refer to :doc:`cameras/render_modes`.
 
 Here is a minimal RenderProduct in USDA that renders ``LdrColor`` from a camera at ``/World/Camera``:
 
@@ -68,10 +68,10 @@ It is also possible to specify multiple sensors in a single RenderProduct:
 When a RenderProduct targets multiple sensors, RTX splits the output frame into
 tiles, one tile per sensor. Use this pattern when the sensors share the same
 output variables and resolution and the application wants one tiled output for
-throughput. For a complete camera example, see
+throughput. For a complete camera example, refer to
 :doc:`../examples/python_tiled_rendering`.
 
-For more information about OpenUSD Relationships, see the `Learn OpenUSD page on Relationships <https://docs.nvidia.com/learn-openusd/latest/stage-setting/properties/relationships.html>`_.
+For more information about OpenUSD Relationships, refer to the `Learn OpenUSD page on Relationships <https://docs.nvidia.com/learn-openusd/latest/stage-setting/properties/relationships.html>`_.
 
 The ``rel orderedVars`` Relationship
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -84,7 +84,7 @@ The ``rel orderedVars`` Relationship
 
 The RenderVar prims can be defined as children of the RenderProduct (as shown above), or in a shared ``Vars`` scope elsewhere in the stage.
 
-For more information about OpenUSD Relationships, see the `Learn OpenUSD page on Relationships <https://docs.nvidia.com/learn-openusd/latest/stage-setting/properties/relationships.html>`_.
+For more information about OpenUSD Relationships, refer to the `Learn OpenUSD page on Relationships <https://docs.nvidia.com/learn-openusd/latest/stage-setting/properties/relationships.html>`_.
 
 RenderVar
 ---------
@@ -97,11 +97,11 @@ A ``RenderVar`` prim declares a named output. The ``sourceName`` attribute speci
        string sourceName = "LdrColor"
    }
 
-The available source names depend on the sensor type. See :doc:`cameras/outputs` for camera sensor outputs, :doc:`lidar` for lidar point-cloud channels, and :doc:`radar` for radar point-cloud channels.
+The available source names depend on the sensor type. Refer to :doc:`cameras/outputs` for camera sensor outputs, :doc:`lidar` for lidar point-cloud channels, and :doc:`radar` for radar point-cloud channels.
 
 For sensors that produce multi-tensor outputs -- lidar and radar point clouds, for example -- the ``RenderVar`` prim also carries a ``channels`` attribute that selects which tensors the output should include. Only listed channels are produced (the sensor model auto-enables a small set like ``Counts`` and ``Flags`` regardless):
 
-.. literalinclude:: ../../examples/python/sensors/lidar/lidar_example.usda
+.. literalinclude:: ../../examples/python/lidar/lidar_example.usda
    :language: usda
    :start-after: # [snippet:configure-lidar-pointcloud-output]
    :end-before: # [/snippet:configure-lidar-pointcloud-output]
@@ -164,7 +164,7 @@ Adding RenderProducts at Runtime
 
 If the USD file you are loading does not already contain the RenderProduct and RenderVar prims, you can compose them into an inline root layer without editing the original scene.
 
-Create an inline USDA string that uses ``subLayers`` to include the original scene and authors the RenderProducts in the same root layer. Load that string with ``open_usd_from_string`` (Python) or ``ovrtx_open_usd_from_string`` (C):
+Create an inline USDA string that uses ``subLayers`` to include the original scene and authors the RenderProducts in the same root layer. Populate that string with ``ovstage.population.open_usd_from_string`` (Python) or ``ovrtx_open_usd_from_string`` (C compatibility):
 
 .. tab-set::
 
@@ -186,7 +186,7 @@ Create an inline USDA string that uses ``subLayers`` to include the original sce
 
 .. tip::
 
-   Use ``add_usd_reference`` / ``add_usd_reference_from_string`` only when you need to add removable referenced content after a root stage is already open. For documentation snippets that need one composed root stage, prefer the inline ``subLayers`` pattern shown above.
+   Use the ovstage population reference functions only when you need removable referenced content after a root stage is already open. For one composed root stage, prefer the inline ``subLayers`` pattern shown above.
 
 
 Advanced RenderProduct Controls
@@ -196,7 +196,7 @@ The sections below describe controls authored on the RenderProduct after the
 basic sensor/output wiring is in place: renderer settings, warm-up behavior, and
 per-product GPU device allow-lists. They are collected here because they affect
 how a RenderProduct produces output. For camera-mode-specific settings and
-examples, see :doc:`cameras/render_modes`.
+examples, refer to :doc:`cameras/render_modes`.
 
 Render Settings
 ^^^^^^^^^^^^^^^
@@ -211,7 +211,7 @@ After changing a render setting, call :py:meth:`~ovrtx.Renderer.reset()` (Python
 
    .. tab-item:: Python
 
-      Use :py:meth:`~ovrtx.Renderer.write_attribute()` to write the setting to the RenderProduct prim:
+      Write the setting through an ovstage query at a new ordinal:
 
       .. literalinclude:: ../../tests/docs/python/test_base.py
          :language: python
@@ -237,13 +237,13 @@ After loading a scene or changing render settings, the first few rendered frames
 - **Texture streaming** -- ovrtx streams textures on demand. Initial frames use low-resolution mip levels while higher-resolution data loads in the background.
 - **Path tracing convergence** -- The path tracer accumulates samples over successive frames. Early frames are noisy; quality improves as more samples are gathered.
 
-To get a good quality image, run warm-up frames before capturing output. 40 frames is a conservative default that handles both texture streaming and convergence for typical scenes.
+To get a good quality image, run warm-up frames before capturing output. A conservative default of 40 frames handles both texture streaming and convergence for typical scenes.
 
 You should warm up after any of the following:
 
-- Loading a scene with ``open_usd()`` / ``open_usd_from_string()`` or adding a reference with ``add_usd_reference*`` (new textures need to stream in).
+- Populating a scene or adding an ovstage USD reference (new textures need to stream in).
 - Calling ``reset()`` (accumulated path tracing samples are discarded).
-- Changing render settings that invalidate the accumulation buffer (e.g., bounce counts).
+- Changing render settings that invalidate the accumulation buffer (for example, bounce counts).
 
 .. tab-set::
 

@@ -23,6 +23,18 @@ extern "C"
     /* Path dictionary vtable for managing tokens, paths and path lists */
     typedef struct path_dictionary_vtable_t path_dictionary_vtable_t;
 
+    /*
+     * Path dictionary instance bundle.
+     *
+     * `vtable` is owned and populated by the owner subsystem (e.g. ovstage);
+     * callers MUST NOT free it.
+     *
+     * `context` is opaque implementation state. Its lifetime equals the
+     * dictionary's lifetime, which is in turn fixed by the owner's contract
+     * (see e.g. `ovstage_api.h::get_path_dictionary`). When the dictionary
+     * is destroyed, every token, prim path and outstanding path-list
+     * reference minted through it is invalidated simultaneously.
+     */
     typedef struct path_dictionary_instance_t
     {
         path_dictionary_vtable_t* vtable;

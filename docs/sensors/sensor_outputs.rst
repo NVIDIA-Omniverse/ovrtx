@@ -12,9 +12,9 @@ Sensor Outputs
 ==============
 
 This page describes how to map and read RenderVar outputs after stepping a
-RenderProduct. For authoring RenderProducts and RenderVars in USD, see
-:doc:`configuration`. For available camera outputs, see :doc:`cameras/outputs`.
-For lidar and radar PointCloud readback, see :doc:`pointclouds`.
+RenderProduct. For authoring RenderProducts and RenderVars in USD, refer to
+:doc:`configuration`. For available camera outputs, refer to :doc:`cameras/outputs`.
+For lidar and radar PointCloud readback, refer to :doc:`pointclouds`.
 
 .. _mapping-outputs:
 
@@ -107,10 +107,12 @@ Synchronization and Lifetime
   unmapping after your own CUDA work.
 - Dropping a step-result object does not invalidate live mappings; mappings have
   independent lifetime.
-- Copy data if it must outlive the mapping.
+- In Python the mapping is consumer-owned — a held view keeps the buffer valid past
+  unmap, so copying for lifetime is not required (copy only for data beyond the last
+  view). In C, copy before unmap if the data must outlive the mapping.
 
 The Vulkan interop example shows a full double-buffered C path using CUDA arrays,
-timeline semaphores, and explicit synchronization. See
+timeline semaphores, and explicit synchronization. Refer to
 :doc:`../examples/c_vulkan_interop`.
 
 Composite Output Format
@@ -145,7 +147,7 @@ container that pairs zero or more bulk *tensors* with zero or more lightweight
 Tensors
 ^^^^^^^
 
-Tensors carry the bulk data of an output. Each tensor is a named multi-dimensional array described by the widely-adopted DLPack convention, which specifies:
+Tensors carry the bulk data of an output. Each tensor is a named multi-dimensional array described by the widely adopted DLPack convention, which specifies:
 
 - A data pointer (may point to CPU or CUDA memory).
 - Shape (number of dimensions and size of each).
@@ -154,9 +156,9 @@ Tensors carry the bulk data of an output. Each tensor is a named multi-dimension
 
 DLPack is the format that NumPy, PyTorch, Warp, JAX, and CuPy use to exchange tensor data zero-copy. Receiving a DLPack tensor lets the consumer build a view in any of those libraries without copying the underlying bytes.
 
-Tensor shapes for variable-sized outputs (e.g. point clouds) encode the *maximum* extent rather than the actual count. The shape itself is in the descriptor, so it is available synchronously -- consumers read it to pre-allocate before the bulk data is ready. The actual per-frame count is delivered post-render via a separate scalar tensor (e.g. ``Counts`` for sensor point clouds).
+Tensor shapes for variable-sized outputs (for example, point clouds) encode the *maximum* extent rather than the actual count. The shape itself is in the descriptor, so it is available synchronously -- consumers read it to pre-allocate before the bulk data is ready. The actual per-frame count is delivered post-render through a separate scalar tensor (for example, ``Counts`` for sensor point clouds).
 
-A couple of DLPack conventions worth surfacing: ``strides`` are expressed in *number of elements*, not bytes; and a scalar value is represented as a one-element tensor with shape ``[1]`` (or ``[T]`` for one-per-tile).
+Two DLPack conventions worth surfacing: ``strides`` are expressed in *number of elements*, not bytes. A scalar value is represented as a one-element tensor with shape ``[1]`` (or ``[T]`` for one-per-tile).
 
 Examples of tensors within an output:
 
@@ -171,7 +173,7 @@ Examples of tensors within an output:
 
 - A camera ``HdrColor`` output:
 
-  - one image tensor -- ``[H, W, 4]`` ``float16``, CUDA, accessed as the mapping itself via DLPack.
+  - one image tensor -- ``[H, W, 4]`` ``float16``, CUDA, accessed as the mapping itself through DLPack.
 
 The set of tensors that an output type publishes is determined by the output's semantic ``type`` and documented through the ``doc`` strings (and the higher-level wrappers, when one exists).
 
@@ -182,14 +184,14 @@ Params
 
 Params carry lightweight metadata as named, typed key-value pairs. They are always CPU-resident and always available synchronously once the output is mapped.
 
-A param is structurally a DLTensor whose dtype encodes the value type and whose shape encodes scalar vs. array (``{1}`` for scalar, ``{N}`` for a vector, ``{4, 4}`` for a matrix). This keeps the descriptor uniform with the tensor list: the same DLPack consumer code works for both, and there is no separate enum-tagged value type to switch over.
+A param is structurally a DLTensor whose dtype encodes the value type and whose shape encodes scalar compared to array (``{1}`` for scalar, ``{N}`` for a vector, ``{4, 4}`` for a matrix). This keeps the descriptor uniform with the tensor list: the same DLPack consumer code works for both, and there is no separate enum-tagged value type to switch over.
 
 Examples of params (drawn from the sensor ``PointCloud`` output):
 
 - ``frameId`` (uint64) -- identifies the simulation frame.
 - ``timestampNs`` (uint64) -- simulation time in nanoseconds.
 - ``modelToAppTransform`` (float32 ``[4, 4]``) -- coordinate transform from sensor frame to application frame.
-- ``coordsType`` (uint32) -- spherical vs. cartesian coordinate encoding.
+- ``coordsType`` (uint32) -- spherical compared to cartesian coordinate encoding.
 - ``frameStartTimeStampNs`` / ``frameEndTimeStampNs`` (uint64) -- shutter open / close.
 
 Sizing information (e.g. the per-point tensor's maximum extent) is carried by the tensor's shape in the descriptor and does not need a separate param. The post-render *actual* count for a variable-sized output is carried by a tensor (e.g. ``Counts``) so that it stays on the producing stream.
@@ -212,7 +214,7 @@ USD Schema Mapping
 
 Each render variable output corresponds to one ``RenderVar`` in USD, and ``orderedVars`` on the ``RenderProduct`` selects which ones to produce. A minimal lidar product authored to emit a four-channel ``PointCloud`` looks like:
 
-.. literalinclude:: ../../examples/python/sensors/lidar/lidar_example.usda
+.. literalinclude:: ../../examples/python/lidar/lidar_example.usda
    :language: usda
    :start-after: # [snippet:configure-lidar-pointcloud-output]
    :end-before: # [/snippet:configure-lidar-pointcloud-output]

@@ -1376,7 +1376,6 @@ def "Render" (
                 float omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSample = 3199.9995
                 float omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse = 3199.9995
                 int omni:rtx:pt:maxSamplesPerLaunch = 2073600
-                int omni:rtx:pt:mgpu:maxPixelsPerRegionExponent = 12
                 bool omni:rtx:reflections:denoiser:enabled = 0
                 token omni:rtx:rendermode = "RealTimePathTracing"
                 color3f omni:rtx:rt:ambientLight:color = (0.1, 0.1, 0.1)

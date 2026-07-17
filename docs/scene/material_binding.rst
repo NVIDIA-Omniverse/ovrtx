@@ -11,7 +11,7 @@
 Material Binding
 ================
 
-Materials in USD are assigned to geometry prims via the ``material:binding`` relationship. ovrtx lets you change these bindings at runtime, so you can swap materials on prims without reloading the scene.
+Materials in USD are assigned to geometry prims through the ``material:binding`` relationship. An ovstage write can change these bindings at runtime without reloading the scene.
 
 To bind a material, write the ``material:binding`` attribute on the target geometry prim with the absolute path of the material prim as a path string.
 
@@ -26,7 +26,7 @@ Binding a Material
 
    .. tab-item:: Python
 
-      Use :py:meth:`~ovrtx.Renderer.write_array_attribute()` with the prim path, the ``material:binding`` attribute name, and the material path as a ``list[list[str]]``. The string list format is automatically detected as path/relationship data.
+      Intern the material path, then write the relationship through an ovstage query with ``AttributeSemantic.RELATIONSHIP_PATH_ID``.
 
       .. literalinclude:: ../../tests/docs/python/test_base.py
          :language: python

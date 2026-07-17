@@ -8,8 +8,16 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// Test for ovrtx_set_log_callback channel filtering (0.3.0 semantics:
-// channel_filter is a RUST_LOG-style list of channel-prefix thresholds).
+// Test for ovrtx_set_log_callback channel filtering (RUST_LOG-style
+// channel-prefix thresholds).
+//
+// The renderer runs in STANDALONE mode (no ovstage attach) so we can drive
+// ovrtx-native scene-load activity to generate reliable log traffic. The
+// ovstage population log stream flows through a separate ovstage_set_log_callback
+// bridge — the ovrtx callback under test does not capture it, so an
+// attached-mode variant would need to trigger ovrtx-side activity through
+// ovrtx_step_with_stage. ovrtx_set_log_callback itself is not deprecated;
+// only the trigger APIs (ovrtx_open_usd_from_file / ovrtx_reset_stage) are.
 
 #include <gtest/gtest.h>
 #include "helpers.h"
