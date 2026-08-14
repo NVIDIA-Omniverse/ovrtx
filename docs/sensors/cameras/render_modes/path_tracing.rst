@@ -47,7 +47,7 @@ Path Tracing
    * - ``omni:rtx:pt:samplesPerPixel``
 
        Maximum number of samples to accumulate per pixel. When this count is reached, rendering stops until a scene or setting change is detected. Set to 0 to remove this limit.
-     - ``int``
+     - ``uint``
      - ``512``
    * - ``omni:rtx:pt:samplesPerIteration``
 
@@ -62,22 +62,22 @@ Path Tracing
    * - ``omni:rtx:pt:limits:maxBounces``
 
        Maximum number of ray bounces for any ray type. Higher values give more accurate results, but worse performance.
-     - ``int``
+     - ``uint``
      - ``4``
    * - ``omni:rtx:pt:limits:maxGlossyBounces``
 
        Maximum number of ray bounces for specular and transmission.
-     - ``int``
+     - ``uint``
      - ``6``
    * - ``omni:rtx:pt:maxVolumeBounces``
 
        Maximum number of ray bounces for SSS.
-     - ``int``
+     - ``uint``
      - ``15``
    * - ``omni:rtx:pt:limits:maxFogBounces``
 
        Maximum number of bounces for volume scattering within a fog/sky volume.
-     - ``int``
+     - ``uint``
      - ``2``
    * - ``omni:rtx:pt:fractionalCutoutOpacity``
 
@@ -231,9 +231,9 @@ Non-Uniform Volumes
      - ``false``
    * - ``omni:rtx:pt:volumes:transmittanceMethod``
 
-       Choose between Biased Ray Marching or Ratio Tracking. Biased ray marching is the ideal option in all cases.
-     - ``int``
-     - ``BiasedRayMarching``
+       Choose between ``biasedRayMarching`` or ``ratioTracking``. Biased ray marching is the ideal option in all cases.
+     - ``token``
+     - ``"biasedRayMarching"``
    * - ``omni:rtx:pt:volumes:tracking:maxScatteringSteps``
 
        Maximum delta tracking steps between bounces. Increase for highly scattering volumes like clouds.
@@ -247,7 +247,7 @@ Non-Uniform Volumes
    * - ``omni:rtx:pt:limits:maxVolumeBounces``
 
        Maximum number of bounces in non-uniform volumes.
-     - ``int``
+     - ``uint``
      - ``2``
 
 Multi-GPU
@@ -333,9 +333,9 @@ Anti-Aliasing
      - Default
    * - ``omni:rtx:pt:pixelFilter:filter``
 
-       Sampling pattern used for anti-aliasing. Select from Box, Triangle, Gaussian, and Uniform.
-     - ``int``
-     - ``Triangle``
+       Sampling pattern used for anti-aliasing. Select from ``box``, ``triangle``, ``gaussian``, and ``uniform``.
+     - ``token``
+     - ``"triangle"``
    * - ``omni:rtx:pt:pixelFilter:radius``
 
        Sampling footprint radius, in pixels, when generating samples with the selected anti-aliasing pattern.

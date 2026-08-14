@@ -365,6 +365,7 @@ static void docs_wait_ovstage_no_errors(ovstage_instance_t* stage, ovstage_op_id
     ovstage_op_wait_result_t wait_result{};
     ovstage_api_status_t status =
         ovstage_wait_op(stage, op_id, OVSTAGE_TIMEOUT_INFINITE, &wait_result);
+    ovstage_release_op(stage, op_id);
     if (status != OVSTAGE_OK) {
         FAIL() << "ovstage_wait_op status=" << static_cast<int>(status) << "\n"
                << format_ovstage_last_error();
@@ -490,7 +491,10 @@ static std::set<std::string> docs_ovstage_collect_paths(
     if (eq.status != OVSTAGE_OK) return paths;
 
     ovstage_op_wait_result_t wait_result{};
-    if (ovstage_wait_op(stage, eq.op_index, OVSTAGE_TIMEOUT_INFINITE, &wait_result) != OVSTAGE_OK) {
+    ovstage_api_status_t wait_status =
+        ovstage_wait_op(stage, eq.op_index, OVSTAGE_TIMEOUT_INFINITE, &wait_result);
+    ovstage_release_op(stage, eq.op_index);
+    if (wait_status != OVSTAGE_OK) {
         return paths;
     }
     if (wait_result.error_op_id_count != 0) return paths;

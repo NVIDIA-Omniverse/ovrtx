@@ -117,6 +117,11 @@ Every `@deprecated(...)` renderer scene method in [`renderer.py`](../../python/o
 
 `Renderer.step()` and `Renderer.step_async()` are **not** deprecated. In attached mode, pass the committed ovstage ordinal. Picking, selection outlines, render-output mapping, renderer operation status, renderer waits, logging, and renderer-owned path IDs remain on `ovrtx.Renderer`.
 
+For a phased migration, `RendererConfig(suppress_deprecation_warnings=True)`
+temporarily suppresses Python and native runtime warnings. Keep migration work
+tracked: suppression does not change deprecated behavior or the API removal
+schedule, and warnings remain enabled by default.
+
 ## Instructions
 
 1. Update dependencies first. Install the ovstage 0.1 Python wheel alongside ovrtx 0.4.

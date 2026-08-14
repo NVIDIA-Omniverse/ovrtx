@@ -13,13 +13,13 @@ Getting Started in C
 
 ovrtx runtime validation requires an NVIDIA RTX-capable GPU, a supported NVIDIA driver, internet access, and execution outside sandboxed environments. The minimal example downloads scene assets from S3. Supported driver versions are listed in :doc:`../driver_requirements`.
 
-The C/C++ examples require CMake and a development environment. Install the prerequisites for your platform:
+The C/C++ examples require CMake 3.16 or newer, a C++17 compiler, and a development environment. Building the whole example set through the top-level ``examples/c/CMakeLists.txt`` needs CMake 3.18. Install the prerequisites for your platform:
 
 .. tab-set::
 
    .. tab-item:: Windows
 
-      Install `Visual Studio 2017 or newer <https://visualstudio.microsoft.com/>`_ (which provides CMake and a C++ toolchain).
+      Install `Visual Studio 2022 17.8 or newer <https://visualstudio.microsoft.com/>`_ (which provides CMake and a C++ toolchain). ovrtx binaries require the Microsoft VC runtime 14.38 or newer; VS 2022 17.8 is the oldest release that ships it. Older toolchains work only if you separately install a `VC redistributable <https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170>`_ of 14.38 or newer.
 
    .. tab-item:: Linux (Ubuntu)
 
@@ -70,22 +70,40 @@ Installation
 CMake
 ^^^^^
 
-ovrtx binary distributions can be found on the GitHub `Releases page <https://github.com/NVIDIA-Omniverse/ovrtx/releases>`__, and contain a CMake config.
-
-Alternatively, download the appropriate package for your system from the `Releases page <https://github.com/NVIDIA-Omniverse/ovrtx/releases>`__ and point
-``CMAKE_PREFIX_PATH`` to the directory where you extracted the archive and use ``find_package(ovrtx)``
-from your ``CMakeLists.txt``.
-
-For other build systems, download the appropriate package for your system from the `Releases page <https://github.com/NVIDIA-Omniverse/ovrtx/releases>`__. The headers are in the
-``include`` directory and libraries are in ``lib`` and ``bin``, in either static or dynamic flavors.
+ovrtx requires CMake 3.16 or newer; ``find_package(ovrtx)`` fails on older versions. ovrtx binary distributions can be found on the GitHub `Releases page <https://github.com/NVIDIA-Omniverse/ovrtx/releases>`__, and contain a CMake config.
 
 The simplest way to add ovrtx as a dependency to your project is using CMake FetchContent:
 
-.. literalinclude:: ../../examples/c/cmake/ovrtx.cmake
+.. filtered-literalinclude:: ../../examples/c/cmake/ovrtx.cmake
    :language: cmake
-   :lines: 27-83
+   :start-after: # [snippet:ovrtx_fetch]
+   :end-before: # [/snippet:ovrtx_fetch]
+   :omit-markers:
+   :exclude-pattern: ^\s*#\s*AUTOREMOVE:
 
 Note that the macro above is provided for convenience in ``ovrtx.cmake`` in the ``examples/c/cmake`` directory in `the repository <https://github.com/NVIDIA-Omniverse/ovrtx>`__.
+
+Alternatively, download the appropriate package for your system from the `Releases page <https://github.com/NVIDIA-Omniverse/ovrtx/releases>`__, point
+``CMAKE_PREFIX_PATH`` at the directory where you extracted the archive, and use ``find_package(ovrtx)``
+from your ``CMakeLists.txt``. The macro above already takes this path when it can: it tries
+``find_package(ovrtx QUIET)`` first and only downloads the package if that fails.
+
+For a complete worked ``CMakeLists.txt`` — package fetch, static-loader link, the release-CRT setting
+Windows needs, and the runtime setup below — copy ``examples/c/minimal/CMakeLists.txt`` from the
+examples tree. That example is built in CI, so it stays current with the packages it consumes.
+
+Calling ``ovrtx_setup_runtime()`` is required, not optional: linking succeeds without it, but the
+application will fail at runtime because it cannot locate the ``bin/`` payload described in
+`Runtime Packaging and Deployment`_. The helper reads ``OVRTX_BINARY_DIR``, which
+``find_package(ovrtx)`` sets to the package ``bin/`` directory, so you can also use that variable
+directly if you prefer to stage the runtime yourself.
+
+The setup above covers ovrtx alone. From ovrtx 0.4 onward an application normally also links
+ovstage and attaches a stage to the renderer; see :doc:`/core/ovstage_integration` for that
+combined setup.
+
+For other build systems, download the appropriate package for your system from the `Releases page <https://github.com/NVIDIA-Omniverse/ovrtx/releases>`__. The headers are in the
+``include`` directory and libraries are in ``lib`` and ``bin``, in either static or dynamic flavors.
 
 Runtime Packaging and Deployment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

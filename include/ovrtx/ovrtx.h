@@ -123,9 +123,7 @@ extern "C"
      * - Safe to call before @ref ovrtx_initialize() and before @ref ovrtx_create_renderer().
      * - Also publishes the same process environment that the ovrtx loader sets before
      *   loading ovrtx.dylib (Hydra/USD toggles, MDL search paths, MaterialX search
-     *   paths, and resolver MDL-bypass env). If dev/test settings were queued via
-     *   `OVRTX_EXTENSION_APPLY_SETTINGS`, only the path settings needed for this
-     *   lightweight USD environment are consumed here.
+     *   paths, and resolver MDL-bypass env).
      * - Idempotent for matching roots: the first call performs registration; subsequent
      *   calls with the same effective root are no-ops.
      * - **First-call wins.** Once schema/plugin paths have been registered against an
@@ -368,6 +366,9 @@ extern "C"
      * one or more target paths in the runtime stage representation.
      * The source path must exist in the stage.
      * The target paths must not already exist in the stage.
+     * Relationship targets, path values, and USD attribute connections that
+     * point inside the source subtree are rebased to each target subtree. External
+     * paths are copied unchanged.
      * @param instance Renderer instance
      * @param source_path_in_usd Path to the source path to clone
      * @param target_paths Array of target paths to clone to

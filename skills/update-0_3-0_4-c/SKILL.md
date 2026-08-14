@@ -62,7 +62,7 @@ Do **not** use this skill for:
 Resolve inputs in this order:
 
 - Target language: C or C++ (skill covers only the C API surface).
-- Dependency manager and package pin (the app's `CMakeLists.txt` / `ovrtx.cmake` or equivalent must be able to add `ovstage::ovstage`).
+- Dependency manager and package pin (the app's `CMakeLists.txt` / `ovrtx.cmake` or equivalent must be able to add `ovstage::ovstage_static`).
 - Which deprecated ovrtx entry points the app currently calls (see the mapping table below).
 - Whether the app does **one-shot** scene loading (open a USD file once, then step) or **incremental** scene edits (references, resets, attribute writes, time samples).
 - Whether the app uses picking, selection outlines, or the renderer's path dictionary — these stay on ovrtx and change independently.
@@ -71,7 +71,7 @@ Resolve inputs in this order:
 
 - Read [`../update-0_3-0_4-common/Reference.md`](../update-0_3-0_4-common/Reference.md) for language-agnostic ownership, ordering, path-dictionary, transform, exposure, and async-boundary guidance.
 - Read the `CHANGELOG.md` `[0.4.0]` section in [`../../CHANGELOG.md`](../../CHANGELOG.md) for release-level context, but if any bullet contradicts this skill or the current doxygen in `ovrtx.h`, trust the header and this skill. The definitive statements for the attach-mode update contract live at the top of the `[0.4.0]` `### Changed` block.
-- The app must be able to pull `ovstage` 0.1.x (a new dependency in 0.4). Confirm the CMake / package fetch step provides both `ovrtx::ovrtx` and `ovstage::ovstage`.
+- The app must be able to pull `ovstage` 0.1.x (a new dependency in 0.4). Confirm the CMake / package fetch step provides both `ovrtx::ovrtx_static` and `ovstage::ovstage_static`.
 - Preserve user code structure. This is an API migration, not a refactor.
 
 
@@ -130,6 +130,11 @@ From `CHANGELOG.md` `[0.4.0]`:
 
 The 0.3 deprecated entry points still compile in 0.4 — the compiler emits `OVRTX_DEPRECATED` warnings for each — but they should be replaced with the ovstage-based equivalents below.
 
+For a phased migration,
+`ovrtx_config_entry_suppress_deprecation_warnings(true)` temporarily suppresses
+native runtime warnings. It does not suppress `OVRTX_DEPRECATED` compiler
+diagnostics, change deprecated behavior, or extend the API removal schedule.
+
 
 ## Architecture
 
@@ -169,7 +174,7 @@ include(ovstage)
 ovrtx_fetch()
 ovstage_fetch()
 
-target_link_libraries(myapp PRIVATE ovrtx::ovrtx ovstage::ovstage)
+target_link_libraries(myapp PRIVATE ovrtx::ovrtx_static ovstage::ovstage_static)
 ovrtx_setup_runtime(myapp)
 ovstage_setup_runtime(myapp)
 ```
@@ -178,16 +183,13 @@ ovstage_setup_runtime(myapp)
 
 Copy `ovstage.cmake` from the examples tree — do not reduce it to "copy `ovstage.dll` next to the exe." The runtime setup is load-order sensitive.
 
-### Windows: delay-load `ovstage.dll` (required)
+### Windows: `ovstage.dll` must not load at process init
 
 Attach mode needs **one** shared `omni.fabric` / USD runtime in-process. On Windows, `ovstage.dll` statically imports `ov_25.11usd_ms.dll` and `tbb12.dll`. If the OS loads `ovstage.dll` at process init (before `ovrtx_create_renderer` has loaded the single `plugins/ov_25.11usd_ms.dll` from ovrtx's package), you get a second USD module instance → split `PlugRegistry` / `TfType` state → crashes or subtle corruption.
 
-`ovstage_setup_runtime()` in [`ovstage.cmake`](../../examples/c/cmake/ovstage.cmake) fixes this by:
+Linking `ovstage::ovstage_static` avoids this by construction: nothing imports `ovstage.dll`, so the OS cannot load it at init. The static loader calls `LoadLibrary` on the first `ovstage_*` call, which in attach mode is always **after** `ovrtx_create_renderer`. `ovstage_setup_runtime()` in [`ovstage.cmake`](../../examples/c/cmake/ovstage.cmake) only junctions the package `bin/` beside the exe as `ovstage/`, which the app passes to `ovstage_initialize()`; there is no DLL copy and no link-option surgery.
 
-1. **`/DELAYLOAD:ovstage.dll`** (+ `delayimp`) on MSVC — `ovstage.dll` loads on the first `ovstage_*` call, which in attach mode is always **after** `ovrtx_create_renderer`.
-2. Copying only **`ovstage.dll`** and **`ovstage_usd_schemas/`** (data-only schema bundle) into the exe directory — **not** ovstage's flat dependency DLLs (ovrtx's junctioned `plugins/` tree already provides the single USD closure).
-
-Non-MSVC Windows toolchains need an equivalent lazy-load strategy; see the warning in `ovstage_setup_runtime`.
+If you link the dynamic `ovstage::ovstage` instead, the import is real and must be deferred, so `ovstage_setup_runtime()` applies **`/DELAYLOAD:ovstage.dll`** (+ `delayimp`) on MSVC and copies only **`ovstage.dll`** and **`ovstage_usd_schemas/`** (data-only schema bundle) into the exe directory — **not** ovstage's flat dependency DLLs, since ovrtx's junctioned `plugins/` tree already provides the single USD closure. Non-MSVC Windows toolchains need an equivalent lazy-load strategy; see the warning in `ovstage_setup_runtime`.
 
 ### Linux runtime
 
@@ -270,7 +272,7 @@ The ported examples factor small helpers into each `main.cpp` (not a shared libr
 |---|---|---|
 | `print_ovstage_error` | — | Logs `ovstage_population_get_last_error()` then `ovstage_get_last_error()` (both parameterless) |
 | `wait_population_op` | `ovstage_population_wait_op` | USD open / reference / apply / reset population enqueues |
-| `wait_ovstage_op` | `ovstage_wait_op` | `ovstage_advance_write_floor` and other data-plane enqueues |
+| `wait_ovstage_op` | `ovstage_wait_op` + `ovstage_release_op` | `ovstage_advance_write_floor` and other data-plane enqueues — `ovstage_release_op` must always be called after `ovstage_wait_op` for every successfully enqueued op |
 | `commit_ovstage_ordinal` | `wait_ovstage_op` + `ovstage_advance_write_floor` | Seal an ordinal before `ovrtx_step_with_stage` |
 | `cleanup` lambda | detach → destroy stage → destroy renderer | Teardown ordering; detach before destroying the stage |
 
@@ -281,7 +283,7 @@ When porting `status-queries`, do not add `ovrtx_query_op_status` polling around
 
 ## Instructions
 
-1. Find version pins first. Update the app's ovrtx package pin to 0.4.x and confirm `ovstage` 0.1.x is available. Add [`ovstage.cmake`](../../examples/c/cmake/ovstage.cmake) alongside [`ovrtx.cmake`](../../examples/c/cmake/ovrtx.cmake); link `ovstage::ovstage` and call `ovstage_setup_runtime` (do not skip delay-load on Windows).
+1. Find version pins first. Update the app's ovrtx package pin to 0.4.x and confirm `ovstage` 0.1.x is available. Add [`ovstage.cmake`](../../examples/c/cmake/ovstage.cmake) alongside [`ovrtx.cmake`](../../examples/c/cmake/ovrtx.cmake); link `ovstage::ovstage_static` and call `ovstage_setup_runtime` (do not hand-roll the Windows runtime layout).
 2. Scan the app for the `OVRTX_DEPRECATED` entry points listed above. Every hit is a migration site.
 3. Introduce an `ovstage_instance_t` per renderer, create it with `ovstage_create_instance`, attach with `ovrtx_attach_ovstage` before the first step, and detach in the teardown path.
 4. Rewrite scene ingest per intent (see the mapping table): root layer replacement -> `ovstage_population_open_usd_from_*`; additive references -> `ovstage_population_add_usd_reference_from_*` + `ovstage_population_apply_usd_changes`; reset -> `ovstage_population_reset_usd` + `ovstage_population_apply_usd_changes`; time-only -> `ovstage_population_apply_usd_time`.
@@ -315,7 +317,7 @@ This skill has no scripts. Use repository search and targeted edits directly.
 - Compile error redefining `ovstage_instance_t`: the app added an explicit `<ovstage/ovstage_api/ovstage_api_types.h>` include next to `<ovrtx/ovrtx.h>`. Include only `<ovstage/ovstage.h>` alongside `<ovrtx/ovrtx.h>`.
 - Compile error on `ovx_string_t::str` / `ovx_string_t::len`: ovstage now uses the shared `ptr` / `length` spellings. Rename field accesses.
 - Compile error passing `stage` to `ovstage_get_last_error(stage)` or `ovstage_population_get_last_error(stage)`: both are **parameterless** in current 0.1.x headers.
-- Windows crash at startup or `PlugFindPluginResource` / duplicate `TfType` registration: two USD runtimes loaded — verify `/DELAYLOAD:ovstage.dll` is set, `ovstage_setup_runtime` was called, and no second `ov_25.11usd_ms.dll` was copied into the exe root from the ovstage package.
+- Windows crash at startup or `PlugFindPluginResource` / duplicate `TfType` registration: two USD runtimes loaded — verify the target links `ovstage::ovstage_static` (or, on the dynamic path, that `/DELAYLOAD:ovstage.dll` is set), that `ovstage_setup_runtime` was called, and that no second `ov_25.11usd_ms.dll` was copied into the exe root from the ovstage package.
 - Visual tearing, corruption, or undefined-behavior symptoms on the second frame onward: the app queued the next ordinal's writes and `ovstage_advance_write_floor` without first waiting on the previous `ovrtx_step_with_stage` op id. Add `ovrtx_wait_op` on the returned step op before advancing ordinals.
 - Prim paths from pick-hit tensors or ovstage queries decode as garbage strings: an ovrtx-produced ID was passed through `ovstage_get_path_dictionary(stage)` (or vice versa). Route IDs through the dictionary of the API that produced them — `ovrtx_get_path_dictionary(renderer)` for pick-hit / other ovrtx-owned IDs, `ovstage_get_path_dictionary(stage)` for ovstage query / write IDs.
 - Silent visual regressions after migration typically map to the shared migration behavior reference — check transform tensor layout, unauthored `exposure:*` attributes, or a picking/selection write routed through `ovstage_write_attribute` instead of the ovrtx helpers.

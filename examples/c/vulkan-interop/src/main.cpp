@@ -135,7 +135,8 @@ static bool parse_args(int argc,
                        std::string& camera_prim_path,
                        UpAxis& up_axis,
                        Units& units,
-                       int& num_frames);
+                       int& num_frames,
+                       bool& headless);
 static bool print_ovstage_error(ovstage_instance_t* stage,
                                 ovstage_api_status_t status,
                                 std::string_view operation);
@@ -223,6 +224,7 @@ static auto find_render_var_tensor(ovrtx_render_var_output_t const& output,
                                    std::string_view tensor_name) -> DLTensor const*;
 static auto find_render_var_param(ovrtx_render_var_output_t const& output,
                                   std::string_view param_name) -> DLTensor const*;
+static auto checksum_pixels(std::vector<uint8_t> const& pixels) -> uint64_t;
 
 // Search for color output in ovrtx results, preferring HdrColor over LdrColor
 // Returns the output handle and sets the output_type
@@ -238,6 +240,7 @@ int main(int argc, char* argv[]) {
     UpAxis up_axis;
     Units units;
     int num_frames = 0;
+    bool headless = false;
 
     if (!parse_args(argc,
                     argv,
@@ -246,8 +249,15 @@ int main(int argc, char* argv[]) {
                     camera_prim_path,
                     up_axis,
                     units,
-                    num_frames)) {
+                    num_frames,
+                    headless)) {
         return 0; // Help was shown or parse error
+    }
+
+    if (headless) {
+        if (num_frames == 0) {
+            num_frames = 100;
+        }
     }
 
     std::cerr << "USD file: " << usd_file_path << std::endl;
@@ -256,6 +266,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Up axis: " << (up_axis == UpAxis::Y ? "Y" : "Z") << std::endl;
     std::cerr << "Units: "
               << (units == Units::Meters ? "meters" : "centimeters") << std::endl;
+    std::cerr << "Mode: " << (headless ? "headless" : "windowed") << std::endl;
 
     // =========================================================================
     // Initialize ovrtx
@@ -504,29 +515,34 @@ int main(int argc, char* argv[]) {
               << tex_height << std::endl;
 
     // =========================================================================
-    // Initialize GLFW and create window
+    // Initialize GLFW and create window when running the interactive sample.
     // =========================================================================
-    if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW" << std::endl;
-        return cleanup(1);
+    if (!headless) {
+        if (!glfwInit()) {
+            std::cerr << "Failed to initialize GLFW" << std::endl;
+            return cleanup(1);
+        }
+
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+        window = glfwCreateWindow(
+            WINDOW_WIDTH, WINDOW_HEIGHT, "ovrtx-Vulkan Interop", nullptr, nullptr);
+        if (!window) {
+            std::cerr << "Failed to create window" << std::endl;
+            glfwTerminate();
+            return cleanup(1);
+        }
+
+        update_window_title(window, ovrtx_accumulation_status_t{});
+
+        glfwSetMouseButtonCallback(window, mouse_button_callback);
+        glfwSetCursorPosCallback(window, cursor_position_callback);
+        glfwSetScrollCallback(window, scroll_callback);
+    } else {
+        std::cerr << "Running without GLFW window or Vulkan swapchain"
+                  << std::endl;
     }
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-
-    window = glfwCreateWindow(
-        WINDOW_WIDTH, WINDOW_HEIGHT, "ovrtx-Vulkan Interop", nullptr, nullptr);
-    if (!window) {
-        std::cerr << "Failed to create window" << std::endl;
-        glfwTerminate();
-        return cleanup(1);
-    }
-
-    update_window_title(window, ovrtx_accumulation_status_t{});
-
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetCursorPosCallback(window, cursor_position_callback);
-    glfwSetScrollCallback(window, scroll_callback);
 
     // Create orbit camera
     // Start with a decent framing on the robot
@@ -541,12 +557,14 @@ int main(int argc, char* argv[]) {
     g_orbit_camera = &orbit_camera;
     g_camera_dirty = true;
 
+    bool readback_ok = true;
+
     // Scope for VulkanContext
     try {
         // VulkanContext chooses a Vulkan device that matches the CUDA UUID
         // above.
         VulkanContextConfig vk_config;
-        vk_config.window = window;
+        vk_config.window = headless ? nullptr : window;
         vk_config.initial_sampled_image_capacity = 16;
 
         VulkanContext vk(vk_config, cuda_uuid);
@@ -563,33 +581,45 @@ int main(int argc, char* argv[]) {
                 tex_width, tex_height, vk_format, VK_FILTER_LINEAR, true);
         }
 
-        // Load precompiled SPIR-V shaders from next to the executable
-        std::filesystem::path shader_dir = get_executable_dir() / "shaders";
-        std::string vert_path = (shader_dir / "fullscreen.vert.spv").string();
-        std::string frag_path = (shader_dir / "fullscreen.frag.spv").string();
-        std::string overlay_vert_path =
-            (shader_dir / "overlay.vert.spv").string();
-        std::string overlay_frag_path =
-            (shader_dir / "overlay.frag.spv").string();
-        std::vector<uint32_t> vert_spirv = load_spirv(vert_path);
-        std::vector<uint32_t> frag_spirv = load_spirv(frag_path);
-        std::vector<uint32_t> overlay_vert_spirv =
-            load_spirv(overlay_vert_path);
-        std::vector<uint32_t> overlay_frag_spirv =
-            load_spirv(overlay_frag_path);
+        // Load precompiled SPIR-V shaders from next to the executable. These
+        // are only needed for windowed presentation, so skip them in headless.
+        ShaderHandle vert_shader;
+        ShaderHandle frag_shader;
+        ShaderHandle overlay_vert_shader;
+        ShaderHandle overlay_frag_shader;
+        if (!headless) {
+            std::filesystem::path shader_dir = get_executable_dir() / "shaders";
+            std::string vert_path = (shader_dir / "fullscreen.vert.spv").string();
+            std::string frag_path = (shader_dir / "fullscreen.frag.spv").string();
+            std::string overlay_vert_path =
+                (shader_dir / "overlay.vert.spv").string();
+            std::string overlay_frag_path =
+                (shader_dir / "overlay.frag.spv").string();
+            std::vector<uint32_t> vert_spirv = load_spirv(vert_path);
+            std::vector<uint32_t> frag_spirv = load_spirv(frag_path);
+            std::vector<uint32_t> overlay_vert_spirv =
+                load_spirv(overlay_vert_path);
+            std::vector<uint32_t> overlay_frag_spirv =
+                load_spirv(overlay_frag_path);
 
-        std::cerr << "Loaded shaders: vertex=" << vert_spirv.size()
-                  << " words, fragment=" << frag_spirv.size()
-                  << " words, overlay_vertex=" << overlay_vert_spirv.size()
-                  << " words, overlay_fragment=" << overlay_frag_spirv.size()
-                  << " words" << std::endl;
+            std::cerr << "Loaded shaders: vertex=" << vert_spirv.size()
+                      << " words, fragment=" << frag_spirv.size()
+                      << " words, overlay_vertex=" << overlay_vert_spirv.size()
+                      << " words, overlay_fragment=" << overlay_frag_spirv.size()
+                      << " words" << std::endl;
 
-        auto [vert_shader, frag_shader] =
-            vk.create_linked_vertex_and_fragment_shaders(vert_spirv,
-                                                         frag_spirv);
-        auto [overlay_vert_shader, overlay_frag_shader] =
-            vk.create_linked_vertex_and_fragment_shaders(overlay_vert_spirv,
-                                                         overlay_frag_spirv);
+            auto fullscreen_shaders =
+                vk.create_linked_vertex_and_fragment_shaders(vert_spirv,
+                                                             frag_spirv);
+            vert_shader = fullscreen_shaders.first;
+            frag_shader = fullscreen_shaders.second;
+
+            auto overlay_shaders =
+                vk.create_linked_vertex_and_fragment_shaders(overlay_vert_spirv,
+                                                             overlay_frag_spirv);
+            overlay_vert_shader = overlay_shaders.first;
+            overlay_frag_shader = overlay_shaders.second;
+        }
 
         // CUDA writes require GENERAL layout and external queue ownership.
         for (int i = 0; i < SHARED_IMAGE_COUNT; ++i) {
@@ -764,6 +794,141 @@ int main(int argc, char* argv[]) {
             write_idx = 1;
         }
 
+        int total_frames = 1;
+        if (headless) {
+            // Headless mode drives the ovrtx->CUDA->Vulkan interop path for a
+            // fixed number of frames without a swapchain, validating the
+            // producer/consumer pipeline in automated environments.
+            std::cerr << "Running headless render loop for " << num_frames
+                      << " frames..." << std::endl;
+            while (total_frames < num_frames) {
+                enqueue_result = ovrtx_step_with_stage(renderer,
+                                                       render_products,
+                                                       1.0 / 60.0,
+                                                       stage_ordinal,
+                                                       &current_step_result);
+                if (check_and_print_error(enqueue_result, "step")) {
+                    cuda_cleanup();
+                    glfwDestroyWindow(window);
+                    glfwTerminate();
+                    return cleanup(1);
+                }
+
+                result = ovrtx_fetch_results(renderer,
+                                             current_step_result,
+                                             ovrtx_timeout_infinite,
+                                             &outputs);
+                if (check_and_print_error(result, "fetch_results")) {
+                    cuda_cleanup();
+                    glfwDestroyWindow(window);
+                    glfwTerminate();
+                    return cleanup(1);
+                }
+
+                refresh_render_feedback(
+                    window, accumulation_status, outputs, render_product_path);
+
+                OutputType frame_output_type;
+                color_output_handle =
+                    find_color_output(outputs, frame_output_type);
+                if (color_output_handle == OVRTX_INVALID_HANDLE) {
+                    std::cerr << "ERROR: could not find output from "
+                              << render_product_path << std::endl;
+                    ovrtx_destroy_results(renderer, current_step_result);
+                    cuda_cleanup();
+                    glfwDestroyWindow(window);
+                    glfwTerminate();
+                    return cleanup(2);
+                }
+
+                result = ovrtx_map_render_var_output(renderer,
+                                                   color_output_handle,
+                                                   &map_desc,
+                                                   ovrtx_timeout_infinite,
+                                                   &rendered_output);
+                if (check_and_print_error(result, "map_render_var_output")) {
+                    ovrtx_destroy_results(renderer, current_step_result);
+                    cuda_cleanup();
+                    glfwDestroyWindow(window);
+                    glfwTerminate();
+                    return cleanup(1);
+                }
+
+                current_map_handle = rendered_output.map_handle;
+                has_mapped_output = true;
+
+                CUarray cuda_array = reinterpret_cast<CUarray>(
+                    rendered_output.tensors[0].dl->data);
+                CUevent wait_event = reinterpret_cast<CUevent>(
+                    rendered_output.cuda_sync.wait_event);
+                int out_width =
+                    static_cast<int>(rendered_output.tensors[0].dl->shape[1]);
+                int out_height =
+                    static_cast<int>(rendered_output.tensors[0].dl->shape[0]);
+
+                if (wait_event) {
+                    cuda_wait_event(wait_event, cuda_stream);
+                }
+                cuda_copy_array_to_surface(write_idx,
+                                           cuda_array,
+                                           out_width,
+                                           out_height,
+                                           cuda_format,
+                                           cuda_stream);
+                cuEventRecord(cuda_copy_done_event, cuda_stream);
+                cuStreamSynchronize(cuda_stream);
+
+                ovrtx_cuda_sync_t copy_done_sync = {};
+                copy_done_sync.wait_event =
+                    reinterpret_cast<uintptr_t>(cuda_copy_done_event);
+                result = ovrtx_unmap_render_var_output(
+                    renderer, current_map_handle, copy_done_sync);
+                if (check_and_print_error(result, "unmap_render_var_output")) {
+                    ovrtx_destroy_results(renderer, current_step_result);
+                    cuda_cleanup();
+                    glfwDestroyWindow(window);
+                    glfwTerminate();
+                    return cleanup(1);
+                }
+                result = ovrtx_destroy_results(renderer, current_step_result);
+                if (check_and_print_error(result, "destroy_results")) {
+                    cuda_cleanup();
+                    glfwDestroyWindow(window);
+                    glfwTerminate();
+                    return cleanup(1);
+                }
+                has_mapped_output = false;
+
+                read_idx = write_idx;
+                write_idx = (write_idx + 1) % SHARED_IMAGE_COUNT;
+                ++total_frames;
+            }
+
+            VkImage read_image = vk.sampled_image(shared_images[read_idx]).image;
+            vk.immediate_submit([read_image, &vk](CommandBuffer cmd) {
+                cmd.image_memory_barrier(read_image,
+                                         VK_IMAGE_ASPECT_COLOR_BIT,
+                                         VK_IMAGE_LAYOUT_GENERAL,
+                                         VK_PIPELINE_STAGE_2_NONE,
+                                         VK_ACCESS_2_NONE,
+                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                         VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                         VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                                         VK_QUEUE_FAMILY_EXTERNAL,
+                                         vk.queue_family());
+                cmd.image_memory_barrier(read_image,
+                                         VK_IMAGE_ASPECT_COLOR_BIT,
+                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                         VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                         VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                                         VK_IMAGE_LAYOUT_GENERAL,
+                                         VK_PIPELINE_STAGE_2_NONE,
+                                         VK_ACCESS_2_NONE,
+                                         vk.queue_family(),
+                                         VK_QUEUE_FAMILY_EXTERNAL);
+            });
+        }
+
         // Timing accumulators
         double accumulated_cpu_ms = 0.0;
         double accumulated_vulkan_ms = 0.0;
@@ -786,13 +951,20 @@ int main(int argc, char* argv[]) {
             all_cuda_times_ms.reserve(num_frames);
         }
 
-        std::cerr << "Starting render loop..." << std::endl;
-        if (num_frames > 0) {
+        if (headless) {
+            std::cerr << "Headless validation rendered " << total_frames
+                      << " frames" << std::endl;
+        } else {
+            std::cerr << "Starting render loop..." << std::endl;
+        }
+        if (num_frames > 0 && !headless) {
             std::cerr << "Will render " << num_frames
                       << " frames then save out.png and exit" << std::endl;
         }
 
-        int total_frames = 0;
+        if (!headless) {
+            total_frames = 0;
+        }
 
         // Persisted viewport selection; the outline follows the latest pick.
         std::vector<ovx_primpath_t> selected_prim_path_ids;
@@ -805,7 +977,7 @@ int main(int argc, char* argv[]) {
         // 2) observe CUDA completion and swap read/write roles
         // 3) enqueue next ovrtx->CUDA copy if CUDA is idle
         // 4) render/present last completed buffer in Vulkan
-        while (!glfwWindowShouldClose(window)) {
+        while (!headless && !glfwWindowShouldClose(window)) {
             glfwPollEvents();
 
             auto size = vk.framebuffer_size();
@@ -1177,14 +1349,15 @@ int main(int argc, char* argv[]) {
         vk.wait_for_fence();
 
         // Print frame time statistics if --num-frames was specified
-        if (num_frames > 0) {
+        if (num_frames > 0 && !headless) {
             print_frame_time_stats(total_frames,
                                    all_cpu_times_ms,
                                    all_vulkan_times_ms,
                                    all_cuda_times_ms);
         }
 
-        // Save last rendered frame to PNG if --num-frames was specified
+        // Save last rendered frame to PNG if --num-frames was specified. In
+        // headless mode this doubles as interop validation via a checksum.
         if (num_frames > 0) {
             std::cerr << "Reading back frame from buffer " << read_idx
                       << "..." << std::endl;
@@ -1195,18 +1368,29 @@ int main(int argc, char* argv[]) {
                                         (output_type == OutputType::HdrColor)
                                             ? CudaImageFormat::Half4
                                             : CudaImageFormat::UInt8_4);
+            uint64_t const checksum = checksum_pixels(pixels);
+            std::cerr << "Readback checksum: " << checksum << std::endl;
+            if (pixels.empty() || checksum == 0) {
+                std::cerr << "Readback validation failed" << std::endl;
+                readback_ok = false;
+            }
 
-            int ok = stbi_write_png("out.png",
-                                    tex_width,
-                                    tex_height,
-                                    4,
-                                    pixels.data(),
-                                    tex_width * 4);
-            if (ok) {
-                std::cerr << "Saved out.png (" << tex_width << "x" << tex_height
-                          << ")" << std::endl;
+            if (!pixels.empty()) {
+                int ok = stbi_write_png("out.png",
+                                        tex_width,
+                                        tex_height,
+                                        4,
+                                        pixels.data(),
+                                        tex_width * 4);
+                if (ok) {
+                    std::cerr << "Saved out.png (" << tex_width << "x"
+                              << tex_height << ")" << std::endl;
+                } else {
+                    std::cerr << "Failed to write out.png" << std::endl;
+                    readback_ok = false;
+                }
             } else {
-                std::cerr << "Failed to write out.png" << std::endl;
+                readback_ok = false;
             }
         }
 
@@ -1231,6 +1415,10 @@ int main(int argc, char* argv[]) {
     int cleanup_result = cleanup(0);
     if (cleanup_result != 0) {
         return cleanup_result;
+    }
+
+    if (!readback_ok) {
+        return 1;
     }
 
     std::cerr << "Done!" << std::endl;
@@ -1370,6 +1558,7 @@ static bool wait_ovstage_op(ovstage_instance_t* stage,
                                                   enqueue_result.op_index,
                                                   OVSTAGE_TIMEOUT_INFINITE,
                                                   &wait_result);
+    ovstage_release_op(stage, enqueue_result.op_index);
     if (status != OVSTAGE_OK) {
         return print_ovstage_error(stage, status, operation);
     }
@@ -1582,6 +1771,9 @@ static void print_usage(char const* program_name) {
     std::cerr
         << "  --num-frames, -n <N>      Render N frames then save out.png "
            "and exit" << std::endl;
+    std::cerr
+        << "  --headless, --no-window   Run Vulkan/CUDA interop validation "
+           "without GLFW" << std::endl;
     std::cerr << "  --camera, -c <path>       Orbit camera prim (default: "
               << DEFAULT_CAMERA_PRIM_PATH << ")" << std::endl;
     std::cerr << "  --help, -h                Show this help message" << std::endl;
@@ -1594,7 +1786,8 @@ static bool parse_args(int argc,
                        std::string& camera_prim_path,
                        UpAxis& up_axis,
                        Units& units,
-                       int& num_frames) {
+                       int& num_frames,
+                       bool& headless) {
     // Set defaults
     usd_file = DEFAULT_USD_FILE_URL;
     render_product = DEFAULT_RENDER_PRODUCT_PATH;
@@ -1602,6 +1795,7 @@ static bool parse_args(int argc,
     up_axis = DEFAULT_UP_AXIS;
     units = DEFAULT_SCENE_UNITS;
     num_frames = 0;
+    headless = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -1672,6 +1866,8 @@ static bool parse_args(int argc,
                 std::cerr << "Error: --num-frames must be a positive integer" << std::endl;
                 return false;
             }
+        } else if (arg == "--headless" || arg == "--no-window") {
+            headless = true;
         } else {
             std::cerr << "Error: unknown option '" << arg << "'" << std::endl;
             print_usage(argv[0]);
@@ -1710,6 +1906,14 @@ static auto cuda_format_for_output(OutputType type) -> CudaImageFormat {
 
 static auto output_type_name(OutputType type) -> char const* {
     return (type == OutputType::HdrColor) ? "HdrColor" : "LdrColor";
+}
+
+static auto checksum_pixels(std::vector<uint8_t> const& pixels) -> uint64_t {
+    uint64_t checksum = 0;
+    for (size_t i = 0; i < pixels.size(); ++i) {
+        checksum += static_cast<uint64_t>(i + 1) * pixels[i];
+    }
+    return checksum;
 }
 
 // Keep perf reporting separate from the render loop so timing collection logic

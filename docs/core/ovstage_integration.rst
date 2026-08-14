@@ -35,9 +35,9 @@ modes:
   still available, but its scene population, query, and attribute APIs are
   deprecated in 0.4 as scene ownership transitions entirely to ovstage in a
   future release.
-- **Attached** — ovrtx borrows or replicates scene state from an external
-  ovstage instance. The application creates and drives the ovstage instance;
-  ovrtx reads from it.
+- **Attached** — ovrtx renders scene state from an external ovstage instance.
+  The application creates and drives the ovstage instance; ovrtx reads from
+  it.
 
 Responsibility Split
 --------------------
@@ -62,52 +62,40 @@ Responsibility Split
 The Attached Update Loop
 ------------------------
 
-After mutating ovstage, wait for the operation and advance its write floor.
-The ordinal passed to ovrtx is a committed-publication gate: rendering may
-observe that publication or a later one. In C, call
-:c:func:`ovrtx_update_from_stage` before :c:func:`ovrtx_step_with_stage`. The
-high-level Python :meth:`ovrtx.Renderer.step` method performs both operations:
+After mutating ovstage, advance its write floor and wait for that publication
+to complete. The write-floor operation is ordered after the mutations it
+publishes. The ordinal passed to ovrtx is a committed-publication gate:
+rendering may observe that publication or a later one.
+
+In C, enqueue :c:func:`ovrtx_update_from_stage` followed by
+:c:func:`ovrtx_step_with_stage`. The two operations are stream-ordered, so no
+wait is needed between them. The high-level Python
+:meth:`ovrtx.Renderer.step` method performs the update, waits for the step, and
+fetches its results:
 
 .. tab-set::
 
    .. tab-item:: C
 
-      .. code-block:: c
-
-         /* 1. Advance simulation in ovstage at ordinal N. */
-         ovstage_write_attribute(stage, &desc, ordinal_n, ...);
-         ovstage_clone(stage, src, targets, num_targets, ordinal_n, ...);
-
-         /* 2. Pull that committed state into the renderer's Fabric. */
-         ovrtx_enqueue_result_t update_op = ovrtx_update_from_stage(renderer, ordinal_n);
-         ovrtx_op_wait_result_t update_wait;
-         ovrtx_wait_op(renderer, update_op.op_index, OVRTX_TIMEOUT_INFINITE, &update_wait);
-
-         /* 3. Render. */
-         ovrtx_step_result_handle_t step_result;
-         ovrtx_step_with_stage(renderer, products, delta_t, ordinal_n, &step_result);
+      .. filtered-literalinclude:: ../../tests/docs/c/test_stage_mutation.cpp
+         :language: cpp
+         :start-after: // [snippet:doc-attached-update-loop-c]
+         :end-before: // [/snippet:doc-attached-update-loop-c]
+         :exclude-pattern: ^\s*ASSERT_
+         :dedent:
 
    .. tab-item:: Python
 
-      .. code-block:: python
-
-         # 1. Advance simulation in ovstage at ordinal N.
-         stage.write_attribute(
-             query, attribute, ordinal=ordinal_n, tensors=values, is_array=False
-         ).wait()
-         stage.clone(src, targets, ordinal=ordinal_n)
-         stage.advance_write_floor(ordinal_n).wait()
-
-         # 2. Update from the committed publication and render.
-         outputs = renderer.step(products, delta_t, ordinal=ordinal_n)
+      .. literalinclude:: ../../tests/docs/python/test_stage_mutation.py
+         :language: python
+         :start-after: # [snippet:doc-attached-update-loop-python]
+         :end-before: # [/snippet:doc-attached-update-loop-python]
+         :dedent:
 
 A per-attribute write-floor gate in ovstage makes repeated calls to
 :c:func:`ovrtx_update_from_stage` at the same ordinal a fast no-op: if no
 attribute has a new write at or after the current floor, the update returns
 immediately without touching Fabric.
-
-The update applies committed population changes while retaining shared
-attribute storage. Python performs this update automatically before stepping.
 
 Ordinals and Write-Floor Gates
 -------------------------------

@@ -51,7 +51,7 @@ Settings
    * - ``omni:rtx:minimal:constantColor``
 
        The color to use in Constant Diffuse shading mode.
-     - ``float3``
+     - ``color3f``
      -
    * - ``omni:rtx:minimal:castShadows``
 
@@ -61,7 +61,7 @@ Settings
    * - ``omni:rtx:rt:ambientLight:color``
 
        Color of the global ambient environment lighting.
-     - ``float3``
+     - ``color3f``
      -
    * - ``omni:rtx:rt:ambientLight:intensity``
 

@@ -409,7 +409,7 @@ class Renderer:
     def attach_ovstage(self, stage: Any) -> None:
         """Attach an externally owned ``ovstage.Stage`` to this renderer.
 
-        The renderer borrows the Stage's native instance and retains the Python
+        The renderer uses the Stage's native instance and retains the Python
         object until detach or renderer destruction. Do not explicitly destroy
         the Stage while it is attached.
 
@@ -459,20 +459,14 @@ class Renderer:
     def update_from_stage(self, ordinal: int) -> None:
         """Update from the attached ovstage through at least ``ordinal``.
 
-        In BORROW mode this synchronizes the renderer's scene state with committed
-        population changes while attribute values remain shared with ovstage. In
-        REPLICATE mode it copies committed Stage data into the renderer-owned stage.
-        Normal calls to :meth:`step` perform this update automatically in both modes.
+        Normal calls to :meth:`step` perform this update automatically.
         """
         self.update_from_stage_async(ordinal).wait()
 
     def update_from_stage_async(self, ordinal: int) -> Operation[bool]:
         """Enqueue an update from the attached ovstage through at least ``ordinal``.
 
-        BORROW synchronizes the renderer's scene state with committed population
-        changes without copying shared attribute values. REPLICATE copies committed
-        Stage data into the renderer-owned stage. :meth:`step_async` performs this
-        update automatically in both modes.
+        :meth:`step_async` performs this update automatically.
 
         Args:
             ordinal: Minimum committed ovstage publication to update through.
@@ -963,9 +957,8 @@ class Renderer:
         Equivalent to ``step_async(...).wait().fetch()`` with infinite
         timeouts for both the operation wait and the result fetch.
 
-        When an ovstage is attached, the step first synchronizes the renderer with
-        committed Stage changes through ``ordinal``. BORROW keeps attribute values
-        shared; REPLICATE copies committed data into the renderer-owned stage.
+        When an ovstage is attached, the step first updates the renderer from
+        committed Stage changes through ``ordinal``.
 
         Args:
             render_products: Set of render product paths to step.
@@ -999,9 +992,8 @@ class Renderer:
         ``.wait()`` to get a :class:`PendingFetch`, then ``.fetch()``
         to retrieve the :class:`RenderProductSetOutputs`.
 
-        When an ovstage is attached, the step first enqueues synchronization with
-        committed Stage changes through ``ordinal``. BORROW keeps attribute values
-        shared; REPLICATE copies committed data into the renderer-owned stage.
+        When an ovstage is attached, the step first enqueues an update from
+        committed Stage changes through ``ordinal``.
 
         Args:
             render_products: Set of render product paths to step.
@@ -2254,6 +2246,7 @@ class Renderer:
             "read_gpu_transforms": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.READ_GPU_TRANSFORMS),
             "keep_system_alive": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.KEEP_SYSTEM_ALIVE),
             "active_cuda_gpus": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.ACTIVE_CUDA_GPUS),
+            "datastore_cache": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.DATASTORE_CACHE),
             "use_vulkan": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.USE_VULKAN),
             "selection_outline_enabled": (
                 bindings.ovrtx_config_entry_bool,
@@ -2267,6 +2260,10 @@ class Renderer:
                 bindings.ovrtx_config_entry_int,
                 bindings.ConfigInt64Key.SELECTION_FILL_MODE,
             ),
+            "dome_baking_resolution": (
+                bindings.ovrtx_config_entry_int,
+                bindings.ConfigInt64Key.DOME_BAKING_RESOLUTION,
+            ),
             "enable_geometry_streaming": (
                 bindings.ovrtx_config_entry_bool,
                 bindings.ConfigBoolKey.ENABLE_GEOMETRY_STREAMING,
@@ -2276,7 +2273,15 @@ class Renderer:
                 bindings.ConfigBoolKey.ENABLE_GEOMETRY_STREAMING_LOD,
             ),
             "enable_spg": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.ENABLE_SPG),
+            "suppress_deprecation_warnings": (
+                bindings.ovrtx_config_entry_bool,
+                bindings.ConfigBoolKey.SUPPRESS_DEPRECATION_WARNINGS,
+            ),
             "motion_bvh": (bindings.ovrtx_config_entry_int, bindings.ConfigInt64Key.MOTION_BVH),
+            "texture_streaming_mode": (
+                bindings.ovrtx_config_entry_int,
+                bindings.ConfigInt64Key.TEXTURE_STREAMING_MODE,
+            ),
             "_attach_mode": (bindings.ovrtx_config_entry_int, bindings.ConfigInt64Key._ATTACH_MODE),
         }
 
@@ -2286,6 +2291,8 @@ class Renderer:
             if value is not None:
                 if field_name == "motion_bvh":
                     value = int(Renderer._normalize_motion_bvh(value))
+                elif field_name == "texture_streaming_mode":
+                    value = int(Renderer._normalize_texture_streaming_mode(value))
                 elif field_name == "_attach_mode":
                     value = int(Renderer._normalize_attach_mode(value))
                 entries.append(factory(key, value))
@@ -2306,6 +2313,25 @@ class Renderer:
                 return bindings.MotionBvh(int(normalized))
         raise ValueError(
             f"Invalid motion_bvh value {value!r}; expected MotionBvh, int 0..2, or 'disable'/'enable'/'auto'"
+        )
+
+    @staticmethod
+    def _normalize_texture_streaming_mode(
+        value: bindings.TextureStreamingMode | int | str,
+    ) -> bindings.TextureStreamingMode:
+        if isinstance(value, bindings.TextureStreamingMode):
+            return value
+        if isinstance(value, int):
+            return bindings.TextureStreamingMode(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            try:
+                return bindings.TextureStreamingMode[normalized.upper()]
+            except KeyError:
+                return bindings.TextureStreamingMode(int(normalized))
+        raise ValueError(
+            f"Invalid texture_streaming_mode value {value!r}; expected TextureStreamingMode, int 0..2, "
+            "or 'disable'/'synchronous'/'asynchronous'"
         )
 
     @staticmethod

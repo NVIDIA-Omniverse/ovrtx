@@ -99,7 +99,7 @@ Use this table to answer "how do I read USD type X?" Ovstage uses `stage.read_at
 | `extent`, `_worldExtent` | `np.float64`, shape `(N, 6)` | `{kDLFloat, 64, 6}` | `extent` is local-space; `_worldExtent` is world-space. |
 | `string` | `uint8` byte array, decode as UTF-8 | `{kDLUInt, 8, 1}` with `is_array=true` | Scalar USD strings are represented as byte arrays. This is not `string[]`; string arrays are not supported. Use `token[]` for string-like arrays. |
 | `token` / `token[]` | raw `uint64` token IDs | `{kDLUInt, 64, 1}` | Resolve token IDs with `ovstage.PathDictionary.token_to_string()`. |
-| `asset` | UTF-8 `uint8` byte rows with `AttributeSemantic.ASSET_STRING` | `{kDLUInt, 64, 2}` | Deprecated C compatibility reads represent scalar assets as token pairs. |
+| `asset` | raw `uint64` token pairs, one `{authored, resolved}` pair per prim | `{kDLUInt, 64, 2}` | Transitional (ovstage 0.1.x, RENDERING population domain): a populated scalar asset reads back as two token IDs per prim — the authored path token and the resolved path token (`0` when unresolved) — with attribute semantic `NONE`. Resolve tokens with `ovstage.PathDictionary.token_to_string()`. Planned to become UTF-8 `ASSET_STRING` byte rows in a future minor release. Deprecated C compatibility reads use the same token-pair layout. |
 | `relationship` | raw `uint64` path IDs | path IDs / path-list semantics | Resolve path IDs with `ovstage.PathDictionary.path_to_string()`. Use relationship-specific skills for schema-specific behavior. |
 | `timecode` / `timecode[]` | unsupported | unsupported | |
 
@@ -191,11 +191,11 @@ C raw snippets:
 | token | `doc-read-usd-token-c` |
 | token array | `doc-read-usd-token-array-c` |
 | string bytes | `doc-read-usd-string-c` |
-| scalar asset byte row (SKIPPED — known ovstage gap) | `doc-read-usd-asset-c` |
+| scalar asset token pair | `doc-read-usd-asset-c` |
 
 The snippets listed in this table live in `tests/docs/c/test_all_attributes.cpp`.
 
-C token and asset snippets include path-dictionary resolution because the C API exposes `ovstage_get_path_dictionary()`. The asset read snippet is currently under `GTEST_SKIP` — `ovstage_read_attributes` on a scalar `asset` returns END_OF_ITERATION with no rows even though the HAS query finds the attribute populated. **This is a known issue tracked internally**; treat the `doc-read-usd-asset-c` and `doc-write-usd-asset-c` snippets as *provisional / not runtime-validated* until it is resolved.
+C token and asset snippets include path-dictionary resolution because the C API exposes `ovstage_get_path_dictionary()`. As of ovstage 0.1.1, reading a scalar `asset` populated through the RENDERING domain returns one fixed `{kDLUInt, 64, 2}` element per prim carrying the `{authored-path token, resolved-path token}` pair (resolved token `0` when unresolved), with attribute semantic `NONE`; decode tokens via `path_dictionary_get_strings_from_tokens()` — the `doc-read-usd-asset-c` snippet demonstrates exactly this and is runtime-validated. This representation is **transitional** and planned to become UTF-8 `ASSET_STRING` byte rows in a future minor release — do not build long-lived tooling against the token-pair layout without tracking that change. (On ovstage 0.1.0, single-prim scalar-asset reads returned END_OF_ITERATION with no rows; multi-prim reads already returned token pairs.)
 
 ### Local and world-space extents in C
 

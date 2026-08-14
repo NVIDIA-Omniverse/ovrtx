@@ -52,6 +52,56 @@ protected:
     }
 };
 
+TEST_F(StageMutationTest, AttachedUpdateLoop) {
+    docs_load_base();
+    if (HasFatalFailure()) return;
+
+    constexpr ovstage_ordinal_t ordinal = 2;
+    ovx_string_t source = ovx_str("/World/Plane");
+    ovx_string_t target = ovx_str("/World/PlaneClone");
+    ovx_string_t render_product = ovx_str("/Render/Camera");
+    ovrtx_render_product_set_t products{};
+    products.render_products = &render_product;
+    products.num_render_products = 1;
+
+    // [snippet:doc-attached-update-loop-c]
+    ovstage_enqueue_result_t mutation =
+        ovstage_clone(stage_, source, &target, 1, ordinal);
+    ASSERT_EQ(mutation.status, OVSTAGE_OK);
+
+    ovstage_write_floor_desc_t floor{
+        ordinal, OVSTAGE_SCOPE_ALL, nullptr, 0};
+    ovstage_enqueue_result_t floor_op =
+        ovstage_advance_write_floor(stage_, &floor);
+    ASSERT_EQ(floor_op.status, OVSTAGE_OK);
+
+    ovstage_op_wait_result_t floor_wait{};
+    ovstage_api_status_t floor_status = ovstage_wait_op(
+        stage_, floor_op.op_index, OVSTAGE_TIMEOUT_INFINITE, &floor_wait);
+    ASSERT_EQ(floor_status, OVSTAGE_OK);
+    ASSERT_EQ(floor_wait.error_op_id_count, 0u);
+
+    ovrtx_enqueue_result_t update =
+        ovrtx_update_from_stage(renderer_, ordinal);
+    ASSERT_API_SUCCESS(update.status);
+
+    ovrtx_step_result_handle_t step_results = OVRTX_INVALID_HANDLE;
+    ovrtx_enqueue_result_t step = ovrtx_step_with_stage(
+        renderer_, products, 1.0 / 60.0, ordinal, &step_results);
+    ASSERT_API_SUCCESS(step.status);
+
+    ovrtx_op_wait_result_t step_wait{};
+    ovrtx_result_t step_wait_status = ovrtx_wait_op(
+        renderer_, step.op_index, ovrtx_timeout_infinite, &step_wait);
+    ASSERT_API_SUCCESS(step_wait_status.status);
+    ASSERT_NO_OP_ERRORS(step_wait);
+
+    ovrtx_destroy_results(renderer_, step_results);
+    ovstage_release_op(stage_, mutation.op_index);
+    ovstage_release_op(stage_, floor_op.op_index);
+    // [/snippet:doc-attached-update-loop-c]
+}
+
 TEST_F(StageMutationTest, AddRemoveUsdReferenceFromFile) {
     open_root();
     if (HasFatalFailure()) return;

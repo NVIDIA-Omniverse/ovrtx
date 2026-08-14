@@ -72,20 +72,25 @@ Common configuration entries include:
            - Write renderer logs to a file.
          * - ``log_level=...``
            - Set log verbosity.
-         * - ``binary_package_root_path=...``
-           - Point to a custom binary package root. May include
-             ``${executable_dir}`` (see :c:macro:`OVX_CONFIG_EXECUTABLE_DIR_TOKEN`)
-             to anchor the path at the running executable's directory.
+         * - ``suppress_deprecation_warnings=True``
+           - Suppress Python and native runtime warnings from deprecated APIs.
+             Compile-time C/C++ diagnostics are unaffected.
          * - ``keep_system_alive=True``
            - Keep shared graphics resources alive after the last renderer.
          * - ``active_cuda_gpus="0,1"``
            - Restrict renderer-level CUDA-visible devices.
+         * - ``datastore_cache="grpcdns://host:port"``
+           - Configure the UJITSO datastore cache. ``grpcdns_notls://`` and ``local://`` are also supported.
+             When omitted, existing cache defaults and environment configuration remain unchanged.
          * - ``use_vulkan=True``
            - Select the Vulkan backend where supported.
          * - ``motion_bvh=...``
            - Motion BVH mode: ``"disable"`` (default), ``"enable"``, or ``"auto"``.
              Sensors that require motion effects (for example, lidar, radar, acoustic, rolling-shutter camera)
              should use ``"auto"`` or ``"enable"``.
+         * - ``texture_streaming_mode=...``
+           - Texture streaming mode: ``"disable"``, ``"synchronous"``, or
+             ``"asynchronous"`` (default).
 
    .. tab-item:: C
 
@@ -98,6 +103,9 @@ Common configuration entries include:
            - Write renderer logs to a file.
          * - :c:func:`ovrtx_config_entry_log_level`
            - Set log verbosity.
+         * - :c:func:`ovrtx_config_entry_suppress_deprecation_warnings`
+           - Suppress native runtime warnings from deprecated APIs.
+             Compile-time deprecation diagnostics are unaffected.
          * - :c:func:`ovrtx_config_entry_binary_package_root_path`
            - Point to a custom binary package root. May include
              :c:macro:`OVX_CONFIG_EXECUTABLE_DIR_TOKEN` to anchor the path at the
@@ -106,11 +114,26 @@ Common configuration entries include:
            - Keep shared graphics resources alive after the last renderer.
          * - :c:func:`ovrtx_config_entry_active_cuda_gpus`
            - Restrict renderer-level CUDA-visible devices.
+         * - :c:func:`ovrtx_config_entry_datastore_cache`
+           - Configure the UJITSO datastore cache with ``grpcdns://``,
+             ``grpcdns_notls://``, or ``local://``.
          * - :c:func:`ovrtx_config_entry_use_vulkan`
            - Select the Vulkan backend where supported.
          * - :c:func:`ovrtx_config_entry_motion_bvh`
            - Motion BVH mode: ``OVRTX_MOTION_BVH_DISABLE`` (default),
              ``OVRTX_MOTION_BVH_ENABLE``, or ``OVRTX_MOTION_BVH_AUTO``.
+         * - :c:func:`ovrtx_config_entry_texture_streaming_mode`
+           - Texture streaming mode: ``OVRTX_TEXTURE_STREAMING_DISABLE``,
+             ``OVRTX_TEXTURE_STREAMING_SYNCHRONOUS``, or
+             ``OVRTX_TEXTURE_STREAMING_ASYNCHRONOUS`` (default).
+
+Deprecation warnings remain enabled by default. Suppression is intended for
+phased migrations where deprecated compatibility APIs must remain temporarily;
+it does not change their behavior or removal schedule.
+
+Texture streaming mode is process-global and applies to every active renderer
+instance. Synchronous mode processes texture feedback synchronously; it does
+not make every texture loading operation synchronous.
 
 Renderer-level ``active_cuda_gpus`` must be compatible with any per-RenderProduct
 ``deviceIds`` allow-list. Refer to :ref:`render-product-device-pinning`.
@@ -123,8 +146,10 @@ together next to ``libovrtx-dynamic.so`` or ``ovrtx-dynamic.dll``. The runtime
 package includes directories such as ``cache``, ``library``, ``libs``, ``mdl``,
 ``plugins``, ``rendering-data``, and ``usd_plugins``.
 
-Set ``binary_package_root_path`` only when static linking ovrtx or when a custom
-deployment layout separates the loader library from the package directories.
+In C, set ``binary_package_root_path`` through
+:c:func:`ovrtx_config_entry_binary_package_root_path` only when static linking
+ovrtx or when a custom deployment layout separates the loader library from the
+package directories.
 When the package ``bin/`` directory lives next to your executable, pass
 ``OVX_CONFIG_EXECUTABLE_DIR_TOKEN`` (``"${executable_dir}"``) instead of
 resolving the executable directory in client code.

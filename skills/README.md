@@ -172,7 +172,7 @@ example, `cloning-prims` documents legacy `renderer.clone_usd()`, while current 
 | `mapping-attributes` | Map ovstage buffers by ordinal; provide `element_sizes` for ragged arrays |
 | `attribute-bindings` | Write ordering governed by ovstage ordinals |
 | `project-setup-python` | Declare `ovstage>=0.1` dependency alongside ovrtx |
-| `project-setup-c` | Link `ovstage::ovstage`; see ovstage's `project-setup-c` skill |
+| `project-setup-c` | Link `ovstage::ovstage_static`; see ovstage's `project-setup-c` skill |
 
 When working in attached-mode contexts, also consult the ovstage agent context
 (`AGENTS.md` and skills shipped with the ovstage package).

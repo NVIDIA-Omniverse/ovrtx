@@ -73,6 +73,12 @@ After loading a scene or changing render settings in **Real-Time Path-Tracing** 
 1. **Texture streaming** -- ovrtx streams textures on demand. The first frames use low-resolution mip levels while higher-resolution data loads in the background. This typically takes 10-30 frames depending on scene complexity.
 2. **Path tracing convergence** -- The real-time path tracer accumulates samples over successive frames. Early frames are noisy; quality improves as more samples are gathered.
 
+Texture streaming is asynchronous by default. Applications can select
+`TextureStreamingMode.DISABLE`, `SYNCHRONOUS`, or `ASYNCHRONOUS` through
+`RendererConfig.texture_streaming_mode` (or the equivalent C config helper).
+Synchronous mode controls texture-feedback processing; it does not guarantee
+that every texture loading operation completes synchronously.
+
 To get a good quality image in RT2 mode, step the renderer for a number of warmup frames before capturing output. 40 frames is a good default that handles both texture streaming and basic convergence.
 
 ### PathTracing (`pt`) mode does not need warmup

@@ -117,6 +117,8 @@ clone snippet; the two are kept for parity with the Python `clone` /
 - The source path **must exist** in the stage.
 - The target paths **must not already exist** in the stage.
 - Cloning copies the entire subtree under the source path, including all children.
+- Relationship targets, path values, and USD attribute connections under the source
+  subtree are rebased to the corresponding clone. Paths outside the subtree stay unchanged.
 - In Python, advance the ovstage write floor after the clone completes and before rendering its ordinal.
 - In C, `ovstage_clone` returns an `ovstage_enqueue_result_t`; wait on the returned `op_index` with `ovstage_wait_op()` before advancing the write floor or using the cloned prims (e.g., writing attributes or stepping).
 

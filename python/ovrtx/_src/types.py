@@ -22,9 +22,10 @@ from .bindings import (  # noqa: F401 — re-exported public API
     PrimMode,
     SelectionFillMode,
     Semantic,
+    TextureStreamingMode,
 )
 from .dlpack import DLPACK_MAJOR_VERSION, DLDataType, DLTensor, ManagedDLTensor, _to_dlpack_capsule
-from .helpers import deprecated
+from .helpers import _deprecation_warnings_suppressed, deprecated
 
 if TYPE_CHECKING:
     from .renderer import Renderer
@@ -531,12 +532,13 @@ class MappedRenderVar:
                 f"Render variable '{self.name}' has multiple tensors ({n}: {list(self._tensors)}); "
                 f"use rv['<tensor_name>'] (or np.from_dlpack(rv['<tensor_name>']))."
             )
-        warnings.warn(
-            ".tensor is deprecated for single-tensor render variables; use the mapping directly: "
-            "np.from_dlpack(rv). Will be removed in a later release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        if not _deprecation_warnings_suppressed(self):
+            warnings.warn(
+                ".tensor is deprecated for single-tensor render variables; use the mapping directly: "
+                "np.from_dlpack(rv). Will be removed in a later release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         rec = next(iter(self._tensors.values()))
         return ManagedDLTensor(rec.dl, manager_ctx=self, deleter_callback=None, readonly=True)
 
@@ -1605,6 +1607,11 @@ class RendererConfig:
     active_cuda_gpus: Optional[str] = None
     """Comma-separated CUDA device indices to use for rendering (e.g., "0,1,2")."""
 
+    datastore_cache: Optional[str] = None
+    """Protocol-prefixed datastore cache configuration used by UJITSO. Supported values include
+    ``grpcdns://host:port``, ``grpcdns_notls://host:port``, and ``local://path``. When omitted,
+    existing defaults and environment-variable behavior are preserved."""
+
     use_vulkan: Optional[bool] = None
     """Select Vulkan rendering backend. On Linux Vulkan is always used.
     On Windows, set True to force Vulkan instead of the default DX12."""
@@ -1626,6 +1633,16 @@ class RendererConfig:
     Init-time only; changing requires recreating the renderer.
     Default: :attr:`SelectionFillMode.GLOBAL`."""
 
+    dome_baking_resolution: Optional[int] = None
+    """DomeLight baking resolution in texels, used when an MDL material drives a
+    DomeLight's image source. Applies renderer-wide to all dome lights. Valid
+    range is ``1..8192``; out-of-range values are clamped by the renderer.
+
+    Init-time only; changing requires recreating the renderer. When ``None``,
+    ovrtx does not write the setting: the value is ``4096`` for the first
+    renderer in a fresh process, but a value set by a prior in-process renderer
+    (or via dev settings) is left in place rather than reset."""
+
     enable_geometry_streaming: Optional[bool] = None
     """Geometry streaming opt-in config entry."""
 
@@ -1636,6 +1653,13 @@ class RendererConfig:
     """Set to False to disable Sensor Processing Graphs (SPG), enabled by default.
        This is a global setting, applying to all active renderer instances."""
 
+    suppress_deprecation_warnings: Optional[bool] = None
+    """Suppress Python and native runtime warnings emitted by deprecated OVRTX APIs.
+
+    Compile-time deprecation diagnostics for C and C++ consumers are unaffected. When ``None`` or
+    ``False``, runtime deprecation warnings remain enabled.
+    """
+
     motion_bvh: Optional[MotionBvh] = None
     """Motion BVH mode for sensor pipelines (lidar, radar, acoustic).
 
@@ -1645,6 +1669,17 @@ class RendererConfig:
     When ``None`` (default), motion BVH is disabled and no config entry is sent.
     Sensor workflows should pass :attr:`MotionBvh.AUTO` or :attr:`MotionBvh.ENABLE`.
     Init-time only; changing requires recreating the renderer."""
+
+    texture_streaming_mode: Optional[TextureStreamingMode] = None
+    """Texture streaming mode.
+
+    Accepts a :class:`TextureStreamingMode` member, the equivalent ``int`` value
+    (``0..2``), or the strings ``"disable"``, ``"synchronous"``, or
+    ``"asynchronous"``. When ``None``, asynchronous mode is used.
+
+    Synchronous mode controls texture-feedback processing; it does not make all
+    texture loading operations synchronous. This setting is process-global and
+    applies to all active renderer instances."""
 
     def __repr__(self) -> str:
         set_fields = ", ".join(

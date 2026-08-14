@@ -107,3 +107,27 @@ def test_renderer_config_version_and_async_stage(output_dir):
     renderer.detach_ovstage()
     stage.destroy()
     renderer.destroy()
+
+
+def test_dome_baking_resolution_config(output_dir):
+    """dome_baking_resolution is accepted at renderer creation and round-trips.
+
+    Verifies the int64 config wiring (RendererConfig field -> whitelist ->
+    ovrtx_config_entry_int -> OVRTX_CONFIG_DOME_BAKING_RESOLUTION) does not raise
+    and that the value is echoed back on ``renderer.config``. This is an
+    API-surface check only.
+
+    That the value is actually applied to the carb setting and clamped is
+    covered behaviorally by the C++ unit test
+    ``test.ovrtx.unit`` ->
+    "OVRTX - DomeLight baking resolution config applies to carb setting".
+    Golden validation that the baked DomeLight environment texture visually
+    changes with resolution requires an MDL-material-driven dome and lives in
+    the dedicated ovrtx domelight test suite.
+    """
+    config = ovrtx.RendererConfig(
+        dome_baking_resolution=256,
+        log_file_path=str(output_dir / "dome-baking-resolution.log"),
+    )
+    renderer = ovrtx.Renderer(config=config)
+    assert renderer.config.dome_baking_resolution == 256

@@ -12,7 +12,7 @@
 
 #define OVRTX_VERSION_MAJOR 0
 #define OVRTX_VERSION_MINOR 4
-#define OVRTX_VERSION_PATCH 0
+#define OVRTX_VERSION_PATCH 1
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -813,6 +813,19 @@ extern "C"
      *  @{
      */
 
+    /** Texture streaming mode.
+     *  Set via @ref OVRTX_CONFIG_TEXTURE_STREAMING_MODE at renderer creation.
+     *  The setting is process-global and applies to all active renderer instances. */
+    typedef enum ovrtx_texture_streaming_mode_t
+    {
+        /** Disable texture streaming. Textures are created as regular resources. */
+        OVRTX_TEXTURE_STREAMING_DISABLE = 0,
+        /** Enable texture streaming and process texture feedback synchronously. */
+        OVRTX_TEXTURE_STREAMING_SYNCHRONOUS = 1,
+        /** Enable texture streaming and process texture feedback asynchronously (default). */
+        OVRTX_TEXTURE_STREAMING_ASYNCHRONOUS = 2,
+    } ovrtx_texture_streaming_mode_t;
+
     /** Key type tag for @ref ovrtx_config_entry_t; selects which key and value union members are valid. */
     typedef enum ovrtx_config_key_type_t
     {
@@ -849,6 +862,9 @@ extern "C"
         /** If false, disables Sensor Processing Graphs (SPG), default: enabled.
          * This is a global setting, applying to all active renderer instances. */
         OVRTX_CONFIG_ENABLE_SPG,
+        /** If true, suppresses runtime deprecation warnings emitted by legacy OVRTX APIs.
+         * Compile-time deprecation diagnostics are unaffected. Create_renderer. */
+        OVRTX_CONFIG_SUPPRESS_DEPRECATION_WARNINGS,
         OVRTX_CONFIG_BOOL_COUNT
     } ovrtx_config_bool_t;
 
@@ -864,6 +880,10 @@ extern "C"
         OVRTX_CONFIG_LOG_LEVEL,
         /** Comma-separated CUDA device indices to use (e.g. "0,1,2"). Create_renderer. */
         OVRTX_CONFIG_ACTIVE_CUDA_GPUS,
+        /** Protocol-prefixed datastore cache configuration used by UJITSO.
+         * Supported values: "grpcdns://host:port", "grpcdns_notls://host:port", and "local://path".
+         * System-level; init and create_renderer values must match when both are specified. */
+        OVRTX_CONFIG_DATASTORE_CACHE,
         OVRTX_CONFIG_STRING_COUNT
     } ovrtx_config_string_t;
 
@@ -882,7 +902,18 @@ extern "C"
          *  Init-time only; changing requires renderer recreation.
          *  When not specified, defaults to @ref OVRTX_MOTION_BVH_DISABLE. */
         OVRTX_CONFIG_MOTION_BVH,
-        OVRTX_CONFIG_INT64_COUNT = 4
+        /** DomeLight baking resolution (texels) used when an MDL material drives a DomeLight's image
+         *  source. Applies renderer-wide to all dome lights. Valid range 1..8192; out-of-range values
+         *  are clamped by the renderer. When provided it takes precedence; when omitted the renderer
+         *  leaves the setting untouched (default 4096 on a fresh renderer).
+         *  Init-time only; changing requires renderer recreation. */
+        OVRTX_CONFIG_DOME_BAKING_RESOLUTION = 4,
+        /** Texture streaming mode. Value type: @ref ovrtx_texture_streaming_mode_t.
+         *  Invalid values cause renderer creation to fail. When omitted, defaults to
+         *  @ref OVRTX_TEXTURE_STREAMING_ASYNCHRONOUS.
+         *  Process-global; changing affects all active renderer instances. */
+        OVRTX_CONFIG_TEXTURE_STREAMING_MODE = 5,
+        OVRTX_CONFIG_INT64_COUNT = 6
     } ovrtx_config_int64_t;
 
     /** Uint64 config keys (reserved for future use). Value type: uint64_t. */

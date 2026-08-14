@@ -23,8 +23,8 @@ registry contract (one-shot per process during ``Plug_InitConfig``) made
 keeping two implementations in sync error-prone — when the C side picked up
 the renamed ``OV_PXR_PLUGINPATH_2511`` env-var via the ``OV_OPENUSD_PLUGINPATH``
 build macro, the Python copy silently diverged and broke schema discovery
-in co-load scenarios with peer subsystems (the OMPE-92973 follow-up bug).
-A single source of truth in C avoids that class of drift entirely.
+in co-load scenarios with peer subsystems. A single source of truth in C
+avoids that class of drift entirely.
 """
 
 from __future__ import annotations

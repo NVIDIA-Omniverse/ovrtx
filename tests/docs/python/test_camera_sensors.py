@@ -11,10 +11,11 @@
 from pathlib import Path
 
 import numpy as np
-import ovrtx
-import ovstage
 import pytest
 from PIL import Image
+
+import ovrtx
+import ovstage
 
 SCENE_PATH = str((Path(__file__).parent / "../../../tests/data/simple_camera.usda").resolve())
 
@@ -76,6 +77,7 @@ def test_step_and_map_camera_outputs(renderer, stage, output_dir):
             assert hdr_pixels.dtype == np.float16
     # [/snippet:doc-step-and-map-camera-outputs]
 
+
 def test_step_async_returns_operation(renderer, stage):
     """``step_async`` returns an ``Operation[PendingFetch[RenderProductSetOutputs]]``.
 
@@ -102,6 +104,7 @@ def test_step_async_returns_operation(renderer, stage):
     assert isinstance(pending, ovrtx.PendingFetch)
     assert isinstance(products, ovrtx.RenderProductSetOutputs)
 
+
 def test_map_camera_output_cuda(renderer, stage):
     """Map a render output as CUDA memory."""
     ordinal = 1
@@ -110,14 +113,15 @@ def test_map_camera_output_cuda(renderer, stage):
     products = renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
 
     # [snippet:doc-map-render-output-cuda]
-    mapping = products["/Render/Camera"].frames[0].render_vars["LdrColor"].map(
-        device=ovrtx.Device.CUDA
-    )
+    mapping = products["/Render/Camera"].frames[0].render_vars["LdrColor"].map(device=ovrtx.Device.CUDA)
     try:
+        assert mapping.wait_event is not None
+        mapping.wait()
         assert mapping.__dlpack_device__()[0] == 2  # DLPack kDLCUDA
     finally:
         mapping.unmap()
     # [/snippet:doc-map-render-output-cuda]
+
 
 def test_renderer_result_no_longer_exported():
     """The 0.2.0 ``RendererResult`` export was removed; importing it must fail."""

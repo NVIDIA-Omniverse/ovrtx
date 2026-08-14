@@ -15,7 +15,7 @@ Real-Time Path-Tracing (RTPT) is the default render mode. It produces high-quali
 
 .. code-block:: usda
 
-   token omni:rtx:rendermode = "Real-Time Path-Tracing"
+   token omni:rtx:rendermode = "RealTimePathTracing"
 
 Settings
 --------
@@ -56,7 +56,7 @@ Ray Bounces and Shading
 
 Maximum number of ray bounces for any ray type. Higher values give more accurate global illumination, but worse performance.
 
-| Type: ``int`` | Default: ``3``
+| Type: ``uint`` | Default: ``3``
 
 .. grid:: 3
    :class-container: setting-comparison
@@ -81,7 +81,7 @@ Maximum number of ray bounces for any ray type. Higher values give more accurate
 
 Maximum number of ray bounces for specular and transmission. Affects reflections and refractions through transparent materials like glass.
 
-| Type: ``int`` | Default: ``3``
+| Type: ``uint`` | Default: ``3``
 
 .. grid:: 3
    :class-container: setting-comparison
@@ -116,8 +116,8 @@ Other Ray Bounce and Shading Settings
    * - ``omni:rtx:rtpt:maxVolumeBounces``
 
        Maximum number of ray bounces for SSS.
-     - ``int``
-     - ``15``
+     - ``uint``
+     - ``3``
    * - ``omni:rtx:pt:fractionalCutoutOpacity``
 
        If enabled, fractional cutout opacity values are treated as a measure of surface 'presence', resulting in a translucency effect similar to alpha-blending.

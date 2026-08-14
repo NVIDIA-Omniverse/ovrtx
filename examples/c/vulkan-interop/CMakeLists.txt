@@ -59,8 +59,8 @@ else()
     message(STATUS "glfw3 not found. Building from source")
     FetchContent_Declare(
         glfw3 
-        URL https://github.com/glfw/glfw/releases/download/3.4/glfw-3.4.zip
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        URL https://github.com/glfw/glfw/releases/download/3.4/glfw-3.4.zip
     )
     FetchContent_MakeAvailable(glfw3)
 endif()

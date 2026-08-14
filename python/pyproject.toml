@@ -1,6 +1,6 @@
 [project]
 name = "ovrtx"
-version = "0.4.0"
+version = "0.4.1"
 description = "NVIDIA RTX Rendering Python API"
 requires-python = ">=3.10,<3.14"
 dependencies = []

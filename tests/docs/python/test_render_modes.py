@@ -39,7 +39,7 @@ def Scope "Render" {
         # or set samples this low, but it's an easy way to
         # see the difference
         bool omni:rtx:pt:denoising:enabled = false
-        int omni:rtx:pt:samplesPerPixel = 2
+        uint omni:rtx:pt:samplesPerPixel = 2
         # [/omit]
 
         def RenderVar "LdrColor" {

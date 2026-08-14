@@ -30,7 +30,7 @@ Available Modes
      - ``omni:rtx:rendermode``
      - Description
    * - Real-Time Path-Tracing
-     - ``Real-Time Path-Tracing``
+     - ``RealTimePathTracing``
      - Full path-traced rendering with real-time denoising. Produces high-quality images with accurate global illumination, reflections, and shadows. This is the default mode and the best choice for most applications requiring visual fidelity.
    * - Path Tracing
      - ``PathTracing``
@@ -46,7 +46,7 @@ Choosing a Mode
 - Use **Path Tracing** when you need converged, reference-quality images and can afford to accumulate samples across frames.
 - Use **Minimal** when rendering throughput matters more than visual quality -- for example, thousands of environments stepping in parallel for RL training.
 
-Different RenderProducts in the same scene can use different render modes. For example, one camera could use ``Real-Time Path-Tracing`` for RGB output while another uses ``Minimal`` for fast segmentation.
+Different RenderProducts in the same scene can use different render modes. For example, one camera could use **Real-Time Path-Tracing** for RGB output while another uses **Minimal** for fast segmentation.
 
 Refer to :doc:`outputs` for the available outputs per render mode.
 

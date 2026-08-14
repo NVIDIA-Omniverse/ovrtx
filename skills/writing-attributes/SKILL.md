@@ -134,7 +134,7 @@ Use this table to answer "how do I write USD type X?" For ovstage, pass `is_arra
 | `extent`, `_worldExtent` | `np.float64`, shape `(N, 6)` | `{kDLFloat, 64, 6}` | Usually read-only from population; `extent` is local-space, `_worldExtent` is world-space. |
 | `string` | UTF-8 `np.uint8` byte rows with `is_array=True` and `AttributeSemantic.STRING` | `{kDLUInt, 8, 1}` with `is_array=true` | One byte row represents one USD string value. |
 | `token` / `token[]` | `np.uint64` IDs from `PathDictionary.intern_token()` with `AttributeSemantic.TOKEN_ID` | `{kDLUInt, 64, 1}` raw IDs with `OVRTX_SEMANTIC_TOKEN_ID`, or compatibility string helpers | Set `is_array` to match the USD attribute kind. |
-| `asset` | UTF-8 `np.uint8` byte rows with `AttributeSemantic.ASSET_STRING` | `{kDLUInt, 64, 2}` | Deprecated C compatibility writes represent scalar assets as token pairs. |
+| `asset` | not supported for populated attributes (see note below) | not supported for populated attributes | Writing to a USD-populated scalar `asset` attribute is not supported in ovstage 0.1.x: `ASSET_STRING` byte-row payloads are rejected with a type mismatch, and raw token-pair writes are not validated end-to-end; asset write support is planned for a future minor release. Fresh (non-populated) attributes can be created with UTF-8 byte rows and `AttributeSemantic.ASSET_STRING`. Deprecated C compatibility writes represent scalar assets as `{kDLUInt, 64, 2}` token pairs. |
 | `relationship` | `np.uint64` IDs from `PathDictionary.intern_path()` with `is_array=True` and `AttributeSemantic.RELATIONSHIP_PATH_ID` | path string/path ID semantics | Use relationship-specific skills for schema-specific behavior. |
 | `timecode` / `timecode[]` | unsupported | unsupported | |
 
@@ -209,9 +209,9 @@ C raw snippets:
 | token | `doc-write-usd-token-c` |
 | token array | `doc-write-usd-token-array-c` |
 | string bytes | `doc-write-usd-string-c` |
-| scalar asset byte row (test SKIPPED — known ovstage gap) | `doc-write-usd-asset-c` |
+| scalar asset byte row (write half SKIPPED — writes unsupported) | `doc-write-usd-asset-c` |
 
-The snippets listed in this table live in `tests/docs/c/test_all_attributes.cpp`. **The scalar-asset write snippet is currently under `GTEST_SKIP` alongside its read counterpart (`AllAttributesTest.AssetReadWriteSnippets`); this is a known issue tracked internally. Treat both `doc-read-usd-asset-c` and `doc-write-usd-asset-c` as *provisional / not runtime-validated* until it is resolved.**
+The snippets listed in this table live in `tests/docs/c/test_all_attributes.cpp`. **Writing to a USD-populated scalar `asset` attribute is not supported in ovstage 0.1.x** (the read side is fixed as of 0.1.1 and returns token pairs — see the reading-attributes skill; the `doc-read-usd-asset-c` snippet is runtime-validated). The write half of `AllAttributesTest.AssetReadWriteSnippets` skips with that reason, so treat `doc-write-usd-asset-c` as *provisional*: it expresses the planned canonical `ASSET_STRING` byte-row payload that lands with asset write support in the next minor release.
 
 ## Key Types / Functions
 

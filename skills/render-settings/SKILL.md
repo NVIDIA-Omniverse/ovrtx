@@ -73,7 +73,7 @@ This skill has no scripts.
 
 Render settings in ovrtx are written as attributes on the **RenderProduct** prim. To change a setting, use `write_attribute()` in Python or `ovrtx_write_attribute()` in C, targeting the RenderProduct prim path (e.g., `/Render/Camera`) with the setting's attribute name.
 
-Settings use the `omni:rtx:` namespace prefix. For example, to set the maximum number of path tracing bounces, write `omni:rtx:rtpt:maxBounces` as an `int32` attribute.
+Settings use the `omni:rtx:` namespace prefix. For example, to set the maximum number of path tracing bounces, write `omni:rtx:rtpt:maxBounces` as a `uint32` attribute.
 
 After changing a render setting, call `reset()` and run warm-up frames to allow the renderer to converge with the new setting.
 
@@ -93,13 +93,13 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 
 | Python | C |
 |--------|---|
-| `renderer.write_attribute(prim_paths=["/Render/Camera"], attribute_name="omni:rtx:rtpt:maxBounces", tensor=np.array([value], dtype=np.int32))` | `ovrtx_write_attribute(renderer, &binding, &buffer, OVRTX_DATA_ACCESS_SYNC)` with `int32` DLTensor |
+| `renderer.write_attribute(prim_paths=["/Render/Camera"], attribute_name="omni:rtx:rtpt:maxBounces", tensor=np.array([value], dtype=np.uint32))` | `ovrtx_write_attribute(renderer, &binding, &buffer, OVRTX_DATA_ACCESS_SYNC)` with `uint32` DLTensor |
 
 ## Render Mode Selection
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `omni:rtx:rendermode` | `string` | `"Real-Time Path-Tracing"` | Render mode: `"Real-Time Path-Tracing"`, `"PathTracing"`, or `"Minimal"` |
+| `omni:rtx:rendermode` | `token` | `"RealTimePathTracing"` | Render mode: `"RealTimePathTracing"`, `"PathTracing"`, or `"Minimal"` |
 
 ## Real-Time Path-Tracing Settings (`rtpt:`)
 
@@ -115,9 +115,9 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 
 | Setting | Type | Default |
 |---------|------|---------|
-| `omni:rtx:rtpt:maxBounces` | `int` | `3` |
-| `omni:rtx:rtpt:maxSpecularAndTransmissionBounces` | `int` | `3` |
-| `omni:rtx:rtpt:maxVolumeBounces` | `int` | `15` |
+| `omni:rtx:rtpt:maxBounces` | `uint` | `3` |
+| `omni:rtx:rtpt:maxSpecularAndTransmissionBounces` | `uint` | `3` |
+| `omni:rtx:rtpt:maxVolumeBounces` | `uint` | `3` |
 | `omni:rtx:pt:fractionalCutoutOpacity` | `bool` | `true` |
 | `omni:rtx:rtpt:maxRoughness` | `float` | `0.3` |
 | `omni:rtx:rt:reflections:roughnessCacheThreshold` | `float` | `0.3` |
@@ -146,13 +146,13 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 
 | Setting | Type | Default |
 |---------|------|---------|
-| `omni:rtx:pt:samplesPerPixel` | `int` | `512` |
+| `omni:rtx:pt:samplesPerPixel` | `uint` | `512` |
 | `omni:rtx:pt:samplesPerIteration` | `int` | `1` |
 | `omni:rtx:pt:adaptiveSampling:enabled` | `bool` | `true` |
-| `omni:rtx:pt:limits:maxBounces` | `int` | `4` |
-| `omni:rtx:pt:limits:maxGlossyBounces` | `int` | `6` |
-| `omni:rtx:pt:maxVolumeBounces` | `int` | `15` |
-| `omni:rtx:pt:limits:maxFogBounces` | `int` | `2` |
+| `omni:rtx:pt:limits:maxBounces` | `uint` | `4` |
+| `omni:rtx:pt:limits:maxGlossyBounces` | `uint` | `6` |
+| `omni:rtx:pt:maxVolumeBounces` | `uint` | `15` |
+| `omni:rtx:pt:limits:maxFogBounces` | `uint` | `2` |
 | `omni:rtx:pt:fractionalCutoutOpacity` | `bool` | `true` |
 
 ### Denoising
@@ -197,10 +197,10 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 | Setting | Type | Default |
 |---------|------|---------|
 | `omni:rtx:pt:ptvol:enabled` | `bool` | `false` |
-| `omni:rtx:pt:volumes:transmittanceMethod` | `int` | BiasedRayMarching |
+| `omni:rtx:pt:volumes:transmittanceMethod` | `token` | `"biasedRayMarching"` |
 | `omni:rtx:pt:volumes:tracking:maxScatteringSteps` | `int` | `1024` |
 | `omni:rtx:pt:volumes:tracking:maxShadowSteps` | `int` | `32` |
-| `omni:rtx:pt:limits:maxVolumeBounces` | `int` | `2` |
+| `omni:rtx:pt:limits:maxVolumeBounces` | `uint` | `2` |
 
 ### Multi-GPU
 
@@ -225,7 +225,7 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 
 | Setting | Type | Default |
 |---------|------|---------|
-| `omni:rtx:pt:pixelFilter:filter` | `int` | Triangle |
+| `omni:rtx:pt:pixelFilter:filter` | `token` | `"triangle"` |
 | `omni:rtx:pt:pixelFilter:radius` | `float` | `1.0` |
 
 ## Minimal Settings
@@ -235,15 +235,15 @@ Minimal mode is optimized for speed-of-light rendering performance and stability
 | Setting | Type | Description |
 |---------|------|-------------|
 | `omni:rtx:minimal:mode` | `int` | Minimal render mode variant |
-| `omni:rtx:minimal:constantColor` | `float3` | Constant color output |
+| `omni:rtx:minimal:constantColor` | `color3f` | Constant color output |
 | `omni:rtx:minimal:castShadows` | `bool` | Enable hard shadows from the first `DistantLight` |
-| `omni:rtx:rt:ambientLight:color` | `float3` | Ambient light color |
+| `omni:rtx:rt:ambientLight:color` | `color3f` | Ambient light color |
 | `omni:rtx:rt:ambientLight:intensity` | `float` | Ambient light intensity |
 
 ## Troubleshooting
 
 - Render settings are attributes on the **RenderProduct** prim, not on a separate RenderSettings prim. Write them to the same prim path you pass to `step()` (e.g., `/Render/Camera`).
-- The dtype must match exactly -- `omni:rtx:rtpt:maxBounces` is `int32`, not `int64`.
+- The dtype must match the schema type exactly. Most integer settings above are `uint`, so write `np.uint32` -- `omni:rtx:rtpt:maxBounces` is `uint32`, not `int32` or `int64`. Settings typed `token` (such as `omni:rtx:rendermode` and `omni:rtx:pt:pixelFilter:filter`) are written as interned token IDs, not integers; see `writing-attributes` for the full USD-type-to-dtype table.
 - After changing a setting, call `reset()` and run warm-up frames before capturing output. The renderer needs time to reconverge.
 - Settings use the `omni:rtx:` namespace prefix, with subsystem prefixes like `rtpt:` (real-time path tracing), `post:` (post-processing), etc.
 

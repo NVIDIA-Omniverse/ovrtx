@@ -23,6 +23,7 @@
 #   # package (DLLs + junctions on Windows, rpath on Linux) beside the exe.
 #   ovrtx_setup_runtime(myapp)
 
+# [snippet:ovrtx_fetch]
 # Capture this file's directory at parse time (before macro expansion)
 # CMAKE_CURRENT_LIST_DIR inside a macro would refer to the caller's directory
 set(_OVRTX_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
@@ -46,14 +47,14 @@ macro(ovrtx_fetch)
         # Platform-specific package selection
         if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             set(OVRTX_PACKAGE_SYSTEM "windows-x86_64")
-            set(OVRTX_HASH "27309609a2969acfb7531800b0d81db6c3fcbef37f2d92c9b80edba44d9c8132")
+            set(OVRTX_HASH "cecbc2bd727e0ce032bf1965b572bfb7084109d35b5ee42894f8d6d4e5cbac42")
         elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_aarch64")
-                set(OVRTX_HASH "c77dbf42cf8d92ad15ad777d57b5fe90ee7699c44c351990c6012f188600355a")
+                set(OVRTX_HASH "159345c4b9467bad03989172de10742402419156050fbc4bf2cbe65af4efc2c8")
             elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_x86_64")
-                set(OVRTX_HASH "fe3a42e6559a74f1c553d5926f9b029891972b57dc0fce90d981f384ff28847f")
+                set(OVRTX_HASH "4cd49249ad3a08f02c3bebaba5f88c6a117ef073b08e39b9220bbfc671cd88cd")
             else()
                 message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}")
             endif()
@@ -78,7 +79,7 @@ macro(ovrtx_fetch)
         FetchContent_Declare(
             ovrtx
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.4.0/ovrtx@0.4.0.346409.5d959a01.${OVRTX_PACKAGE_SYSTEM}.zip"
+            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.4.1/ovrtx@0.4.1.364340.7f330117.${OVRTX_PACKAGE_SYSTEM}.zip"
             URL_HASH SHA256=${OVRTX_HASH}
         )
 
@@ -93,6 +94,7 @@ macro(ovrtx_fetch)
 
     endif()
 endmacro()
+# [/snippet:ovrtx_fetch]
 
 # Detect whether TARGET links the static ovrtx loader (model #1). Both
 # ovrtx_setup_runtime and ovstage_setup_runtime branch on this: only under model #1

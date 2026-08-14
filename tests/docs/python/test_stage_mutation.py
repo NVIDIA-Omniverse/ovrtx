@@ -92,6 +92,27 @@ def test_add_remove_usd_reference_from_string(stage):
     assert _query_prefix_count(stage, "/World/Injected") == 0
 
 
+def test_attached_update_loop(renderer, stage):
+    """Publish an ovstage mutation and render it through attached ovrtx."""
+    ovstage.population.open_usd(stage, TEST_BASE_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
+
+    # [snippet:doc-attached-update-loop-python]
+    ordinal = 2
+
+    stage.clone("/World/Plane", ["/World/PlaneClone"], ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+
+    outputs = renderer.step(
+        render_products={"/Render/Camera"},
+        delta_time=1.0 / 60.0,
+        ordinal=ordinal,
+    )
+    # [/snippet:doc-attached-update-loop-python]
+
+    assert "/Render/Camera" in outputs
+
+
 def test_clone_usd(stage):
     """Clone a mesh subtree and verify the clone keeps mesh data."""
     ovstage.population.open_usd(stage, TEST_BASE_PATH, ordinal=1)

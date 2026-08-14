@@ -101,6 +101,7 @@ class ConfigBoolKey(IntEnum):
     ENABLE_GEOMETRY_STREAMING = 6
     ENABLE_GEOMETRY_STREAMING_LOD = 7
     ENABLE_SPG = 8
+    SUPPRESS_DEPRECATION_WARNINGS = 9
 
 
 # ovrtx_config_string_t
@@ -110,6 +111,7 @@ class ConfigStringKey(IntEnum):
     LOG_FILE_PATH = 1
     LOG_LEVEL = 2
     ACTIVE_CUDA_GPUS = 3
+    DATASTORE_CACHE = 4
 
 
 # ovrtx_config_int64_t
@@ -120,6 +122,8 @@ class ConfigInt64Key(IntEnum):
     SELECTION_FILL_MODE = 1
     MOTION_BVH = 2
     _ATTACH_MODE = 3
+    DOME_BAKING_RESOLUTION = 4
+    TEXTURE_STREAMING_MODE = 5
 
 
 # ovrtx_config_double_t
@@ -164,6 +168,23 @@ class MotionBvh(IntEnum):
     """Motion BVH enabled from renderer creation."""
     AUTO = 2
     """Motion BVH enabled at runtime when a non-visual sensor is rendered."""
+
+
+# ovrtx_texture_streaming_mode_t
+class TextureStreamingMode(IntEnum):
+    """Texture streaming behavior selected when the renderer is created.
+
+    ``SYNCHRONOUS`` controls texture-feedback processing; it does not make all
+    texture loading operations synchronous. The mode is process-global and
+    applies to all active renderer instances.
+    """
+
+    DISABLE = 0
+    """Texture streaming is disabled."""
+    SYNCHRONOUS = 1
+    """Texture streaming is enabled and texture feedback is processed synchronously."""
+    ASYNCHRONOUS = 2
+    """Texture streaming is enabled and texture feedback is processed asynchronously (default)."""
 
 
 # ovrtx_attach_mode_t

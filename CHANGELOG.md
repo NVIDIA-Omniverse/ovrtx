@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-08-04
+
+## Summary
+
+ovrtx 0.4.1 adds rendering configuration controls and includes rendering,
+sensor, GPU interoperability, and stability improvements.
+
+## Highlights
+
+- Added `OVRTX_CONFIG_TEXTURE_STREAMING_MODE` and corresponding C and Python
+  APIs to select disabled, synchronous, or asynchronous texture streaming.
+- Added `OVRTX_CONFIG_DOME_BAKING_RESOLUTION` and corresponding C and Python
+  APIs for renderer-wide DomeLight MDL baking resolution.
+- Added `OVRTX_CONFIG_DATASTORE_CACHE` and corresponding C and Python APIs for
+  local and gRPC UJITSO caches.
+- Added `OVRTX_CONFIG_SUPPRESS_DEPRECATION_WARNINGS` and corresponding C and
+  Python APIs to silence runtime deprecation warnings during phased migrations.
+- Added per-tile render-history reset controls to reduce ghosting after camera
+  changes.
+- Added opt-in spectator rendering for cameras without an assigned scene
+  partition.
+
+## Notable Fixes
+
+- Improved RTX Minimal motion output for static scenes, deforming meshes, and
+  animated Points.
+- Improved StableIdMap correctness and stability, restoring semantic mappings
+  and preventing an `instance_segmentation_fast` crash.
+- Fixed missing or incorrect transforms when GPU transform reads are enabled.
+- Fixed camera targets on tiled RenderProducts cloned through ovstage.
+- Improved transform updates for scene-partitioned content.
+- Improved texture readiness and rendering stability by correcting texture-mip
+  selection and residency handling.
+- Improved rendering determinism by resetting temporal state consistently and waiting for required texture mips to finish loading.
+- Fixed RTX Minimal procedural geometry.
+- Improved foreground TLAS determinism for scene-partitioned content.
+- Fixed GPU asynchronous writes for Points and BasisCurves.
+- Fixed empty SPG AOVs in ovstage-attached workflows.
+- Fixed Python CUDA interop in packaged installations.
+- Prevented renderer teardown from hanging indefinitely on stalled operations.
+
 ## [0.4.0] - 2026-07-17
 
 # ovrtx 0.4.0 Release Notes

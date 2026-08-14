@@ -386,6 +386,7 @@ bool wait_ovstage_op(ovstage_instance_t* stage,
     ovstage_op_wait_result_t wait_result {};
     ovstage_api_status_t status =
         ovstage_wait_op(stage, enqueue.op_index, OVSTAGE_TIMEOUT_INFINITE, &wait_result);
+    ovstage_release_op(stage, enqueue.op_index);
     if (status != OVSTAGE_OK) {
         print_ovstage_error(stage, status, operation);
         return true;
@@ -546,7 +547,7 @@ int main(int argc, char* argv[])
         return cleanup(1);
     }
 
-    // Create the ovstage instance and attach it to the renderer (BORROW mode).
+    // Create the ovstage instance and attach it to the renderer.
     ovstage_instance_desc_t stage_desc {};
     stage_desc.name = "radar";
     ovstage_api_status_t stage_result = ovstage_create_instance(&stage_desc, &stage);

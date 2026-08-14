@@ -132,6 +132,17 @@ Config helpers in C (`ovrtx_config.h`):
 - `ovrtx_config_entry_keep_system_alive(bool)` -- keep shared GPU resources alive after the last renderer is destroyed, so a subsequent `ovrtx_create_renderer` reuses them
 - `ovrtx_config_entry_active_cuda_gpus(ovx_string_t)` -- comma-separated CUDA-visible device indices (e.g., `"0,1,2"`), after `CUDA_VISIBLE_DEVICES` filtering/remapping, to select which GPUs the renderer may use
 - `ovrtx_config_entry_use_vulkan(bool)` -- select Vulkan rendering backend where supported
+- `ovrtx_config_entry_dome_baking_resolution(int)` -- DomeLight MDL baking resolution in texels (renderer-wide, range `1..8192`; when omitted the setting is left untouched, default `4096` on a fresh renderer); Python `RendererConfig(dome_baking_resolution=...)`
+- `ovrtx_config_entry_texture_streaming_mode(ovrtx_texture_streaming_mode_t)` -- select disabled, synchronous, or asynchronous texture streaming (asynchronous by default); Python `RendererConfig(texture_streaming_mode=ovrtx.TextureStreamingMode.*)`
+- `ovrtx_config_entry_suppress_deprecation_warnings(bool)` -- suppress native runtime warnings from deprecated APIs; Python `RendererConfig(suppress_deprecation_warnings=True)`
+
+Texture streaming mode is process-global and applies to all active renderer
+instances. `OVRTX_TEXTURE_STREAMING_SYNCHRONOUS` controls texture-feedback
+processing; it does not make all texture loading operations synchronous.
+
+Deprecation warnings remain enabled by default. Suppression is useful during a
+phased migration, but does not suppress compile-time C/C++ diagnostics or
+change the deprecated APIs' removal schedule.
 
 ## Troubleshooting
 

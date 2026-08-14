@@ -38,7 +38,7 @@ These packages include a number of pre-packaged dependencies.
 
 In addition to these pre-packaged dependencies, two other depedencies are noted here:
 1. starting with version 0.4 of ovrtx, a dependency on the NVIDIA [ovstage](https://github.com/NVIDIA-Omniverse/ovstage) library is introduced. 
-    * While this dependency is currently optional, it will be required in the next release. To enable a smooth migration from the ovstage-like APIs included in ovrtx 0.3, the ovrtx 0.4 release continues including those APIs, marked with a deprecated tag. To ease the migration to ovstage, you can take advantage of the agent-friendly migration skills [for C](skills/update-0_3-0_4-python/SKILL.md) and [for Python](skills/update-0_3-0_4-c/SKILL.md).
+    * While this dependency is currently optional, it will be required in the next release. To enable a smooth migration from the ovstage-like APIs included in ovrtx 0.3, the ovrtx 0.4 release continues including those APIs, marked with a deprecated tag. To ease the migration to ovstage, you can take advantage of the agent-friendly migration skills [for C](skills/update-0_3-0_4-c/SKILL.md) and [for Python](skills/update-0_3-0_4-python/SKILL.md).
 2. on Windows, ovrtx depends on [Microsoft's VC runtime redistributable libraries](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170), with a minimum version of 14.38 (as included in Visual Studio 2022 17.8). 
     * These libraries can be installed by an end user (using the linked Microsoft resources) or can be included by an application. 
     * The use of this version of the MSVC runtime libraries makes our binaries compatible with the vcruntime140.dll pre-packaged in Python distributions for Windows as old as Python 3.11. Older Python versions include older vcruntime140.dll, and are therefore not guaranteed to work.
@@ -46,8 +46,8 @@ In addition to these pre-packaged dependencies, two other depedencies are noted 
 ## System requirements
 
 - **C/C++**:
-    - The ovrtx library has a C11-compatible interface. It can be loaded dynamically or by statically linking to the `ovstage-static` loader library, which requires linking to the C++ stdlib. 
-    - The example code requires a C++17 compiler and CMake 3.18+. The examples use cmake to fetch the prebuilt ovrtx and ovstage packages from their GitHub.com release pages.
+    - The ovrtx library has a C11-compatible interface. It can be loaded dynamically or by statically linking to the `ovrtx-static` loader library, which requires linking to the C++ stdlib. 
+    - The example code requires a C++17 compiler and CMake 3.16+ (`find_package(ovrtx)` fails on older versions); building the whole example set through the top-level `examples/c/CMakeLists.txt` needs 3.18. The examples use cmake to fetch the prebuilt ovrtx and ovstage packages from their GitHub.com release pages.
 - **Python**:
     - Python 3.11–3.13 versions are supported
     - The examples use [uv](https://docs.astral.sh/uv/) to resolve the `ovrtx` wheel.
@@ -94,7 +94,7 @@ The first step from a newly built application will block for 1-2 minutes while s
 
 ## Getting Started in C/C++
 
-The C/C++ examples require CMake and a development environment. On Windows this is provided by [Visual Studio 2017 or newer](https://visualstudio.microsoft.com/).
+The C/C++ examples require CMake 3.16 or newer and a development environment. On Windows this is provided by [Visual Studio 2022 17.8 or newer](https://visualstudio.microsoft.com/), which is the oldest release shipping the VC runtime 14.38 that ovrtx requires (see the dependency note above).
 
 
 On Linux (Ubuntu):

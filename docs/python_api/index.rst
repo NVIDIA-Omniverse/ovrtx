@@ -170,6 +170,10 @@ Enums
    :members:
    :undoc-members:
 
+.. autoclass:: ovrtx.TextureStreamingMode
+   :members:
+   :undoc-members:
+
 .. autoclass:: ovrtx.AttributeFilterMode
    :members:
    :undoc-members:

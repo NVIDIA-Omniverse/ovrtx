@@ -79,9 +79,10 @@ from ._src.types import (
     SelectionFillMode,
     SelectionGroupStyle,
     Semantic,
+    TextureStreamingMode,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 __all__ = [
     "__version__",
@@ -104,6 +105,7 @@ __all__ = [
     "PrimMode",
     "SelectionFillMode",
     "MotionBvh",
+    "TextureStreamingMode",
     "Semantic",
     "AttributeFilterMode",
     "FilterKind",

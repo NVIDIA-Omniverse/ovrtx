@@ -237,6 +237,13 @@ After loading a scene or changing render settings, the first few rendered frames
 - **Texture streaming** -- ovrtx streams textures on demand. Initial frames use low-resolution mip levels while higher-resolution data loads in the background.
 - **Path tracing convergence** -- The path tracer accumulates samples over successive frames. Early frames are noisy; quality improves as more samples are gathered.
 
+Texture streaming is asynchronous by default. Select disabled, synchronous, or
+asynchronous behavior when creating the renderer with
+``RendererConfig.texture_streaming_mode`` or
+:c:func:`ovrtx_config_entry_texture_streaming_mode`. Synchronous mode controls
+texture-feedback processing; it does not make all texture loading operations
+synchronous. See :doc:`../core/renderer_configuration`.
+
 To get a good quality image, run warm-up frames before capturing output. A conservative default of 40 frames handles both texture streaming and convergence for typical scenes.
 
 You should warm up after any of the following:

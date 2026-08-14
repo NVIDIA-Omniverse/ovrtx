@@ -94,6 +94,7 @@ static bool wait_ovstage_op(ovstage_instance_t* stage,
     ovstage_op_wait_result_t wait_result {};
     ovstage_api_status_t status =
         ovstage_wait_op(stage, enqueue.op_index, OVSTAGE_TIMEOUT_INFINITE, &wait_result);
+    ovstage_release_op(stage, enqueue.op_index);
     if (status != OVSTAGE_OK) {
         return print_ovstage_error(stage, status, operation);
     }

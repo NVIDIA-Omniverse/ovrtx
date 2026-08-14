@@ -163,6 +163,18 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_enable_spg(bool enable_spg
 }
 
 /**
+ * Suppress runtime warnings emitted when deprecated OVRTX APIs are called.
+ *
+ * This does not affect compile-time deprecation diagnostics from OVRTX_DEPRECATED.
+ * When omitted, runtime deprecation warnings remain enabled.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_suppress_deprecation_warnings(
+    bool suppress_deprecation_warnings)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_SUPPRESS_DEPRECATION_WARNINGS, suppress_deprecation_warnings);
+}
+
+/**
  * Configure motion BVH (ray-traced motion) behavior for sensor pipelines.
  *
  * @param mode One of @ref ovrtx_motion_bvh_t. Must be set before the first
@@ -172,6 +184,21 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_enable_spg(bool enable_spg
 static inline ovrtx_config_entry_t ovrtx_config_entry_motion_bvh(ovrtx_motion_bvh_t mode)
 {
     return ovrtx_config_entry_int(OVRTX_CONFIG_MOTION_BVH, (int64_t)mode);
+}
+
+/**
+ * Configure texture streaming behavior.
+ *
+ * @param mode One of @ref ovrtx_texture_streaming_mode_t. When not provided,
+ *             texture streaming defaults to @ref OVRTX_TEXTURE_STREAMING_ASYNCHRONOUS.
+ *             Synchronous mode processes texture feedback synchronously; it does not
+ *             make all texture loading operations synchronous. This setting is
+ *             process-global and applies to all active renderer instances.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_texture_streaming_mode(
+    ovrtx_texture_streaming_mode_t mode)
+{
+    return ovrtx_config_entry_int(OVRTX_CONFIG_TEXTURE_STREAMING_MODE, (int64_t)mode);
 }
 
 /**
@@ -221,6 +248,24 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_active_cuda_gpus(ovx_strin
 }
 
 /**
+ * Configure the datastore cache used by UJITSO.
+ *
+ * Supported protocol-prefixed values are:
+ * - `grpcdns://host:port` for the Derived Data Cache with TLS
+ * - `grpcdns_notls://host:port` for the Derived Data Cache without TLS
+ * - `local://path` for a local datastore
+ *
+ * Omitting this entry preserves the existing cache defaults and environment-variable behavior.
+ *
+ * @param cache Cache configuration string. cache.ptr must remain valid until the API call that
+ *              consumes the config returns.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_datastore_cache(ovx_string_t cache)
+{
+    return ovrtx_config_entry_string(OVRTX_CONFIG_DATASTORE_CACHE, cache);
+}
+
+/**
  * Enable the selection outline postprocessing pass.
  *
  * When enabled, prims marked with a non-zero selection group (via ovrtx_set_selection_outline_group)
@@ -253,6 +298,21 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_selection_outline_width(in
 static inline ovrtx_config_entry_t ovrtx_config_entry_selection_fill_mode(ovrtx_selection_fill_mode_t mode)
 {
     return ovrtx_config_entry_int(OVRTX_CONFIG_SELECTION_FILL_MODE, (int64_t)mode);
+}
+
+/**
+ * Configure the DomeLight baking resolution (texels).
+ *
+ * Controls the resolution of the environment texture baked from an MDL material assigned to a
+ * DomeLight's image source. Applies renderer-wide to all dome lights. Valid range is 1..8192;
+ * out-of-range values are clamped by the renderer. If this entry is not provided, the renderer
+ * leaves the setting untouched (the default is 4096 on a fresh renderer).
+ *
+ * Init-time only; changing requires renderer recreation.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_dome_baking_resolution(int resolution)
+{
+    return ovrtx_config_entry_int(OVRTX_CONFIG_DOME_BAKING_RESOLUTION, (int64_t)resolution);
 }
 
 /** @} */ // end of ovrtx_config_helpers
