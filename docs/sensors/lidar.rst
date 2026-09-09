@@ -127,9 +127,10 @@ Within the first ``Counts[0]`` entries, a point is valid when
 ``Flags[i] & 0x40`` is non-zero. Do not compare ``Flags[i] == 0x40`` because
 other lidar-specific bits can be set at the same time.
 
-With ``includeInvalidPoints = false``, invalid returns are dropped before output.
-With ``includeInvalidPoints = true``, invalid entries can be present inside the
-``Counts`` range and must be filtered by ``Flags`` before using channels such as
-``Coordinates``, ``Intensity``, ``HitNormal``, or ``Velocity`` as real returns.
+With ``includeInvalidPoints = false`` (the default), invalid returns are dropped
+before output. With ``includeInvalidPoints = true``, invalid entries can be
+present inside the ``Counts`` range and must be filtered by ``Flags`` before
+using channels such as ``Coordinates``, ``Intensity``, ``HitNormal``, or
+``Velocity`` as real returns.
 
 For map/read code, refer to :doc:`pointclouds`.

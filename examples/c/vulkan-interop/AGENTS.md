@@ -105,15 +105,16 @@ Options:
 
 Initialization:
 
-1. `ovrtx_initialize` -> `ovrtx_create_renderer`
-2. Create an ovstage instance, attach it to OVRTX, populate USD with `ovstage_population_open_usd_from_file`, and advance the write floor
-3. Call `cuda_init(&cuda_uuid)` to use the CUDA context/device selected by OVRTX
-4. Run one `ovrtx_step_with_stage` to detect output type and dimensions
-5. Create Vulkan context using CUDA UUID for device matching
-6. Create two exportable sampled images (`SHARED_IMAGE_COUNT = 2`)
-7. Export Vulkan image memory and import into CUDA as surface-backed arrays
-8. Export Vulkan timeline semaphore and import into CUDA
-9. Prime first frame into buffer 0
+1. `cuda_apply_scheduling_workaround()` as the first statement of `main()`, before anything can create a CUDA context
+2. `ovrtx_initialize` -> `ovrtx_create_renderer`
+3. Create an ovstage instance, attach it to OVRTX, populate USD with `ovstage_population_open_usd_from_file`, and advance the write floor
+4. Configure CUDA-visible device 0 in ovrtx, then call `cuda_init(0, &cuda_uuid)` to validate the OVRTX context and obtain its MIG-aware UUID with `cuDeviceGetUuid_v2`
+5. Run one `ovrtx_step_with_stage` to detect output type and dimensions
+6. Create Vulkan context using CUDA UUID for device matching
+7. Create two exportable sampled images (`SHARED_IMAGE_COUNT = 2`)
+8. Export Vulkan image memory and import into CUDA as surface-backed arrays
+9. Export Vulkan timeline semaphore and import into CUDA
+10. Prime first frame into buffer 0
 
 Main loop:
 
@@ -148,11 +149,13 @@ The core OVRTX frame lifecycle used by this sample:
 
 Do not skip unmap/destroy; the sample treats these as required per-frame cleanup.
 
+CUDA device identity is based on process-visible ordinals after `CUDA_VISIBLE_DEVICES` filtering. The configured ovrtx GPU, RenderProduct `deviceIds`, and mapped DLPack `device_id` use that same ordinal namespace. Vulkan device selection compares `cuDeviceGetUuid_v2` with `VkPhysicalDeviceIDProperties::deviceUUID`; never use PCI identity, `cudaDeviceProp::uuid`, or legacy `cuDeviceGetUuid` to distinguish MIG instances.
+
 ## Output Type and Format Mapping
 
 Output detection:
 
-- Search render vars for `HdrColor` first, then `LdrColor`.
+- Search render vars by source name for `HdrColor` first, then `LdrColor`; OVRTX reports regular USD RenderVars by full prim path.
 - `HdrColor` is preferred when both exist.
 
 Format mapping used in this sample:
@@ -171,6 +174,8 @@ Format mapping used in this sample:
   - CUDA writes `write_idx`
   - Vulkan samples `read_idx`
   - indices swap only after CUDA frame is complete
+- Known driver scheduling interaction on Linux: the OVRTX -> CUDA stream wait above disturbs Vulkan scheduling and stalls the renderer's GPU work. Workaround is `CUDA_DEVICE_MAX_CONNECTIONS=1` in the environment before the first CUDA context is created. `cuda_apply_scheduling_workaround()` (`src/cuda/cuda_kernel.cpp`, snippet `cuda-device-max-connections`) does this from the first statement of `main()`, so the call site must stay first; it defers to a value already in the environment, which is the no-rebuild opt-out. See `docs/core/cuda_vulkan_scheduling.rst`. Windows is unaffected, where the function is a no-op.
+- The interaction needs **both** an outstanding stream wait and concurrent renderer Vulkan submission. An outstanding wait alone is not enough: if the loop blocks on the copy before enqueueing more renderer work, the renderer sits idle and nothing is disturbed. This is why only the headless loop reproduces it (`Runtime Flow`), while the windowed loop, which gates the next step on the previous copy, shows no difference from the workaround.
 
 ## Camera and Scene Updates
 
@@ -188,7 +193,7 @@ Format mapping used in this sample:
 - Picking remains active while attached to ovstage and prints resolved prim paths.
 - Selection outlines are enabled at renderer creation with `ovrtx_config_entry_selection_outline_enabled(true)` and `ovrtx_config_entry_selection_fill_mode(OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR)`.
 - Group `1` is styled once at startup with `ovrtx_set_selection_group_styles()` (custom outline color plus translucent fill).
-- The current selection is drawn by assigning group `1` through `ovrtx_set_selection_outline_group()`; group `0` clears the prior selection. This is renderer-only, stream-ordered state that works in BORROW attach mode without `ovrtx_write_attribute()` or Fabric attribute writes.
+- The current selection is drawn by assigning group `1` through `ovrtx_set_selection_outline_group()`; group `0` clears the prior selection. This is renderer-only, stream-ordered state that works while attached without `ovrtx_write_attribute()` or scene attribute writes.
 
 ## Dependencies
 

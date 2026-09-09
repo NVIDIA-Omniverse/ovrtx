@@ -56,7 +56,7 @@ def "Render"
 
 # [snippet:doc-interpret-semantic-segmentation-python]
 def _map_render_var(frame, name: str) -> np.ndarray:
-    mapped = frame.render_vars[name].map(device=ovrtx.Device.CPU)
+    mapped = frame.render_vars[f"/Render/SemanticCamera/{name}"].map(device=ovrtx.Device.CPU)
     view = np.from_dlpack(mapped)
     result = view.copy()
     del view, mapped

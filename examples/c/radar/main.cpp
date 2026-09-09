@@ -41,6 +41,7 @@
 namespace {
 
 constexpr char kRenderProductPath[] = "/World/Render/Products/RadarProduct";
+constexpr char kPointCloudRenderVarPath[] = "/World/Render/Vars/PointCloud";
 constexpr char kDefaultSceneFileName[] = "radar_example.usda";
 constexpr int kWarmupStepCount = 3;
 constexpr int kMotionStepCount = 10;
@@ -157,7 +158,7 @@ bool wait_for_success(ovrtx_renderer_t* renderer,
 // This example has one render product and one PointCloud render variable.
 ovrtx_render_var_output_handle_t find_render_var_output(
     ovrtx_render_product_set_outputs_t const& outputs,
-    char const* render_var_name)
+    char const* output_to_find)
 {
     for (size_t p = 0; p < outputs.output_count; ++p) {
         ovrtx_render_product_output_t const& product = outputs.outputs[p];
@@ -170,7 +171,7 @@ ovrtx_render_var_output_handle_t find_render_var_output(
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const& var =
                     frame.output_render_vars[v];
-                if (string_equals(var.render_var_name, render_var_name)) {
+                if (string_equals(var.render_var_path, output_to_find)) {
                     return var.output_handle;
                 }
             }
@@ -218,32 +219,45 @@ T const* cpu_tensor_data(ovrtx_render_var_output_t const& output,
 // [/snippet:cpu-tensor-helper]
 
 // [snippet:read-radar-pointcloud]
-// Read the mapped PointCloud tensors for one step. Counts tells how many point
-// entries are valid; RCS and RadialVelocityMs are per-detection values.
+// Read the mapped PointCloud tensors for one step. Counts bounds the delivered
+// detection entries; Flags determines per-entry validity.
 bool print_pointcloud_step(ovrtx_render_var_output_t const& output,
                            int step,
                            int* moving_detection_count,
                            float* max_abs_radial_velocity)
 {
-    // The USD requests these channels on the radar PointCloud RenderVar.
+    // The USD requests the payload channels; the model auto-enables Counts and
+    // Flags.
     int32_t const* counts_data = cpu_tensor_data<int32_t>(output, "Counts");
+    uint8_t const* flags_data = cpu_tensor_data<uint8_t>(output, "Flags");
     float const* rcs_data = cpu_tensor_data<float>(output, "RCS");
     float const* radial_velocity_data =
         cpu_tensor_data<float>(output, "RadialVelocityMs");
 
-    if (!counts_data || !rcs_data || !radial_velocity_data) {
+    if (!counts_data || !flags_data || !rcs_data || !radial_velocity_data) {
         return false;
     }
 
-    // Counts is a scalar tensor containing the number of valid point entries.
-    int32_t const valid_point_count = counts_data[0];
-    if (valid_point_count <= 0) {
-        std::cerr << "Expected at least one valid radar point, got "
-                  << valid_point_count << "\n";
+    // Counts is a scalar tensor containing the delivered detection count.
+    int32_t const detection_count = counts_data[0];
+    if (detection_count <= 0) {
+        std::cerr << "Expected at least one radar detection, got "
+                  << detection_count << "\n";
         return false;
     }
 
-    const size_t valid_points = static_cast<size_t>(valid_point_count);
+    const size_t detection_entries = static_cast<size_t>(detection_count);
+    constexpr uint8_t kValidFlag = 0x40;
+    size_t valid_detection_count = 0;
+    for (size_t i = 0; i < detection_entries; ++i) {
+        if ((flags_data[i] & kValidFlag) != 0) {
+            ++valid_detection_count;
+        }
+    }
+    if (valid_detection_count == 0) {
+        std::cerr << "Radar PointCloud contained no valid detections\n";
+        return false;
+    }
 
     // RCS is the radar cross section channel returned for each detection.
     bool found_finite_rcs = false;
@@ -251,7 +265,10 @@ bool print_pointcloud_step(ovrtx_render_var_output_t const& output,
     float max_rcs = -std::numeric_limits<float>::infinity();
 
     // RCS values are regular float channel entries in the composite output.
-    for (size_t i = 0; i < valid_points; ++i) {
+    for (size_t i = 0; i < detection_entries; ++i) {
+        if ((flags_data[i] & kValidFlag) == 0) {
+            continue;
+        }
         const float rcs_value = rcs_data[i];
         if (std::isfinite(rcs_value)) {
             found_finite_rcs = true;
@@ -260,7 +277,8 @@ bool print_pointcloud_step(ovrtx_render_var_output_t const& output,
         }
     }
     if (!found_finite_rcs) {
-        std::cerr << "RCS tensor was present but contained no finite values for valid points\n";
+        std::cerr
+            << "RCS tensor was present but contained no finite values for valid detections\n";
         return false;
     }
 
@@ -271,7 +289,10 @@ bool print_pointcloud_step(ovrtx_render_var_output_t const& output,
 
     // Approaching objects report negative radial velocity; track magnitude when
     // reporting detections from the moving cube.
-    for (size_t i = 0; i < valid_points; ++i) {
+    for (size_t i = 0; i < detection_entries; ++i) {
+        if ((flags_data[i] & kValidFlag) == 0) {
+            continue;
+        }
         const float radial_velocity = radial_velocity_data[i];
         if (!std::isfinite(radial_velocity)) {
             continue;
@@ -287,14 +308,15 @@ bool print_pointcloud_step(ovrtx_render_var_output_t const& output,
         }
     }
     if (!found_finite_radial_velocity) {
-        std::cerr << "RadialVelocityMs tensor contained no finite values for valid points\n";
+        std::cerr
+            << "RadialVelocityMs tensor contained no finite values for valid detections\n";
         return false;
     }
 
     *moving_detection_count += step_moving_detection_count;
 
     std::cout << "  step " << step
-              << ": valid points=" << valid_point_count
+              << ": valid points=" << valid_detection_count
               << ", RCS min/max=[" << min_rcs << ", " << max_rcs << "]"
               << ", radial velocity min/max=[" << min_radial_velocity << ", "
               << max_radial_velocity << "]"
@@ -649,7 +671,7 @@ int main(int argc, char* argv[])
         }
 
         ovrtx_render_var_output_handle_t pointcloud_handle =
-            find_render_var_output(outputs, "PointCloud");
+            find_render_var_output(outputs, kPointCloudRenderVarPath);
         if (pointcloud_handle == OVRTX_INVALID_HANDLE) {
             std::cerr << "PointCloud render var output not found\n";
             destroy_step_results(renderer, &step_handle);

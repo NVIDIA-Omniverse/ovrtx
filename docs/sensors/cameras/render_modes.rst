@@ -36,7 +36,7 @@ Available Modes
      - ``PathTracing``
      - Progressive path tracing that accumulates samples over multiple frames for ground-truth-quality rendering. Best suited for offline or reference-quality workflows where convergence time is acceptable.
    * - Minimal
-     - ``Minimal``
+     - ``MinimalRendering``
      - Lightweight rasterization-based rendering with minimal GPU cost. Use this when you need maximum throughput and do not require path-traced lighting -- for example, segmentation masks, bounding-box visualization, or high-FPS reinforcement learning loops.
 
 Choosing a Mode

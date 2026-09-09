@@ -1,0 +1,29 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "MotionKernel"
+)
+
+# [snippet:motion-shader-definition]
+def Shader "MotionKernel"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:spg:sourceAsset = @MotionKernel.cu@
+    uniform token info:spg:sourceAsset:subIdentifier = "motion"
+
+    # Two ordinary resource-inputs. Nothing here marks one of them as a past
+    # frame; that follows from the RenderVar the scene connects it to.
+    opaque inputs:Current
+    opaque inputs:Previous
+    float inputs:gain = 6.0
+    opaque outputs:Difference
+}
+# [/snippet:motion-shader-definition]

@@ -5,8 +5,6 @@ author with `info:implementationSource = "id"` and an `info:id` — no `.cu` or 
 This example chains two stdlib nodes: **Add** doubles `LdrColor`'s brightness by adding it to
 itself (saturating at 255), then **Scale** downscales that result to half resolution.
 
-> **ovrtx 0.4 compatibility:** This example uses the deprecated renderer scene-loading API so it can remain focused on SPG authoring. Use the 0.3-to-0.4 migration skill when moving scene management to ovstage.
-
 ```usda
 def Shader "AddNode"
 {
@@ -52,7 +50,17 @@ internal to the chain and only the final `Downscaled` AOV is published.
 uv run main.py
 ```
 
-A successful run writes `_output/input.png` and `_output/downscaled.png`.
+A successful run writes `_output/input.png` and `_output/downscaled.png`, and prints:
+
+```
+output 640x360 from 1280x720
+largest difference from the host-computed result: 0
+```
+
+Both nodes are exact in integers, so the comparison admits no tolerance. Add saturates to
+`min(2v, 255)` and Scale takes the source pixel under each destination pixel's centre, which
+`main.py` rebuilds on the host. A value that did not double means Add never ran; a size that
+did not halve means Scale never ran. Either exits non-zero.
 
 ## Other built-in nodes
 

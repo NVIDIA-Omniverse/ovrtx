@@ -59,15 +59,17 @@ static ovx_string_t ovx_str(char const* s) {
 static ovrtx_render_var_output_handle_t
 find_product_output(ovrtx_render_product_output_t const& product_output,
                     char const* output_to_find) {
+    size_t const output_to_find_len = strlen(output_to_find);
     for (size_t f = 0; f < product_output.output_frame_count; ++f) {
         ovrtx_render_product_frame_output_t const& frame =
             product_output.output_frames[f];
         for (size_t v = 0; v < frame.render_var_count; ++v) {
             ovrtx_render_product_render_var_output_t const& var =
                 frame.output_render_vars[v];
-            if (var.render_var_name.ptr &&
-                strncmp(var.render_var_name.ptr, output_to_find,
-                        var.render_var_name.length) == 0) {
+            if (var.render_var_path.ptr &&
+                var.render_var_path.length == output_to_find_len &&
+                strncmp(var.render_var_path.ptr, output_to_find,
+                        var.render_var_path.length) == 0) {
                 return var.output_handle;
             }
         }
@@ -461,7 +463,7 @@ static size_t docs_query_prefix_count(ovstage_instance_t* stage, char const* pre
 
 // Collect the string prim-paths of every prim matched by `query_handle`.
 // Enumerates via a read of the built-in usd-path attribute at latest(ordinal)
-// — the fabric-side authoritative source of prim identity. Groups' prims are
+// — the runtime-side authoritative source of prim identity. Groups' prims are
 // walked with the standard offset/count/index_map subsetting semantics so a
 // backend that returns non-contiguous prim groups is handled correctly.
 static std::set<std::string> docs_ovstage_collect_paths(
@@ -472,7 +474,7 @@ static std::set<std::string> docs_ovstage_collect_paths(
     path_dictionary_instance_t* pd = ovstage_get_path_dictionary(stage);
     if (!pd) return paths;
 
-    // Reading usd-path directly is not currently supported by the Fabric
+    // Reading usd-path directly is not currently supported by the runtime
     // backend even though it is filter-usable — use usd-prim-type which every
     // populated prim carries. We do not care about the tensor data; the
     // enumeration comes from group.prims.list.

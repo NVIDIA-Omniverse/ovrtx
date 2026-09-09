@@ -40,6 +40,7 @@
 namespace {
 
 constexpr char kRenderProductPath[] = "/World/Render/Products/LidarProduct";
+constexpr char kPointCloudRenderVarPath[] = "/World/Render/Vars/PointCloud";
 constexpr char kDefaultSceneFileName[] = "lidar_example.usda";
 constexpr int kWarmupStepCount = 3;
 constexpr double kStepDeltaTimeSeconds = 0.1;
@@ -154,7 +155,7 @@ bool wait_for_success(ovrtx_renderer_t* renderer,
 // This example has one render product and one PointCloud render variable.
 ovrtx_render_var_output_handle_t find_render_var_output(
     ovrtx_render_product_set_outputs_t const& outputs,
-    char const* render_var_name)
+    char const* output_to_find)
 {
     for (size_t p = 0; p < outputs.output_count; ++p) {
         ovrtx_render_product_output_t const& product = outputs.outputs[p];
@@ -167,7 +168,7 @@ ovrtx_render_var_output_handle_t find_render_var_output(
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const& var =
                     frame.output_render_vars[v];
-                if (string_equals(var.render_var_name, render_var_name)) {
+                if (string_equals(var.render_var_path, output_to_find)) {
                     return var.output_handle;
                 }
             }
@@ -215,8 +216,8 @@ T const* cpu_tensor_data(ovrtx_render_var_output_t const& output,
 // [/snippet:cpu-tensor-helper]
 
 // [snippet:read-lidar-pointcloud]
-// Read one mapped lidar PointCloud. Counts is the valid point count; Intensity
-// and TimeOffsetNs are per-point channels over that valid range.
+// Read one mapped lidar PointCloud. Counts bounds the delivered entries. The
+// scene sets includeInvalidPoints=false, so the delivered entries are valid.
 bool print_pointcloud_summary(ovrtx_render_var_output_t const& output)
 {
     // The USD also requests Coordinates; this example only needs scalar and
@@ -230,7 +231,8 @@ bool print_pointcloud_summary(ovrtx_render_var_output_t const& output)
         return false;
     }
 
-    // Counts is a scalar tensor containing the number of valid point entries.
+    // With invalid returns dropped by the scene, Counts is also the valid-point
+    // count.
     int32_t const valid_point_count = counts_data[0];
     if (valid_point_count <= 0) {
         std::cerr << "Expected at least one valid lidar point, got "
@@ -241,7 +243,7 @@ bool print_pointcloud_summary(ovrtx_render_var_output_t const& output)
     double intensity_sum = 0.0;
     int32_t max_time_offset_ns = time_offset_data[0];
 
-    // Only the first Counts entries are valid in each per-point channel.
+    // Only the first Counts entries are delivered in each per-point channel.
     for (int32_t i = 0; i < valid_point_count; ++i) {
         const float intensity = intensity_data[i];
         if (!std::isfinite(intensity)) {
@@ -556,7 +558,7 @@ int main(int argc, char* argv[])
     }
 
     ovrtx_render_var_output_handle_t pointcloud_handle =
-        find_render_var_output(outputs, "PointCloud");
+        find_render_var_output(outputs, kPointCloudRenderVarPath);
     if (pointcloud_handle == OVRTX_INVALID_HANDLE) {
         std::cerr << "PointCloud render var output not found\n";
         destroy_step_results(renderer, &step_handle);

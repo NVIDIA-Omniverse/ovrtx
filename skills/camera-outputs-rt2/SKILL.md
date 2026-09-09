@@ -14,7 +14,6 @@ description: >
   asks what AOVs/render vars are available, what format or dtype an output has, or how
   to read a specific output like depth, normals, albedo, or distance.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

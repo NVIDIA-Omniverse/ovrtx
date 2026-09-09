@@ -11,17 +11,13 @@
 Python: Planet System
 =====================
 
-Animated planetary system demo using ovrtx Python bindings. Demonstrates loading a USD scene and injecting additional geometry using ``add_usd_reference_from_string``, using ``bind_attribute``/``map_attribute`` for zero-copy transform updates, and GPU-accelerated animation with Warp kernels. Planets orbit a central cube with hierarchical animation (orbit parent rotation + planet self-spin).
-
-This example uses deprecated renderer stage APIs for its CPU and CUDA
-attribute-mapping paths. Use the 0.3-to-0.4 migration skill when updating stage
-management.
+Animated planetary system demo using ovrtx Python bindings. Demonstrates loading a USD scene into an attached ovstage, injecting additional geometry via ``ovstage.population.add_usd_reference_from_string``, reusing one ovstage query for ordinal-keyed per-frame transform writes, and GPU-accelerated animation with Warp kernels. Planets orbit a central cube with hierarchical animation (orbit parent rotation + planet self-spin).
 
 By default, rendered frames are streamed to `rerun.io <https://rerun.io/>`_ for live visualization. Frames can also be saved to disk as PNGs.
 
 .. pull-quote::
 
-   *“Create a Python animation example that loads a base scene, injects generated runtime geometry, creates persistent transform bindings, updates many transforms efficiently each simulation step using CPU or GPU compute, renders frames, optionally streams or saves them, and cleans up bindings explicitly.”*
+   *“Create a Python animation example that loads a base scene, injects generated runtime geometry, creates one reusable stage query, updates many transforms efficiently each simulation step using CPU or GPU compute, renders frames, optionally streams or saves them, and releases the query explicitly.”*
 
 .. image:: ../../img/example-planet-system.jpg
    :alt: Planet system example output

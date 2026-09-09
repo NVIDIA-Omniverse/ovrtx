@@ -4,8 +4,6 @@ The "hello world" of Sensor Processing Graphs (SPG). It runs a custom CUDA kerne
 post-processing pass over the renderer's `LdrColor` AOV, converting it to grayscale entirely
 on the GPU, and publishes the result as a new `LdrGrayscale` AOV.
 
-> **ovrtx 0.4 compatibility:** This example uses the deprecated renderer scene-loading API so it can remain focused on SPG authoring. Use the 0.3-to-0.4 migration skill when moving scene management to ovstage.
-
 This is the minimal **three-file** SPG shader:
 
 | File | Role |
@@ -23,6 +21,22 @@ The names line up across all three files — the `extern "C"` kernel name, the
 
 ![output](../../../img/example-spg-grayscale.png)
 
+## The same shader in Slang
+
+The same node is also provided as a Slang compute shader, so the two backends can be
+compared side by side:
+
+| CUDA | Slang |
+|------|-------|
+| `GrayscaleKernel.cu` | `GrayscaleKernel.slang` |
+| `GrayscaleKernel.cu.lua` | `GrayscaleKernel.slang.lua` |
+| `GrayscaleKernel.usda` | `GrayscaleKernel.slang.usda` |
+| `grayscale_scene.usda` | `grayscale_scene_slang.usda` |
+
+The shader definition and the scene wiring are the same for both; only the source asset
+differs. Slang nodes require the renderer to run on the Vulkan backend, which is the
+default.
+
 ## Prerequisites
 
 - Python 3.10-3.13
@@ -34,12 +48,18 @@ The names line up across all three files — the `extern "C"` kernel name, the
 ## Running
 
 ```bash
-uv run main.py
+uv run main.py                                   # CUDA
+uv run main.py --scene grayscale_scene_slang.usda  # Slang
 ```
 
 The first step compiles the CUDA kernel with NVRTC and may block for up to a minute on a
 fresh shader cache. A successful run writes `_output/input.png` (the rendered `LdrColor`) and
-`_output/grayscale.png` (the SPG output).
+`_output/grayscale.png` (the SPG output), which is the same image with the colour taken out.
+
+The run checks `R == G == B` in every pixel of the output, which is what grayscale means and
+which the renderer's own `LdrColor` does not satisfy. It tests the input too: on a scene that
+was already grey, a node that never ran would pass the first test. A failing check exits
+non-zero.
 
 ## How it works
 
@@ -48,7 +68,7 @@ fresh shader cache. A successful run writes `_output/input.png` (the rendered `L
 - The launch script's `args` list maps Lua-wrapped values to the kernel's C parameters in
   order — the binding is positional, not by name.
 - An SPG output AOV is read back exactly like a built-in render var:
-  `frame.render_vars["LdrGrayscale"].map(device=ovrtx.Device.CPU)`.
+  `frame.render_vars["/Render/GrayscaleDemo/LdrGrayscale"].map(device=ovrtx.Device.CPU)`.
 
-See the `spg-usd-lua-authoring` skill and the **Sensor Processing Graphs** section of the docs
+See the `spg` skill and the **Sensor Processing Graphs** section of the docs
 for the full authoring reference.

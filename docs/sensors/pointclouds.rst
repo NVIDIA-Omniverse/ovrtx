@@ -12,9 +12,11 @@ Reading Sensor PointClouds
 ==========================
 
 Lidar and radar ``PointCloud`` RenderVars are composite render outputs. Mapping
-one output exposes one named tensor per requested channel plus CPU params that
-describe the output. Use ``Counts`` to bound per-point or per-detection tensors
-before reading channel values.
+one output exposes one named tensor per requested payload channel, model-added
+``Counts`` and ``Flags`` tensors, and CPU params that describe the output.
+``Counts[0]`` is the delivered-entry count; delivered indices are
+``[0, Counts[0])``. When invalid entries may be present, use the ``Flags``
+``VALID`` bit (``Flags[i] & 0x40``) to determine per-entry validity.
 
 For the output container format, refer to :doc:`sensor_outputs`. For sensor-specific
 channel meanings, refer to :doc:`lidar` and :doc:`radar`.
@@ -40,11 +42,12 @@ Python
          :end-before: # [/snippet:read-radar-pointcloud]
          :dedent:
 
-In Python, ``frame.render_vars["PointCloud"].map(device=ovrtx.Device.CPU)``
-returns a mapped composite output. Index by exact channel name, then pass the
-channel object to a DLPack consumer such as NumPy. The mapping is
-consumer-owned: a held DLPack view keeps the data valid past ``unmap``, so copy
-only when data must outlive the last held view.
+In Python, ``frame.render_vars`` is keyed by the full RenderVar prim path, for
+example ``frame.render_vars["/World/Render/Vars/PointCloud"]`` in the lidar and
+radar examples. Mapping that output returns the composite ``PointCloud`` data.
+Index by exact channel name, then pass the channel object to a DLPack consumer
+such as NumPy. The mapping is consumer-owned: a held DLPack view keeps the data
+valid past ``unmap``, so copy only when data must outlive the last held view.
 
 C
 -
@@ -68,9 +71,9 @@ C
          :dedent:
 
 In C, map the ``PointCloud`` render var with
-:c:func:`ovrtx_map_render_var_output`, find named tensors in
+:c:func:`ovrtx_map_render_var_output()`, find named tensors in
 ``ovrtx_render_var_output_t::tensors``, then unmap with
-:c:func:`ovrtx_unmap_render_var_output`.
+:c:func:`ovrtx_unmap_render_var_output()`.
 
 CPU and CUDA Mapping
 --------------------
@@ -81,16 +84,27 @@ available for GPU point-cloud pipelines:
 - Python uses ``map(device=ovrtx.Device.CUDA)``.
 - C uses ``OVRTX_MAP_DEVICE_TYPE_CUDA`` for linear CUDA memory.
 
-GPU-mapped tensors are CUDA DLTensors. Consume them with GPU-aware code and
-respect the synchronization hints on the mapped output. ``CUDA_ARRAY`` mapping
-is intended for image-style outputs, not point-cloud channel tensors.
+Each mapped ``DLTensor`` object's ``device`` field reports its actual storage
+device type and ID. Explicit CPU mapping returns ``kDLCPU`` tensors, and
+explicit CUDA mapping returns linear ``kDLCUDA`` tensors. In C,
+``OVRTX_MAP_DEVICE_TYPE_DEFAULT`` lets the runtime choose the most efficient
+representation; inspect ``device`` on every returned ``DLTensor``. Params remain
+CPU-resident for every mapping mode.
+
+Consume CUDA tensors with GPU-aware code and respect the synchronization hints
+on the mapped output. ``CUDA_ARRAY`` mapping is intended for image-style
+outputs, not point-cloud channel tensors.
 
 Rules
 -----
 
-- Use ``Counts[0]`` before slicing or iterating per-point tensors.
-- Treat channel names as part of the data contract; they must match the
-  ``channels`` authored on the ``PointCloud`` RenderVar.
+- Use ``Counts[0]`` as the delivered-entry count before slicing or iterating
+  per-point or per-detection tensors.
+- Do not treat ``Counts`` as proof that every delivered entry is valid. When
+  invalid entries may be present, keep entries whose ``Flags`` ``VALID`` bit is
+  set (``Flags[i] & 0x40``).
+- Treat requested payload channel names as part of the data contract; they must
+  match the ``channels`` authored on the ``PointCloud`` RenderVar.
 - ``Counts`` and ``Flags`` are auto-enabled by lidar and radar models.
 - Other payload channels are present only when requested.
 - In Python the mapping is consumer-owned: a held DLPack consumer view (for example, a NumPy array) keeps the
@@ -113,14 +127,15 @@ Produced by the lidar sensor model.
 
 .. code-block:: text
 
-    ovrtx_render_var_output_t "PointCloud"
-      name:    "PointCloud"
+    ovrtx_render_var_output_t
+      name:    "/World/Render/Vars/PointCloud"
+      type:    "PointCloud"
 
-      tensors (all CUDA, Nmax is the per-frame allocation bound):
+      tensors (device reported by each DLTensor; Nmax is the per-frame allocation bound):
         "Coordinates"    -- [3, Nmax]   float32   (x, y, z per point; spherical or cartesian per coordsType)
         "Intensity"      -- [Nmax]      float32   (return intensity per point)
         "Flags"          -- [Nmax]      uint8     (validity / classification flags; auto-enabled)
-        "Counts"         -- [1]         int32     (actual number of valid points this frame; auto-enabled)
+        "Counts"         -- [1]         int32     (number of delivered point entries this frame; auto-enabled)
         "TimeOffsetNs"   -- [Nmax]      int32     (per-point time offset from frame start)
         "EmitterId"      -- [Nmax]      uint32    (emitter / beam index)
         "ChannelId"      -- [Nmax]      uint32    (channel / detector index)
@@ -132,7 +147,7 @@ Produced by the lidar sensor model.
         "EchoId"         -- [Nmax]      uint8     (echo / return index)
         "TickState"      -- [Nmax]      uint8     (per-tick state)
 
-      params (CPU):
+      params (always CPU):
         "frameId"                  -- uint64
         "timestampNs"              -- uint64
         "modality"                 -- uint32
@@ -146,7 +161,7 @@ Produced by the lidar sensor model.
         "frameEndTimeStampNs"      -- uint64
         "frameEndPosM"             -- float32 [3]
         "frameEndOrientation"      -- float32 [4]
-        "maxPoints"                -- uint32     (maximum point allocation; use Counts for the valid per-frame count)
+        "maxPoints"                -- uint32     (maximum point allocation; use Counts for the delivered per-frame range)
 
 Field-by-field meaning, units, and visualization patterns are in :doc:`lidar`.
 
@@ -157,18 +172,19 @@ Produced by the radar sensor model.
 
 .. code-block:: text
 
-    ovrtx_render_var_output_t "PointCloud"
-      name:    "PointCloud"
+    ovrtx_render_var_output_t
+      name:    "/World/Render/Vars/PointCloud"
+      type:    "PointCloud"
 
-      tensors (all CUDA, Nmax is the per-frame allocation bound):
+      tensors (device reported by each DLTensor; Nmax is the per-frame allocation bound):
         "Coordinates"      -- [3, Nmax]  float32   (range, azimuth, elevation -- or x, y, z per coordsType)
         "RCS"              -- [Nmax]     float32   (radar cross section)
         "RadialVelocityMs" -- [Nmax]     float32   (radial velocity, m/s -- negative for approaching)
         "TimeOffsetNs"     -- [Nmax]     int32     (per-detection time offset from frame start)
         "Flags"            -- [Nmax]     uint8     (auto-enabled)
-        "Counts"           -- [1]        int32     (actual number of valid detections this frame; auto-enabled)
+        "Counts"           -- [1]        int32     (number of delivered detections this frame; auto-enabled)
 
-      params (CPU):
+      params (always CPU):
         "frameId"                  -- uint64
         "timestampNs"              -- uint64
         "modality"                 -- uint32
@@ -181,6 +197,6 @@ Produced by the radar sensor model.
         "frameEndTimeStampNs"      -- uint64
         "frameEndPosM"             -- float32 [3]
         "frameEndOrientation"      -- float32 [4]
-        "maxPoints"                -- uint32     (maximum detection allocation; use Counts for the valid per-frame count)
+        "maxPoints"                -- uint32     (maximum detection allocation; use Counts for the delivered per-frame range)
 
 Field-by-field meaning is in :doc:`radar`.

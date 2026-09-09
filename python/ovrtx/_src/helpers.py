@@ -8,6 +8,7 @@
 
 import contextvars
 import functools
+import inspect
 import warnings
 import weakref
 from typing import Callable
@@ -30,7 +31,7 @@ def deprecated(replacement: str):
     """Mark a public Python API deprecated while suppressing nested delegation warnings."""
 
     def decorate(function: Callable):
-        message = f"{function.__qualname__} is deprecated in ovrtx 0.4. {replacement}"
+        message = f"{function.__qualname__} has been deprecated since ovrtx 0.4. {replacement}"
 
         @functools.wraps(function)
         def wrapped(*args, **kwargs):
@@ -44,7 +45,14 @@ def deprecated(replacement: str):
             finally:
                 _DEPRECATION_DEPTH.reset(token)
 
-        wrapped.__doc__ = f"Deprecated since ovrtx 0.4. {replacement}\n\n{function.__doc__ or ''}"
+        # cleandoc() before prepending: the notice is unindented, so on Python < 3.13
+        # (which does not dedent docstrings at compile time) a raw concatenation leaves
+        # an unindented line above an indented body. Every consumer that infers the
+        # block indent from the docstring -- help(), IDE tooltips, and Sphinx's
+        # prepare_docstring -- then computes a margin of zero and dedents nothing,
+        # which stops Napoleon from recognizing the "Args:"/"Returns:" sections.
+        body = inspect.cleandoc(function.__doc__ or "")
+        wrapped.__doc__ = f"Deprecated since ovrtx 0.4. {replacement}\n\n{body}"
         setattr(wrapped, "__ovrtx_deprecated__", message)
         return wrapped
 

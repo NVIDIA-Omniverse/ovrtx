@@ -14,7 +14,6 @@ description: >
   workflows. Use when user asks about async rendering, non-blocking operations,
   polling, timeouts, or parallel rendering.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

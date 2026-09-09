@@ -39,6 +39,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.graphviz",
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx_mdinclude",
@@ -47,6 +48,13 @@ extensions = [
 ]
 
 # -- Options for Breathe (C API documentation) -------------------------------
+# -- Options for graphviz (SPG graph diagrams) -------------------------------
+# SVG so the diagrams stay sharp at any zoom. Node fills carry the meaning: data
+# resources in slate, SPG nodes in green, so a reader can tell them apart at a
+# glance and the colours read on both the light and the dark theme.
+graphviz_output_format = "svg"
+graphviz_dot_args = ["-Gbgcolor=transparent"]
+
 breathe_projects = {"ovrtx": "_doxygen/xml"}
 breathe_default_project = "ovrtx"
 breathe_default_members = ("members", "undoc-members")
@@ -57,7 +65,10 @@ breathe_domain_by_extension = {"h": "c"}
 mdinclude_transform = True
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+# README.md is contributor-facing build instructions, not published documentation.
+# Without this exclusion Sphinx renders it as an orphan page (in no toctree) that is
+# still served on the public site.
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "README.md"]
 
 # Suppress warnings for known issues
 suppress_warnings = [
@@ -231,5 +242,12 @@ def convert_markdown_codeblocks(app, what, name, obj, options, lines):
     lines.extend(result)
 
 
+def hide_dlpack_methods(app, what, name, obj, skip, options):
+    if name in {"__dlpack__", "__dlpack_device__"}:
+        return True
+    return None
+
+
 def setup(app):
+    app.connect("autodoc-skip-member", hide_dlpack_methods, priority=100)
     app.connect("autodoc-process-docstring", convert_markdown_codeblocks)

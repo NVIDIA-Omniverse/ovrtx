@@ -82,8 +82,8 @@ Common configuration entries include:
          * - ``datastore_cache="grpcdns://host:port"``
            - Configure the UJITSO datastore cache. ``grpcdns_notls://`` and ``local://`` are also supported.
              When omitted, existing cache defaults and environment configuration remain unchanged.
-         * - ``use_vulkan=True``
-           - Select the Vulkan backend where supported.
+         * - ``enable_geometry_streaming=True``
+           - Opt in to geometry streaming. Disabled by default when omitted or ``None``.
          * - ``motion_bvh=...``
            - Motion BVH mode: ``"disable"`` (default), ``"enable"``, or ``"auto"``.
              Sensors that require motion effects (for example, lidar, radar, acoustic, rolling-shutter camera)
@@ -117,8 +117,8 @@ Common configuration entries include:
          * - :c:func:`ovrtx_config_entry_datastore_cache`
            - Configure the UJITSO datastore cache with ``grpcdns://``,
              ``grpcdns_notls://``, or ``local://``.
-         * - :c:func:`ovrtx_config_entry_use_vulkan`
-           - Select the Vulkan backend where supported.
+         * - :c:func:`ovrtx_config_entry_enable_geometry_streaming`
+           - Opt in to geometry streaming. Disabled by default when omitted.
          * - :c:func:`ovrtx_config_entry_motion_bvh`
            - Motion BVH mode: ``OVRTX_MOTION_BVH_DISABLE`` (default),
              ``OVRTX_MOTION_BVH_ENABLE``, or ``OVRTX_MOTION_BVH_AUTO``.
@@ -138,10 +138,20 @@ not make every texture loading operation synchronous.
 Renderer-level ``active_cuda_gpus`` must be compatible with any per-RenderProduct
 ``deviceIds`` allow-list. Refer to :ref:`render-product-device-pinning`.
 
+Backend Support
+---------------
+
+OVRTX 0.5 public packages use Vulkan on Windows and Linux. The former
+``use_vulkan`` Python field, ``OVRTX_CONFIG_USE_VULKAN`` C key, and
+``ovrtx_config_entry_use_vulkan()`` C helper have been removed. Passing the
+retired C key from a pre-0.5 binary returns ``OVRTX_API_ERROR`` with a migration
+diagnostic; recompile the application against the 0.5 headers and remove the
+backend selection entry.
+
 Runtime Package Layout
 ----------------------
 
-With dynamic linking, ovrtx expects the binary package ``bin`` layout to stay
+With the shared-loader model, ovrtx expects the binary package ``bin`` layout to stay
 together next to ``libovrtx-dynamic.so`` or ``ovrtx-dynamic.dll``. The runtime
 package includes directories such as ``cache``, ``library``, ``libs``, ``mdl``,
 ``plugins``, ``rendering-data``, and ``usd_plugins``.

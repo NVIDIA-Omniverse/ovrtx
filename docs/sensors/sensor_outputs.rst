@@ -25,9 +25,24 @@ After a renderer step completes, each RenderProduct result contains one or more
 render var outputs. A render var output must be mapped before application code
 can read its tensor data.
 
-In C, map with :c:func:`ovrtx_map_render_var_output`. In Python, use
-``RenderVarOutput.map(device=Device.CPU | Device.CUDA)``. Tensor data is
-returned on the requested device, while params are always CPU-resident.
+In C, map with :c:func:`ovrtx_map_render_var_output()`. In Python, use
+``RenderVarOutput.map(device=...)`` with ``Device.CPU``, ``Device.CUDA``, or
+``Device.CUDA_ARRAY``. Tensor data is
+returned on the requested device, while params are always CPU-resident. For
+output types that support the requested mode, explicit CPU and CUDA
+mappings return ``kDLCPU`` and linear ``kDLCUDA`` tensors, respectively.
+``Device.DEFAULT`` / ``OVRTX_MAP_DEVICE_TYPE_DEFAULT`` lets the runtime choose
+the most efficient representation; inspect ``device`` on every returned
+``DLTensor``.
+
+``Device.CUDA_ARRAY`` is the zero-copy path for image outputs. It returns an
+opaque CUDA array handle instead of readable memory, so the tensor reports an
+opaque-handle dtype and cannot be consumed through DLPack. Read the handle from
+``tensor.cuda_array`` and consume it with a CUDA library of your choice --
+Warp 1.15+ (``wp.Texture2D(cuda_array=handle)``), CuPy's ``cupy.cuda.texture``,
+or your own CUDA wrapper. It requires the output to be array-backed, which is
+the norm for image render targets; requesting it for an output held in linear
+CUDA memory fails and directs you to ``Device.CUDA`` instead.
 
 Single-tensor camera outputs such as ``LdrColor`` can be consumed directly as a
 DLPack tensor. Composite outputs such as lidar and radar ``PointCloud`` expose
@@ -127,7 +142,7 @@ container that pairs zero or more bulk *tensors* with zero or more lightweight
 
     ovrtx_render_var_output_t
        |
-       |-- name        : string    -- identifies this output (matches the RenderVar prim name in USD)
+       |-- name        : string    -- identifies this output (full RenderVar prim path in USD)
        |-- type        : string    -- semantic type tag (e.g. "PointCloud", "HdrColor")
        |-- doc         : string    -- human-readable description
        |-- version     : int       -- version of this output's schema, for forward/backward compatibility
@@ -156,11 +171,22 @@ Tensors carry the bulk data of an output. Each tensor is a named multi-dimension
 
 DLPack is the format that NumPy, PyTorch, Warp, JAX, and CuPy use to exchange tensor data zero-copy. Receiving a DLPack tensor lets the consumer build a view in any of those libraries without copying the underlying bytes.
 
-Tensor shapes for variable-sized outputs (for example, point clouds) encode the *maximum* extent rather than the actual count. The shape itself is in the descriptor, so it is available synchronously -- consumers read it to pre-allocate before the bulk data is ready. The actual per-frame count is delivered post-render through a separate scalar tensor (for example, ``Counts`` for sensor point clouds).
+Tensor shapes for variable-sized outputs (for example, point clouds) encode the
+*maximum* extent rather than the delivered-entry count. The shape itself is in
+the descriptor, so it is available synchronously -- consumers read it to
+pre-allocate before the bulk data is ready.
+
+The delivered per-frame entry count is provided post-render through a separate
+scalar tensor (for example, ``Counts`` for sensor point clouds). For outputs
+with a status channel such as ``Flags``, per-entry validity is a separate
+property.
 
 Two DLPack conventions worth surfacing: ``strides`` are expressed in *number of elements*, not bytes. A scalar value is represented as a one-element tensor with shape ``[1]`` (or ``[T]`` for one-per-tile).
 
 Examples of tensors within an output:
+
+The CUDA annotations below assume an explicit CUDA mapping. An explicit CPU
+mapping returns the same tensors as CPU DLTensors.
 
 - A lidar ``PointCloud`` output:
 
@@ -168,16 +194,16 @@ Examples of tensors within an output:
   - ``Intensity`` -- ``[maxPoints]`` ``float32``, CUDA
   - ``Flags`` -- ``[maxPoints]`` ``uint8``, CUDA
   - ``TimeOffsetNs`` -- ``[maxPoints]`` ``int32``, CUDA
-  - ``Counts`` -- ``[1]`` ``int32``, CUDA (actual number of valid points produced this frame)
+  - ``Counts`` -- ``[1]`` ``int32``, CUDA (number of delivered point entries this frame)
   - ...plus other channels (``EmitterId``, ``HitNormal``, ``Velocity``, ...) depending on what the ``RenderVar`` requests.
 
 - A camera ``HdrColor`` output:
 
   - one image tensor -- ``[H, W, 4]`` ``float16``, CUDA, accessed as the mapping itself through DLPack.
 
-The set of tensors that an output type publishes is determined by the output's semantic ``type`` and documented through the ``doc`` strings (and the higher-level wrappers, when one exists).
+The set of tensors that an output type publishes is determined by the output's semantic ``type`` and documented through the ``doc`` strings (and the higher-level wrappers, when one exists). The output ``render_var_path`` is the full RenderVar prim path, while the RenderVar's ``sourceName`` selects the semantic output type.
 
-For convenience, if an output has only a single tensor--such as camera outputs like ``LdrColor`` or ``DepthSD``--the Python wrapper exposes the mapping itself as the DLPack tensor. Composite render variables such as sensor ``PointCloud`` expose named tensors and params.
+For convenience, if an output has only a single tensor--such as camera outputs like ``LdrColor`` or the deprecated ``DepthSD``--the Python wrapper exposes the mapping itself as the DLPack tensor. Composite render variables such as sensor ``PointCloud`` expose named tensors and params.
 
 Params
 ^^^^^^
@@ -194,7 +220,7 @@ Examples of params (drawn from the sensor ``PointCloud`` output):
 - ``coordsType`` (uint32) -- spherical compared to cartesian coordinate encoding.
 - ``frameStartTimeStampNs`` / ``frameEndTimeStampNs`` (uint64) -- shutter open / close.
 
-Sizing information (e.g. the per-point tensor's maximum extent) is carried by the tensor's shape in the descriptor and does not need a separate param. The post-render *actual* count for a variable-sized output is carried by a tensor (e.g. ``Counts``) so that it stays on the producing stream.
+Sizing information (e.g. the per-point tensor's maximum extent) is carried by the tensor's shape in the descriptor and does not need a separate param. The post-render delivered-entry count for a variable-sized output is carried by a tensor (e.g. ``Counts``) so that it stays on the producing stream.
 
 Python Representation
 ^^^^^^^^^^^^^^^^^^^^^
@@ -204,7 +230,7 @@ The ovrtx Python module wraps the raw C struct in a small, ergonomic API. ``Rend
 - ``np.from_dlpack(rv)`` -- for a single-tensor render variable, the mapping itself is the DLPack view of that tensor (used for ``HdrColor`` / ``LdrColor``).
 - ``rv["Coordinates"]`` -- for a multi-tensor render variable, index by tensor name to get a ``RenderVarTensor`` (DLPack-compatible, zero-copy).
 - ``rv.params["frameId"]`` -- look up a ``RenderVarParam`` by name; also DLPack-compatible.
-- ``rv.name`` / ``rv.type`` / ``rv.doc`` / ``rv.version`` -- the output's identity and schema metadata.
+- ``rv.render_var_path`` / ``rv.type`` / ``rv.doc`` / ``rv.version`` -- the output's identity and schema metadata.
 
 These wrappers cover the common case. Consumers that need direct access can fall back to walking ``num_tensors`` / ``tensors`` and ``num_params`` / ``params`` (in C) or iterating the ``MappedRenderVar`` (in Python). Third-party sensor models can publish new output types without shipping any wrapper code -- the generic API works on anything that conforms to the format.
 

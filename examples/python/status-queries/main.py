@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 from PIL import Image
 
 USD_URL = "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Samples/Robot-OVRTX/robot-ovrtx.usda"
@@ -65,19 +66,26 @@ def main():
     args = parser.parse_args()
 
     # [snippet:create-renderer]
-    # Create the Renderer and load a USD layer into it
+    # Create the Renderer and attach the stage that owns scene data.
     output_dir = Path("_output")
     output_dir.mkdir(exist_ok=True)
     config = ovrtx.RendererConfig(log_file_path=str(output_dir / "status-queries-ovrtx.log"))
     print("Creating renderer...", file=sys.stderr)
     renderer = ovrtx.Renderer(config=config)
+    stage = ovstage.Stage("ovrtx.example.status-queries")
+    renderer.attach_ovstage(stage)
     print("Renderer created.", file=sys.stderr)
     # [/snippet:create-renderer]
 
     # [snippet:load-usd-with-status]
+    # Population operations complete on the stage; poll with a wait timeout
+    # (nanoseconds) for coarse progress reporting while the scene loads.
     print(f"Opening {USD_URL}...", file=sys.stderr)
-    load_op = renderer.open_usd_async(USD_URL)
-    wait_with_status(load_op, "open_usd")
+    ordinal = 1
+    load_op = ovstage.population.open_usd_async(stage, USD_URL, ordinal=ordinal)
+    while load_op.wait(timeout=1_000_000_000) is None:
+        print("open_usd: loading...", file=sys.stderr)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
     print("USD loaded.", file=sys.stderr)
     # [/snippet:load-usd-with-status]
 
@@ -85,9 +93,11 @@ def main():
     shader_cache_op = renderer.step_async(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
     pending_shader_cache_products = wait_for_shader_cache_step(shader_cache_op)
-    pending_shader_cache_products.fetch()
+    shader_cache_products = pending_shader_cache_products.fetch()
+    del shader_cache_products, pending_shader_cache_products, shader_cache_op
     # [/snippet:compile-shader-cache-with-status]
 
     # [snippet:step-with-status]
@@ -96,6 +106,7 @@ def main():
     step_op = renderer.step_async(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
     pending_products = wait_with_status(step_op, "step")
     products = pending_products.fetch()
@@ -107,8 +118,11 @@ def main():
     print("Fetching results...", file=sys.stderr)
     for _product_name, product in products.items():
         for frame in product.frames:
-            var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
-            pixels = np.from_dlpack(var)
+            var = frame.render_vars["/Render/Camera/LdrColor"].map(device=ovrtx.Device.CPU)
+            view = np.from_dlpack(var)
+            pixels = view.copy()
+            del view
+            var.unmap()
             img = Image.fromarray(pixels)
             if args.png:
                 img.save(output_dir / "render.png")
@@ -117,6 +131,12 @@ def main():
                 img.show()
     print("Fetched results.", file=sys.stderr)
     # [/snippet:read-render-output]
+
+    del var, frame, product, products
+    del pending_products, step_op
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
 
 
 if __name__ == "__main__":

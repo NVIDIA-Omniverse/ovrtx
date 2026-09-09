@@ -15,7 +15,6 @@ description: >
   visualization values. Use reading-sensor-pointclouds when the user needs to map or
   fetch the tensors first.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -77,7 +76,7 @@ Lidar `PointCloud` output is a composite render var with per-point tensors. Use 
 > **Source:** `examples/python/lidar/main.py` snippet `read-lidar-pointcloud`
 > **Source:** `examples/c/lidar/main.cpp` snippet `read-lidar-pointcloud`
 
-The lidar examples demonstrate a minimal interpretation path: read `Coordinates`, `Counts`, `Intensity`, and `TimeOffsetNs`, slice each per-point tensor to the valid range, and summarize or visualize the result.
+The lidar examples demonstrate a minimal interpretation path: read `Coordinates`, `Counts`, `Intensity`, and `TimeOffsetNs`, slice each per-point tensor to the delivered range, and summarize or visualize the result. Their scenes explicitly set `includeInvalidPoints = false`, so the delivered range is also the valid range.
 
 ## Channels
 

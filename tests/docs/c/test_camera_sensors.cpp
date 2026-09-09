@@ -69,8 +69,8 @@ def "Render" {
     ASSERT_API_SUCCESS(result.status);
 
     // [snippet:doc-step-and-map-camera-outputs-c]
-    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "LdrColor");
-    ovrtx_render_var_output_handle_t hdr_handle = find_output(outputs, "HdrColor");
+    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
+    ovrtx_render_var_output_handle_t hdr_handle = find_output(outputs, "/Render/Camera/HdrColor");
     ASSERT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
     ASSERT_NE(hdr_handle, OVRTX_INVALID_HANDLE);
 

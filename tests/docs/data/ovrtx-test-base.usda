@@ -35,7 +35,7 @@
             double "rtx:pathtracing:fireflyFilter:maxUnexposedIntensityPerSample" = 3199.99951171875
             double "rtx:pathtracing:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse" = 3199.99951171875
             int "rtx:pathtracing:maxBounces" = 23
-            int "rtx:pathtracing:maxSpecularAndTransmissionBounces" = 23
+            int "rtx:pathtracing:extraSpecularAndTransmissiveBounces" = 0
             double "rtx:raytracing:inscattering:maxRTSampleUnexposedIntensity" = 204799.96875
             double "rtx:translucency:maxRayUnexposedIntensity" = 19199.998046875
         }

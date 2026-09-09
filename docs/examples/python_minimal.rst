@@ -13,9 +13,9 @@ Python: Minimal Example
 
 This is the minimal Python example from the ovrtx README. It demonstrates the basic workflow:
 
-1. Create a Renderer
-2. Load a USD layer from a remote S3 scene URL
-3. Step the renderer to produce a frame
+1. Create a Renderer and attach an ovstage Stage
+2. Populate the Stage from a remote S3 scene URL and publish its ordinal
+3. Step the renderer at that ordinal to produce a frame
 4. Map the rendered output and display it
 
 .. pull-quote::

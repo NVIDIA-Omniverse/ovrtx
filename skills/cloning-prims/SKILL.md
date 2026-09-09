@@ -13,7 +13,6 @@ description: >
   Cloning USD subtrees to create copies at new paths. Use when user asks to clone,
   duplicate, copy a prim, or create instances of existing geometry.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

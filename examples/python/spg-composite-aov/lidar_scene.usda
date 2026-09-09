@@ -1,0 +1,203 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "World"
+    startTimeCode = 0
+    endTimeCode = 1
+    timeCodesPerSecond = 10
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def OmniLidar "Lidar" (
+        prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+    )
+    {
+        token omni:sensor:Core:elementsCoordsType = "CARTESIAN"
+        # Only valid returns are delivered, so Counts bounds exactly the entries
+        # the shader may read.
+        bool omni:sensor:Core:includeInvalidPoints = false
+        double2 omni:sensor:frameRate = (10, 1)
+
+        double3 xformOp:translate = (0, 0, 1)
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    # A post marking where the sensor stands. It sits inside the sweep's blind
+    # zone: the steepest beam leaves at -15 degrees elevation, so from 1 m up it
+    # is already 0.89 m above the ground at this post's radius, and the post
+    # stops at 0.7 m. The lidar therefore cannot see it, and the histogram is the
+    # same with it as without. Widening or raising it would break that.
+    def Material "MarkerMaterial"
+    {
+        token outputs:surface.connect = </World/MarkerMaterial/Shader.outputs:surface>
+
+        def Shader "Shader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (1.0, 0.45, 0.1)
+            color3f inputs:emissiveColor = (1.6, 0.6, 0.12)
+            float inputs:roughness = 1
+            float inputs:metallic = 0
+            token outputs:surface
+        }
+    }
+
+    def Cylinder "SensorMarker" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </World/MarkerMaterial>
+        uniform token axis = "Z"
+        double height = 0.7
+        double radius = 0.35
+        float3[] extent = [(-0.35, -0.35, -0.35), (0.35, 0.35, 0.35)]
+        double3 xformOp:translate = (0, 0, 0.35)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    # The only two things the sensor can reach, so every return in the chart
+    # comes from one of them. There is deliberately no ground: a flat plane
+    # returns from every downward beam, at a different distance per elevation
+    # angle, which buries the boxes under tens of thousands of near returns.
+    #
+    # Each box is placed at its own bearing, because head on the near one would
+    # stand exactly in front of the far one and hide it: both cover the same 14
+    # degrees of azimuth.
+    #
+    # Each box is also turned to face the sensor. That is what puts one bar on
+    # the chart per box: the front face then lies at a single distance. Left
+    # axis aligned at these bearings, the far box would smear across a metre of
+    # range, because a 3 m wide face seen at an angle has its far corner further
+    # away than its near corner, and its side face further away still.
+    #
+    # The far box is twice as far and twice as wide, so it covers the same angle
+    # and collects the same number of beams. The two bars therefore come out the
+    # same height, and distance is the only thing that separates them.
+    def Cube "NearCube"
+    {
+        double size = 1.5
+        color3f[] primvars:displayColor = [(0.45, 0.43, 0.39)]
+        # 6 m from the sensor, bearing -14.45 degrees. The front face, which is
+        # what returns, is half the box nearer: 5.25 m.
+        double3 xformOp:translate = (5.82, -1.5, 0.75)
+        float xformOp:rotateZ = -14.45
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZ"]
+    }
+
+    def Cube "FarCube"
+    {
+        double size = 3
+        color3f[] primvars:displayColor = [(0.5, 0.4, 0.3)]
+        # 12 m from the sensor, bearing +14.47 degrees, front face at 10.5 m.
+        double3 xformOp:translate = (11.62, 3, 1.5)
+        float xformOp:rotateZ = 14.47
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZ"]
+    }
+
+
+    # A view camera for the reference image, placed to the side of the sensor's
+    # forward axis rather than along it, so the post and the two boxes are
+    # spread across the frame instead of overlapping. It is used only by the
+    # SceneView render product; the lidar is the camera for the product that
+    # matters.
+    def Camera "ViewCamera"
+    {
+        float2 clippingRange = (0.1, 10000)
+        float focalLength = 18
+        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 0.2425, 0.9701, 0), (0, -0.9701, 0.2425, 0), (6, -16, 5, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    # With no ground to bounce light, a single distant light leaves everything
+    # but the upward faces black. The dome lights the boxes from all round so
+    # they read as solid objects; the distant light keeps enough directionality
+    # to tell their faces apart.
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 600
+        token inputs:texture:format = "latlong"
+    }
+
+    def DistantLight "DistantLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float intensity = 2500
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+}
+
+# The PointCloud RenderVar is the composite. `channels` decides which channels it
+# carries, and those are exactly the names the launch script finds in .tensors:
+# ask for one here and it appears, leave it out and it does not. Counts is
+# requested because the shader needs it to know how much of the other channels
+# is real. Intensity is requested too, to show that asking for a channel is what
+# makes it appear; main.py reads it from the host even though the node does not.
+#
+# Histogram is an ordinary single-resource AOV, so a node can turn a composite
+# into something a normal image consumer can read.
+# [snippet:lidar-render-graph]
+def Scope "Render"
+{
+    def RenderProduct "LidarProduct"
+    {
+        rel camera = </World/Lidar>
+        rel orderedVars = [ <PointCloud>, <Histogram> ]
+
+        def RenderVar "PointCloud"
+        {
+            uniform string sourceName = "PointCloud"
+            opaque omni:rtx:aov
+            token[] channels = [
+                "Coordinates",
+                "Intensity",
+                "Counts",
+                "TimeOffsetNs"
+            ]
+        }
+
+        def RenderVar "Histogram"
+        {
+            uniform string sourceName = "Histogram"
+            opaque omni:rtx:aov.connect = <../RangeHistogramKernel.outputs:Histogram>
+        }
+
+        def Shader "RangeHistogramKernel" (
+            references = @RangeHistogramKernel.usda@
+        )
+        {
+            opaque inputs:PointCloud.connect = <../PointCloud.omni:rtx:aov>
+        }
+    }
+
+    # A second render product, this one an ordinary camera, so the run can save a
+    # picture of the scene the lidar is sweeping. It shares nothing with the
+    # lidar product but the scene: one step fills both.
+    def RenderProduct "SceneView"
+    {
+        uniform int2 resolution = (608, 342)
+        rel camera = </World/ViewCamera>
+        rel orderedVars = [ <LdrColor> ]
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+            opaque omni:rtx:aov
+        }
+    }
+}
+# [/snippet:lidar-render-graph]

@@ -1,0 +1,83 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+# Slang variant of lidar_scene.usda. The sensor and the world are referenced from
+# that scene so this file shows only what differs between the two backends: the
+# shader definition it instantiates.
+(
+    defaultPrim = "World"
+    startTimeCode = 0
+    endTimeCode = 1
+    timeCodesPerSecond = 10
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World" (
+    references = @lidar_scene.usda@</World>
+)
+{
+}
+
+# [snippet:lidar-render-graph]
+def Scope "Render"
+{
+    def RenderProduct "LidarProduct"
+    {
+        rel camera = </World/Lidar>
+        rel orderedVars = [ <PointCloud>, <Histogram> ]
+
+        def RenderVar "PointCloud"
+        {
+            uniform string sourceName = "PointCloud"
+            opaque omni:rtx:aov
+            token[] channels = [
+                "Coordinates",
+                "Intensity",
+                "Counts",
+                "TimeOffsetNs"
+            ]
+        }
+
+        def RenderVar "Histogram"
+        {
+            uniform string sourceName = "Histogram"
+            opaque omni:rtx:aov.connect = <../RangeHistogramKernel.outputs:Histogram>
+        }
+
+        # The only difference from lidar_scene.usda: this references the Slang
+        # shader definition instead of the CUDA one. The wiring is identical
+        # because both declare the same ports.
+        def Shader "RangeHistogramKernel" (
+            references = @RangeHistogramKernel.slang.usda@
+        )
+        {
+            opaque inputs:PointCloud.connect = <../PointCloud.omni:rtx:aov>
+        }
+    }
+
+    # A second render product, this one an ordinary camera, so the run can save a
+    # picture of the scene the lidar is sweeping. It shares nothing with the
+    # lidar product but the scene: one step fills both.
+    def RenderProduct "SceneView"
+    {
+        uniform int2 resolution = (608, 342)
+        rel camera = </World/ViewCamera>
+        rel orderedVars = [ <LdrColor> ]
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+            opaque omni:rtx:aov
+        }
+    }
+}
+# [/snippet:lidar-render-graph]

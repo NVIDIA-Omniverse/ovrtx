@@ -15,7 +15,6 @@ description: >
   visualization values. Use reading-sensor-pointclouds when the user needs to map or
   fetch the tensors first.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -77,7 +76,7 @@ Radar `PointCloud` output is a composite render var with one tensor per detectio
 > **Source:** `examples/python/radar/main.py` snippet `read-radar-pointcloud`
 > **Source:** `examples/c/radar/main.cpp` snippet `read-radar-pointcloud`
 
-The radar examples demonstrate the usual interpretation path: slice to valid detections, summarize channel values, and treat radial velocity sign deliberately.
+The radar examples demonstrate the usual interpretation path: slice to the delivered detection range, filter that range with `Flags`, summarize channel values, and treat radial velocity sign deliberately.
 
 ## Channels
 

@@ -1,0 +1,948 @@
+#usda 1.0
+(
+    customLayerData = {
+        dictionary cameraSettings = {
+            dictionary Front = {
+                double3 position = (0, 0, 50000)
+                double radius = 500
+            }
+            dictionary Perspective = {
+                double3 position = (500, 500, 500)
+                double3 target = (-0.00000397803842133726, 0.000007956076785831101, -0.000003978038307650422)
+            }
+            dictionary Right = {
+                double3 position = (-50000, 0, 0)
+                double radius = 500
+            }
+            dictionary Top = {
+                double3 position = (0, 50000, 0)
+                double radius = 500
+            }
+            string boundCamera = "/World/Camera"
+        }
+        dictionary omni_layer = {
+            dictionary locked = {
+            }
+            dictionary muteness = {
+            }
+        }
+        dictionary renderSettings = {
+        }
+    }
+    defaultPrim = "World"
+    endTimeCode = 100
+    metersPerUnit = 0.01
+    startTimeCode = 0
+    timeCodesPerSecond = 60
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def DomeLight "DomeLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float inputs:intensity = 1000
+        float inputs:shaping:cone:angle = 180
+        float inputs:shaping:cone:softness
+        float inputs:shaping:focus
+        color3f inputs:shaping:focusTint
+        asset inputs:shaping:ies:file
+        asset inputs:texture:file = @../../../tests/docs/data/studio.exr@
+        token inputs:texture:format = "latlong"
+        custom int omni:rtx:usdluxVersion = 2505
+        double3 xformOp:rotateXYZ = (0, 270, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Camera "Camera" (
+        prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+        hide_in_stage_window = false
+        no_delete = false
+    )
+    {
+        float4[] clippingPlanes = []
+        float2 clippingRange = (1, 10000000)
+        float exposure = 0
+        float exposure:fStop = 5
+        float exposure:iso = 100
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        float focalLength = 60
+        float focusDistance = 400
+        float fStop = 0
+        float horizontalAperture = 20.955
+        float horizontalApertureOffset = 0
+        custom vector3d omni:kit:centerOfInterest = (0, 0, -965.7928048217041)
+        custom float omni:rtx:autoExposure:adaptationSpeed = 3.5
+        custom bool omni:rtx:autoExposure:enabled = 0
+        custom bool omni:rtx:autoExposure:histogramClamping:enabled = 1
+        custom float omni:rtx:autoExposure:histogramClamping:maxLuminance = 100000
+        custom float omni:rtx:autoExposure:histogramClamping:minLuminance = 50
+        custom token omni:rtx:autoExposure:histogramFilter = "median"
+        custom float omni:rtx:autoExposure:whitePointScale = 10
+        token projection = "perspective"
+        uniform token purpose = "default"
+        double shutter:close = 0
+        double shutter:open = 0
+        uniform token stereoRole = "mono"
+        float verticalAperture = 15.2908
+        float verticalApertureOffset = 0
+        token visibility = "inherited"
+        float3 xformOp:rotateYXZ = (0.14732623, 90.09062, 58.407017)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (523.8372638016807, 779.3600085599357, -1.2947906700591434)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+
+    def Xform "ground"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def "ground" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale
+            double3 xformOp:translate
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_01" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_02" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 200)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_03" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_04" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, -200)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_05" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale
+            double3 xformOp:translate = (100, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_06" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (100, 0, 100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_07" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (100, 0, 200)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_08" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (100, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_09" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (100, 0, -200)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_10" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale
+            double3 xformOp:translate = (-100, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_11" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-100, 0, 100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_12" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-100, 0, 200)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_13" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-100, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def "ground_14" (
+            prepend payload = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-100, 0, -200)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+    }
+
+    def Scope "Looks"
+    {
+        def Material "mtl_uvalign"
+        {
+            token outputs:mdl:displacement.connect = </World/Looks/mtl_uvalign/Shader.outputs:out>
+            token outputs:mdl:surface.connect = </World/Looks/mtl_uvalign/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Looks/mtl_uvalign/Shader.outputs:out>
+
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                asset inputs:diffuse_texture = @../../../tests/docs/data/uv-align.png@ (
+                    colorSpace = "auto"
+                )
+                token outputs:out (
+                    renderType = "material"
+                )
+            }
+        }
+    }
+
+    def Xform "proj_planar"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (20, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def "cube" (
+            prepend payload = @../../../tests/docs/data/cube.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cube" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_planar/cube/Cube>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "planar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+            }
+        }
+
+        def "cone" (
+            prepend payload = @../../../tests/docs/data/cone.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.3, 0.3, 0.3)
+            double3 xformOp:translate = (0, 0, 50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cone" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_planar/cone/Cone>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "planar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-10, 50, 0)
+            }
+        }
+
+        def "cylinder" (
+            prepend payload = @../../../tests/docs/data/cylinder.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cylinder" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_planar/cylinder/Cylinder>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "planar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+            }
+        }
+
+        def "sphere" (
+            prepend payload = @../../../tests/docs/data/sphere.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.25, 0.25, 0.25)
+            double3 xformOp:translate = (0, 0, -50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Sphere" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_planar/sphere/Sphere>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "planar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (5, 50, 0)
+            }
+        }
+
+        def "torus" (
+            prepend payload = @../../../tests/docs/data/torus.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Torus" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_planar/torus/Torus>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "planar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-5, 25, 0)
+            }
+        }
+    }
+
+    def Xform "proj_spherical"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (70, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def "cube" (
+            prepend payload = @../../../tests/docs/data/cube.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cube" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_spherical/cube/Cube>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "sphericalNormalized"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+            }
+        }
+
+        def "cone" (
+            prepend payload = @../../../tests/docs/data/cone.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.3, 0.3, 0.3)
+            double3 xformOp:translate = (0, 0, 50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cone" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_spherical/cone/Cone>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "sphericalNormalized"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-10, 50, 0)
+            }
+        }
+
+        def "cylinder" (
+            prepend payload = @../../../tests/docs/data/cylinder.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cylinder" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_spherical/cylinder/Cylinder>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "sphericalNormalized"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+            }
+        }
+
+        def "sphere" (
+            prepend payload = @../../../tests/docs/data/sphere.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.25, 0.25, 0.25)
+            double3 xformOp:translate = (0, 0, -50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Sphere" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_spherical/sphere/Sphere>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "sphericalNormalized"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (5, 50, 0)
+            }
+        }
+
+        def "torus" (
+            prepend payload = @../../../tests/docs/data/torus.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Torus" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_spherical/torus/Torus>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "sphericalNormalized"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-5, 25, 0)
+            }
+        }
+    }
+
+    def Xform "proj_triplanar"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (120, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def "cube" (
+            prepend payload = @../../../tests/docs/data/cube.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cube" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_triplanar/cube/Cube>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "triPlanar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+            }
+        }
+
+        def "cone" (
+            prepend payload = @../../../tests/docs/data/cone.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.3, 0.3, 0.3)
+            double3 xformOp:translate = (0, 0, 50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cone" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_triplanar/cone/Cone>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "triPlanar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-10, 50, 0)
+            }
+        }
+
+        def "cylinder" (
+            prepend payload = @../../../tests/docs/data/cylinder.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cylinder" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_triplanar/cylinder/Cylinder>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "triPlanar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+            }
+        }
+
+        def "sphere" (
+            prepend payload = @../../../tests/docs/data/sphere.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.25, 0.25, 0.25)
+            double3 xformOp:translate = (0, 0, -50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Sphere" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_triplanar/sphere/Sphere>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "triPlanar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (5, 50, 0)
+            }
+        }
+
+        def "torus" (
+            prepend payload = @../../../tests/docs/data/torus.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Torus" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_triplanar/torus/Torus>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token omni:projector:type = "triPlanar"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-5, 25, 0)
+            }
+        }
+    }
+
+    def Xform "proj_cubic"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-30, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def "cube" (
+            prepend payload = @../../../tests/docs/data/cube.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            # [snippet:doc-uv-projector-binding]
+            over "Cube" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_cubic/cube/CubicProjection>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+            }
+            # [/snippet:doc-uv-projector-binding]
+
+            # [snippet:doc-uv-projector-api]
+            def Xform "CubicProjection" (
+                prepend apiSchemas = ["OmniProjectorAPI"]
+            )
+            {
+                token omni:projector:type = "cubic"
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:rotateXYZ = (0, 0, 0)
+                double3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (0, 0, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+            # [/snippet:doc-uv-projector-api]
+        }
+
+        def "cone" (
+            prepend payload = @../../../tests/docs/data/cone.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.3, 0.3, 0.3)
+            double3 xformOp:translate = (0, 0, 50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cone" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_cubic/cone/Cone>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-10, 50, 0)
+            }
+        }
+
+        def "cylinder" (
+            prepend payload = @../../../tests/docs/data/cylinder.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Cylinder" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_cubic/cylinder/Cylinder>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                double3 omni:projector:uv:scale = (5, 5, 5)
+            }
+        }
+
+        def "sphere" (
+            prepend payload = @../../../tests/docs/data/sphere.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.25, 0.25, 0.25)
+            double3 xformOp:translate = (0, 0, -50)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Sphere" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_cubic/sphere/Sphere>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (5, 50, 0)
+            }
+        }
+
+        def "torus" (
+            prepend payload = @../../../tests/docs/data/torus.usd@
+        )
+        {
+            double3 xformOp:rotateXYZ
+            double3 xformOp:scale = (0.2, 0.2, 0.2)
+            double3 xformOp:translate = (0, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "Torus" (
+                prepend apiSchemas = ["MaterialBindingAPI", "OmniProjectorAPI", "OmniCoordSysAPI:st"]
+            )
+            {
+                rel coordSys:st:binding = </World/proj_cubic/torus/Torus>
+                rel material:binding = </World/Looks/mtl_uvalign> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                double3 omni:projector:uv:scale = (5, 5, 5)
+                double3 xformOp:translate = (-5, 25, 0)
+            }
+        }
+    }
+}
+
+def "Render" (
+    hide_in_stage_window = true
+    no_delete = true
+)
+{
+    def "OmniverseKit"
+    {
+        def "HydraTextures" (
+            hide_in_stage_window = true
+            no_delete = true
+        )
+        {
+            def RenderProduct "omni_kit_widget_viewport_ViewportTexture_0" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/Camera>
+                token omni:rtx:ambientOcclusion:denoiserMode = "none"
+                token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
+                token omni:rtx:background:source:type = "domeLight"
+                bool omni:rtx:debug:view:pixelDebug:enableFixedTextPos = 1
+                token omni:rtx:directLighting:sampledLighting:denoisingTechnique = "None"
+                bool omni:rtx:dlss:frameGeneration = 1
+                float3 omni:rtx:domeLight:rotationAxis = (0, 1, 0)
+                bool omni:rtx:indirectDiffuse:denoiser:enabled = 0
+                bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
+                bool omni:rtx:post:registeredCompositing:invertToneMap = 1
+                bool omni:rtx:pt:adaptiveSampling:filterError = 0
+                uint omni:rtx:pt:adaptiveSampling:fixedSppIterations = 2
+                uint omni:rtx:pt:maxSamplesPerLaunch = 2073600
+                uint omni:rtx:pt:mgpu:maxPixelsPerRegionExponent = 12
+                bool omni:rtx:reflections:denoiser:enabled = 0
+                token omni:rtx:rendermode = "RealTimePathTracing"
+                color3f omni:rtx:rt:ambientLight:color = (0.1, 0.1, 0.1)
+                bool omni:rtx:rt:demoire = 0
+                bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
+                int omni:rtx:rt:sss:samples = 1
+                uint omni:rtx:rtpt:maxVolumeBounces = 15
+                float omni:rtx:rtpt:modulatingRoughnessThreshold = 0.08
+                bool omni:rtx:scene:hydra:mdlMaterialWarmup = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (1920, 1080)
+            }
+        }
+    }
+
+    def RenderSettings "OmniverseGlobalRenderSettings" (
+        prepend apiSchemas = ["OmniRtxSettingsGlobalRtAdvancedAPI_1", "OmniRtxSettingsGlobalPtAdvancedAPI_1"]
+        no_delete = true
+    )
+    {
+        rel products = </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>
+    }
+
+    def "Vars"
+    {
+        def RenderVar "LdrColor" (
+            hide_in_stage_window = true
+            no_delete = true
+        )
+        {
+            uniform string sourceName = "LdrColor"
+            uniform token sourceType = "raw"
+        }
+    }
+}
+
+over "OmniverseKit_Persp" (
+    prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float exposure:fStop = 5
+    float exposure:responsivity = 1.1026709
+    float exposure:time = 0.02
+    float focalLength = 18.147562
+    float focusDistance = 400
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -866.0254037844387)
+    float3 xformOp:rotateXYZ = (-35.26439, 45, 4.4979834e-15)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (500, 500, 500)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Front" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (-0, 0, -0)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, 0, 50000)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Right" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (0, -90, -0)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (-50000, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Top" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (90, -4.961563e-15, 180)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, 50000, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}

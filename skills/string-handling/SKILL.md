@@ -13,7 +13,6 @@ description: >
   Working with ovx_string_t in C and C++. Use when user asks about printing, comparing,
   or converting ovx strings.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

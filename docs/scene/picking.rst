@@ -196,7 +196,8 @@ token into the path components:
 Selection Outlines
 ------------------
 
-Selection outlines are disabled by default. Enable them when creating the renderer:
+Selection outlines are enabled by default. Set ``selection_outline_enabled=False`` in Python or use
+``ovrtx_config_entry_selection_outline_enabled(false)`` in C to disable the global pass. Create the renderer:
 
 .. tab-set::
 

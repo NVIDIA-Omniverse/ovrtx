@@ -47,8 +47,16 @@ int main(int argc, char *argv[])
     app.setPalette(dark);
 
     // Initialize ovrtx before any USD calls — ovrtx bootstraps the USD
-    // runtime and plugin registry that OpenUSD needs.
-    ovrtx_config_t config{};
+    // runtime and plugin registry that OpenUSD needs. The static loader resolves
+    // the package through the side-by-side `ovrtx/` link created by
+    // ovrtx_setup_runtime().
+    ovx_string_t ovrtx_package_root = {
+        OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx",
+        sizeof(OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx") - 1};
+    ovrtx_config_entry_t config_entries[] = {
+        ovrtx_config_entry_binary_package_root_path(ovrtx_package_root),
+    };
+    ovrtx_config_t config{config_entries, 1};
     ovrtx_result_t result = ovrtx_initialize(&config);
     if (result.status != OVRTX_API_SUCCESS) {
         ovx_string_t error = ovrtx_get_last_error();

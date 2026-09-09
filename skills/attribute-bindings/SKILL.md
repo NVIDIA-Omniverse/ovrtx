@@ -15,7 +15,6 @@ description: >
   writes, efficient animation loops, bind_attribute, or updating transforms every
   frame with caller-owned tensors.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -127,7 +126,7 @@ Binding flags (C only, set via `desc.flags`):
 ## Troubleshooting
 
 - **Tensor lifetime:** Fetched mapping groups are valid only while the ovstage mapping is active. Copy anything that must outlive unmap.
-- The canonical transform attribute name is `"omni:xform"`. The legacy name `"omni:fabric:localMatrix"` (used in examples above) is also accepted. New code should prefer `"omni:xform"`.
+- Use the `"omni:xform"` attribute name for local transforms.
 - Release reusable ovstage queries explicitly when the hot path is done.
 - In C, `OVRTX_BINDING_FLAG_OPTIMIZE` should be used for the primary hot-path binding. The last binding created with this flag takes priority.
 

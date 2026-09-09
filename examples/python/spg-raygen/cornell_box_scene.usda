@@ -1,0 +1,170 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+(
+    doc = "SPG raygen Cornell-box SHOWCASE (ovrtx). A closed room (floor, ceiling, back wall, left/right walls) with two ROTATED SOLID BOX prims, rendered by a single RaygenCornellBox SPG node using only standard ray-tracing intrinsics: one primary ray per pixel, the geometric normal recovered from two sideways probe rays, and a shadow ray toward the light. Surface colour is the recovered normal (encoded) modulated by N.L and shadowing, so each face's hue identifies its orientation: floor +Y (green-ish), ceiling -Y (magenta-ish), back wall +Z (blue-ish), left wall +X (red-ish), right wall -X (cyan-ish). The two blocks are real 6-sided meshes rotated about Y, so their faces are NOT axis aligned -- each face still resolves to its own correct normal, which is what proves the recovery works on ordinary solid geometry. Room spans x/y in [-200, 200], z in [-400, 100] (open toward the camera at z = 400)."
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def DistantLight "defaultLight"
+    {
+        float inputs:intensity = 3000
+        double3 xformOp:rotateXYZ = (315, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    # ---------------------------------------------------------------------------------------------
+    # The room. Each wall is a single quad whose object-space front face points +Z; the rotation below
+    # turns that into the wall's inward normal.
+    # ---------------------------------------------------------------------------------------------
+
+    # Floor, y = -200, inward normal +Y.
+    def Mesh "Floor"
+    {
+        float3[] extent = [(-200, -250, 0), (200, 250, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 3, 2]
+        point3f[] points = [(-200, -250, 0), (200, -250, 0), (-200, 250, 0), (200, 250, 0)]
+        uniform token subdivisionScheme = "none"
+        double xformOp:rotateX = -90
+        double3 xformOp:translate = (0, -200, -150)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateX"]
+    }
+
+    # Ceiling, y = +200, inward normal -Y.
+    def Mesh "Ceiling"
+    {
+        float3[] extent = [(-200, -250, 0), (200, 250, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 3, 2]
+        point3f[] points = [(-200, -250, 0), (200, -250, 0), (-200, 250, 0), (200, 250, 0)]
+        uniform token subdivisionScheme = "none"
+        double xformOp:rotateX = 90
+        double3 xformOp:translate = (0, 200, -150)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateX"]
+    }
+
+    # Back wall, z = -400, inward normal +Z (faces the camera).
+    def Mesh "BackWall"
+    {
+        float3[] extent = [(-200, -200, 0), (200, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 3, 2]
+        point3f[] points = [(-200, -200, 0), (200, -200, 0), (-200, 200, 0), (200, 200, 0)]
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (0, 0, -400)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    # Left wall, x = -200, inward normal +X.
+    def Mesh "LeftWall"
+    {
+        float3[] extent = [(-250, -200, 0), (250, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 3, 2]
+        point3f[] points = [(-250, -200, 0), (250, -200, 0), (-250, 200, 0), (250, 200, 0)]
+        uniform token subdivisionScheme = "none"
+        double xformOp:rotateY = 90
+        double3 xformOp:translate = (-200, 0, -150)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateY"]
+    }
+
+    # Right wall, x = +200, inward normal -X.
+    def Mesh "RightWall"
+    {
+        float3[] extent = [(-250, -200, 0), (250, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 3, 2]
+        point3f[] points = [(-250, -200, 0), (250, -200, 0), (-250, 200, 0), (250, 200, 0)]
+        uniform token subdivisionScheme = "none"
+        double xformOp:rotateY = -90
+        double3 xformOp:translate = (200, 0, -150)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateY"]
+    }
+
+    # ---------------------------------------------------------------------------------------------
+    # Two SOLID boxes standing on the floor, rotated about Y so their faces are not axis aligned. Each
+    # is one ordinary 6-sided mesh prim -- the kind of geometry a per-object normal could never
+    # describe, and exactly what the probe-ray recovery has to get right.
+    # ---------------------------------------------------------------------------------------------
+
+    # Short block, right side: half extents 60, standing on the floor (centre y = -140).
+    def Mesh "BlockShort"
+    {
+        float3[] extent = [(-60, -60, -60), (60, 60, 60)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 6, 2, 3, 7, 4, 5, 1, 0, 4, 0, 2, 6, 5, 7, 3, 1]
+        point3f[] points = [(-60, -60, 60), (60, -60, 60), (-60, 60, 60), (60, 60, 60), (-60, -60, -60), (60, -60, -60), (-60, 60, -60), (60, 60, -60)]
+        uniform token subdivisionScheme = "none"
+        double xformOp:rotateY = -18
+        double3 xformOp:translate = (90, -140, -120)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateY"]
+    }
+
+    # Tall block, left side: half extents (60, 120, 60), standing on the floor (centre y = -80).
+    def Mesh "BlockTall"
+    {
+        float3[] extent = [(-60, -120, -60), (60, 120, 60)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 4, 6, 7, 5, 6, 2, 3, 7, 4, 5, 1, 0, 4, 0, 2, 6, 5, 7, 3, 1]
+        point3f[] points = [(-60, -120, 60), (60, -120, 60), (-60, 120, 60), (60, 120, 60), (-60, -120, -60), (60, -120, -60), (-60, 120, -60), (60, 120, -60)]
+        uniform token subdivisionScheme = "none"
+        double xformOp:rotateY = 20
+        double3 xformOp:translate = (-90, -80, -220)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateY"]
+    }
+
+    # Camera of the showcase product: at the open front of the room, looking down -Z into it.
+    def Camera "Camera"
+    {
+        float2 clippingRange = (1, 1000000)
+        float focalLength = 18.0
+        double3 xformOp:translate = (0, 0, 400)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+# [snippet:raygen-render-graph]
+def Scope "Render"
+{
+    def RenderProduct "CornellBox"
+    {
+        uniform int2 resolution = (256, 256)
+        rel camera = </World/Camera>
+        rel orderedVars = [ <LdrColor>, <Cornell> ]
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+            opaque omni:rtx:aov
+        }
+
+        # The SPG-rendered image. The sourceName is deliberately SPG-specific so it cannot collide with
+        # (and be shadowed by) a built-in renderer AOV.
+        def RenderVar "Cornell"
+        {
+            uniform string sourceName = "SpgCornellBox"
+            opaque omni:rtx:aov.connect = <../RaygenCornellBox.outputs:image>
+        }
+
+        def Shader "RaygenCornellBox" (
+            references = @RaygenCornellBox.slang.usda@
+        )
+        {
+            opaque outputs:image
+        }
+    }
+}
+# [/snippet:raygen-render-graph]

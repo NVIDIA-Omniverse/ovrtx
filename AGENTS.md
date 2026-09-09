@@ -24,57 +24,35 @@ detection. When both libraries are used together:
 
 ovrtx can operate in **standalone compatibility mode** (the renderer-owned scene
 APIs are deprecated in 0.4) or **attached mode** (renders scene state from an
-external ovstage instance via BORROW or REPLICATE attach modes). Scene ownership
-transitions entirely to ovstage in a future release.
+external ovstage instance). Scene ownership transitions entirely to ovstage in a
+future release.
 
 Skills that touch ovstage concepts (cloning, attributes, queries, stage loading)
 should cross-reference ovstage as authoritative for scene-data behavior. When
 working in an attached-mode context, also pull ovstage's agent context — its
 `AGENTS.md`.
 
-Key docs: `docs/core/ovstage_integration.rst` (attach modes, ordinals, update
+Key docs: `docs/core/ovstage_integration.rst` (attachment, ordinals, update
 loop), `CHANGELOG.md` §0.4.
 
-The public C examples consume ovstage as its **own independent package**, symmetric
-with ovrtx: `examples/c/cmake/ovstage.cmake` provides `ovstage_fetch()` (mirrors
-`ovrtx.cmake`) and `ovstage_setup_runtime()`, and the example `CMakeLists.txt`
-files call both `ovrtx_*` and `ovstage_*`. Both packages are consumed **in place**
-(Ulrich's model #1 for ovrtx), so nothing but ovstage's own runtime lands next to
-the exe:
-
-- **ovrtx** links the **static** loader (`ovrtx::ovrtx_static`); the app passes the
-  package binary root to `ovrtx_create_renderer` via
-  `ovrtx_config_entry_binary_package_root_path()`. The loader loads `ovrtx-dynamic`
-  and all of ovrtx's runtime resources from the package in place. To keep the exe
-  directory self-contained without baking an absolute path into the binary,
-  `ovrtx_setup_runtime()` creates a single `ovrtx/` link (junction on Windows, symlink
-  on Linux) beside the exe pointing at the package `bin/`, and `main.cpp` resolves the
-  root at runtime as `<dir of exe>/ovrtx`.
-- **ovstage** is dynamic-only (import lib for `ovstage.dll`, no binary-root config)
-  and self-locates its bundled carb plugins (`omni.fabric`/`usdrt.*`/`gpucompute`/
-  ...) relative to where `ovstage.dll` is loaded from — it needs a sibling
-  `plugins/` tree. This is the ovstage team's own deployment contract (see
-  `rendering/ovstage/examples/smoke/` — `CMakeLists.txt` + `run_smoke_test.py`). So
-  `ovstage_setup_runtime()` copies `ovstage.dll` next to the exe and **junctions**
-  its data-only `ovstage_usd_schemas/` beside it. Its `plugins/` handling depends on
-  the ovrtx model: under model #1 (single `ovrtx/` link) the exe root's `plugins/` is
-  free, so ovstage junctions its own `plugins/` there; under model #2 ovrtx replicates
-  its `plugins/` at the exe root and `ovstage.dll` shares that one tree.
-
-`ovstage.dll` statically imports `usd_ms`/`tbb12`, so it is **delay-loaded**: it
-loads on the first `ovstage_*` call — after `ovrtx_create_renderer` has already
-loaded the single `usd_ms` from the ovrtx package — and binds that module by base
-name. ovrtx and ovstage must therefore be the same release train (matched `usd_ms`
-ABI). One open item: ovrtx (its package) and ovstage (junctioned) each carry a carb
-plugin set; `usd_ms`/`tbb` dedupe by name, but a single `omni.fabric`/USD runtime in
-attach mode still needs on-hardware confirmation. The ovstage version is pinned in
-`deps/ovrtx_deps.yaml` (propagated to `ovstage.cmake` by
-`tools/update_ovrtx_deps.py`).
+The public C examples consume ovstage as its own independent package, symmetric
+with ovrtx. Both packages expose a static loader (model #1) and a shared loader
+(model #2). The operating system loads only the shared forwarding loader in
+model #2; both models open the OpenUSD-dependent runtime on the first
+initialization call. `examples/c/minimal/` builds both combinations from the same
+source and calls `ovrtx_register_schema_paths()` before either runtime can load
+OpenUSD. Keep ovrtx and ovstage on the same release train, and keep
+`examples/c/cmake/{ovrtx,ovstage}.cmake` synchronized with package layout changes.
 
 For codebases still on ovrtx 0.3 that need to move to ovrtx 0.4 + ovstage 0.1
 (the first release where attached mode became the primary user-facing
 workflow), use [`update-0_3-0_4-c`](skills/update-0_3-0_4-c/SKILL.md) for C/C++
 codebase and [`update-0_3-0_4-python`](skills/update-0_3-0_4-python/SKILL.md) for Python codebases.
+
+For existing Python or C/C++ applications moving from ovrtx 0.4.x to 0.5.x,
+use [`update-0-4-to-0-5`](skills/update-0-4-to-0-5/SKILL.md). It covers the 0.5
+RenderVar/DLPack/API migrations, sensor asset changes, and the paired ovstage
+0.1 to 0.2 data-contract changes that can affect an attached application.
 
 ## Start Here
 
@@ -86,8 +64,8 @@ codebase and [`update-0_3-0_4-python`](skills/update-0_3-0_4-python/SKILL.md) fo
 
 - `python/ovrtx/` - Python package source
 - `tests/` - Python test suite (pytest)
-- `examples/python/` - Python example projects (`minimal`, `planet-system`)
-- `examples/c/` - C/C++ example projects (`minimal`, `vulkan-interop`)
+- `examples/python/` - Python example projects (see `examples/README.md` for the full list)
+- `examples/c/` - C/C++ example projects (see `examples/README.md` for the full list)
 - `skills/` - Task-oriented agent skills (`*/SKILL.md`)
 - `docs/` - Sphinx docs, including Python/C getting started and API reference scaffolding
 
@@ -124,7 +102,7 @@ Linux:
 cd examples/c/minimal
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/minimal
+./build/static/minimal
 ```
 
 Windows:
@@ -133,7 +111,7 @@ Windows:
 cd examples/c/minimal
 cmake -B build
 cmake --build build --config Release
-.\build\Release\minimal.exe
+.\build\static\Release\minimal.exe
 ```
 
 Success means `out.png` exists and matches the documented minimal reference image.
@@ -152,7 +130,7 @@ Success means `out.png` exists and matches the documented minimal reference imag
   - `cmake -B build -DCMAKE_BUILD_TYPE=Release`
   - `cmake --build build`
 - Run binary on Linux:
-  - `./build/minimal`
+  - `./build/static/minimal`
 
 ### Tests
 
@@ -189,16 +167,18 @@ When a request maps to a known ovrtx workflow, go directly to the relevant skill
 - Runtime stage queries -> `skills/stage-queries/SKILL.md`
 - Cloning prims -> `skills/cloning-prims/SKILL.md`
 - Warmup/image quality -> `skills/warmup/SKILL.md`
+- Sequential crop rendering and stitching -> `skills/sliced-rendering/SKILL.md`
 - C project bootstrapping -> `skills/project-setup-c/SKILL.md`
 - Python project bootstrapping -> `skills/project-setup-python/SKILL.md`
 - CUDA interop -> `skills/cuda-interop/SKILL.md`
-- Sensor Processing Graphs (SPG): CUDA/USD/Lua post-processing of AOVs -> `skills/spg-usd-lua-authoring/SKILL.md`
+- Sensor Processing Graphs (SPG): running your own CUDA or Slang code over render outputs -> `skills/spg/SKILL.md`
 - App-level lifecycle and ordering -> `skills/application-flow/SKILL.md`
 - Error/reporting patterns -> `skills/error-handling/SKILL.md`
 - String handling (ovx_string_t) -> `skills/string-handling/SKILL.md`
 - 0.2 to 0.3 project upgrades -> `skills/update-0_2-0_3/SKILL.md`
 - 0.3 to 0.4 (+ ovstage 0.1) migration for C codebases -> `skills/update-0_3-0_4-c/SKILL.md`
 - 0.3 to 0.4 (+ ovstage 0.1) migration for Python codebases -> `skills/update-0_3-0_4-python/SKILL.md`
+- 0.4 to 0.5 migration for Python and C/C++ codebases -> `skills/update-0-4-to-0-5/SKILL.md`
 
 If multiple skills seem relevant, start with `skills/application-flow/SKILL.md`, then layer in specialized skills.
 
@@ -221,4 +201,3 @@ These rules are mandatory. Test/example code is the single source of truth; skil
 ## Notes
 
 - The project is pre-release; behavior, APIs, and packaging details may evolve.
-- `README.md` currently includes an internal-package-index note for Python installation during early access. Keep this in mind when validating install or onboarding steps.

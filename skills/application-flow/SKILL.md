@@ -14,7 +14,6 @@ description: >
   to structure an ovrtx program, what the main steps are, or how the pieces fit
   together.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -92,7 +91,7 @@ The USD stage contains three prim types that work together to produce rendered o
 
 - **Camera** (or sensor) prim -- defines the sensor itself: position, orientation, lens properties (focal length, aperture), exposure settings. This is a standard `UsdGeomCamera` prim in the scene hierarchy.
 - **RenderProduct** prim -- the thing you actually point the renderer at. It ties together a Camera (via `rel camera`), an output resolution (`int2 resolution`), and a list of output variables (via `rel orderedVars`). When you call `step()`, you pass RenderProduct paths, not Camera paths.
-- **RenderVar** prim -- declares a single named output (e.g., `LdrColor`, `HdrColor`, `DepthSD`) that the renderer produces for its parent RenderProduct.
+- **RenderVar** prim -- declares a single output. Its full prim path identifies the output in step results; its `sourceName` (e.g., `LdrColor`, `HdrColor`, `DepthSD`) selects the renderer AOV.
 
 ```
 /World/Camera          ← Camera prim (sensor definition)
@@ -125,11 +124,11 @@ Key implications for agents:
 
 > **Source:** `examples/python/minimal/main.py` snippet `create-renderer`
 >
-> Followed by: `examples/python/minimal/main.py` snippet `add-usd`
+> **Source (continued):** `examples/python/minimal/main.py` snippet `add-usd`
 >
-> Followed by: `examples/python/minimal/main.py` snippet `step`
+> **Source (continued):** `examples/python/minimal/main.py` snippet `step`
 >
-> Followed by: `examples/python/minimal/main.py` snippet `read-render-output`
+> **Source (continued):** `examples/python/minimal/main.py` snippet `read-render-output`
 >
 > For the full lifecycle with attribute writes, bindings, and cloning, compose the relevant skill snippets.
 
@@ -137,15 +136,15 @@ Key implications for agents:
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `create-renderer`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `load-usd-and-wait`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `load-usd-and-wait`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `step-renderer`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `step-renderer`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `fetch-results`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `fetch-results`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `map-rendered-output-cpu`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `map-rendered-output-cpu`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `unmap-and-cleanup`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `unmap-and-cleanup`
 
 ## Key Differences: Python vs C
 
@@ -154,7 +153,7 @@ Key implications for agents:
 | Renderer lifetime | GC or explicit `del` | `ovrtx_destroy_renderer()` |
 | USD loading | `open_usd()` blocks | `ovrtx_open_usd_from_file()` is async; must poll/wait |
 | Step | `step()` returns outputs directly | `ovrtx_step()` + `ovrtx_wait_op()` + `ovrtx_fetch_results()` |
-| Output access | `var = render_vars["..."].map()` | `ovrtx_map_render_var_output()` + `ovrtx_unmap_render_var_output()` |
+| Output access | `var = render_vars["/Render/Camera/LdrColor"].map()` | `ovrtx_map_render_var_output()` + `ovrtx_unmap_render_var_output()` |
 | Result cleanup | Automatic (GC) | Must call `ovrtx_destroy_results()` |
 | Error handling | Python exceptions (`RuntimeError`) | Check `ovrtx_result_t.status` + `ovrtx_get_last_error()` |
 

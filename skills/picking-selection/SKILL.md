@@ -14,7 +14,6 @@ description: >
   outline drawing. Use when implementing click picking, drag selection, printing picked
   prim names, or highlighting selected prims.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -100,9 +99,10 @@ CUDA-visible GPU 0 by authoring `uint[] deviceIds = [0]`. `deviceIds` is an
 allow-list of indices into `CUDA_VISIBLE_DEVICES`; ovrtx may choose any
 CUDA-visible GPU from the list.
 
-Selection drawing is separate from picking. Enable the selection outline pass at
-renderer creation, then set non-zero selection outline group ids on the prims
-that should be outlined. Write group `0` to clear an outline.
+Selection drawing is separate from picking. The selection outline pass is enabled
+by default. Set non-zero selection outline group ids on the prims that should be
+outlined, and write group `0` to clear an outline. Pass
+`selection_outline_enabled=False` at renderer creation to disable the global pass.
 
 Selection styling has two layers:
 - Global renderer-creation state controls outline width and fill mode.
@@ -128,7 +128,7 @@ uses per-group fill color, such as `GROUP_FILL_COLOR` /
 
 ## Python
 
-### Create a renderer with outline drawing enabled
+### Create a renderer for selection outlines
 
 > **Source:** `tests/docs/python/test_picking_selection.py` snippet `doc-create-selection-outline-renderer-python`
 
@@ -251,7 +251,7 @@ The group id selects which per-group style that prim uses.
 |--------|---|
 | `Renderer.enqueue_pick_query()` | `ovrtx_enqueue_pick_query()` |
 | `Renderer.resolve_prim_path_id()` | `ovrtx_get_path_dictionary()` plus path dictionary utilities |
-| `RendererConfig(selection_outline_enabled=True)` | `ovrtx_config_entry_selection_outline_enabled(true)` |
+| `RendererConfig(selection_outline_enabled=False)` | `ovrtx_config_entry_selection_outline_enabled(false)` |
 | `RendererConfig(selection_outline_width=...)` | `ovrtx_config_entry_selection_outline_width(...)` |
 | `RendererConfig(selection_fill_mode=SelectionFillMode.GROUP_FILL_COLOR)` | `ovrtx_config_entry_selection_fill_mode(OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR)` |
 | `Renderer.set_selection_group_styles()` | `ovrtx_set_selection_group_styles()` |

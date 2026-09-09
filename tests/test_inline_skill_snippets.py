@@ -13,6 +13,12 @@ assert SPEC.loader is not None
 sys.modules["inline_skill_snippets"] = inline_skill_snippets
 SPEC.loader.exec_module(inline_skill_snippets)
 
+VALIDATOR_PATH = REPO_ROOT / "tools" / "ci" / "validate_skills.py"
+VALIDATOR_SPEC = importlib.util.spec_from_file_location("validate_skills", VALIDATOR_PATH)
+validate_skills = importlib.util.module_from_spec(VALIDATOR_SPEC)
+assert VALIDATOR_SPEC.loader is not None
+VALIDATOR_SPEC.loader.exec_module(validate_skills)
+
 
 class InlineSkillSnippetsTest(unittest.TestCase):
     def setUp(self):
@@ -20,8 +26,11 @@ class InlineSkillSnippetsTest(unittest.TestCase):
         self.repo_root = Path(self.temp_dir.name)
         self.skills_dir = self.repo_root / "skills"
         self.output_dir = self.repo_root / "out-skills"
+        self.validator_repo_root = validate_skills.REPO_ROOT
+        validate_skills.REPO_ROOT = self.repo_root
 
     def tearDown(self):
+        validate_skills.REPO_ROOT = self.validator_repo_root
         self.temp_dir.cleanup()
 
     def write(self, relative_path, content):
@@ -30,7 +39,7 @@ class InlineSkillSnippetsTest(unittest.TestCase):
         path.write_text(content, encoding="utf-8")
         return path
 
-    def test_dry_run_inlines_single_plural_and_followed_by_references(self):
+    def test_dry_run_inlines_single_plural_and_qualified_references(self):
         self.write(
             "tests/docs/python/test_sample.py",
             """
@@ -69,7 +78,7 @@ int main() {
 
 > **Source:** `examples/c/minimal/main.cpp` snippets `create-renderer`, `destroy-renderer`
 >
-> Followed by: `tests/docs/python/test_sample.py` snippet `doc-step`
+> **Source (continued):** `tests/docs/python/test_sample.py` snippet `doc-step`
 """,
         )
         self.write("skills/README.md", "This should be copied but not transformed.\n")
@@ -84,7 +93,7 @@ int main() {
 
         transformed = (self.output_dir / "sample" / "SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn("> **Source:**", transformed)
-        self.assertNotIn("> Followed by:", transformed)
+        self.assertNotIn("> **Source (continued):**", transformed)
         self.assertNotIn("\n>\n", transformed)
         self.assertIn("```python\nrenderer.step()\nrenderer.step()\n```", transformed)
         self.assertIn(
@@ -100,6 +109,65 @@ int main() {
         self.assertEqual(4, stats.expanded_references)
         self.assertEqual(1, stats.transformed_files)
         self.assertEqual(0, stats.unresolved_references)
+
+    def test_unsupported_reference_label_fails(self):
+        self.write(
+            "skills/sample/SKILL.md",
+            "> **Invented source:** `tests/docs/python/test_sample.py` snippet `doc-unsupported-label`\n",
+        )
+        self.write(
+            "tests/docs/python/test_sample.py",
+            """
+# [snippet:doc-unsupported-label]
+renderer.step()
+# [/snippet:doc-unsupported-label]
+""",
+        )
+
+        with self.assertRaisesRegex(
+            inline_skill_snippets.InlineSkillSnippetError,
+            "unsupported snippet-reference label",
+        ):
+            inline_skill_snippets.inline_skill_snippets(
+                repo_root=self.repo_root,
+                skills_dir=self.skills_dir,
+                output_dir=self.output_dir,
+                in_place=False,
+                allow_missing=False,
+            )
+
+    def test_malformed_source_reference_fails_inliner_and_validator(self):
+        skill_file = self.write(
+            "skills/sample/SKILL.md",
+            "> **Source:** `tests/docs/python/test_sample.py` `doc-missing-keyword`\n",
+        )
+
+        with self.assertRaisesRegex(
+            inline_skill_snippets.InlineSkillSnippetError,
+            "malformed snippet reference",
+        ):
+            inline_skill_snippets.inline_skill_snippets(
+                repo_root=self.repo_root,
+                skills_dir=self.skills_dir,
+                output_dir=self.output_dir,
+                in_place=False,
+                allow_missing=False,
+            )
+
+        errors = validate_skills.validate_source_references(skill_file, skill_file.read_text(), {})
+        self.assertEqual(1, len(errors))
+        self.assertIn("malformed snippet reference", errors[0])
+
+    def test_validator_ignores_reference_examples_in_fences(self):
+        skill_file = self.write(
+            "skills/sample/SKILL.md",
+            "```markdown\n"
+            "> **Invented source:** `tests/docs/python/test_sample.py` snippet `doc-example`\n"
+            "```\n",
+        )
+
+        errors = validate_skills.validate_source_references(skill_file, skill_file.read_text(), {})
+        self.assertEqual([], errors)
 
     def test_missing_reference_fails_by_default(self):
         self.write(

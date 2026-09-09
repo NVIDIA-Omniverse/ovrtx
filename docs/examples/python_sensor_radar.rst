@@ -17,11 +17,6 @@ maps the composite render variable to CPU memory, and visualizes detections in
 ``RadialVelocityMs``: blue is approaching the sensor, green is near zero, and
 red is receding.
 
-This example retains the deprecated standalone population APIs because attached
-ovstage rendering in ovrtx 0.4 does not preserve the radar motion output
-demonstrated here. Use ovstage for CPU stage workflows that do not
-depend on radar motion history.
-
 The scene is Z-up and contains a radar at ``(0, 0, 1)`` rotated to look along
 world +X, an asphalt ground plane, a moving steel cube, and a fixed concrete
 cube. The moving cube advances toward the radar across 10 simulation steps.

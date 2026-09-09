@@ -128,19 +128,25 @@ int main() {
     // [snippet:create-renderer]
     // Create the renderer, providing configuration settings.
     //
-    // The STATIC ovrtx loader resolves the ${executable_dir} token to the running
-    // executable's directory, so we hand it the token instead of computing the path
-    // in client code. ovrtx_setup_runtime() links the package bin beside the exe as
-    // "ovrtx/".
+    ovrtx_config_t config {};
+#ifdef OVRTX_EXAMPLE_STATIC_LOADERS
+    // The static loader needs the package root linked beside the executable.
     ovx_string_t ovrtx_package_root = {
         OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx",
         sizeof(OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx") - 1};
     ovrtx_config_entry_t config_entries[] = {
         ovrtx_config_entry_binary_package_root_path(ovrtx_package_root),
     };
-    ovrtx_config_t config {};
     config.entries = config_entries;
     config.entry_count = sizeof(config_entries) / sizeof(config_entries[0]);
+#endif
+
+    // Publish ovrtx's schema paths before either runtime can initialize OpenUSD.
+    result = ovrtx_register_schema_paths(&config);
+    if (check_and_print_error(result, "register_schema_paths")) {
+        return 1;
+    }
+
     std::cerr << "Creating renderer. The first run of the application will take some time as shaders are compiled and cached..." << std::endl;
     result = ovrtx_create_renderer(&config, &renderer);
     if (check_and_print_error(result, "create_renderer")) {
@@ -170,8 +176,7 @@ int main() {
                 result_code = 1;
             }
         }
-        // Release the ovstage static loader (unloads ovstage.dll). Safe even if
-        // ovstage_initialize failed or was never reached.
+        // Release ovstage process state. Safe even if initialization failed.
         ovstage_shutdown();
         return result_code;
     };
@@ -189,20 +194,18 @@ int main() {
     // select which one to render, and which RenderVars to output.
     char const* usd_url = "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Samples/Robot-OVRTX/robot-ovrtx.usda";
 
-    // The STATIC ovstage loader resolves ${executable_dir} the same way ovrtx does
-    // above; ovstage_setup_runtime() links the package bin beside the exe as
-    // "ovstage/" (next to "ovrtx/"). ovrtx_create_renderer() above already loaded
-    // the shared usd_ms runtime; ovstage.dll loads lazily on the first ovstage call
-    // and reuses that runtime.
+    ovstage_config_t stage_config {};
+#ifdef OVRTX_EXAMPLE_STATIC_LOADERS
+    // The static loader needs the package root linked beside the executable.
     ovx_string_t ovstage_package_root = {
         OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovstage",
         sizeof(OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovstage") - 1};
     ovstage_config_entry_t stage_config_entries[] = {
         ovstage_config_entry_binary_package_root_path(ovstage_package_root),
     };
-    ovstage_config_t stage_config {};
     stage_config.entries = stage_config_entries;
     stage_config.entry_count = sizeof(stage_config_entries) / sizeof(stage_config_entries[0]);
+#endif
     ovstage_api_status_t stage_init_status = ovstage_initialize(&stage_config);
     if (stage_init_status != OVSTAGE_OK) {
         print_ovstage_error(nullptr, stage_init_status, "initialize");
@@ -284,10 +287,10 @@ int main() {
         return cleanup(1);
     }
 
-    // Find LdrColor in outputs
+    // Find LdrColor by its authored RenderVar prim path.
     ovrtx_render_var_output_handle_t ldrcolor_output_handle =
-        find_output(outputs, "LdrColor");
-    if (ldrcolor_output_handle == -1) {
+        find_output(outputs, "/Render/Camera/LdrColor");
+    if (ldrcolor_output_handle == OVRTX_INVALID_HANDLE) {
         std::cerr << "LdrColor output not found" << std::endl;
         ovrtx_destroy_results(renderer, step_result_handle);
         return cleanup(1);
@@ -361,7 +364,6 @@ int main() {
 static ovrtx_render_var_output_handle_t
 find_output(ovrtx_render_product_set_outputs_t const& outputs,
             char const* output_to_find) {
-    ovrtx_render_var_output_handle_t output_handle = -1;
     for (size_t i = 0; i < outputs.output_count; ++i) {
         ovrtx_render_product_output_t const& product_output =
             outputs.outputs[i];
@@ -371,16 +373,14 @@ find_output(ovrtx_render_product_set_outputs_t const& outputs,
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const& var =
                     frame.output_render_vars[v];
-                if (var.render_var_name.ptr &&
-                    strncmp(var.render_var_name.ptr,
-                            output_to_find,
-                            var.render_var_name.length) == 0) {
-                    output_handle = var.output_handle;
-                    break;
+                if (var.render_var_path.ptr &&
+                    std::string_view(var.render_var_path.ptr, var.render_var_path.length) ==
+                        std::string_view(output_to_find)) {
+                    return var.output_handle;
                 }
             }
         }
     }
-    return output_handle;
+    return OVRTX_INVALID_HANDLE;
 }
 // [/snippet:find-output-helper]

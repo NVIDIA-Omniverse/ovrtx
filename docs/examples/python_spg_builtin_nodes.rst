@@ -16,10 +16,6 @@ with ``info:implementationSource = "id"`` and an ``info:id`` — no ``.cu`` or `
 This example chains two stdlib nodes: ``Add`` doubles the ``LdrColor`` AOV's brightness by adding
 it to itself (saturating at 255), then ``Scale`` downscales that result to half resolution.
 
-This example uses the deprecated renderer scene-loading API so it can remain
-focused on SPG authoring. Use the 0.3-to-0.4 migration skill when moving scene
-management to ovstage.
-
 .. pull-quote::
 
    *“Chain two built-in SPG nodes (no custom CUDA) that brighten the color output and downscale it to half resolution, wired into a RenderProduct via info:id.”*
@@ -42,5 +38,9 @@ Running
 
    uv run main.py
 
-A successful run writes ``_output/input.png`` and ``_output/downscaled.png``. See
-:ref:`spg-stdlib-nodes` for the full catalog of built-in nodes.
+A successful run writes ``_output/input.png`` and ``_output/downscaled.png``, half the input's
+width and height.
+
+Both nodes are exact in integers, so the run rebuilds their result on the host and compares with
+no tolerance: a value that did not double means Add never ran, and a size that did not halve means
+Scale never ran. See :ref:`spg-stdlib-nodes` for the full catalog of built-in nodes.

@@ -12,9 +12,7 @@ Writing Transforms
 ==================
 
 Transforms are ordinary runtime stage attributes with a transform semantic.
-The canonical transform attribute is ``omni:xform``. The legacy
-``omni:fabric:localMatrix`` name is also accepted, but new code should prefer
-``omni:xform``.
+Use the ``omni:xform`` attribute for local transforms.
 
 ovrtx uses the USD row-vector matrix convention: translation is stored in the
 last row of a 4x4 matrix, at ``matrix[3][0..2]`` or flat indices ``12..14``.

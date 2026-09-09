@@ -47,10 +47,6 @@ Important Output Attributes
    * - Attribute
      - Values
      - Use
-   * - ``omni:sensor:WpmDmat:auxOutputType``
-     - ``NONE``, ``BASIC``, ``EXTRA``, ``FULL``
-     - Controls auxiliary data in ``GenericModelOutput``. It does not add
-       ``PointCloud`` channels.
    * - ``omni:sensor:WpmDmat:elementsCoordsType``
      - ``CARTESIAN`` or ``SPHERICAL``
      - Coordinate representation for detections.
@@ -108,10 +104,10 @@ Radar Channels
 Interpreting Radar Output
 -------------------------
 
-Within the first ``Counts[0]`` entries, a detection is valid when
+``Counts[0]`` is the delivered-detection count; delivered indices are
+``[0, Counts[0])``. Within that range, a detection is valid when
 ``Flags[i] & 0x40`` is non-zero. ``RadialVelocityMs`` is signed; approaching
-detections can be negative, so use absolute value when checking only for
-motion.
+detections can be negative, so use absolute value when checking only for motion.
 
 For map/read code, refer to :doc:`pointclouds`. For material behavior that affects
 radar returns, refer to :doc:`nonvisual_materials`.

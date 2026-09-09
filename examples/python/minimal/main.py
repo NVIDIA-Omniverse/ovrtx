@@ -58,7 +58,7 @@ def main():
     print("Fetching results...", file=sys.stderr)
     for _product_name, product in products.items():
         for frame in product.frames:
-            var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
+            var = frame.render_vars["/Render/Camera/LdrColor"].map(device=ovrtx.Device.CPU)
             view = np.from_dlpack(var)
             pixels = view.copy()
             del view

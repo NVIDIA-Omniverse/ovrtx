@@ -10,23 +10,17 @@
 
 from __future__ import annotations
 
-import ctypes
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
-import ovrtx
 import ovstage
-import pytest
-from ovrtx._src import bindings
 
 
 ALL_ATTRIBUTES_PATH = str((Path(__file__).parent / "../data/all-attributes.usda").resolve())
 WORLD = "/World"
 EXTENT_LEAF = "/World/ExtentTranslate/ExtentScale/ExtentLeaf"
-
-pytestmark = pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
 
 
 @dataclass(frozen=True)
@@ -41,9 +35,9 @@ class AttributeCase:
     kind: Literal["numeric", "token", "token_array", "asset", "string"] = "numeric"
 
 
-def _load_all_attributes(renderer):
-    renderer.open_usd(ALL_ATTRIBUTES_PATH)
-    renderer.reset()
+def _load_all_attributes(stage):
+    ovstage.population.open_usd(stage, ALL_ATTRIBUTES_PATH, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
 
 
 def _updated_numeric(value: Any, dtype: np.dtype) -> Any:
@@ -287,11 +281,6 @@ SUPPORTED_ATTRIBUTE_CASES = [
 ]
 
 
-KNOWN_USD_POPULATION_BUGS = {
-    "test:float3": "scalar float3 is created but populated as zero; direct runtime write/read still works",
-}
-
-
 UNSUPPORTED_AUTHORED_ATTRIBUTE_NAMES = [
     "test:assetArray",
     "test:rel",
@@ -305,17 +294,6 @@ UNSUPPORTED_AUTHORED_ATTRIBUTE_NAMES = [
 CASE_BY_NAME = {case.name: case for case in SUPPORTED_ATTRIBUTE_CASES}
 
 
-def _attribute_info(renderer, name: str):
-    prims = renderer.query_prims(
-        require_all=[(ovrtx.FilterKind.HAS_ATTRIBUTE, name)],
-        attribute_filter_mode=ovrtx.AttributeFilterMode.SPECIFIC,
-        attribute_names=[name],
-    )
-    assert WORLD in prims, f"{name} was not populated on {WORLD}"
-    assert name in prims[WORLD], f"{name} was not returned in query results for {WORLD}"
-    return prims[WORLD][name]
-
-
 def _numeric_expected(case: AttributeCase, value: Any) -> np.ndarray:
     assert case.dtype is not None
     arr = np.array(value, dtype=case.dtype)
@@ -324,20 +302,35 @@ def _numeric_expected(case: AttributeCase, value: Any) -> np.ndarray:
     return arr.reshape((1, *case.value_shape))
 
 
-def _read_numeric(renderer, case: AttributeCase) -> np.ndarray:
-    if case.is_array:
-        tensor = renderer.read_array_attribute(case.name, [WORLD])[WORLD]
-    else:
-        tensor = renderer.read_attribute(case.name, [WORLD])
-    return np.array(np.from_dlpack(tensor))
+def _read_values(stage, paths, query, case: AttributeCase, ordinal: int) -> np.ndarray:
+    attribute = paths.intern_token(case.name)
+    with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+        group = read.fetch_next()
+        assert group is not None, f"{case.name} was not populated on {WORLD}"
+        try:
+            assert group.attribute == attribute
+            assert group.is_array == case.is_array, f"is_array {group.is_array} != {case.is_array}"
+            return np.from_dlpack(group.dlpack(0)).copy()
+        finally:
+            stage.release_group(group)
 
 
-def _write_numeric(renderer, case: AttributeCase) -> None:
+def _read_numeric(stage, paths, query, case: AttributeCase, ordinal: int) -> np.ndarray:
+    return _read_values(stage, paths, query, case, ordinal)
+
+
+def _write_numeric(stage, paths, query, case: AttributeCase, ordinal: int) -> None:
     value = _numeric_expected(case, case.updated)
-    if case.is_array:
-        renderer.write_array_attribute([WORLD], case.name, [value])
-    else:
-        renderer.write_attribute([WORLD], case.name, value)
+    lanes = int(np.prod(case.value_shape)) if case.value_shape else 1
+    dtype = ovstage.numpy_to_dldatatype(value.dtype, lanes=lanes)
+    tensor = ovstage.make_dltensor(value, dtype=dtype, shape=[value.shape[0]], ndim=1)
+    stage.write_attribute(
+        query,
+        paths.intern_token(case.name),
+        ordinal=ordinal,
+        tensors=tensor,
+        is_array=case.is_array,
+    ).wait()
 
 
 def _assert_array_close(label: str, actual: np.ndarray, expected: np.ndarray) -> None:
@@ -351,104 +344,120 @@ def _assert_array_close(label: str, actual: np.ndarray, expected: np.ndarray) ->
         raise AssertionError(f"{label} value {actual.tolist()} != {expected.tolist()}")
 
 
-def _path_dictionary(renderer):
-    return renderer._get_path_dict()
-
-
-def _create_token(renderer, text: str) -> int:
-    pd = _path_dictionary(renderer)
-    source = bindings.ovx_string_t(text)
-    token = ctypes.c_uint64(0)
-    result = pd.vtable.contents.create_tokens_from_strings(
-        pd.context, ctypes.byref(source), 1, ctypes.byref(token)
-    )
-    assert result.status == 0, f"Failed to create token for {text!r}"
-    return token.value
-
-
-def _read_token_strings(renderer, case: AttributeCase) -> list[str]:
-    pd = _path_dictionary(renderer)
-    if case.is_array:
-        tensor = renderer.read_array_attribute(case.name, [WORLD])[WORLD]
-    else:
-        tensor = renderer.read_attribute(case.name, [WORLD])
-    values = np.array(np.from_dlpack(tensor))
+def _read_token_strings(stage, paths, query, case: AttributeCase, ordinal: int) -> list[str]:
+    values = _read_values(stage, paths, query, case, ordinal)
     expected_shape = (len(case.initial),) if case.is_array else (1,)
     assert values.shape == expected_shape, f"token read shape {values.shape} != {expected_shape}"
-    return [pd.token_to_string(int(value)) for value in values.reshape(-1)]
+    return [paths.token_to_string(int(value)) for value in values.reshape(-1)]
 
 
-def _read_asset_string(renderer, case: AttributeCase) -> str:
-    pd = _path_dictionary(renderer)
-    values = np.array(np.from_dlpack(renderer.read_attribute(case.name, [WORLD])))
+def _read_asset_path_id(stage, paths, query, case: AttributeCase, ordinal: int) -> str:
+    values = _read_values(stage, paths, query, case, ordinal)
     assert values.shape == (1, 2), f"asset read shape {values.shape} != (1, 2)"
     assert int(values[0, 1]) == 0, f"asset second lane {int(values[0, 1])} != 0"
-    return pd.token_to_string(int(values[0, 0]))
+    return paths.token_to_string(int(values[0, 0]))
 
 
-def _asset_tensor(renderer, value: str) -> np.ndarray:
-    return np.array([[_create_token(renderer, value), 0]], dtype=np.uint64)
+def _asset_tensor(paths, value: str) -> np.ndarray:
+    return np.array([[paths.intern_token(value), 0]], dtype=np.uint64)
 
 
 def _string_bytes(value: str) -> np.ndarray:
     return np.frombuffer(value.encode("utf-8"), dtype=np.uint8).copy()
 
 
-def _read_string(renderer, case: AttributeCase, expected: str | None = None) -> str:
-    values = np.array(np.from_dlpack(renderer.read_array_attribute(case.name, [WORLD])[WORLD]))
+def _read_string(stage, paths, query, case: AttributeCase, ordinal: int, expected: str | None = None) -> str:
+    values = _read_values(stage, paths, query, case, ordinal)
     expected_text = case.initial if expected is None else expected
     expected_shape = (len(expected_text.encode("utf-8")),)
     assert values.shape == expected_shape, f"string read shape {values.shape} != {expected_shape}"
     return bytes(values.tolist()).decode("utf-8")
 
 
-def _check_case(renderer, case: AttributeCase) -> None:
-    info = _attribute_info(renderer, case.name)
-    assert info.is_array == case.is_array, f"is_array {info.is_array} != {case.is_array}"
-
+def _check_case(stage, paths, query, case: AttributeCase, ordinal: int) -> None:
     if case.kind == "numeric":
-        if case.name not in KNOWN_USD_POPULATION_BUGS:
-            _assert_array_close(
-                f"{case.name} initial",
-                _read_numeric(renderer, case),
-                _numeric_expected(case, case.initial),
-            )
-        _write_numeric(renderer, case)
-        _assert_array_close(f"{case.name} updated", _read_numeric(renderer, case), _numeric_expected(case, case.updated))
+        _assert_array_close(
+            f"{case.name} initial",
+            _read_numeric(stage, paths, query, case, ordinal - 1),
+            _numeric_expected(case, case.initial),
+        )
+        _write_numeric(stage, paths, query, case, ordinal)
+        stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+        _assert_array_close(
+            f"{case.name} updated",
+            _read_numeric(stage, paths, query, case, ordinal),
+            _numeric_expected(case, case.updated),
+        )
     elif case.kind == "token":
-        assert _read_token_strings(renderer, case) == [case.initial]
-        renderer.write_attribute([WORLD], case.name, [case.updated])
-        assert _read_token_strings(renderer, case) == [case.updated]
+        assert _read_token_strings(stage, paths, query, case, ordinal - 1) == [case.initial]
+        stage.write_attribute(
+            query,
+            paths.intern_token(case.name),
+            ordinal=ordinal,
+            tensors=np.array([paths.intern_token(case.updated)], dtype=np.uint64),
+            is_array=False,
+            semantic=ovstage.AttributeSemantic.TOKEN_ID,
+        ).wait()
+        stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+        assert _read_token_strings(stage, paths, query, case, ordinal) == [case.updated]
     elif case.kind == "token_array":
-        assert _read_token_strings(renderer, case) == case.initial
-        renderer.write_array_attribute([WORLD], case.name, [case.updated], is_token=True)
-        assert _read_token_strings(renderer, case) == case.updated
+        assert _read_token_strings(stage, paths, query, case, ordinal - 1) == case.initial
+        stage.write_attribute(
+            query,
+            paths.intern_token(case.name),
+            ordinal=ordinal,
+            tensors=np.array([paths.intern_token(value) for value in case.updated], dtype=np.uint64),
+            is_array=True,
+            semantic=ovstage.AttributeSemantic.TOKEN_ID,
+        ).wait()
+        stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+        assert _read_token_strings(stage, paths, query, case, ordinal) == case.updated
     elif case.kind == "asset":
-        assert _read_asset_string(renderer, case) == case.initial
-        renderer.write_attribute([WORLD], case.name, _asset_tensor(renderer, case.updated))
-        assert _read_asset_string(renderer, case) == case.updated
+        assert _read_asset_path_id(stage, paths, query, case, ordinal - 1) == case.initial
+        stage.write_attribute(
+            query,
+            paths.intern_token(case.name),
+            ordinal=ordinal,
+            tensors=_asset_tensor(paths, case.updated),
+            is_array=False,
+            semantic=ovstage.AttributeSemantic.ASSET_PATH_ID,
+        ).wait()
+        stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+        assert _read_asset_path_id(stage, paths, query, case, ordinal) == case.updated
     elif case.kind == "string":
-        assert _read_string(renderer, case) == case.initial
-        renderer.write_array_attribute([WORLD], case.name, [_string_bytes(case.updated)])
-        assert _read_string(renderer, case, case.updated) == case.updated
+        assert _read_string(stage, paths, query, case, ordinal - 1) == case.initial
+        stage.write_attribute(
+            query,
+            paths.intern_token(case.name),
+            ordinal=ordinal,
+            tensors=_string_bytes(case.updated),
+            is_array=True,
+            semantic=ovstage.AttributeSemantic.STRING,
+        ).wait()
+        stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+        assert _read_string(stage, paths, query, case, ordinal, case.updated) == case.updated
 
 
-def test_supported_authored_attributes_round_trip(renderer):
+def test_supported_authored_attributes_round_trip(stage):
     """Read every supported authored type, write a new value, then read it back."""
-    _load_all_attributes(renderer)
+    _load_all_attributes(stage)
 
     successes = []
     failures = []
 
-    for case in SUPPORTED_ATTRIBUTE_CASES:
-        if case.name in KNOWN_USD_POPULATION_BUGS:
-            continue
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings([WORLD])
         try:
-            _check_case(renderer, case)
-        except Exception as exc:
-            failures.append(f"{case.usd_type} {case.name}: {type(exc).__name__}: {exc}")
-        else:
-            successes.append(f"{case.usd_type} {case.name}")
+            with stage.query_from_path_list(path_list) as query:
+                for ordinal, case in enumerate(SUPPORTED_ATTRIBUTE_CASES, start=2):
+                    try:
+                        _check_case(stage, paths, query, case, ordinal)
+                    except Exception as exc:
+                        failures.append(f"{case.usd_type} {case.name}: {type(exc).__name__}: {exc}")
+                    else:
+                        successes.append(f"{case.usd_type} {case.name}")
+        finally:
+            paths.destroy_path_list(path_list)
 
     print("\nSupported authored attribute round-trip results:")
     print(f"  succeeded: {len(successes)}")
@@ -461,210 +470,429 @@ def test_supported_authored_attributes_round_trip(renderer):
     assert not failures, "Supported authored attribute round-trip failures:\n" + "\n".join(failures)
 
 
-def test_scalar_float3_population_bug_is_explicit(renderer):
-    """Current runtime bug: authored scalar float3 populates as zero, but runtime writes work."""
-    _load_all_attributes(renderer)
-
-    case = CASE_BY_NAME["test:float3"]
-    initial = _read_numeric(renderer, case)
-    assert initial.shape == (1, 3)
-    _assert_array_close("test:float3 populated bug value", initial, np.zeros((1, 3), dtype=np.float32))
-
-    _write_numeric(renderer, case)
-    _assert_array_close("test:float3 updated", _read_numeric(renderer, case), _numeric_expected(case, case.updated))
-
-
-def test_unsupported_authored_attributes_are_not_populated(renderer):
+def test_unsupported_authored_attributes_are_not_populated(stage):
     """Documented unsupported authored fields remain absent from runtime attribute queries."""
-    _load_all_attributes(renderer)
+    _load_all_attributes(stage)
 
-    prims = renderer.query_prims(attribute_filter_mode=ovrtx.AttributeFilterMode.ALL)
-    world_attributes = prims[WORLD]
-    unexpected = [name for name in UNSUPPORTED_AUTHORED_ATTRIBUTE_NAMES if name in world_attributes]
+    with ovstage.PathDictionary(stage) as paths:
+        attributes = {name: paths.intern_token(name) for name in UNSUPPORTED_AUTHORED_ATTRIBUTE_NAMES}
+        unexpected = []
+        for name, attribute in attributes.items():
+            world_attribute_filter = ovstage.Filter(
+                [
+                    ovstage.Predicate("usd-path", ovstage.FilterOp.IN, [WORLD]),
+                    ovstage.Predicate(attribute, ovstage.FilterOp.HAS),
+                ]
+            )
+            with stage.query(filter=world_attribute_filter) as query:
+                if query.result().total_prim_count:
+                    unexpected.append(name)
     assert not unexpected, f"Unsupported authored attributes were populated unexpectedly: {unexpected}"
 
 
-def test_raw_attribute_read_write_snippets(renderer):
-    """Raw snippets for docs/skills: direct ovrtx calls only, assertions outside."""
-    _load_all_attributes(renderer)
+def test_raw_attribute_read_write_snippets(stage):
+    """Exercise the ovstage attribute read and write examples."""
+    _load_all_attributes(stage)
 
-    bool_values = np.array(np.from_dlpack(renderer.read_attribute("test:bool", [WORLD])))
-    assert bool_values.shape == (1,)
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings([WORLD])
+        try:
+            with stage.query_from_path_list(path_list) as query:
+                ordinal = 1
 
-    renderer.write_attribute([WORLD], "test:bool", np.array([False], dtype=np.bool_))
-    _assert_array_close("test:bool", _read_numeric(renderer, CASE_BY_NAME["test:bool"]), np.array([False]))
+                bool_case = CASE_BY_NAME["test:bool"]
+                bool_values = _read_numeric(stage, paths, query, bool_case, ordinal)
+                assert bool_values.shape == (1,)
+                ordinal += 1
+                stage.write_attribute(
+                    query,
+                    paths.intern_token("test:bool"),
+                    ordinal=ordinal,
+                    tensors=np.array([False], dtype=np.bool_),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                _assert_array_close(
+                    "test:bool",
+                    _read_numeric(stage, paths, query, bool_case, ordinal),
+                    np.array([False]),
+                )
 
-    # [snippet:doc-read-usd-int]
-    int_values = np.array(np.from_dlpack(renderer.read_attribute("test:int", [WORLD])))
-    # [/snippet:doc-read-usd-int]
-    assert int_values.shape == (1,)
+                int_attribute = paths.intern_token("test:int")
+                # [snippet:doc-read-usd-int]
+                with stage.read_attributes(query, [int_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    int_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-int]
+                assert int_values.shape == (1,)
 
-    # [snippet:doc-write-usd-int]
-    renderer.write_attribute([WORLD], "test:int", np.array([-35], dtype=np.int32))
-    # [/snippet:doc-write-usd-int]
-    _assert_array_close("test:int", _read_numeric(renderer, CASE_BY_NAME["test:int"]), np.array([-35], dtype=np.int32))
+                ordinal += 1
+                # [snippet:doc-write-usd-int]
+                stage.write_attribute(
+                    query,
+                    int_attribute,
+                    ordinal=ordinal,
+                    tensors=np.array([-35], dtype=np.int32),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-int]
+                _assert_array_close(
+                    "test:int",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:int"], ordinal),
+                    np.array([-35], dtype=np.int32),
+                )
 
-    # [snippet:doc-read-usd-float]
-    float_values = np.array(np.from_dlpack(renderer.read_attribute("test:float", [WORLD])))
-    # [/snippet:doc-read-usd-float]
-    assert float_values.shape == (1,)
+                float_attribute = paths.intern_token("test:float")
+                # [snippet:doc-read-usd-float]
+                with stage.read_attributes(query, [float_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    float_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-float]
+                assert float_values.shape == (1,)
 
-    # [snippet:doc-write-usd-float]
-    renderer.write_attribute([WORLD], "test:float", np.array([24.25], dtype=np.float32))
-    # [/snippet:doc-write-usd-float]
-    _assert_array_close("test:float", _read_numeric(renderer, CASE_BY_NAME["test:float"]), np.array([24.25], dtype=np.float32))
+                ordinal += 1
+                # [snippet:doc-write-usd-float]
+                stage.write_attribute(
+                    query,
+                    float_attribute,
+                    ordinal=ordinal,
+                    tensors=np.array([24.25], dtype=np.float32),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-float]
+                _assert_array_close(
+                    "test:float",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:float"], ordinal),
+                    np.array([24.25], dtype=np.float32),
+                )
 
-    # [snippet:doc-read-usd-point3f]
-    point3f_values = np.array(np.from_dlpack(renderer.read_attribute("test:point3f", [WORLD])))
-    # [/snippet:doc-read-usd-point3f]
-    assert point3f_values.shape == (1, 3)
+                point3f_attribute = paths.intern_token("test:point3f")
+                # [snippet:doc-read-usd-point3f]
+                with stage.read_attributes(query, [point3f_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    point3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-point3f]
+                assert point3f_values.shape == (1, 3)
 
-    # [snippet:doc-write-usd-point3f]
-    renderer.write_attribute([WORLD], "test:point3f", np.array([[75.85, 75.95, 76.05]], dtype=np.float32))
-    # [/snippet:doc-write-usd-point3f]
-    _assert_array_close(
-        "test:point3f",
-        _read_numeric(renderer, CASE_BY_NAME["test:point3f"]),
-        np.array([[75.85, 75.95, 76.05]], dtype=np.float32),
-    )
+                ordinal += 1
+                # [snippet:doc-write-usd-point3f]
+                stage.write_attribute(
+                    query,
+                    point3f_attribute,
+                    ordinal=ordinal,
+                    tensors=np.array([[75.85, 75.95, 76.05]], dtype=np.float32),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-point3f]
+                _assert_array_close(
+                    "test:point3f",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:point3f"], ordinal),
+                    np.array([[75.85, 75.95, 76.05]], dtype=np.float32),
+                )
 
-    # [snippet:doc-read-usd-point3f-array]
-    point3f_array_values = np.array(np.from_dlpack(renderer.read_array_attribute("test:point3fArray", [WORLD])[WORLD]))
-    # [/snippet:doc-read-usd-point3f-array]
-    assert point3f_array_values.shape == (2, 3)
+                point3f_array_attribute = paths.intern_token("test:point3fArray")
+                # [snippet:doc-read-usd-point3f-array]
+                with stage.read_attributes(
+                    query, [point3f_array_attribute], ovstage.OrdinalRange.latest(ordinal)
+                ) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    point3f_array_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-point3f-array]
+                assert point3f_array_values.shape == (2, 3)
 
-    # [snippet:doc-write-usd-point3f-array]
-    renderer.write_array_attribute(
-        [WORLD],
-        "test:point3fArray",
-        [np.array([[75.85, 75.95, 76.05], [76.85, 76.95, 77.05]], dtype=np.float32)],
-    )
-    # [/snippet:doc-write-usd-point3f-array]
-    _assert_array_close(
-        "test:point3fArray",
-        _read_numeric(renderer, CASE_BY_NAME["test:point3fArray"]),
-        np.array([[75.85, 75.95, 76.05], [76.85, 76.95, 77.05]], dtype=np.float32),
-    )
+                ordinal += 1
+                # [snippet:doc-write-usd-point3f-array]
+                point3f_array = np.array(
+                    [[75.85, 75.95, 76.05], [76.85, 76.95, 77.05]],
+                    dtype=np.float32,
+                )
+                point3f_dtype = ovstage.numpy_to_dldatatype(point3f_array.dtype, lanes=3)
+                point3f_tensor = ovstage.make_dltensor(
+                    point3f_array,
+                    dtype=point3f_dtype,
+                    shape=[len(point3f_array)],
+                    ndim=1,
+                )
+                stage.write_attribute(
+                    query,
+                    point3f_array_attribute,
+                    ordinal=ordinal,
+                    tensors=point3f_tensor,
+                    is_array=True,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-point3f-array]
+                _assert_array_close(
+                    "test:point3fArray",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:point3fArray"], ordinal),
+                    point3f_array,
+                )
 
-    # [snippet:doc-read-usd-normal3f]
-    normal3f_values = np.array(np.from_dlpack(renderer.read_attribute("test:normal3f", [WORLD])))
-    # [/snippet:doc-read-usd-normal3f]
-    assert normal3f_values.shape == (1, 3)
+                normal3f_attribute = paths.intern_token("test:normal3f")
+                # [snippet:doc-read-usd-normal3f]
+                with stage.read_attributes(query, [normal3f_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    normal3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-normal3f]
+                assert normal3f_values.shape == (1, 3)
 
-    # [snippet:doc-write-usd-normal3f]
-    renderer.write_attribute([WORLD], "test:normal3f", np.array([[68.85, 68.95, 69.05]], dtype=np.float32))
-    # [/snippet:doc-write-usd-normal3f]
-    _assert_array_close(
-        "test:normal3f",
-        _read_numeric(renderer, CASE_BY_NAME["test:normal3f"]),
-        np.array([[68.85, 68.95, 69.05]], dtype=np.float32),
-    )
+                ordinal += 1
+                # [snippet:doc-write-usd-normal3f]
+                stage.write_attribute(
+                    query,
+                    normal3f_attribute,
+                    ordinal=ordinal,
+                    tensors=np.array([[68.85, 68.95, 69.05]], dtype=np.float32),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-normal3f]
+                _assert_array_close(
+                    "test:normal3f",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:normal3f"], ordinal),
+                    np.array([[68.85, 68.95, 69.05]], dtype=np.float32),
+                )
 
-    # [snippet:doc-read-usd-vector3f]
-    vector3f_values = np.array(np.from_dlpack(renderer.read_attribute("test:vector3f", [WORLD])))
-    # [/snippet:doc-read-usd-vector3f]
-    assert vector3f_values.shape == (1, 3)
+                vector3f_attribute = paths.intern_token("test:vector3f")
+                # [snippet:doc-read-usd-vector3f]
+                with stage.read_attributes(query, [vector3f_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    vector3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-vector3f]
+                assert vector3f_values.shape == (1, 3)
 
-    # [snippet:doc-write-usd-vector3f]
-    renderer.write_attribute([WORLD], "test:vector3f", np.array([[102.85, 102.95, 103.05]], dtype=np.float32))
-    # [/snippet:doc-write-usd-vector3f]
-    _assert_array_close(
-        "test:vector3f",
-        _read_numeric(renderer, CASE_BY_NAME["test:vector3f"]),
-        np.array([[102.85, 102.95, 103.05]], dtype=np.float32),
-    )
+                ordinal += 1
+                # [snippet:doc-write-usd-vector3f]
+                stage.write_attribute(
+                    query,
+                    vector3f_attribute,
+                    ordinal=ordinal,
+                    tensors=np.array([[102.85, 102.95, 103.05]], dtype=np.float32),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-vector3f]
+                _assert_array_close(
+                    "test:vector3f",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:vector3f"], ordinal),
+                    np.array([[102.85, 102.95, 103.05]], dtype=np.float32),
+                )
 
-    # [snippet:doc-read-usd-color3f]
-    color3f_values = np.array(np.from_dlpack(renderer.read_attribute("test:color3f", [WORLD])))
-    # [/snippet:doc-read-usd-color3f]
-    assert color3f_values.shape == (1, 3)
+                color3f_attribute = paths.intern_token("test:color3f")
+                # [snippet:doc-read-usd-color3f]
+                with stage.read_attributes(query, [color3f_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    color3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-color3f]
+                assert color3f_values.shape == (1, 3)
 
-    # [snippet:doc-write-usd-color3f]
-    renderer.write_attribute([WORLD], "test:color3f", np.array([[3.85, 3.95, 4.05]], dtype=np.float32))
-    # [/snippet:doc-write-usd-color3f]
-    _assert_array_close(
-        "test:color3f",
-        _read_numeric(renderer, CASE_BY_NAME["test:color3f"]),
-        np.array([[3.85, 3.95, 4.05]], dtype=np.float32),
-    )
+                ordinal += 1
+                # [snippet:doc-write-usd-color3f]
+                stage.write_attribute(
+                    query,
+                    color3f_attribute,
+                    ordinal=ordinal,
+                    tensors=np.array([[3.85, 3.95, 4.05]], dtype=np.float32),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-color3f]
+                _assert_array_close(
+                    "test:color3f",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:color3f"], ordinal),
+                    np.array([[3.85, 3.95, 4.05]], dtype=np.float32),
+                )
 
-    # [snippet:doc-read-usd-matrix4d]
-    matrix4d_values = np.array(np.from_dlpack(renderer.read_attribute("test:matrix4d", [WORLD])))
-    # [/snippet:doc-read-usd-matrix4d]
-    assert matrix4d_values.shape == (1, 16)
+                matrix4d_attribute = paths.intern_token("test:matrix4d")
+                # [snippet:doc-read-usd-matrix4d]
+                with stage.read_attributes(query, [matrix4d_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    matrix4d_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-matrix4d]
+                assert matrix4d_values.shape == (1, 16)
 
-    # [snippet:doc-write-usd-matrix4d]
-    renderer.write_attribute(
-        [WORLD],
-        "test:matrix4d",
-        np.array([[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]], dtype=np.float64),
-    )
-    # [/snippet:doc-write-usd-matrix4d]
-    _assert_array_close(
-        "test:matrix4d",
-        _read_numeric(renderer, CASE_BY_NAME["test:matrix4d"]),
-        np.array([[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]], dtype=np.float64),
-    )
+                ordinal += 1
+                matrix4d_updated = np.array(
+                    [[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]],
+                    dtype=np.float64,
+                )
+                # [snippet:doc-write-usd-matrix4d]
+                stage.write_attribute(
+                    query,
+                    matrix4d_attribute,
+                    ordinal=ordinal,
+                    tensors=matrix4d_updated,
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-matrix4d]
+                _assert_array_close(
+                    "test:matrix4d",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:matrix4d"], ordinal),
+                    matrix4d_updated,
+                )
 
-    # [snippet:doc-read-usd-quatf]
-    quatf_values = np.array(np.from_dlpack(renderer.read_attribute("test:quatf", [WORLD])))
-    # [/snippet:doc-read-usd-quatf]
-    assert quatf_values.shape == (1, 4)
+                quatf_attribute = paths.intern_token("test:quatf")
+                # [snippet:doc-read-usd-quatf]
+                with stage.read_attributes(query, [quatf_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    quatf_values = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                # [/snippet:doc-read-usd-quatf]
+                assert quatf_values.shape == (1, 4)
 
-    # [snippet:doc-write-usd-quatf]
-    renderer.write_attribute([WORLD], "test:quatf", np.array([[82.85, 82.95, 83.05, 1.75]], dtype=np.float32))
-    # [/snippet:doc-write-usd-quatf]
-    _assert_array_close(
-        "test:quatf",
-        _read_numeric(renderer, CASE_BY_NAME["test:quatf"]),
-        np.array([[82.85, 82.95, 83.05, 1.75]], dtype=np.float32),
-    )
+                ordinal += 1
+                # [snippet:doc-write-usd-quatf]
+                stage.write_attribute(
+                    query,
+                    quatf_attribute,
+                    ordinal=ordinal,
+                    tensors=np.array([[82.85, 82.95, 83.05, 1.75]], dtype=np.float32),
+                    is_array=False,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-quatf]
+                _assert_array_close(
+                    "test:quatf",
+                    _read_numeric(stage, paths, query, CASE_BY_NAME["test:quatf"], ordinal),
+                    np.array([[82.85, 82.95, 83.05, 1.75]], dtype=np.float32),
+                )
 
-    # [snippet:doc-read-usd-string]
-    string_bytes = np.array(np.from_dlpack(renderer.read_array_attribute("test:string", [WORLD])[WORLD]))
-    string_value = bytes(string_bytes.tolist()).decode("utf-8")
-    # [/snippet:doc-read-usd-string]
-    assert string_value == "initial string"
+                string_attribute = paths.intern_token("test:string")
+                # [snippet:doc-read-usd-string]
+                with stage.read_attributes(query, [string_attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    group = read.fetch_next()
+                    if group is None:
+                        raise RuntimeError("No matching attribute was returned")
+                    string_bytes = np.from_dlpack(group.dlpack(0)).copy()
+                    stage.release_group(group)
+                string_value = bytes(string_bytes.tolist()).decode("utf-8")
+                # [/snippet:doc-read-usd-string]
+                assert string_value == "initial string"
 
-    # [snippet:doc-write-usd-string]
-    renderer.write_array_attribute(
-        [WORLD],
-        "test:string",
-        [np.frombuffer("updated longer string".encode("utf-8"), dtype=np.uint8).copy()],
-    )
-    # [/snippet:doc-write-usd-string]
-    assert _read_string(renderer, CASE_BY_NAME["test:string"], "updated longer string") == "updated longer string"
+                ordinal += 1
+                # [snippet:doc-write-usd-string]
+                updated_string = np.frombuffer(
+                    "updated longer string".encode("utf-8"),
+                    dtype=np.uint8,
+                ).copy()
+                stage.write_attribute(
+                    query,
+                    string_attribute,
+                    ordinal=ordinal,
+                    tensors=updated_string,
+                    is_array=True,
+                    semantic=ovstage.AttributeSemantic.STRING,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-string]
+                assert (
+                    _read_string(
+                        stage,
+                        paths,
+                        query,
+                        CASE_BY_NAME["test:string"],
+                        ordinal,
+                        "updated longer string",
+                    )
+                    == "updated longer string"
+                )
 
-    token_ids = np.array(np.from_dlpack(renderer.read_attribute("test:token", [WORLD])))
-    token_value = _path_dictionary(renderer).token_to_string(int(token_ids[0]))
-    assert token_value == "initialToken"
+                token_case = CASE_BY_NAME["test:token"]
+                token_ids = _read_values(stage, paths, query, token_case, ordinal)
+                token_value = paths.token_to_string(int(token_ids[0]))
+                assert token_value == "initialToken"
 
-    # [snippet:doc-write-usd-token]
-    renderer.write_attribute([WORLD], "test:token", ["updatedToken"])
-    # [/snippet:doc-write-usd-token]
-    assert _read_token_strings(renderer, CASE_BY_NAME["test:token"]) == ["updatedToken"]
+                ordinal += 1
+                # [snippet:doc-write-usd-token]
+                token_attribute = paths.intern_token("test:token")
+                updated_token = np.array([paths.intern_token("updatedToken")], dtype=np.uint64)
+                stage.write_attribute(
+                    query,
+                    token_attribute,
+                    ordinal=ordinal,
+                    tensors=updated_token,
+                    is_array=False,
+                    semantic=ovstage.AttributeSemantic.TOKEN_ID,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-token]
+                assert _read_token_strings(stage, paths, query, token_case, ordinal) == ["updatedToken"]
 
-    token_array_ids = np.array(np.from_dlpack(renderer.read_array_attribute("test:tokenArray", [WORLD])[WORLD]))
-    token_array_values = [_path_dictionary(renderer).token_to_string(int(token_id)) for token_id in token_array_ids]
-    assert token_array_values == ["initialTokenA", "initialTokenB"]
+                token_array_case = CASE_BY_NAME["test:tokenArray"]
+                token_array_ids = _read_values(stage, paths, query, token_array_case, ordinal)
+                token_array_values = [paths.token_to_string(int(token_id)) for token_id in token_array_ids]
+                assert token_array_values == ["initialTokenA", "initialTokenB"]
 
-    # [snippet:doc-write-usd-token-array]
-    renderer.write_array_attribute([WORLD], "test:tokenArray", [["updatedTokenA", "updatedTokenB"]], is_token=True)
-    # [/snippet:doc-write-usd-token-array]
-    assert _read_token_strings(renderer, CASE_BY_NAME["test:tokenArray"]) == ["updatedTokenA", "updatedTokenB"]
+                ordinal += 1
+                # [snippet:doc-write-usd-token-array]
+                token_array_attribute = paths.intern_token("test:tokenArray")
+                updated_tokens = np.array(
+                    [paths.intern_token("updatedTokenA"), paths.intern_token("updatedTokenB")],
+                    dtype=np.uint64,
+                )
+                stage.write_attribute(
+                    query,
+                    token_array_attribute,
+                    ordinal=ordinal,
+                    tensors=updated_tokens,
+                    is_array=True,
+                    semantic=ovstage.AttributeSemantic.TOKEN_ID,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                # [/snippet:doc-write-usd-token-array]
+                assert _read_token_strings(stage, paths, query, token_array_case, ordinal) == [
+                    "updatedTokenA",
+                    "updatedTokenB",
+                ]
 
-    asset_values = np.array(np.from_dlpack(renderer.read_attribute("test:asset", [WORLD])))
-    asset_value = _path_dictionary(renderer).token_to_string(int(asset_values[0, 0]))
-    assert asset_value == "initial_asset.usd"
+                asset_case = CASE_BY_NAME["test:asset"]
+                asset_values = _read_values(stage, paths, query, asset_case, ordinal)
+                asset_value = paths.token_to_string(int(asset_values[0, 0]))
+                assert asset_value == "initial_asset.usd"
 
-    asset_pd = renderer._get_path_dict()
-    asset_source = bindings.ovx_string_t("updated_asset.usd")
-    asset_token = ctypes.c_uint64(0)
-    asset_pd.vtable.contents.create_tokens_from_strings(
-        asset_pd.context, ctypes.byref(asset_source), 1, ctypes.byref(asset_token)
-    )
-    renderer.write_attribute([WORLD], "test:asset", np.array([[asset_token.value, 0]], dtype=np.uint64))
-    assert _read_asset_string(renderer, CASE_BY_NAME["test:asset"]) == "updated_asset.usd"
+                ordinal += 1
+                stage.write_attribute(
+                    query,
+                    paths.intern_token("test:asset"),
+                    ordinal=ordinal,
+                    tensors=_asset_tensor(paths, "updated_asset.usd"),
+                    is_array=False,
+                    semantic=ovstage.AttributeSemantic.ASSET_PATH_ID,
+                ).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                assert _read_asset_path_id(stage, paths, query, asset_case, ordinal) == "updated_asset.usd"
+        finally:
+            paths.destroy_path_list(path_list)
 
 
 def test_ovstage_bool_read_write_snippets(stage):

@@ -20,6 +20,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SCENE = SCRIPT_DIR / "lidar_example.usda"
 OUTPUT_DIR = SCRIPT_DIR / "_output"
 RENDER_PRODUCT = "/World/Render/Products/LidarProduct"
+POINTCLOUD_RENDER_VAR = "/World/Render/Vars/PointCloud"
 WARMUP_STEPS = 3
 STEP_DT_SECONDS = 0.1
 
@@ -73,13 +74,14 @@ def log_lidar_points(rr, points: np.ndarray, intensity: np.ndarray) -> None:
 # [snippet:read-lidar-pointcloud]
 def read_lidar_pointcloud(frame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Map the PointCloud composite tensor to CPU and return valid point channels."""
-    with frame.render_vars["PointCloud"].map(device=ovrtx.Device.CPU) as pointcloud:
+    with frame.render_vars[POINTCLOUD_RENDER_VAR].map(device=ovrtx.Device.CPU) as pointcloud:
         coordinates = np.from_dlpack(pointcloud["Coordinates"])
         counts = np.from_dlpack(pointcloud["Counts"])
         intensity = np.from_dlpack(pointcloud["Intensity"])
         time_offset_ns = np.from_dlpack(pointcloud["TimeOffsetNs"])
 
-        # Counts contains the number of valid entries in the per-point tensors.
+        # Counts bounds the delivered entries. This scene sets
+        # includeInvalidPoints=false, so the delivered entries are all valid.
         valid_count = int(counts[0])
         points = np.asarray(coordinates[:, :valid_count].T)
         return (

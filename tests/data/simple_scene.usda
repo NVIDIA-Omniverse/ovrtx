@@ -329,7 +329,6 @@ def "Render" (
                 bool omni:rtx:debug:view:pixelDebug:enableFixedTextPos = 1
                 bool omni:rtx:debug:view:scaleToTargetRes = 0
                 token omni:rtx:directLighting:sampledLighting:denoisingTechnique = "None"
-                bool omni:rtx:dlss:frameGeneration = 1
                 bool omni:rtx:indirectDiffuse:denoiser:enabled = 0
                 bool omni:rtx:post:aa:limitedOps = 0
                 bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1

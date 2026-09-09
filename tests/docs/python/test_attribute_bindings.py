@@ -223,7 +223,7 @@ def test_unmap_attribute_async(stage):
         paths.destroy_path_list(path_list)
 
 
-@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
+@pytest.mark.allow_deprecated_ovrtx_api
 def test_map_attribute_cuda(renderer):
     """Map an attribute on CUDA, edit it with Warp, and read back on CPU."""
     _load_base_legacy(renderer)
@@ -245,7 +245,7 @@ def test_map_attribute_cuda(renderer):
     assert _read_xform_legacy(renderer)[0, 3, 0] == 6.0
 
 
-@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
+@pytest.mark.allow_deprecated_ovrtx_api
 def test_write_attribute_async_data_access_cuda(renderer):
     """Write a CUDA tensor with asynchronous data access and stream sync."""
     _load_base_legacy(renderer)

@@ -14,7 +14,6 @@ description: >
   when the user asks to "upgrade from 0.2 to 0.3", migrate ovrtx API usage,
   update 0.2 projects to 0.3, or fix code after moving from ovrtx 0.2.x to 0.3.x.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -139,7 +138,8 @@ Use transient per-thread wait error data and process-global logging callbacks.
 - If async Python code gets a `PendingFetch` where it expected outputs, add the explicit `.fetch()` step after `op.wait()`.
 - If C image code still reads `.buffer.dl`, migrate to `rendered_output.tensors[0].dl` for single-tensor camera outputs and validate shape `[height, width, channels]` with scalar lanes.
 - If C error reporting prints empty or invalid strings, consume `ovrtx_get_last_op_error()` results before any later `ovrtx_wait_op()` on the same thread.
-- If mixed OpenUSD/ovPhysX applications report missing ovrtx schemas, call `ovrtx_register_schema_paths()` before any subsystem initializes or opens a USD stage.
+- If mixed OpenUSD/ovPhysX applications report missing ovrtx schemas on ovrtx's bundled OpenUSD, call `ovrtx_register_schema_paths()` before any subsystem initializes or opens a USD stage.
+- If a **separate** OpenUSD runtime co-loaded in the same process misses ovrtx schemas, either set `OVRTX_PXR_SCHEMA_AUTO_REGISTER=1` before registration or use `ovrtx_get_usd_plugin_paths()` (Python: `ovrtx.usd_plugin_paths()`) to enumerate and filter ovrtx's directories before appending them to `PXR_PLUGINPATH_NAME`. Publish the paths before that external runtime opens its first stage.
 
 ## References
 

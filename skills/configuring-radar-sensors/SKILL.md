@@ -15,7 +15,6 @@ description: >
   output frame/coordinate behavior, configure radar scan outputs, or request radar
   PointCloud channels.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -99,7 +98,6 @@ These output-defining attributes, among others, live on the radar prim with the 
 
 | Attribute | Values / Shape | Use |
 |---|---|---|
-| `auxOutputType` | `NONE`, `BASIC`, `EXTRA`, `FULL` | Controls auxiliary data in `GenericModelOutput`. It does not add `PointCloud` channels. |
 | `elementsCoordsType` | `CARTESIAN`, `SPHERICAL` | Coordinate representation for detection coordinates. |
 | `outputFrameOfReference` | `SENSOR`, `WORLD`, `CUSTOM` | Frame of reference for outputs. Prefer `SENSOR` when downstream consumers expect sensor-frame detections. |
 | `customFrameOfReferenceTrafo` | `[x, y, z, roll, pitch, yaw]` | Custom transform used only with `outputFrameOfReference = CUSTOM`. |
@@ -124,7 +122,7 @@ For concise examples, keep one scan unless the behavior being demonstrated requi
 
 > **Source:** `examples/c/radar/radar_example.usda` snippet `configure-radar-pointcloud-output`
 
-For public ovrtx examples, prefer `sourceName = "PointCloud"` when the application only needs selected detection channels. Request only the channels needed by the consumer to keep memory use down.
+`sourceName = "PointCloud"` is the radar sensor render output. Request only the channels needed by the consumer to keep memory use down.
 
 Common radar channels:
 
@@ -135,16 +133,13 @@ Common radar channels:
 | `RadialVelocityMs` | Doppler radial velocity in meters per second. Approaching objects can have negative velocity, so use magnitude when checking only for motion. |
 | `TimeOffsetNs` | Per-detection time offset in nanoseconds relative to scan start. |
 | `Flags` | Model-delivered per-detection status flags. The model auto-enables this channel even when it is not requested explicitly. |
-| `Counts` | Model-delivered valid detection count used before reading per-point tensors. The model auto-enables this channel even when it is not requested explicitly. |
-
-Use `GenericModelOutput` only when a consumer specifically needs the traditional packed radar output. For composite tensor workflows, `PointCloud` is the clearer default.
+| `Counts` | Model-delivered detection entry count used to bound every per-detection tensor. The model auto-enables this channel even when it is not requested explicitly. |
 
 ## Troubleshooting
 
 - Output-defining attributes are not intended for runtime mutation; author them in USD before loading the scene.
-- `Counts` defines the valid range in per-point tensors. Do not iterate over the full tensor allocation.
+- `Counts` defines the delivered range in per-detection tensors. Do not iterate over the full tensor allocation; use `Flags` for per-detection validity.
 - `PointCloud` only needs requested payload channels; the model auto-enables `Counts` and `Flags` and delivers them like ordinary channel tensors.
-- `auxOutputType` affects `GenericModelOutput`, not `PointCloud`.
 - Radar output frame and visualizer frame are separate concerns. If output is in `SENSOR` frame, configure the visualizer to interpret that frame instead of changing the sensor to `WORLD` unless world-frame output is actually desired.
 
 ## Related Skills

@@ -14,7 +14,6 @@ description: >
   frames, image quality, texture streaming, path tracing convergence, or why renders
   look noisy/incomplete.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -94,6 +93,8 @@ When `omni:rtx:rendermode = "PathTracing"` is set on the RenderProduct, the refe
 ## Python
 
 > **Source:** `tests/docs/python/test_base.py` snippet `doc-warmup`
+>
+> **Source (example):** `examples/python/projectors/main.py` snippet `projectors-warmup`
 
 ## C
 

@@ -70,6 +70,7 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    core/application_flow
    core/renderer_configuration
    core/async_status_errors
+   core/cuda_vulkan_scheduling
    core/ovstage_integration
 
 .. toctree::
@@ -86,7 +87,11 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    :maxdepth: 2
    :caption: Sensor Processing Graphs
 
-   spg/index
+   spg/overview
+   spg/first_node
+   spg/do/index
+   spg/ref/index
+   spg/diagnose/index
 
 .. toctree::
    :maxdepth: 2
@@ -99,9 +104,16 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    scene/attribute_bindings
    scene/attribute_mapping
    scene/cloning
-   scene/material_binding
    scene/semantic_labels
    scene/picking
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Materials
+
+   materials/material_binding
+   materials/projectors
+   materials/decals
 
 .. toctree::
    :maxdepth: 2

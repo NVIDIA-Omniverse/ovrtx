@@ -138,10 +138,10 @@ find_output(ovrtx_render_product_set_outputs_t const &outputs,
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const &var =
                     frame.output_render_vars[v];
-                if (var.render_var_name.ptr &&
-                    var.render_var_name.length == output_to_find_len &&
-                    strncmp(var.render_var_name.ptr, output_to_find,
-                            var.render_var_name.length) == 0) {
+                if (var.render_var_path.ptr &&
+                    var.render_var_path.length == output_to_find_len &&
+                    strncmp(var.render_var_path.ptr, output_to_find,
+                            var.render_var_path.length) == 0) {
                     return var.output_handle;
                 }
             }
@@ -310,7 +310,7 @@ void OvrtxEngine::mapAndEmit(uint64_t step_handle)
     }
 
     ovrtx_render_var_output_handle_t color_handle =
-        find_output(outputs, "LdrColor");
+        find_output(outputs, "/Render/Camera/LdrColor");
     if (color_handle == OVRTX_INVALID_HANDLE) {
         std::cerr << "LdrColor output not found\n";
         ovrtx_destroy_results(renderer_, step_handle);

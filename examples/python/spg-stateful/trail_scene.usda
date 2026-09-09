@@ -1,0 +1,144 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+# One glowing ball in front of a flat backdrop. Nothing else: no floor, no
+# reflections, no second object, so nothing in the scene can be mistaken for the
+# effect. main.py drives the ball around a circle, and the SPG node feeds its own
+# previous output back in so the ball drags a fading comet tail behind it.
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    # Emissive, well above 1.0, so the ball carries real dynamic range in
+    # HdrColor and its tail stays visible for many frames as it decays. It does
+    # not illuminate anything; only the dome light does.
+    def Material "GlowMaterial"
+    {
+        token outputs:surface.connect = </World/GlowMaterial/Shader.outputs:surface>
+
+        def Shader "Shader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (1.0, 0.55, 0.15)
+            color3f inputs:emissiveColor = (60, 24, 6)
+            float inputs:roughness = 1
+            float inputs:metallic = 0
+            token outputs:surface
+        }
+    }
+
+    # Fully rough and with no specular lobe (ior 1.0), so the backdrop does not
+    # mirror the glowing ball back into the frame as a second object.
+    def Material "MatteMaterial"
+    {
+        token outputs:surface.connect = </World/MatteMaterial/Shader.outputs:surface>
+
+        def Shader "Shader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0.5, 0.5, 0.55)
+            float inputs:roughness = 1
+            float inputs:metallic = 0
+            float inputs:ior = 1
+            token outputs:surface
+        }
+    }
+
+    def Camera "Camera"
+    {
+        float2 clippingRange = (1, 100000)
+        float focalLength = 18
+        float focusDistance = 700
+        double3 xformOp:translate = (0, 110, 700)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 1200
+        token inputs:texture:format = "latlong"
+    }
+
+    # A single flat backdrop, large enough to fill the frame. It is the only
+    # thing in the scene besides the ball, so nothing competes with the tail.
+    def Mesh "Backdrop" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </World/MatteMaterial>
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-900, -600, -200), (900, -600, -200), (900, 700, -200), (-900, 700, -200)]
+        uniform token subdivisionScheme = "none"
+    }
+
+    # The ball. main.py writes omni:xform on this prim each step, so it is
+    # authored with a matrix xformOp rather than a translate, and it starts at
+    # the top of the circle it will be driven around.
+    def Sphere "Ball" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </World/GlowMaterial>
+        double radius = 21
+        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 280, 0, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+}
+
+# The node reads HdrColor rather than LdrColor because the feedback runs on
+# linear radiance, where multiplying by a constant is an honest fade. It
+# publishes both images it produces, so the pair can be compared without any
+# other processing in between. History is not listed here: a stateful output is
+# the node's own scratch space and needs no RenderVar.
+# [snippet:render-graph]
+def Scope "Render"
+{
+    def RenderProduct "TrailDemo"
+    {
+        uniform int2 resolution = (1280, 720)
+        rel camera = </World/Camera>
+        rel orderedVars = [ <HdrColor>, <LdrLive>, <LdrTrail> ]
+
+        def RenderVar "HdrColor"
+        {
+            uniform string sourceName = "HdrColor"
+            opaque omni:rtx:aov
+        }
+
+        def RenderVar "LdrLive"
+        {
+            uniform string sourceName = "LdrLive"
+            opaque omni:rtx:aov.connect = <../TrailKernel.outputs:Live>
+        }
+
+        def RenderVar "LdrTrail"
+        {
+            uniform string sourceName = "LdrTrail"
+            opaque omni:rtx:aov.connect = <../TrailKernel.outputs:Trail>
+        }
+
+        def Shader "TrailKernel" (
+            references = @TrailKernel.usda@
+        )
+        {
+            opaque inputs:Image.connect = <../HdrColor.omni:rtx:aov>
+        }
+    }
+}
+# [/snippet:render-graph]

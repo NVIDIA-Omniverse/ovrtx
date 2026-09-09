@@ -28,21 +28,24 @@ Create or edit a test file in `tests/docs/python/`. The test function handles se
 
 ```python
 @pytest.mark.usd_scene("simple_camera.usda")
-def test_my_feature(renderer, usd_scene):
+def test_my_feature(renderer, stage, usd_scene):
     """Test description matching the doc section."""
     # Setup -- not in snippet
-    renderer.open_usd_from_string(_make_scene(str(usd_scene)))
+    ordinal = 1
+    ovstage.population.open_usd_from_string(stage, _make_scene(str(usd_scene)), ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
     for _ in range(5):
-        renderer.step(render_products={"/Render/Camera"}, delta_time=1/60)
+        renderer.step(render_products={"/Render/Camera"}, delta_time=1/60, ordinal=ordinal)
 
     # [snippet:doc-my-feature]
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
+        ordinal=ordinal,
     )
     for product_name, product in products.items():
         for frame in product.frames:
-            var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
+            var = frame.render_vars["/Render/Camera/LdrColor"].map(device=ovrtx.Device.CPU)
             pixels = np.from_dlpack(var)
             assert pixels.shape[2] == 4
     # [/snippet:doc-my-feature]
@@ -52,6 +55,14 @@ Key points:
 - Snippet markers wrap **only the doc-visible code** -- setup and assertions stay outside.
 - Use `ovrtx.Device.CPU` (not `Device.CPU` or `"cpu"`) so the snippet is self-explanatory without a visible import.
 - Scene loading uses the sublayer pattern (see `skills/sublayer-test-scenes/SKILL.md`).
+
+### Deprecated API transition
+
+New tests and snippets always use attached ovstage. The
+`@pytest.mark.allow_deprecated_ovrtx_api` marker is reserved for retained tests
+whose subject is the deprecated renderer-owned API contract. Never add
+`filterwarnings`; unsuppressed deprecations remain visible in the suite's
+ovstage migration summary.
 
 ### For USDA data files
 

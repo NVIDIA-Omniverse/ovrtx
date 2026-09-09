@@ -1,0 +1,68 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+# Slang variant of pipeline_scene.usda. The rendered world is referenced from
+# that scene so this file shows only what differs between the two backends:
+# the shader definitions it instantiates.
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "World" (
+    references = @pipeline_scene.usda@</World>
+)
+{
+}
+
+# [snippet:render-graph]
+def Scope "Render"
+{
+    def RenderProduct "PipelineDemo"
+    {
+        uniform int2 resolution = (1280, 720)
+        rel camera = </World/Camera>
+        rel orderedVars = [ <LdrColor>, <LdrInverted> ]
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+            opaque omni:rtx:aov
+        }
+
+        def RenderVar "LdrInverted"
+        {
+            uniform string sourceName = "LdrInverted"
+            opaque omni:rtx:aov.connect = <../InvertKernel.outputs:Inverted>
+        }
+
+        # Chaining works the same for both backends: the wiring below is
+        # identical to pipeline_scene.usda, only the referenced shader
+        # definitions differ.
+        def Shader "GrayscaleKernel" (
+            references = @GrayscaleKernel.slang.usda@
+        )
+        {
+            opaque inputs:LdrColor.connect = <../LdrColor.omni:rtx:aov>
+        }
+
+        def Shader "InvertKernel" (
+            references = @InvertKernel.slang.usda@
+        )
+        {
+            # Chain: consume the grayscale output directly (no intermediate RenderVar).
+            opaque inputs:Image.connect = <../GrayscaleKernel.outputs:LdrGrayscale>
+            float inputs:strength = 1.0
+        }
+    }
+}
+# [/snippet:render-graph]

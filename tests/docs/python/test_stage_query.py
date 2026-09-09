@@ -89,7 +89,7 @@ def test_query_prims_async(stage):
     assert result.total_prim_count > 0
 
 
-@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
+@pytest.mark.allow_deprecated_ovrtx_api
 def test_query_require_any_exclude_all_attrs(renderer):
     """Exercise OR, NOT, and ALL-attributes query options together."""
     renderer.open_usd(TEST_BASE_PATH)
@@ -113,7 +113,7 @@ def test_query_require_any_exclude_all_attrs(renderer):
     assert prims["/World/Plane"]
 
 
-@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
+@pytest.mark.allow_deprecated_ovrtx_api
 def test_query_specific_empty_attribute_list(renderer):
     """SPECIFIC with no requested names returns matched prims with no descriptors."""
     renderer.open_usd(TEST_BASE_PATH)

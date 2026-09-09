@@ -44,7 +44,7 @@ Finally, configure, build, and run the minimal example for your platform:
 
          cmake -B build
          cmake --build build --config Release
-         .\build\Release\minimal.exe
+         .\build\static\Release\minimal.exe
 
    .. tab-item:: Linux
 
@@ -52,7 +52,7 @@ Finally, configure, build, and run the minimal example for your platform:
 
          cmake -B build -DCMAKE_BUILD_TYPE=Release
          cmake --build build
-         ./build/minimal
+         ./build/static/minimal
 
 The minimal example shows how to create the renderer, load an OpenUSD scene, and render a single image. The results are copied back to the CPU for writing out as a PNG.
 
@@ -88,9 +88,22 @@ Alternatively, download the appropriate package for your system from the `Releas
 from your ``CMakeLists.txt``. The macro above already takes this path when it can: it tries
 ``find_package(ovrtx QUIET)`` first and only downloads the package if that fails.
 
-For a complete worked ``CMakeLists.txt`` — package fetch, static-loader link, the release-CRT setting
-Windows needs, and the runtime setup below — copy ``examples/c/minimal/CMakeLists.txt`` from the
-examples tree. That example is built in CI, so it stays current with the packages it consumes.
+For a complete example ``CMakeLists.txt`` that includes package fetching, both
+loader models, the Windows release-CRT setting, and runtime setup, see
+``examples/c/minimal/CMakeLists.txt``. The example builds both models from the
+same source:
+
+.. filtered-literalinclude:: ../../examples/c/minimal/CMakeLists.txt
+   :language: cmake
+   :start-after: # [snippet:linking-models]
+   :end-before: # [/snippet:linking-models]
+   :dedent:
+
+Model #1 links the static forwarding loaders (``ovrtx::ovrtx_static`` and
+``ovstage::ovstage_static``). Model #2 links the shared forwarding loaders
+(``ovrtx::ovrtx`` and ``ovstage::ovstage``). In both models, the runtime and
+OpenUSD remain unloaded until the first initialization call. If ovstage may be
+initialized first, call :c:func:`ovrtx_register_schema_paths` before that call.
 
 Calling ``ovrtx_setup_runtime()`` is required, not optional: linking succeeds without it, but the
 application will fail at runtime because it cannot locate the ``bin/`` payload described in
@@ -122,7 +135,7 @@ ovrtx requires several libraries and other runtime dependencies to be present an
    ├── rendering-data/
    └── usd_plugins/
 
-The ovrtx dynamic library will automatically load the other dependencies at runtime if it is placed alongside them as in the binary distribution. If you need to deploy your application with a different layout, you can point ovrtx to the correct paths using the :c:func:`ovrtx_config_entry_binary_package_root_path` helper function when configuring the renderer. When the package ``bin/`` directory lives next to your executable, use :c:macro:`OVX_CONFIG_EXECUTABLE_DIR_TOKEN` (``"${executable_dir}"``) instead of resolving the executable directory in client code:
+The ovrtx shared loader automatically opens the runtime and its dependencies from this layout. If you need to deploy your application with a different layout, you can point ovrtx to the correct paths using the :c:func:`ovrtx_config_entry_binary_package_root_path` helper function when configuring the renderer. When the package ``bin/`` directory lives next to your executable, use :c:macro:`OVX_CONFIG_EXECUTABLE_DIR_TOKEN` (``"${executable_dir}"``) instead of resolving the executable directory in client code:
 
 .. code-block:: c
 
@@ -143,9 +156,13 @@ Note that when static linking ovrtx, you must provide the binary package root pa
 Sharing OpenUSD with Other Subsystems
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When ovrtx shares the OpenUSD runtime with other subsystems in the same process, every
-subsystem must publish its USD schema and plugin discovery paths *before* the USD schema
-registry is first populated; that registry is built only once per process. Use
+ovrtx-owned OpenUSD (this section):
+"""""""""""""""""""""""""""""""""""
+
+When ovrtx shares its bundled OpenUSD runtime with other subsystems in the same process
+(for example ovphysx), every subsystem must publish its USD schema and plugin discovery
+paths *before OpenUSD is loaded* — USD reads the plugin path as its libraries load, and
+builds the schema registry it feeds only once per process. Use
 :c:func:`ovrtx_register_schema_paths` early so the order of subsequent initialize calls
 does not matter:
 
@@ -154,7 +171,7 @@ does not matter:
    // Register schema paths up front, then initialize subsystems in any order.
    // Pass the same config you will later supply to ovrtx_initialize / ovrtx_create_renderer
    // so the binary package root used during registration matches the one used at init.
-   ovphysx_prepare_usd_plugins();
+   ovphysx_register_schema_paths();
    ovrtx_register_schema_paths(&config);
 
    ovrtx_create_renderer(&config, &renderer);
@@ -173,10 +190,64 @@ Once schema paths have been registered against an effective binary package root,
 later :c:func:`ovrtx_register_schema_paths`, :c:func:`ovrtx_initialize`, or
 :c:func:`ovrtx_create_renderer` call that resolves to a different root logs a warning
 to stderr and is treated as a no-op against the first-registered root —
-``PXR_PLUGINPATH_NAME`` is one-shot per process, so the first call wins. Use the same
+USD plugin-path registration is one-shot per process, so the first call wins.
+:c:func:`ovrtx_get_usd_plugin_path_count` and
+:c:func:`ovrtx_get_usd_plugin_paths` participate in the same pin: calling either before
+any registration pins the enumerated root, and a later registration resolving a
+different root warns and registers the pinned root, so the directories published to an
+external OpenUSD always match what ovrtx's bundled OpenUSD registers. Use the same
 ``OVRTX_CONFIG_BINARY_PACKAGE_ROOT_PATH`` (or the same ``OMNI_USD_PLUGINS_BASE_PATH``
 override) throughout the process. See the function's API documentation for the full
 contract.
+
+In an ovstage-attached application, the call also registers ovrtx's families with ovstage,
+so they resolve as ovstage populates. Call it before ovstage's first populate.
+
+External OpenUSD runtimes:
+""""""""""""""""""""""""""
+
+If the same process **also** uses OpenUSD outside ovrtx — for example a ``usd-core``
+Python distribution, a Kit host, or any OpenUSD build that reads the upstream
+``PXR_PLUGINPATH_NAME`` env var — choose one of the following integration models:
+
+* :c:func:`ovrtx_register_schema_paths` (and the implicit registration done by
+  :c:func:`ovrtx_initialize` / :c:func:`ovrtx_create_renderer`) always writes to the
+  ovrtx-namespaced ``OV_PXR_PLUGINPATH_2511`` key. When
+  ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1`` is set, it also publishes the same schema paths
+  to upstream ``PXR_PLUGINPATH_NAME``.
+* To select or filter the external runtime's paths yourself, leave the opt-in unset,
+  obtain ovrtx's plugin directories via
+  :c:func:`ovrtx_get_usd_plugin_paths`, drop any entries that collide with the external
+  runtime's own built-in schemas, and append the remaining directories to
+  ``PXR_PLUGINPATH_NAME``.
+* **Timing is critical.** OpenUSD's plug registry is populated once during static
+  initialization / the first schema lookup. Setting ``PXR_PLUGINPATH_NAME`` *after* the
+  external OpenUSD runtime has already opened its first stage has no retroactive effect
+  on schema discovery — the paths must be in place **before** the first stage is opened
+  on that runtime.
+
+.. code-block:: c
+
+   // Enumerate ovrtx's schema plugin directories (no env-var mutation).
+   size_t count = ovrtx_get_usd_plugin_path_count(NULL);
+   ovx_string_t* paths = (ovx_string_t*)calloc(count, sizeof(ovx_string_t));
+   if (count == 0 || paths != NULL)
+   {
+       ovrtx_get_usd_plugin_paths(NULL, paths, count);
+
+       // Append the desired subset to PXR_PLUGINPATH_NAME BEFORE any external OpenUSD
+       // opens its first stage. Filter out directories that collide with the external
+       // runtime's built-in schemas as appropriate.
+       //   ... integrator-owned append logic ...
+
+       // Only after the append is done, hand control to the external OpenUSD runtime.
+       //   external_openusd_open_stage(...);
+   }
+
+   free(paths);
+
+The strings returned by :c:func:`ovrtx_get_usd_plugin_paths` are owned by ovrtx and
+valid for the lifetime of the process; the caller must not free them.
 
 Minimal Example
 ---------------

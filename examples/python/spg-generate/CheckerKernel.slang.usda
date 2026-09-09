@@ -1,0 +1,35 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "CheckerKernel"
+)
+
+# [snippet:checker-slang-shader-definition]
+def Shader "CheckerKernel"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:spg:sourceAsset = @CheckerKernel.slang@
+    uniform token info:spg:sourceAsset:subIdentifier = "checker"
+
+    # Every input here is a typed attribute. There is no `opaque inputs:` port,
+    # because this node reads no AOV: it generates its output from these values.
+    #
+    # The colours are exact at 8 bits, so the host can predict the output byte
+    # for byte without depending on how a float is rounded into a texture.
+    int inputs:width = 512
+    int inputs:height = 512
+    int inputs:squareSize = 32
+    float3 inputs:colorA = (1.0, 1.0, 1.0)
+    float3 inputs:colorB = (0.0, 0.0, 0.2)
+
+    opaque outputs:Checker
+}
+# [/snippet:checker-slang-shader-definition]

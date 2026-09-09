@@ -74,6 +74,28 @@ This directory contains example projects demonstrating various features of ovrtx
   </tr>
   <tr>
     <td align="center" width="50%">
+      <img src="../img/example-crop-window.png" alt="Crop Window Example" width="100%">
+      <br>
+      <b>Crop Window</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Create an example that renders a centered dataWindowNDC crop from a full-resolution RenderProduct, verifies the cropped output dimensions, and saves or displays the result.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/crop-window/">Python →</a></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="../img/example-sliced-rendering.png" alt="Sliced Rendering Example" width="100%">
+      <br>
+      <b>Sliced Rendering</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Render one image as four successive dataWindowNDC crops, warm up each crop, and stitch the captured TL, TR, BL, and BR tiles into a full-resolution image.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/sliced-rendering/">Python →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
       <img src="../img/example-sensor-lidar.avif" alt="Lidar Sensor Example" width="100%">
       <br>
       <b>Lidar Sensor</b>
@@ -106,6 +128,18 @@ This directory contains example projects demonstrating various features of ovrtx
       <sub>Build &amp; run in: <a href="c/material-editor/">C →</a></sub>
     </td>
     <td align="center" width="50%">
+      <img src="../docs/img/projectors-lineup.avif" alt="Projectors Example" width="100%">
+      <br>
+      <b>Projectors</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Create an example that loads an authored projector-mapping scene without editing it, warms up the renderer, renders one frame, and saves the result as a PNG.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/projectors/">Python →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
       <img src="../img/example-spg-grayscale.png" alt="SPG Grayscale Example" width="100%">
       <br>
       <b>SPG: Grayscale</b>
@@ -115,8 +149,6 @@ This directory contains example projects demonstrating various features of ovrtx
       </blockquote>
       <sub>Build &amp; run in: <a href="python/spg-grayscale/">Python →</a></sub>
     </td>
-  </tr>
-  <tr>
     <td align="center" width="50%">
       <img src="../img/example-spg-pipeline.png" alt="SPG Pipeline Example" width="100%">
       <br>
@@ -127,6 +159,8 @@ This directory contains example projects demonstrating various features of ovrtx
       </blockquote>
       <sub>Build &amp; run in: <a href="python/spg-pipeline/">Python →</a></sub>
     </td>
+  </tr>
+  <tr>
     <td align="center" width="50%">
       <img src="../img/example-spg-builtin-nodes.png" alt="SPG Built-in Nodes Example" width="100%">
       <br>
@@ -136,6 +170,72 @@ This directory contains example projects demonstrating various features of ovrtx
         <p align="left"><em>“Chain two built-in SPG nodes (no custom CUDA) that brighten the color output and downscale it to half resolution, wired into a RenderProduct via info:id.”</em></p>
       </blockquote>
       <sub>Build &amp; run in: <a href="python/spg-builtin-nodes/">Python →</a></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-stateful.png" alt="SPG Stateful Node Example" width="100%">
+      <br>
+      <b>SPG: Stateful Node</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Make an SPG node read back its own previous output, so a moving object drags a fading trail behind it.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-stateful/">Python →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-composite-aov.png" alt="SPG Composite AOV Example" width="100%">
+      <br>
+      <b>SPG: Composite AOV</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Feed an SPG node from a lidar instead of a camera, reading the point cloud's named channels and publishing a histogram of returns by distance.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-composite-aov/">Python →</a></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-raygen.png" alt="SPG Ray Generation Example" width="100%">
+      <br>
+      <b>SPG: Ray Generation</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Have an SPG node trace the scene itself: a Cornell box with ray-traced shadows and the geometric normal recovered from probe rays alone.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-raygen/">Python →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-generate.png" alt="SPG Generating Node Example" width="100%">
+      <br>
+      <b>SPG: Generating Node</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Write an SPG node with no input AOV that draws a checkerboard from typed USD attributes, and publish it as a render output.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-generate/">Python →</a></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-blur.png" alt="SPG Separable Blur Example" width="100%">
+      <br>
+      <b>SPG: Separable Blur</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Chain two SPG nodes into a separable blur whose tap weights are built once in the launch script, and retune the radius from the host between renders.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-blur/">Python →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="../img/example-spg-previous-frame.png" alt="SPG Previous Frame Example" width="100%">
+      <br>
+      <b>SPG: Previous Frame</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Have an SPG node read the same AOV twice, once live and once a frame back, and publish the difference so only what moved lights up.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/spg-previous-frame/">Python →</a></sub>
     </td>
   </tr>
 </table>

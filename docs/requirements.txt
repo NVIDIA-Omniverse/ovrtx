@@ -1,0 +1,26 @@
+# Documentation toolchain for the ovrtx Sphinx docs.
+#
+# These dependencies are deliberately NOT declared in pyproject.toml as a [docs] extra.
+#
+# Sphinx 8.2 is the first release in which the `duplicate_declaration.c` entry in
+# `suppress_warnings` (see conf.py) actually takes effect. Before 8.2 the C domain emits
+# those warnings without a subtype, so the suppression is silently inert and the build
+# reports 30+ `Duplicate C declaration` warnings from the Breathe-generated C API pages.
+#
+# Sphinx 8.2 requires Python >= 3.11, while ovrtx itself supports Python >= 3.10.
+# Declaring `sphinx>=8.2` in pyproject.toml would drag the whole package's
+# `requires-python` up to 3.11 just to build the docs. Keeping the docs toolchain in a
+# standalone requirements file lets the docs require a newer Python than the package.
+#
+# Building the docs therefore requires Python 3.11 or newer. See README.md.
+#
+# These are floors, not pins: a build resolves to whatever is current. If the docs
+# toolchain ever needs to be reproducible, generate a pinned file with `uv pip compile`.
+
+sphinx>=8.2
+nvidia-sphinx-theme
+sphinx-autodoc-typehints
+sphinx-copybutton
+sphinx-design
+sphinx-mdinclude
+breathe

@@ -16,7 +16,16 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
 from . import bindings
-from .dlpack import DLDataType, DLDataTypeCode, DLDevice, DLDeviceType, DLTensor, ManagedDLTensor
+from .dlpack import (
+    DLDataType,
+    DLDataTypeCode,
+    DLDevice,
+    DLDeviceType,
+    DLTensor,
+    _DLPackable,
+    _from_dlpack,
+    _ManagedTensorLease,
+)
 from .helpers import deprecated
 from .types import (
     _VOID_RESULT,
@@ -52,6 +61,24 @@ _OVSTAGE_WRITE_REPLACEMENT = "Use ovstage.Stage.write_attribute() with an ordina
 _OVSTAGE_BINDING_REPLACEMENT = "Use a reusable ovstage query with ovstage.Stage read, write, or map operations instead."
 _OVSTAGE_MAP_REPLACEMENT = "Use ovstage.Stage.map_attribute() with an ordinal and reusable query instead."
 _OVSTAGE_UNMAP_REPLACEMENT = "Use ovstage.Map.unmap() or ovstage.Stage.unmap_attribute() instead."
+_MAX_TIMEOUT_NS = (1 << 64) - 1
+
+
+def _normalize_timeout(timeout_ns: Optional[int]) -> bindings.ovrtx_timeout_t:
+    """Convert a Python timeout to the representation required by the C API."""
+    if timeout_ns is None:
+        return bindings.OVRTX_TIMEOUT_INFINITE
+    if isinstance(timeout_ns, bool):
+        raise TypeError("timeout_ns must be an integer or None, not bool")
+    try:
+        timeout_ns = operator.index(timeout_ns)
+    except TypeError as error:
+        raise TypeError(f"timeout_ns must be an integer or None, not {type(timeout_ns).__name__}") from error
+    if timeout_ns < 0:
+        return bindings.OVRTX_TIMEOUT_INFINITE
+    if timeout_ns > _MAX_TIMEOUT_NS:
+        raise OverflowError(f"timeout_ns must not exceed {_MAX_TIMEOUT_NS}")
+    return bindings.ovrtx_timeout_t(time_out_ns=timeout_ns)
 
 
 @dataclass
@@ -144,6 +171,7 @@ class _InputBufferStorage:
     def __init__(
         self,
         dl_tensors: List[DLTensor],
+        leases: Optional[List[_ManagedTensorLease]] = None,
         dirty_bits: Optional[bytes] = None,
         cuda_stream: Optional[int] = None,
         cuda_event: Optional[int] = None,
@@ -152,12 +180,14 @@ class _InputBufferStorage:
 
         Args:
             dl_tensors: List of DLTensor objects (will be copied to array)
+            leases: Foreign managed tensors that keep the input data alive
             dirty_bits: Optional dirty bit array (copied if provided)
             cuda_stream: Optional CUDA stream handle (int). Sets both access and done sync stream fields.
             cuda_event: Optional CUDA event handle (int). Sets access sync wait_event field.
         """
-        # Keep Python data references alive (for ASYNC access)
+        # Keep tensor metadata and foreign managed tensors alive for ASYNC access.
         self._tensor_refs = dl_tensors
+        self._leases = leases or []
 
         # Create DLTensor objects array
         self._tensor_storage = list(dl_tensors)  # Keep references
@@ -409,16 +439,18 @@ class Renderer:
     def attach_ovstage(self, stage: Any) -> None:
         """Attach an externally owned ``ovstage.Stage`` to this renderer.
 
-        The renderer uses the Stage's native instance and retains the Python
+        The renderer borrows the Stage's native instance and retains the Python
         object until detach or renderer destruction. Do not explicitly destroy
-        the Stage while it is attached.
+        the Stage while it is attached. A Stage may be attached to only one
+        renderer at a time; detach it before attaching it to another renderer.
 
         Args:
             stage: A live ``ovstage.Stage`` instance.
 
         Raises:
             RuntimeError: If the renderer is invalid, is already attached, or
-                the native attach fails.
+                the Stage is attached to another renderer, or the native attach
+                fails.
             TypeError: If ``stage`` does not expose a compatible native handle.
             ValueError: If the Stage has already been destroyed.
         """
@@ -444,7 +476,10 @@ class Renderer:
         self._attached_ovstage = stage
 
     def detach_ovstage(self) -> None:
-        """Detach the attached ovstage and return the renderer to standalone mode."""
+        """Detach the attached ovstage and return the renderer to standalone mode.
+
+        The renderer may then attach the same or a different live Stage.
+        """
         if self._handle is None:
             raise RuntimeError("Renderer is not valid")
         if self._attached_ovstage is None:
@@ -459,14 +494,18 @@ class Renderer:
     def update_from_stage(self, ordinal: int) -> None:
         """Update from the attached ovstage through at least ``ordinal``.
 
-        Normal calls to :meth:`step` perform this update automatically.
+        This synchronizes the renderer's scene state with committed population
+        changes while attribute values remain shared with ovstage. Normal calls to
+        :meth:`step` perform this update automatically.
         """
         self.update_from_stage_async(ordinal).wait()
 
     def update_from_stage_async(self, ordinal: int) -> Operation[bool]:
         """Enqueue an update from the attached ovstage through at least ``ordinal``.
 
-        :meth:`step_async` performs this update automatically.
+        This synchronizes the renderer's scene state with committed population
+        changes without copying shared attribute values. :meth:`step_async` performs
+        this update automatically.
 
         Args:
             ordinal: Minimum committed ovstage publication to update through.
@@ -882,12 +921,7 @@ class Renderer:
         Returns:
             Operation._Result with status and any errors.
         """
-        # Use infinite timeout if None or negative
-        if timeout_ns is None or timeout_ns < 0:
-            timeout = bindings.OVRTX_TIMEOUT_INFINITE
-        else:
-            timeout = bindings.ovrtx_timeout_t(time_out_ns=timeout_ns)
-
+        timeout = _normalize_timeout(timeout_ns)
         result, c_wait_result = self._bindings.wait_op(self._handle, bindings.ovrtx_op_id_t(operation.op_id), timeout)
 
         # Determine result state
@@ -957,12 +991,15 @@ class Renderer:
         Equivalent to ``step_async(...).wait().fetch()`` with infinite
         timeouts for both the operation wait and the result fetch.
 
-        When an ovstage is attached, the step first updates the renderer from
-        committed Stage changes through ``ordinal``.
+        When an ovstage is attached, the step first synchronizes the renderer with
+        committed Stage changes through ``ordinal`` while attribute values remain
+        shared.
 
         Args:
             render_products: Set of render product paths to step.
-            delta_time: Time delta for the simulation step.
+            delta_time: Time delta for the simulation step. Advances the
+                simulation clock from ``t`` to ``t + delta_time`` and simulates
+                each sensor's schedule across that window.
             ordinal: Minimum committed publication required from the attached
                 ovstage. Execution may observe that publication or a later one.
                 Required in attached mode and invalid in standalone mode.
@@ -974,8 +1011,9 @@ class Renderer:
             RuntimeError: If renderer is invalid, enqueue fails, step fails,
                 fetch fails, or ordinal use does not match attachment state.
             TypeError: If ``ordinal`` is not an integer.
-            ValueError: If no valid render products are provided or ``ordinal``
-                is outside the uint64 range.
+            ValueError: If ``delta_time`` is non-finite or negative, no valid
+                render products are provided, or ``ordinal`` is outside the
+                uint64 range.
         """
         return self.step_async(render_products, delta_time, ordinal=ordinal).wait().fetch()
 
@@ -992,12 +1030,15 @@ class Renderer:
         ``.wait()`` to get a :class:`PendingFetch`, then ``.fetch()``
         to retrieve the :class:`RenderProductSetOutputs`.
 
-        When an ovstage is attached, the step first enqueues an update from
-        committed Stage changes through ``ordinal``.
+        When an ovstage is attached, the step first enqueues synchronization with
+        committed Stage changes through ``ordinal`` while attribute values remain
+        shared.
 
         Args:
             render_products: Set of render product paths to step.
-            delta_time: Time delta for the simulation step.
+            delta_time: Time delta for the simulation step. Advances the
+                simulation clock from ``t`` to ``t + delta_time`` and simulates
+                each sensor's schedule across that window.
             ordinal: Minimum committed publication required from the attached
                 ovstage. Execution may observe that publication or a later one.
                 Required in attached mode and invalid in standalone mode.
@@ -1009,8 +1050,9 @@ class Renderer:
             RuntimeError: If renderer is invalid, enqueue fails, or ordinal use
                 does not match attachment state.
             TypeError: If ``ordinal`` is not an integer.
-            ValueError: If no valid render products are provided or ``ordinal``
-                is outside the uint64 range.
+            ValueError: If ``delta_time`` is non-finite or negative, no valid
+                render products are provided, or ``ordinal`` is outside the
+                uint64 range.
         """
         if self._handle is None:
             raise RuntimeError("Renderer is not valid")
@@ -1022,6 +1064,8 @@ class Renderer:
             raise RuntimeError("ordinal is only valid while an ovstage is attached")
         ordinal_value = self._normalize_ordinal(ordinal) if ordinal is not None else None
 
+        if not math.isfinite(delta_time):
+            raise ValueError(f"delta_time must be finite, got {delta_time}")
         if delta_time < 0:
             raise ValueError(f"delta_time must be non-negative, got {delta_time}")
 
@@ -1092,18 +1136,22 @@ class Renderer:
         """Reset sensor simulation history to a specific time.
 
         Clears accumulated rendering history for all render products and
-        sets the simulation start time for future step() calls.
+        re-bases the simulation clock, so the next :meth:`step` of
+        ``delta_time`` simulates ``[time, time + delta_time]``.
 
         Args:
             time: Simulation time to reset to (default: 0.0).
 
         Raises:
             RuntimeError: If the reset fails.
+            ValueError: If ``time`` is non-finite or negative.
         """
         self.reset_async(time).wait()
 
     def reset_async(self, time: float = 0.0) -> Operation[bool]:
         """Reset sensor simulation history (async).
+
+        See :meth:`reset` for the simulation clock semantics.
 
         Args:
             time: Simulation time to reset to (default: 0.0).
@@ -1113,9 +1161,15 @@ class Renderer:
 
         Raises:
             RuntimeError: If renderer is invalid or enqueue fails.
+            ValueError: If ``time`` is non-finite or negative.
         """
         if self._handle is None:
             raise RuntimeError("Renderer is not valid")
+
+        if not math.isfinite(time):
+            raise ValueError(f"time must be finite, got {time}")
+        if time < 0:
+            raise ValueError(f"time must be non-negative, got {time}")
 
         result = self._bindings.reset(self._handle, time)
         if result.status != bindings.OVRTX_API_SUCCESS:
@@ -1303,7 +1357,9 @@ class Renderer:
         """
         self.set_selection_outline_group_async(prim_path_ids, group_ids).wait()
 
-    def set_selection_outline_group_async(self, prim_path_ids: list[int], group_ids: int | list[int]) -> Operation[bool]:
+    def set_selection_outline_group_async(
+        self, prim_path_ids: list[int], group_ids: int | list[int]
+    ) -> Operation[bool]:
         """Set each prim's selection outline group by path id (async).
 
         Stream-ordered: takes effect on the next ``step()`` after it completes.
@@ -1647,7 +1703,7 @@ class Renderer:
             # Called by PendingFetch.fetch(). Retrieves C query results,
             # resolves token handles to strings via the path dictionary,
             # and builds the user-facing dict mapping each prim path to its attributes.
-            timeout = bindings.OVRTX_TIMEOUT_INFINITE if timeout_ns is None else timeout_ns
+            timeout = _normalize_timeout(timeout_ns)
             result, c_qr = self._bindings.fetch_query_results(self._handle, query_handle, timeout)
             if result.status == bindings.OVRTX_API_TIMEOUT:
                 return None
@@ -1730,7 +1786,7 @@ class Renderer:
         dest: Optional[Any] = None,
         cuda_stream: Optional[int] = None,
         cuda_event: Optional[int] = None,
-    ) -> ManagedDLTensor:
+    ) -> Any:
         """Read a scalar attribute (synchronous, one value per prim).
 
         Returns a DLPack-compatible tensor for use with NumPy, Warp, PyTorch,
@@ -1740,8 +1796,8 @@ class Renderer:
             arr = np.from_dlpack(tensor)
 
         When ``dest`` is provided, data is written directly into the caller's
-        tensor (supports GPU tensors for zero-copy reads). The return value
-        wraps the same memory as ``dest`` — both are usable.
+        tensor (supports GPU tensors for zero-copy reads) and ``dest`` itself
+        is returned.
 
         Equivalent to ``read_attribute_async(...).wait().fetch()``.
 
@@ -1750,9 +1806,9 @@ class Renderer:
             prim_paths: USD prim paths to read from.
             prim_mode: Prim binding mode (default:
                 :attr:`PrimMode.EXISTING_ONLY`).
-            dest: Optional pre-allocated DLPack-compatible tensor. When
-                provided, data is written directly into it. Accepts any
-                object with ``__dlpack__()``.
+            dest: Optional pre-allocated DLPack-compatible tensor with a
+                C-contiguous layout and zero byte offset. When provided, data
+                is written directly into it.
             cuda_stream: Optional CUDA stream handle (``int``) on which you coordinate
                 work with ``dest``. ovrtx waits on this stream before writing and
                 signals on it when done, and forwards it to the DLPack producer of
@@ -1763,11 +1819,13 @@ class Renderer:
                 access sync wait event (waited on before writing to ``dest``).
 
         Returns:
-            :class:`ManagedDLTensor`
+            A DLPack-compatible tensor, or ``dest`` itself when provided.
 
         Raises:
             RuntimeError: If the read fails.
             TypeError: If ``dest`` does not support the DLPack protocol.
+            BufferError: If ``dest`` is read-only, exported as a copy, has a
+                non-zero byte offset, or is not C-contiguous.
         """
         return (
             self.read_attribute_async(
@@ -1791,7 +1849,7 @@ class Renderer:
         dest: Optional[Any] = None,
         cuda_stream: Optional[int] = None,
         cuda_event: Optional[int] = None,
-    ) -> "Operation[PendingFetch[ManagedDLTensor]]":
+    ) -> "Operation[PendingFetch[Any]]":
         """Read a scalar attribute (non-blocking, one value per prim).
 
         Enqueues the read and returns an :class:`Operation`. Call
@@ -1803,17 +1861,17 @@ class Renderer:
             arr = np.from_dlpack(tensor)
 
         When ``dest`` is provided, data is written directly into the caller's
-        tensor (supports GPU tensors for zero-copy reads). The fetched tensor
-        wraps the same memory as ``dest`` — both are usable.
+        tensor (supports GPU tensors for zero-copy reads) and fetching returns
+        ``dest`` itself.
 
         Args:
             attribute_name: Name of the attribute (e.g. ``"radius"``).
             prim_paths: USD prim paths to read from.
             prim_mode: Prim binding mode (default:
                 :attr:`PrimMode.EXISTING_ONLY`).
-            dest: Optional pre-allocated DLPack-compatible tensor. When
-                provided, data is written directly into it. Accepts any
-                object with ``__dlpack__()``.
+            dest: Optional pre-allocated DLPack-compatible tensor with a
+                C-contiguous layout and zero byte offset. When provided, data
+                is written directly into it.
             cuda_stream: Optional CUDA stream handle (``int``) on which you coordinate
                 work with ``dest``. ovrtx waits on this stream before writing and
                 signals on it when done, and forwards it to the DLPack producer of
@@ -1824,28 +1882,26 @@ class Renderer:
                 access sync wait event (waited on before writing to ``dest``).
 
         Returns:
-            ``Operation[PendingFetch[ManagedDLTensor]]``
+            An operation yielding a DLPack-compatible tensor, or ``dest`` itself
+            when provided.
 
         Raises:
             RuntimeError: If enqueue fails.
             TypeError: If ``dest`` does not support the DLPack protocol.
+            BufferError: If ``dest`` is read-only, exported as a copy, has a
+                non-zero byte offset, or is not C-contiguous.
         """
-        dest_dl = DLTensor.from_dlpack(dest, stream=cuda_stream) if dest is not None else None
-
-        def _result_fn_scalar(guard, managed_tensors):
-            if dest_dl is not None:
-                return ManagedDLTensor(dest_dl, manager_ctx=guard, deleter_callback=None, readonly=False)
-            return managed_tensors[0]
+        dest_lease = _from_dlpack(dest, stream=cuda_stream, writable=True) if dest is not None else None
 
         return self._read_attribute_internal(
             attribute_name=attribute_name,
             prim_paths=prim_paths,
             prim_mode=prim_mode,
             dest=dest,
-            dest_dl=dest_dl,
+            dest_lease=dest_lease,
             cuda_stream=cuda_stream,
             cuda_event=cuda_event,
-            result_fn=_result_fn_scalar,
+            result_fn=lambda tensors: tensors[0],
         )
 
     @deprecated(_OVSTAGE_READ_REPLACEMENT)
@@ -1854,7 +1910,7 @@ class Renderer:
         attribute_name: str,
         prim_paths: list[str],
         prim_mode: PrimMode = PrimMode.EXISTING_ONLY,
-    ) -> dict[str, ManagedDLTensor]:
+    ) -> dict[str, Any]:
         """Read an array attribute (synchronous, variable-length per prim).
 
         Returns a dict mapping prim paths to DLPack-compatible tensors,
@@ -1874,7 +1930,7 @@ class Renderer:
                 :attr:`PrimMode.EXISTING_ONLY`).
 
         Returns:
-            ``dict[str, ManagedDLTensor]``
+            A dict of DLPack-compatible tensors.
 
         Raises:
             RuntimeError: If the read fails.
@@ -1895,7 +1951,7 @@ class Renderer:
         attribute_name: str,
         prim_paths: list[str],
         prim_mode: PrimMode = PrimMode.EXISTING_ONLY,
-    ) -> "Operation[PendingFetch[dict[str, ManagedDLTensor]]]":
+    ) -> "Operation[PendingFetch[dict[str, Any]]]":
         """Read an array attribute (non-blocking, variable-length per prim).
 
         Enqueues the read and returns an :class:`Operation`. Call
@@ -1914,7 +1970,7 @@ class Renderer:
                 :attr:`PrimMode.EXISTING_ONLY`).
 
         Returns:
-            ``Operation[PendingFetch[dict[str, ManagedDLTensor]]]``
+            An operation yielding a dict of DLPack-compatible tensors.
 
         Raises:
             RuntimeError: If enqueue fails.
@@ -1924,10 +1980,10 @@ class Renderer:
             prim_paths=prim_paths,
             prim_mode=prim_mode,
             dest=None,
-            dest_dl=None,
+            dest_lease=None,
             cuda_stream=None,
             cuda_event=None,
-            result_fn=lambda guard, managed_tensors: dict(zip(prim_paths, managed_tensors)),
+            result_fn=lambda tensors: dict(zip(prim_paths, tensors)),
         )
 
     def _read_attribute_internal(
@@ -1936,10 +1992,10 @@ class Renderer:
         prim_paths: list[str],
         prim_mode: PrimMode,
         dest: Optional[Any],
-        dest_dl: Optional[DLTensor],
+        dest_lease: Optional[_ManagedTensorLease],
         cuda_stream: Optional[int],
         cuda_event: Optional[int],
-        result_fn,  # (_Guard, list[ManagedDLTensor]) -> ManagedDLTensor (scalar) or dict (array)
+        result_fn,
     ) -> Operation:
         """Internal: enqueue a read operation and return an Operation with a fetch closure."""
         if self._handle is None:
@@ -1963,10 +2019,10 @@ class Renderer:
         binding.binding_desc.prim_mode = bindings.ovrtx_binding_prim_mode_t(prim_mode)
 
         read_dest = None
-        if dest is not None and dest_dl is not None:
-            _string_refs.append(dest_dl)
+        if dest_lease is not None:
+            _string_refs.append(dest_lease)
             read_dest = bindings.ovrtx_read_dest_t()
-            read_dest.tensor = ctypes.pointer(dest_dl)
+            read_dest.tensor = ctypes.pointer(dest_lease.tensor)
             access_sync = bindings.ovrtx_cuda_sync_t()
             done_sync = bindings.ovrtx_cuda_sync_t()
             if cuda_stream is not None:
@@ -1980,6 +2036,9 @@ class Renderer:
         enqueue_result, read_handle = self._bindings.read_attribute(self._handle, binding, read_dest)
         if enqueue_result.status != bindings.OVRTX_API_SUCCESS:
             error_msg = self._bindings.get_last_error() or "Unknown error"
+            prefix_index = error_msg.find("Unsupported DLPack")
+            if prefix_index >= 0:
+                raise BufferError(error_msg[prefix_index:])
             raise RuntimeError(f"Failed to enqueue read_attribute: {error_msg}")
 
         # Idempotent release shared by fetch-error paths, _Guard.__del__ (success), and
@@ -1998,7 +2057,7 @@ class Renderer:
             if released:
                 raise RuntimeError("Read result has already been released after a prior fetch failure")
 
-            timeout = bindings.OVRTX_TIMEOUT_INFINITE if timeout_ns is None else timeout_ns
+            timeout = _normalize_timeout(timeout_ns)
             result, c_output = self._bindings.fetch_read_result(self._handle, read_handle, timeout)
             if result.status == bindings.OVRTX_API_TIMEOUT:
                 return None
@@ -2013,6 +2072,10 @@ class Renderer:
                     f"Read returned no data for '{attribute_name}' (attribute may not exist on the given prims)"
                 )
 
+            if dest_lease is not None:
+                _release_once()
+                return dest
+
             dl_tensors = [c_output.buffers[i].dl for i in range(c_output.buffer_count)]
 
             class _Guard:
@@ -2026,10 +2089,8 @@ class Renderer:
 
             guard = _Guard(self)
 
-            managed_tensors = [
-                ManagedDLTensor(dl, manager_ctx=guard, deleter_callback=None, readonly=True) for dl in dl_tensors
-            ]
-            return result_fn(guard, managed_tensors)
+            tensors = [_DLPackable(dl, owner=guard) for dl in dl_tensors]
+            return result_fn(tensors)
 
         op = Operation(
             renderer=self,
@@ -2059,11 +2120,7 @@ class Renderer:
         if self._handle is None:
             raise RuntimeError("Renderer is not valid")
 
-        if timeout_ns is None or timeout_ns < 0:
-            timeout = bindings.OVRTX_TIMEOUT_INFINITE
-        else:
-            timeout = bindings.ovrtx_timeout_t(time_out_ns=timeout_ns)
-
+        timeout = _normalize_timeout(timeout_ns)
         result, c_outputs = self._bindings.fetch_results(self._handle, step_handle, timeout)
         if result.status == bindings.OVRTX_API_TIMEOUT:
             return None
@@ -2071,20 +2128,26 @@ class Renderer:
             error_msg = self._bindings.get_last_error() or "Unknown error"
             raise RuntimeError(f"Failed to fetch step results: {error_msg}")
 
-        ignored_render_vars = ["LdrColor0", "LdrColor1", "LdrColor2", "HdrColor0", "HdrColor1", "HdrColor2"]
         products = {}
         for c_product in c_outputs.outputs[: c_outputs.output_count]:
             frames = []
             for c_frame in c_product.output_frames[: c_product.output_frame_count]:
-                render_vars = []
+                render_vars = {}
                 for c_var in c_frame.output_render_vars[: c_frame.render_var_count]:
-                    if (var_name := str(c_var.render_var_name)) not in ignored_render_vars:
-                        render_vars.append(RenderVarOutput(name=var_name, handle=c_var.output_handle, renderer=self))
+                    source_name = str(c_var.source_name)
+                    render_var_path = str(c_var.render_var_path)
+                    render_vars[render_var_path] = RenderVarOutput(
+                        render_var_path=render_var_path,
+                        handle=c_var.output_handle,
+                        renderer=self,
+                        source_name=source_name,
+                        source_type=str(c_var.source_type),
+                    )
                 frames.append(
                     FrameOutput(
                         start_time=c_frame.frame_start_time,
                         end_time=c_frame.frame_end_time,
-                        render_vars={var.name: var for var in render_vars},
+                        render_vars=render_vars,
                         progression=int(c_frame.accumulation_status.progression),
                         converged=bool(c_frame.accumulation_status.converged),
                     )
@@ -2096,7 +2159,12 @@ class Renderer:
             if self._handle is not None:
                 self._bindings.destroy_results(self._handle, step_handle)
 
-        return RenderProductSetOutputs(destroy_fn=_destroy, products=products)
+        return RenderProductSetOutputs(
+            destroy_fn=_destroy,
+            products=products,
+            simulation_start_time=c_outputs.simulation_start_time,
+            simulation_end_time=c_outputs.simulation_end_time,
+        )
 
     def _map_output(
         self,
@@ -2149,7 +2217,7 @@ class Renderer:
             raise RuntimeError(f"Render variable output not ready (status={c_output.status})")
 
         # Render variable description fields snapshot: decode strings to Python str; version is signed int.
-        name = str(c_output.name)
+        render_var_path = str(c_output.name)
         type_ = str(c_output.type)
         doc = str(c_output.doc)
         version = int(c_output.version)
@@ -2193,7 +2261,7 @@ class Renderer:
             renderer=self,
             map_handle=map_handle,
             device=device,
-            name=name,
+            render_var_path=render_var_path,
             type=type_,
             doc=doc,
             version=version,
@@ -2232,6 +2300,10 @@ class Renderer:
 
         Uses a whitelist of known config fields. Only whitelisted fields are converted
         to C config entries.
+
+        Raises:
+            TypeError: If a config value has the wrong type.
+            ValueError: If a config value is outside its supported range.
         """
         # Whitelist: field_name -> (factory_function, config_key_enum)
         # Field names must match RendererConfig dataclass fields.
@@ -2247,7 +2319,6 @@ class Renderer:
             "keep_system_alive": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.KEEP_SYSTEM_ALIVE),
             "active_cuda_gpus": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.ACTIVE_CUDA_GPUS),
             "datastore_cache": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.DATASTORE_CACHE),
-            "use_vulkan": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.USE_VULKAN),
             "selection_outline_enabled": (
                 bindings.ovrtx_config_entry_bool,
                 bindings.ConfigBoolKey.SELECTION_OUTLINE_ENABLED,
@@ -2259,10 +2330,6 @@ class Renderer:
             "selection_fill_mode": (
                 bindings.ovrtx_config_entry_int,
                 bindings.ConfigInt64Key.SELECTION_FILL_MODE,
-            ),
-            "dome_baking_resolution": (
-                bindings.ovrtx_config_entry_int,
-                bindings.ConfigInt64Key.DOME_BAKING_RESOLUTION,
             ),
             "enable_geometry_streaming": (
                 bindings.ovrtx_config_entry_bool,
@@ -2282,19 +2349,48 @@ class Renderer:
                 bindings.ovrtx_config_entry_int,
                 bindings.ConfigInt64Key.TEXTURE_STREAMING_MODE,
             ),
+            "aftermath_mode": (
+                bindings.ovrtx_config_entry_int,
+                bindings.ConfigInt64Key.AFTERMATH_MODE,
+            ),
             "_attach_mode": (bindings.ovrtx_config_entry_int, bindings.ConfigInt64Key._ATTACH_MODE),
+            "sensors_allowed_deprecation_base": (
+                bindings.ovrtx_config_entry_string,
+                bindings.ConfigStringKey.SENSORS_ALLOWED_DEPRECATION_BASE,
+            ),
+        }
+        INTEGER_RANGES = {
+            "selection_fill_mode": (0, 3),
         }
 
         entries: List[bindings.ovrtx_config_entry_t] = []
         for field_name, (factory, key) in WHITELIST.items():
             value = getattr(config, field_name, None)
             if value is not None:
+                if factory is bindings.ovrtx_config_entry_bool and not isinstance(value, bool):
+                    raise TypeError(f"RendererConfig.{field_name} must be bool, got {type(value).__name__}")
+                if factory is bindings.ovrtx_config_entry_string and not isinstance(value, str):
+                    raise TypeError(f"RendererConfig.{field_name} must be str, got {type(value).__name__}")
+                if factory is bindings.ovrtx_config_entry_int and isinstance(value, bool):
+                    raise TypeError(f"RendererConfig.{field_name} must be int, got bool")
                 if field_name == "motion_bvh":
                     value = int(Renderer._normalize_motion_bvh(value))
                 elif field_name == "texture_streaming_mode":
                     value = int(Renderer._normalize_texture_streaming_mode(value))
+                elif field_name == "aftermath_mode":
+                    value = int(Renderer._normalize_aftermath_mode(value))
                 elif field_name == "_attach_mode":
                     value = int(Renderer._normalize_attach_mode(value))
+                if factory is bindings.ovrtx_config_entry_int:
+                    try:
+                        value = operator.index(value)
+                    except TypeError as e:
+                        raise TypeError(f"RendererConfig.{field_name} must be int, got {type(value).__name__}") from e
+                    if bounds := INTEGER_RANGES.get(field_name):
+                        if not bounds[0] <= value <= bounds[1]:
+                            raise ValueError(
+                                f"RendererConfig.{field_name} must be in range {bounds[0]}..{bounds[1]}, got {value}"
+                            )
                 entries.append(factory(key, value))
 
         return bindings.ovrtx_config_t(entries)
@@ -2335,6 +2431,23 @@ class Renderer:
         )
 
     @staticmethod
+    def _normalize_aftermath_mode(value: bindings.AftermathMode | int | str) -> bindings.AftermathMode:
+        if isinstance(value, bindings.AftermathMode):
+            return value
+        if isinstance(value, int):
+            return bindings.AftermathMode(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            try:
+                return bindings.AftermathMode[normalized.upper()]
+            except KeyError:
+                return bindings.AftermathMode(int(normalized))
+        raise ValueError(
+            f"Invalid aftermath_mode value {value!r}; expected AftermathMode, int 0..2, "
+            "or disable, enable, or auto"
+        )
+
+    @staticmethod
     def _normalize_attach_mode(value: bindings._AttachMode | int | str) -> bindings._AttachMode:
         if isinstance(value, bindings._AttachMode):
             return value
@@ -2346,7 +2459,9 @@ class Renderer:
                 return bindings._AttachMode[normalized.upper()]
             except KeyError:
                 return bindings._AttachMode(int(normalized))
-        raise ValueError(f"Invalid _attach_mode value {value!r}; expected _AttachMode, int 0..1, or 'borrow'/'replicate'")
+        raise ValueError(
+            f"Invalid _attach_mode value {value!r}; expected _AttachMode, int 0..1, or 'borrow'/'replicate'"
+        )
 
     @staticmethod
     def _normalize_ordinal(value: Any, *, name: str = "ordinal") -> int:
@@ -2962,6 +3077,8 @@ class Renderer:
         if not tensors:
             raise ValueError("tensors list cannot be empty")
 
+        leases = []
+
         if semantic != Semantic.NONE:
             # Explicit semantic path: resolve dtype from the semantic constant
             if semantic == Semantic.PATH_STRING and not is_array:
@@ -2984,12 +3101,8 @@ class Renderer:
                     dl_tensors.append(self._strings_to_dltensor(t))
                 tensors = dl_tensors
             else:
-                tensors = [
-                    self._normalize_tensor_for_write(
-                        semantic, t if isinstance(t, DLTensor) else DLTensor.from_dlpack(t, stream=cuda_stream)
-                    )
-                    for t in tensors
-                ]
+                leases = [_from_dlpack(tensor, stream=cuda_stream) for tensor in tensors]
+                tensors = [self._normalize_tensor_for_write(semantic, lease.tensor) for lease in leases]
 
             tensor_dtype = tensors[0].dtype
             for i, t in enumerate(tensors[1:], start=1):
@@ -3034,10 +3147,8 @@ class Renderer:
                 semantic_dtype = DLDataType(code=DLDataTypeCode.kDLUInt, bits=128, lanes=1)
             else:
                 # Tensor / __dlpack__ input — infer component count from shape
-                dl_tensors = [
-                    t if isinstance(t, DLTensor) else DLTensor.from_dlpack(t, stream=cuda_stream) for t in tensors
-                ]
-                tensors = dl_tensors
+                leases = [_from_dlpack(tensor, stream=cuda_stream) for tensor in tensors]
+                tensors = [lease.tensor for lease in leases]
 
                 ref_tensor = tensors[0]
                 ref_dtype = ref_tensor.dtype
@@ -3070,7 +3181,7 @@ class Renderer:
                 resolved_semantic = Semantic.NONE
 
         input_storage = _InputBufferStorage(
-            tensors, dirty_bits=dirty_bits, cuda_stream=cuda_stream, cuda_event=cuda_event
+            tensors, leases=leases, dirty_bits=dirty_bits, cuda_stream=cuda_stream, cuda_event=cuda_event
         )
 
         binding_storage = _AttributeBindingDescStorage(
@@ -3142,6 +3253,8 @@ class Renderer:
         if not tensors:
             raise ValueError("tensors list cannot be empty")
 
+        leases = []
+
         if self._is_string_semantic(binding.semantic) and data_access == DataAccess.ASYNC:
             raise ValueError("String attributes (token, path) require DataAccess.SYNC")
 
@@ -3156,13 +3269,8 @@ class Renderer:
                 dl_tensors.append(self._strings_to_dltensor(t))
             tensors = dl_tensors
         else:
-            tensors = [
-                self._normalize_tensor_for_write(
-                    binding.semantic,
-                    t if isinstance(t, DLTensor) else DLTensor.from_dlpack(t, stream=cuda_stream),
-                )
-                for t in tensors
-            ]
+            leases = [_from_dlpack(tensor, stream=cuda_stream) for tensor in tensors]
+            tensors = [self._normalize_tensor_for_write(binding.semantic, lease.tensor) for lease in leases]
 
         first_dtype = tensors[0].dtype
         for i, t in enumerate(tensors[1:], start=1):
@@ -3198,7 +3306,7 @@ class Renderer:
             )
 
         input_storage = _InputBufferStorage(
-            tensors, dirty_bits=dirty_bits, cuda_stream=cuda_stream, cuda_event=cuda_event
+            tensors, leases=leases, dirty_bits=dirty_bits, cuda_stream=cuda_stream, cuda_event=cuda_event
         )
 
         binding_desc_or_handle = bindings.ovrtx_binding_desc_or_handle_t(
@@ -3239,7 +3347,7 @@ class Renderer:
         semantic: Semantic = Semantic.NONE,
         prim_mode: PrimMode = PrimMode.EXISTING_ONLY,
         flags: BindingFlag = BindingFlag.NONE,
-    ) -> "AttributeBinding[DLTensor]":
+    ) -> "AttributeBinding[Any]":
         """Create a persistent binding for scalar attribute writes.
 
         Creates a binding handle that can be reused for multiple write() calls,
@@ -3274,7 +3382,7 @@ class Renderer:
                 this binding. Default: ``BindingFlag.NONE``.
 
         Returns:
-            AttributeBinding[DLTensor] for scalar attribute writes.
+            AttributeBinding for scalar attribute writes.
 
         Example:
             ```python
@@ -3309,7 +3417,7 @@ class Renderer:
         semantic: Semantic = Semantic.NONE,
         prim_mode: PrimMode = PrimMode.EXISTING_ONLY,
         flags: BindingFlag = BindingFlag.NONE,
-    ) -> "Operation[AttributeBinding[DLTensor]]":
+    ) -> "Operation[AttributeBinding[Any]]":
         """Create a persistent binding for scalar attribute writes (async).
 
         See :meth:`bind_attribute` for full documentation and examples.
@@ -3334,7 +3442,7 @@ class Renderer:
         shape: Optional[tuple] = None,
         prim_mode: PrimMode = PrimMode.EXISTING_ONLY,
         flags: BindingFlag = BindingFlag.NONE,
-    ) -> "AttributeBinding[List[DLTensor]]":
+    ) -> "AttributeBinding[List[Any]]":
         """Create a persistent binding for array attribute writes.
 
         Array attributes (e.g., ``float3[] points``) may have variable lengths
@@ -3359,7 +3467,7 @@ class Renderer:
                 this binding. Default: ``BindingFlag.NONE``.
 
         Returns:
-            AttributeBinding[List[DLTensor]] for array attribute writes.
+            AttributeBinding for array attribute writes.
 
         Example:
             ```python
@@ -3394,7 +3502,7 @@ class Renderer:
         shape: Optional[tuple] = None,
         prim_mode: PrimMode = PrimMode.EXISTING_ONLY,
         flags: BindingFlag = BindingFlag.NONE,
-    ) -> "Operation[AttributeBinding[List[DLTensor]]]":
+    ) -> "Operation[AttributeBinding[List[Any]]]":
         """Create a persistent binding for array attribute writes (async).
 
         See :meth:`bind_array_attribute` for full documentation and examples.
@@ -3598,13 +3706,13 @@ class Renderer:
             mapping = renderer.map_attribute(
                 ["/World/Cube"], "xformOp:transform",
                 dtype="float64", shape=(4, 4))
-            np.from_dlpack(mapping.tensor)[0] = np.eye(4)
+            np.from_dlpack(mapping)[0] = np.eye(4)
             renderer.unmap_attribute(mapping)
 
             # NumPy dtype objects also work:
             with renderer.map_attribute(["/World/Cube"], "points",
                     dtype=np.float32, shape=(3,)) as mapping:
-                np.from_dlpack(mapping.tensor)[:] = new_points
+                np.from_dlpack(mapping)[:] = new_points
             ```
         """
         if self._handle is None:
@@ -3709,7 +3817,7 @@ class Renderer:
                 ["/World/Cube"], "xformOp:transform",
                 dtype="float64", shape=(4, 4))
             mapping = binding.map()
-            np.from_dlpack(mapping.tensor)[0] = np.eye(4)
+            np.from_dlpack(mapping)[0] = np.eye(4)
             mapping.unmap()
             ```
         """

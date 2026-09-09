@@ -157,11 +157,11 @@ The pixel data is copied from the first `LdrColor` tensor into a `QImage` and th
 
 **5. Attribute editing (`OvrtxEngine::writeFloatAttribute`, etc.)**
 
-`ovrtx_write_attribute()` writes individual shader parameters (float, color3f/float3, int, bool, token) directly to ovrtx's internal scene representation (Fabric). Each write uses:
+`ovrtx_write_attribute()` writes individual shader parameters (float, color3f/float3, int, bool, token) directly to the renderer's runtime scene storage. Each write uses:
 
 - `ovrtx_make_binding_desc()` to describe which prim and attribute to target
 - a CPU DLPack tensor to wrap the value data (`color3f` uses a shape `[1, 3]` payload with scalar tensor dtype, while the binding descriptor advertises a 3-component float attribute)
-- `OVRTX_BINDING_PRIM_MODE_CREATE_NEW` so attributes that aren't yet in Fabric are created on first edit
+- `OVRTX_BINDING_PRIM_MODE_CREATE_NEW` so attributes that do not yet exist are created on first edit
 - `ovrtx_wait_op()` to surface async mutation errors immediately
 - `ovrtx_reset()` after successful mutations so the path tracer does not blend old accumulated samples with the edited material
 

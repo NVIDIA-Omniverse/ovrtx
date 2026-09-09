@@ -12,19 +12,15 @@ Python: Status Queries Example
 ==============================
 
 This example is based on the minimal Python example and adds operation status
-queries for USD loading and rendering.
+queries for the async operations in that flow.
 
 It demonstrates:
 
-1. Loading a USD layer from a remote S3 scene URL with ``open_usd_async()``
-2. Polling ``Operation.query_status()`` while waiting
+1. Creating a Renderer with an attached ovstage Stage
+2. Loading a remote S3 scene with ``ovstage.population.open_usd_async()``, polling with bounded waits (population operations expose no status counters)
 3. Running one shader-cache warm-up step with shader compilation progress
-4. Stepping the renderer with ``step_async()``
+4. Stepping the renderer with ``step_async()`` and querying status while waiting
 5. Fetching and mapping the rendered output
-
-This compatibility example intentionally retains deprecated renderer population
-operations because ovstage population does not expose equivalent progress
-counters. New applications should otherwise use the attached ovstage workflow.
 
 Renderer logs are written to ``_output/status-queries-ovrtx.log``.
 

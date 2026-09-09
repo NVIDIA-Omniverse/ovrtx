@@ -16,11 +16,11 @@ Starting with **ovrtx** version **0.4**, ovrtx integrates with the NVIDIA Omnive
 > [!NOTE]
 > ovrtx is currently **pre-release** software.
 
-To get started with ovstage follow the instructions blelow for the included Python and C/C++ examples.
+To get started with ovrtx follow the instructions below for the included Python and C/C++ examples.
 * [Get started in Python](#getting-started-in-python)
-* [Get started in C](#getting-started-in-c)
+* [Get started in C](#getting-started-in-cc)
 
-Sources live under [`examples/`](examples/) and are the source of truth for the code snippets referenced by the ovstage skills — see the [examples index](examples/README.md).
+Sources live under [`examples/`](examples/) and are the source of truth for the code snippets referenced by the ovrtx skills — see the [examples index](examples/README.md).
 
 ![warehouse](img/warehouse.jpg)
 
@@ -36,7 +36,7 @@ Sources live under [`examples/`](examples/) and are the source of truth for the 
 ovrtx is distributed as a C package (.zip file) available in the Releases page in this repo, and as Python wheels available via pypi.org.
 These packages include a number of pre-packaged dependencies.
 
-In addition to these pre-packaged dependencies, two other depedencies are noted here:
+In addition to these pre-packaged dependencies, two other dependencies are noted here:
 1. starting with version 0.4 of ovrtx, a dependency on the NVIDIA [ovstage](https://github.com/NVIDIA-Omniverse/ovstage) library is introduced. 
     * While this dependency is currently optional, it will be required in the next release. To enable a smooth migration from the ovstage-like APIs included in ovrtx 0.3, the ovrtx 0.4 release continues including those APIs, marked with a deprecated tag. To ease the migration to ovstage, you can take advantage of the agent-friendly migration skills [for C](skills/update-0_3-0_4-c/SKILL.md) and [for Python](skills/update-0_3-0_4-python/SKILL.md).
 2. on Windows, ovrtx depends on [Microsoft's VC runtime redistributable libraries](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170), with a minimum version of 14.38 (as included in Visual Studio 2022 17.8). 
@@ -46,14 +46,31 @@ In addition to these pre-packaged dependencies, two other depedencies are noted 
 ## System requirements
 
 - **C/C++**:
-    - The ovrtx library has a C11-compatible interface. It can be loaded dynamically or by statically linking to the `ovrtx-static` loader library, which requires linking to the C++ stdlib. 
+    - The ovrtx library has a C11-compatible interface. It can be loaded dynamically or by statically linking to the `ovrtx-static` loader library, which requires linking to the C++ stdlib.
     - The example code requires a C++17 compiler and CMake 3.16+ (`find_package(ovrtx)` fails on older versions); building the whole example set through the top-level `examples/c/CMakeLists.txt` needs 3.18. The examples use cmake to fetch the prebuilt ovrtx and ovstage packages from their GitHub.com release pages.
 - **Python**:
-    - Python 3.11–3.13 versions are supported
+    - Python 3.10–3.13 versions are supported
     - The examples use [uv](https://docs.astral.sh/uv/) to resolve the `ovrtx` wheel.
 - CUDA-capable environment for GPU-resident data paths; CPU payload paths are also part of the API surface.
 - DLPack-compatible tensor data for CPU/GPU interchange.
 
+## Network hosts
+
+Installing and running the examples reaches the following hosts. If you are
+behind a restrictive firewall or proxy, allow outbound HTTPS to all of them:
+
+- `pypi.org` and `files.pythonhosted.org` — the public PyPI index and CDN that
+  `uv add ovrtx ovstage` / `pip install ovrtx ovstage` reach to resolve project
+  metadata and download the wheels.
+- `pypi.nvidia.com` — the `ovrtx` PyPI entry is an sdist stub that fetches the
+  platform binary from this host at install time. `ovstage` is fully published to
+  PyPI (binary wheels on `files.pythonhosted.org`) and does not reach this host.
+- `github.com` and the GitHub release CDN (`objects.githubusercontent.com`) — used
+  by `cmake` `FetchContent` in the C examples to download the ovrtx and ovstage
+  release archives, and to clone this repository.
+- `omniverse-content-production.s3.us-west-2.amazonaws.com` — hosts the sample USD
+  scenes loaded at runtime by the Python examples (for example, the robot scene
+  used by `examples/python/minimal/main.py`).
 
 ## Getting Started in Python
 
@@ -71,9 +88,9 @@ pip install ovrtx ovstage
 
 ovstage is optional when maintaining standalone compatibility code. The renderer-owned scene APIs used by that mode are deprecated in ovrtx 0.4.
 
-All the examples in this repository contain pyproject.toml files that are tested with uv. Python 3.11-3.13 are supported.
+All the examples in this repository contain pyproject.toml files that are tested with uv. Python 3.10-3.13 are supported.
 
-If installation fails, first verify that you are using Python 3.11-3.13 and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
+If installation fails, first verify that you are using Python 3.10-3.13 and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
 
 To get started with the repository examples, first clone this repository and run the minimal example with uv:
 

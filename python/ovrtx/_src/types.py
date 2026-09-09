@@ -12,6 +12,7 @@ from dataclasses import dataclass, fields
 from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, TypeVar
 
 from .bindings import (  # noqa: F401 — re-exported public API
+    AftermathMode,
     AttributeFilterMode,
     BindingFlag,
     DataAccess,
@@ -24,7 +25,12 @@ from .bindings import (  # noqa: F401 — re-exported public API
     Semantic,
     TextureStreamingMode,
 )
-from .dlpack import DLPACK_MAJOR_VERSION, DLDataType, DLTensor, ManagedDLTensor, _to_dlpack_capsule
+from .dlpack import (
+    DLDataType,
+    DLDataTypeCode,
+    DLTensor,
+    _DLPackable,
+)
 from .helpers import _deprecation_warnings_suppressed, deprecated
 
 if TYPE_CHECKING:
@@ -183,6 +189,7 @@ class Operation(Generic[T]):
 
         self._pending_fetch = PendingFetch(ctx.fetch_fn) if ctx.fetch_fn else ctx.result.value
         self._ctx = None  # phase complete — release all wait-phase context
+        # Queued CUDA work may outlive wait(); keep input _storage_refs until this operation is released.
         return self._pending_fetch
 
     def query_status(self) -> "OperationStatus":
@@ -314,15 +321,15 @@ class _UnmapState:
         self.cuda_sync = None
 
 
-class MappedRenderVar:
+class MappedRenderVar(_DLPackable):
     """One mapped render variable: named tensors, named params, and the render variable's
-    description fields (:attr:`name`, :attr:`type`, :attr:`doc`, :attr:`version`).
+    description fields (:attr:`render_var_path`, :attr:`type`, :attr:`doc`, :attr:`version`).
 
     Returned by :meth:`RenderVarOutput.map`. A render variable that carries a
     single tensor exposes it via the DLPack protocol on the mapping itself
     (``np.from_dlpack(rv)``); one with multiple tensors exposes them via a
-    dict protocol (``rv["tensor_name"]``). Param values are reached via
-    :attr:`params`.
+    dict protocol (``rv["tensor_name"]``). A params-only render variable has
+    no tensors and exposes its values through :attr:`params`.
 
     **Lifetime.** Use either the context-manager form or a direct
     :meth:`unmap` call to signal that you are done. The underlying buffer
@@ -360,6 +367,14 @@ class MappedRenderVar:
     :meth:`wait` and :meth:`wait_on` are silent no-ops in that case
     (:attr:`wait_event` is ``None``).
 
+    .. note::
+
+       **Known driver scheduling interaction on Linux.** Patterns (1) and (2) are
+       stream-ordered CUDA waits that can reduce throughput when concurrent with the
+       renderer's Vulkan work (on Linux only). This applies to every CUDA stream 
+       and event argument in the Python API. Refer to the 
+       "Known driver scheduling interaction on Linux" note in 
+       :doc:`/core/cuda_vulkan_scheduling` for more details.
     Usage::
 
         # Context-manager form.
@@ -378,40 +393,6 @@ class MappedRenderVar:
         rv.unmap(stream=cuda_stream)            # release with a sync hint
         do_work(arr)
     """
-
-    class _DLPackable:
-        """Internal mix-in: provides the DLPack protocol methods to view classes.
-
-        Subclasses must expose ``_dl`` (the underlying ``DLTensor``) and
-        ``_parent`` (the :class:`MappedRenderVar` that owns the buffer).
-        Adds no slots and no ``__init__``.
-        """
-
-        __slots__ = ()
-
-        def __dlpack_device__(self) -> tuple[int, int]:
-            device = self._dl.device
-            return (device.device_type.value, device.device_id)
-
-        def __dlpack__(
-            self,
-            *,
-            stream: Optional[int] = None,
-            max_version: Optional[tuple[int, int]] = None,
-            dl_device: Optional[tuple[int, int]] = None,
-            copy: Optional[bool] = None,
-        ) -> Any:
-            _ = stream  # synchronization is the caller's responsibility
-            if copy is True:
-                raise BufferError("copy=True not supported")
-            use_versioned = max_version is not None and max_version[0] == DLPACK_MAJOR_VERSION and max_version >= (1, 0)
-            return _to_dlpack_capsule(
-                self._dl,
-                self._parent,
-                None,
-                versioned=use_versioned,
-                readonly=True,
-            )
 
     @dataclass(slots=True, frozen=True)
     class _RenderVarRecord:
@@ -432,7 +413,7 @@ class MappedRenderVar:
         renderer: "Renderer",
         map_handle: int,
         device: Device,
-        name: str,
+        render_var_path: str,
         type: str,
         doc: str,
         version: int,
@@ -468,7 +449,7 @@ class MappedRenderVar:
         renderer._register_mapping(map_handle, self._unmap_state)
 
         # Render variable description fields (plain instance attributes — opaque strings + int).
-        self.name = name
+        self.render_var_path = render_var_path
         self.type = type
         self.doc = doc
         self.version = version
@@ -487,10 +468,20 @@ class MappedRenderVar:
             n: MappedRenderVar._RenderVarRecord(n, d, dl) for (n, d, dl) in params
         }
 
-    @property
-    def device(self) -> Device:
-        """Device this render variable's tensors are mapped to (params are always CPU)."""
-        return self._device
+        n = len(self._tensors)
+        if n == 1:
+            super().__init__(next(iter(self._tensors.values())).dl)
+        elif n == 0:
+            error = f"Render variable '{self.render_var_path}' has no tensors"
+            if self._params:
+                error += "; use rv.params"
+            super().__init__(None, error)
+        else:
+            super().__init__(
+                None,
+                f"Render variable '{self.render_var_path}' has multiple tensors ({n}: {list(self._tensors)}); "
+                "use rv['<tensor_name>'] to access a specific tensor",
+            )
 
     @property
     def params(self) -> dict[str, "RenderVarParam"]:
@@ -505,79 +496,6 @@ class MappedRenderVar:
         """
         self._require_mapped()
         return {name: RenderVarParam(parent=self, record=rec) for name, rec in self._params.items()}
-
-    @property
-    def tensor(self) -> ManagedDLTensor:
-        """Deprecated. Returns the sole tensor of a single-tensor render variable as a :class:`ManagedDLTensor`.
-
-        Emits :class:`DeprecationWarning`. Raises if this render variable
-        carries multiple tensors or none.
-
-        Prefer ``np.from_dlpack(rv)`` for a single-tensor render variable and
-        ``rv["<name>"]`` when there are multiple tensors. The returned
-        :class:`ManagedDLTensor` preserves the historical signature of this
-        accessor — its ``.numpy()``, ``.to_bytes()``, ``.data``, ``.shape``,
-        ``.dtype``, etc. continue to work as before, and the underlying
-        buffer's lifetime is tied to this mapping for as long as any view
-        you minted from it is alive.
-        """
-        self._require_mapped()
-        n = len(self._tensors)
-        if n == 0:
-            raise RuntimeError(
-                f"Render variable '{self.name}' has no tensors; use rv.params for params-only render variables"
-            )
-        if n > 1:
-            raise RuntimeError(
-                f"Render variable '{self.name}' has multiple tensors ({n}: {list(self._tensors)}); "
-                f"use rv['<tensor_name>'] (or np.from_dlpack(rv['<tensor_name>']))."
-            )
-        if not _deprecation_warnings_suppressed(self):
-            warnings.warn(
-                ".tensor is deprecated for single-tensor render variables; use the mapping directly: "
-                "np.from_dlpack(rv). Will be removed in a later release.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        rec = next(iter(self._tensors.values()))
-        return ManagedDLTensor(rec.dl, manager_ctx=self, deleter_callback=None, readonly=True)
-
-    def __dlpack_device__(self) -> tuple[int, int]:
-        """Return ``(device_type, device_id)`` for the sole tensor.
-
-        Only valid on a single-tensor render variable; raises if the render
-        variable carries multiple tensors or none.
-        """
-        device = self._require_uniform("__dlpack_device__").dl.device
-        return (device.device_type.value, device.device_id)
-
-    def __dlpack__(
-        self,
-        *,
-        stream: Optional[int] = None,
-        max_version: Optional[tuple[int, int]] = None,
-        dl_device: Optional[tuple[int, int]] = None,
-        copy: Optional[bool] = None,
-    ) -> Any:
-        """Mint a DLPack capsule for the sole tensor.
-
-        Only valid on a single-tensor render variable; raises if the render
-        variable carries multiple tensors or none. For multi-tensor render
-        variables, use ``rv["<tensor_name>"]``; for a render variable with
-        only params, use ``rv.params``.
-        """
-        rec = self._require_uniform("__dlpack__")
-        _ = stream
-        if copy is True:
-            raise BufferError("copy=True not supported")
-        use_versioned = max_version is not None and max_version[0] == DLPACK_MAJOR_VERSION and max_version >= (1, 0)
-        return _to_dlpack_capsule(
-            rec.dl,
-            self,
-            None,
-            versioned=use_versioned,
-            readonly=True,
-        )
 
     def __getitem__(self, key: str) -> "RenderVarTensor":
         """Return the :class:`RenderVarTensor` for the named tensor.
@@ -595,7 +513,8 @@ class MappedRenderVar:
         rec = self._tensors.get(key)
         if rec is None:
             raise KeyError(
-                f"Render variable '{self.name}' has no tensor named {key!r}; " f"available: {list(self._tensors)}"
+                f"Render variable '{self.render_var_path}' has no tensor named {key!r}; "
+                f"available: {list(self._tensors)}"
             )
         return RenderVarTensor(parent=self, record=rec)
 
@@ -711,6 +630,8 @@ class MappedRenderVar:
             self._unmap_state.cuda_sync = cuda_sync
 
         self._unmapped = True
+        self._dltensor = None
+        self._dlpack_error = f"Mapping for '{self.render_var_path}' already released"
 
         # Clear the originating output's re-map gate at the user-release point.
         # The C unmap is still deferred until the last consumer capsule drops, but
@@ -768,37 +689,18 @@ class MappedRenderVar:
 
     def _require_mapped(self) -> None:
         if self._unmapped:
-            raise RuntimeError(f"Mapping for '{self.name}' already released")
-
-    def _require_uniform(self, op: str) -> "MappedRenderVar._RenderVarRecord":
-        """Validate that this render variable carries exactly one tensor and return its record.
-
-        Shared by ``__dlpack__`` / ``__dlpack_device__`` / ``tensor``.
-        """
-        self._require_mapped()
-        n = len(self._tensors)
-        if n == 0:
-            raise RuntimeError(
-                f"Render variable '{self.name}' has no tensors; {op} requires a single-tensor render variable "
-                f"(use rv.params for params-only render variables)"
-            )
-        if n > 1:
-            raise RuntimeError(
-                f"Render variable '{self.name}' has multiple tensors ({n}: {list(self._tensors)}); "
-                f"{op} requires a single-tensor render variable (use rv['<tensor_name>'] to access a specific tensor)"
-            )
-        return next(iter(self._tensors.values()))
+            raise RuntimeError(f"Mapping for '{self.render_var_path}' already released")
 
     def __repr__(self) -> str:
         state = "unmapped" if self._unmapped else "mapped"
         return (
-            f"MappedRenderVar(name={self.name!r}, type={self.type!r}, "
+            f"MappedRenderVar(render_var_path={self.render_var_path!r}, type={self.type!r}, "
             f"num_tensors={len(self._tensors)}, num_params={len(self._params)}, "
             f"device={self._device.name}, {state})"
         )
 
 
-class RenderVarTensor(MappedRenderVar._DLPackable):
+class RenderVarTensor(_DLPackable):
     """One named tensor from a mapped render variable.
 
     Returned by ``rv["<name>"]``. Implements the DLPack protocol so consumers
@@ -815,12 +717,9 @@ class RenderVarTensor(MappedRenderVar._DLPackable):
 
     def __init__(self, parent: "MappedRenderVar", record: "MappedRenderVar._RenderVarRecord"):
         """Internal: constructed by :meth:`MappedRenderVar.__getitem__`."""
+        super().__init__(record.dl)
         self._parent = parent
         self._record = record
-
-    @property
-    def _dl(self) -> DLTensor:
-        return self._record.dl
 
     @property
     def name(self) -> str:
@@ -833,31 +732,41 @@ class RenderVarTensor(MappedRenderVar._DLPackable):
         return self._record.doc
 
     @property
-    def shape(self) -> tuple:
-        """Tensor shape as a tuple of ints (read from the live DLTensor)."""
-        dl = self._record.dl
-        return tuple(dl.shape[i] for i in range(dl.ndim))
+    def cuda_array(self) -> int:
+        """CUDA array handle (``cudaArray_t`` / ``CUarray``) backing this tensor.
 
-    @property
-    def dtype(self) -> DLDataType:
-        """DLPack data type descriptor."""
-        return self._record.dl.dtype
+        Available on a tensor mapped with :attr:`Device.CUDA_ARRAY`, and on an
+        image output mapped with :attr:`Device.DEFAULT`, which the runtime
+        resolves to the same zero-copy array. Both report an opaque-handle
+        :attr:`dtype`. The value is an image handle, not a device pointer: it
+        cannot be dereferenced and no DLPack consumer can read it.
 
-    @property
-    def device(self):
-        """DLPack device descriptor."""
-        return self._record.dl.device
+        ovrtx hands back the raw handle and nothing else — reading or sampling it is
+        the consumer's own CUDA work, via Warp, CuPy, or your own wrapper. Use
+        :attr:`shape` as the ``(height, width, channels)`` extent and :attr:`dtype`
+        ``bits`` as the per-channel width. See the ``cuda-interop`` skill for the
+        supported read paths and their synchronization requirements.
 
-    @property
-    def ndim(self) -> int:
-        """Tensor rank."""
-        return self._record.dl.ndim
+        Raises:
+            RuntimeError: If this tensor is linear memory rather than a CUDA
+                array, or if the mapping reported a null handle.
+        """
+        dl = self._dlpack_tensor
+        if dl.dtype.code.value != DLDataTypeCode.kDLOpaqueHandle:
+            raise RuntimeError(
+                f"Tensor {self._record.name!r} is linear memory (dtype={dl.dtype}), not a CUDA array; map with "
+                "device=Device.CUDA_ARRAY (or Device.DEFAULT for image outputs), or read this tensor through DLPack."
+            )
+        # A c_void_p field reads back as None when null, so int() would raise TypeError here.
+        if not dl.data:
+            raise RuntimeError(f"Tensor {self._record.name!r} reports a CUDA array dtype but a null handle")
+        return int(dl.data)
 
     def __repr__(self) -> str:
         return f"RenderVarTensor(name={self._record.name!r}, shape={self.shape}, dtype={self.dtype})"
 
 
-class RenderVarParam(MappedRenderVar._DLPackable):
+class RenderVarParam(_DLPackable):
     """One named param value from a mapped render variable. Always CPU-resident.
 
     Returned by ``rv.params["<name>"]``. Implements the DLPack protocol so
@@ -874,12 +783,9 @@ class RenderVarParam(MappedRenderVar._DLPackable):
 
     def __init__(self, parent: "MappedRenderVar", record: "MappedRenderVar._RenderVarRecord"):
         """Internal: constructed by :attr:`MappedRenderVar.params`."""
+        super().__init__(record.dl)
         self._parent = parent
         self._record = record
-
-    @property
-    def _dl(self) -> DLTensor:
-        return self._record.dl
 
     @property
     def name(self) -> str:
@@ -890,27 +796,6 @@ class RenderVarParam(MappedRenderVar._DLPackable):
     def doc(self) -> str:
         """Human-readable description of the param (may be empty)."""
         return self._record.doc
-
-    @property
-    def shape(self) -> tuple:
-        """Param shape as a tuple of ints (scalar params have shape ``()``)."""
-        dl = self._record.dl
-        return tuple(dl.shape[i] for i in range(dl.ndim))
-
-    @property
-    def dtype(self) -> DLDataType:
-        """DLPack data type descriptor."""
-        return self._record.dl.dtype
-
-    @property
-    def device(self):
-        """DLPack device descriptor (always CPU for params)."""
-        return self._record.dl.device
-
-    @property
-    def ndim(self) -> int:
-        """Param rank."""
-        return self._record.dl.ndim
 
     def __repr__(self) -> str:
         return f"RenderVarParam(name={self._record.name!r}, shape={self.shape}, dtype={self.dtype})"
@@ -931,12 +816,16 @@ class RenderVarOutput(Generic[T]):
 
     def __init__(
         self,
-        name: str,
+        render_var_path: str,
         handle: T,
         renderer: "Renderer",
+        source_name: str = "",
+        source_type: str = "",
     ):
         """Internal: created by :meth:`Renderer._fetch_results`."""
-        self.name = name
+        self.render_var_path = render_var_path
+        self.source_name = source_name
+        self.source_type = source_type
         self.handle = handle
         self._renderer = renderer
         self._map_handle: Any = None  # set while a mapping is outstanding; gates re-map
@@ -964,7 +853,7 @@ class RenderVarOutput(Generic[T]):
                 first).
         """
         if self._map_handle is not None:
-            raise RuntimeError(f"Render var '{self.name}' already mapped")
+            raise RuntimeError(f"Render var '{self.render_var_path}' already mapped")
 
         rv = self._renderer._map_output(self.handle, device_type=device, sync_stream=sync_stream)
         self._map_handle = rv._map_handle
@@ -975,7 +864,7 @@ class RenderVarOutput(Generic[T]):
 
     def __repr__(self) -> str:
         status = "mapped" if self._map_handle else "unmapped"
-        return f"RenderVarOutput(name='{self.name}', {status})"
+        return f"RenderVarOutput(render_var_path='{self.render_var_path}', {status})"
 
 
 @dataclass
@@ -983,15 +872,26 @@ class FrameOutput(Generic[T]):
     """Single frame with multiple render variables."""
 
     start_time: float
-    """Sensor simulation time at frame start, in seconds.
+    """Sensor simulation time when this frame's capture began, in seconds.
 
-    Accumulated from ``delta_time`` values passed to :meth:`Renderer.step`.
-    Epoch is 0.0 at renderer creation and after :meth:`reset_stage`;
-    set to *time* after :meth:`reset(time=...) <Renderer.reset>`.
+    This is the sensor's own capture window, not the step's simulation window.
+    A :meth:`Renderer.step` of ``delta_time`` simulates ``[t, t + delta_time]``
+    and places each capture inside that window according to the sensor's
+    authored timing.
+
+    A step may also emit more than one :class:`FrameOutput` per render product
+    (DLSS-G interpolated frames, for instance, sit at earlier instants than the
+    real frame), so only the final frame of a step ends at ``t + delta_time``.
+
     """
     end_time: float
-    """Sensor simulation time at frame end, in seconds (``start_time + delta_time``)."""
+    """Sensor simulation time when this frame's capture ended, in seconds.
+
+    Equal to :attr:`start_time` for instantaneous captures (no authored
+    exposure); otherwise the end of this sensor's frame exposure window.
+    """
     render_vars: dict[str, RenderVarOutput[T]]
+    """Outputs keyed by full authored USD RenderVar prim paths or reserved OVRTX output names."""
     progression: int = 0
     """Path-tracing sample accumulation progress for this render product frame.
 
@@ -1020,6 +920,8 @@ class RenderProductSetOutputs(Generic[T]):
     """Dict-like container for rendering results from a step operation.
 
     Acts as a dictionary mapping render product paths to ProductOutput instances.
+    Also exposes the step's simulation window via
+    :attr:`simulation_start_time` / :attr:`simulation_end_time`.
 
     Example::
 
@@ -1027,9 +929,9 @@ class RenderProductSetOutputs(Generic[T]):
         products = renderer.step(...)
         for product_name, product in products.items():
             for frame in product.frames:
-                for var_name, render_var in frame.render_vars.items():
+                for render_var_path, render_var in frame.render_vars.items():
                     mapping = render_var.map()
-                    # Process mapping.tensor...
+                    # Process mapping...
 
         # Dict-like indexing
         product = products["/Render/Product0"]
@@ -1037,21 +939,50 @@ class RenderProductSetOutputs(Generic[T]):
         # Membership test
         if "/Render/Product0" in products:
             ...
+
+        # Step simulation window (distinct from FrameOutput.start_time)
+        assert products.simulation_start_time == 0.0
+    """
+
+    simulation_start_time: float = 0.0
+    """Sensor simulation time when this step began, in seconds.
+
+    The lower bound of the step window ``[t, t + delta_time]``. After
+    :meth:`Renderer.reset` with ``time=T``, the next
+    :meth:`~Renderer.step` reports ``simulation_start_time == T``. This is
+    the step clock base; it is distinct from
+    :attr:`FrameOutput.start_time`, which is each sensor's own capture
+    instant inside the window.
+    """
+    simulation_end_time: float = 0.0
+    """Sensor simulation time when this step ended, in seconds.
+
+    The upper bound of the step window ``[t, t + delta_time]``
+    (``simulation_start_time + delta_time``).
     """
 
     def __init__(
         self,
         destroy_fn: Callable[[], None],
         products: dict[str, ProductOutput[T]],
+        *,
+        simulation_start_time: float,
+        simulation_end_time: float,
     ):
         """Internal: Created by Renderer._fetch_results().
 
         Args:
             destroy_fn: Callable that releases C step result resources.
-            products: Parsed product outputs keyed by render product name
+            products: Parsed product outputs keyed by render product name.
+            simulation_start_time: Simulation clock at the start of the step
+                that produced these outputs.
+            simulation_end_time: Simulation clock at the end of the step that
+                produced these outputs.
         """
         self._destroy_fn = destroy_fn
         self._outputs = products
+        self.simulation_start_time = simulation_start_time
+        self.simulation_end_time = simulation_end_time
 
     # Dict-like protocol
     def __getitem__(self, key: str) -> ProductOutput[T]:
@@ -1100,7 +1031,11 @@ class RenderProductSetOutputs(Generic[T]):
             print(f"Warning: Exception during RenderProductSetOutputs cleanup in __del__: {e}", file=sys.stderr)
 
     def __repr__(self) -> str:
-        return f"RenderProductSetOutputs({list(self._outputs.keys())})"
+        return (
+            f"RenderProductSetOutputs({list(self._outputs.keys())}, "
+            f"simulation_start_time={self.simulation_start_time!r}, "
+            f"simulation_end_time={self.simulation_end_time!r})"
+        )
 
 
 class AttributeBinding(Generic[_BindingTensorT]):
@@ -1344,15 +1279,7 @@ class AttributeBinding(Generic[_BindingTensorT]):
         return f"AttributeBinding(handle={self._handle}, semantic={self._semantic})"
 
 
-class _AttrMappingCtx:
-    """Lightweight proxy used as manager_ctx for AttributeMapping's ManagedDLTensor.
-
-    Avoids a Py_IncRef reference cycle between AttributeMapping and ManagedDLTensor
-    so that AttributeMapping.__del__ fires via refcount for deterministic cleanup.
-    """
-
-
-class AttributeMapping:
+class AttributeMapping(_DLPackable):
     """High-level wrapper for mapped attribute buffer.
 
     Provides access to an internal buffer for direct writes using NumPy, Warp,
@@ -1370,7 +1297,7 @@ class AttributeMapping:
             dtype=np.float64, shape=(4, 4))
 
         # Write data via NumPy, Warp, etc.
-        array = np.from_dlpack(mapping.tensor)
+        array = np.from_dlpack(mapping)
         array[:] = source_matrix_data
 
         # Unmap to apply changes
@@ -1380,7 +1307,7 @@ class AttributeMapping:
     Or use as context manager:
         ```python
         with renderer.map_attribute(...) as mapping:
-            np.from_dlpack(mapping.tensor)[:] = source_data
+            np.from_dlpack(mapping)[:] = source_data
         # Automatically unmapped on exit
         ```
     """
@@ -1402,40 +1329,33 @@ class AttributeMapping:
             binding_desc: Optional binding descriptor (for write_attribute calls).
             device: Device type (Device.CPU or Device.CUDA).
         """
+        super().__init__(dltensor, readonly=False)
         self._mapping = mapping
         self._renderer = renderer
-        self._dltensor = dltensor
         self._binding_desc = binding_desc
         self._device = device
         self._unmapped = False
-        self._managed_tensor: Optional[ManagedDLTensor] = None
 
     @property
-    def tensor(self) -> ManagedDLTensor:
-        """Access the mapped buffer as a tensor for NumPy, Warp, etc.
+    def tensor(self) -> "AttributeMapping":
+        """Compatibility alias for this DLPack-compatible mapping.
 
         When the mapping was created with ``shape=``, the tensor dimensions
         match ``(N, *shape)`` with a scalar element dtype. For
         ``Semantic.XFORM_MAT4x4`` bindings, the tensor is reshaped to
         ``(N, 4, 4)`` for direct matrix operations.
 
-        Use ``np.from_dlpack(mapping.tensor)`` or equivalent to obtain a
-        writable array view.
+        Prefer ``np.from_dlpack(mapping)``. Existing
+        ``np.from_dlpack(mapping.tensor)`` calls remain equivalent.
 
         Returns:
-            ManagedDLTensor ready for consumption by array libraries.
+            This mapping.
 
         Raises:
             RuntimeError: If accessed after unmap().
         """
-        if self._unmapped:
-            raise RuntimeError(
-                "Mapping already released — access tensor before calling unmap() or exiting the with block."
-            )
-        if self._managed_tensor is None:
-            ctx = _AttrMappingCtx()
-            self._managed_tensor = ManagedDLTensor(self._dltensor, ctx, None, readonly=False)
-        return self._managed_tensor
+        _ = self._dlpack_tensor
+        return self
 
     @property
     def map_handle(self) -> int:
@@ -1456,11 +1376,6 @@ class AttributeMapping:
             ovrtx_binding_desc_t or None
         """
         return self._binding_desc
-
-    @property
-    def device(self) -> Device:
-        """Get the device type this attribute is mapped to."""
-        return self._device
 
     def _do_unmap(self, event: Optional[int] = None, stream: Optional[int] = None) -> "Operation[bool]":
         """Validate, enqueue C unmap, mark unmapped, return Operation.
@@ -1493,8 +1408,9 @@ class AttributeMapping:
         op = self._renderer._enqueue_attribute_unmap(
             int(self._mapping.map_handle), self._build_cuda_sync(event, stream)
         )
-        self._managed_tensor = None
         self._unmapped = True
+        self._dltensor = None
+        self._dlpack_error = "Mapping already released"
         return op
 
     @deprecated(_OVSTAGE_UNMAP_REPLACEMENT)
@@ -1571,8 +1487,9 @@ class AttributeMapping:
                 self._renderer._enqueue_attribute_unmap(int(self._mapping.map_handle))
             except Exception:
                 pass
-            self._managed_tensor = None
             self._unmapped = True
+            self._dltensor = None
+            self._dlpack_error = "Mapping already released"
 
     def __repr__(self) -> str:
         status = "unmapped" if self._unmapped else "mapped"
@@ -1590,7 +1507,7 @@ class RendererConfig:
     """Set the path to the log file for logging output."""
 
     log_level: Optional[str] = None
-    """Set the log level for logging output: "verbose", "info", "warn", "error"."""
+    """Set the log level for logging output (e.g. "verbose", "info", "warn", "error")."""
 
     enable_profiling: Optional[bool] = None
     """Enable internal profiling. Adds overhead when enabled."""
@@ -1612,12 +1529,8 @@ class RendererConfig:
     ``grpcdns://host:port``, ``grpcdns_notls://host:port``, and ``local://path``. When omitted,
     existing defaults and environment-variable behavior are preserved."""
 
-    use_vulkan: Optional[bool] = None
-    """Select Vulkan rendering backend. On Linux Vulkan is always used.
-    On Windows, set True to force Vulkan instead of the default DX12."""
-
     selection_outline_enabled: Optional[bool] = None
-    """Enable the selection-outline post-process pass. Defaults to ``False`` when unset.
+    """Enable the selection-outline post-process pass. Defaults to ``True`` when unset.
     Init-time only; toggling requires recreating the renderer."""
 
     selection_outline_width: Optional[int] = None
@@ -1627,24 +1540,14 @@ class RendererConfig:
 
     selection_fill_mode: Optional[SelectionFillMode] = None
     """Selection-outline fill (interior) mode. Accepts a :class:`SelectionFillMode`
-    member or the equivalent ``int`` value (``0..3``). Out-of-range values are
-    clamped by the renderer.
+    member or the equivalent ``int`` value (``0..3``). Out-of-range values raise
+    :class:`ValueError`.
 
     Init-time only; changing requires recreating the renderer.
     Default: :attr:`SelectionFillMode.GLOBAL`."""
 
-    dome_baking_resolution: Optional[int] = None
-    """DomeLight baking resolution in texels, used when an MDL material drives a
-    DomeLight's image source. Applies renderer-wide to all dome lights. Valid
-    range is ``1..8192``; out-of-range values are clamped by the renderer.
-
-    Init-time only; changing requires recreating the renderer. When ``None``,
-    ovrtx does not write the setting: the value is ``4096`` for the first
-    renderer in a fresh process, but a value set by a prior in-process renderer
-    (or via dev settings) is left in place rather than reset."""
-
     enable_geometry_streaming: Optional[bool] = None
-    """Geometry streaming opt-in config entry."""
+    """Enable geometry streaming. Disabled by default when ``None``."""
 
     enable_geometry_streaming_lod: Optional[bool] = None
     """Geometry streaming LOD opt-in config entry."""
@@ -1669,6 +1572,21 @@ class RendererConfig:
     When ``None`` (default), motion BVH is disabled and no config entry is sent.
     Sensor workflows should pass :attr:`MotionBvh.AUTO` or :attr:`MotionBvh.ENABLE`.
     Init-time only; changing requires recreating the renderer."""
+
+    sensors_allowed_deprecation_base: Optional[str] = None
+    """Allow all soft-deprecated sensor versions while pinned to a specific release:
+    ``"<major>.<minor>.<patch>"`` (e.g. ``"0.4.0"``). Soft-deprecated versions are rejected by
+    default; deprecation is allowed only when this matches the current framework version,
+    so it must be revisited on every framework upgrade. """
+
+    aftermath_mode: Optional[AftermathMode] = None
+    """NVIDIA Nsight Aftermath diagnostics mode.
+
+    Accepts an :class:`AftermathMode` member, the equivalent ``int`` value (``0..2``), or
+    ``"disable"``, ``"enable"``, or ``"auto"``. Disable skips Aftermath initialization, enable
+    selects explicit diagnostics initialization, and ``None`` or auto selects the initialization
+    mode automatically. This setting is process-global and must match the first renderer while the
+    renderer system is alive."""
 
     texture_streaming_mode: Optional[TextureStreamingMode] = None
     """Texture streaming mode.

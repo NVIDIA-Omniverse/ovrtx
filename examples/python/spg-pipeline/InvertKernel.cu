@@ -8,6 +8,7 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
+// [snippet:invert-kernel]
 // Second pass of the pipeline: invert an image. The input is whatever upstream
 // shader is connected to inputs:Image — here, the grayscale output.
 extern "C" __global__ void invert(
@@ -33,3 +34,4 @@ extern "C" __global__ void invert(
         surf2Dwrite<uchar4>(out, outputInverted, x * sizeof(uchar4), y);
     }
 }
+// [/snippet:invert-kernel]

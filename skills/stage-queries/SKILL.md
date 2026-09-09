@@ -14,7 +14,6 @@ description: >
   when user asks to find prims by type, filter by attribute, list all prims, or look up
   attribute types before reading or writing them.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

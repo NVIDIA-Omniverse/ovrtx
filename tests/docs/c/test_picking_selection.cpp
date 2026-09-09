@@ -240,7 +240,7 @@ std::vector<uint8_t> docs_map_ldr_pixels(ovrtx_renderer_t* renderer, ovrtx_step_
         return {};
     }
 
-    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "LdrColor");
+    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
     EXPECT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
     if (ldr_handle == OVRTX_INVALID_HANDLE) {
         ovrtx_destroy_results(renderer, step_handle);
@@ -345,18 +345,16 @@ class PickingSelectionTest : public DocsOvstageTestBase {
 
     static void SetUpTestSuite() {
         // [snippet:doc-create-selection-outline-renderer-c]
-        // Selection-outline requires the renderer be created with the config
-        // entry flipped on. Attach an ovstage instance to populate USD scenes
-        // into it; the pick + set_selection_outline_group calls below run on
-        // the same renderer.
+        // Selection outlines are enabled by default. Attach an ovstage instance
+        // to populate USD scenes into it; the pick and selection calls below
+        // run on the same renderer.
         std::string log_path = (get_output_dir() / "PickingSelectionTest-ovrtx.log").string();
         ovx_string_t log_path_view = {log_path.c_str(), log_path.size()};
 
         ovrtx_config_entry_t entries[] = {
             ovrtx_config_entry_log_file_path(log_path_view),
-            ovrtx_config_entry_selection_outline_enabled(true),
         };
-        ovrtx_config_t config = {entries, 2};
+        ovrtx_config_t config = {entries, 1};
 
         ovrtx_result_t result = ovrtx_create_renderer(&config, &suite_renderer_);
         ASSERT_API_SUCCESS(result.status);
@@ -416,11 +414,10 @@ class SelectionStyleTest : public PickingSelectionTest {
 
         ovrtx_config_entry_t entries[] = {
             ovrtx_config_entry_log_file_path(log_path_view),
-            ovrtx_config_entry_selection_outline_enabled(true),
             ovrtx_config_entry_selection_outline_width(8),
             ovrtx_config_entry_selection_fill_mode(OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR),
         };
-        ovrtx_config_t config = {entries, 4};
+        ovrtx_config_t config = {entries, 3};
 
         ovrtx_result_t result = ovrtx_create_renderer(&config, &suite_renderer_);
         ASSERT_API_SUCCESS(result.status);
@@ -576,9 +573,8 @@ class PickingSelectionLegacyTest : public ::testing::Test {
 
         ovrtx_config_entry_t entries[] = {
             ovrtx_config_entry_log_file_path(log_path_view),
-            ovrtx_config_entry_selection_outline_enabled(true),
         };
-        ovrtx_config_t config = {entries, 2};
+        ovrtx_config_t config = {entries, 1};
 
         ovrtx_result_t result = ovrtx_create_renderer(&config, &renderer_);
         ASSERT_API_SUCCESS(result.status);

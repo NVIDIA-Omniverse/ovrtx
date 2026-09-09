@@ -98,7 +98,7 @@ void render_and_save(ovrtx_renderer_t* renderer,
         ovrtx_fetch_results(renderer, step_handle, ovrtx_timeout_infinite, &outputs);
     ASSERT_API_SUCCESS(result.status);
 
-    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "LdrColor");
+    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
     ASSERT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
     ovrtx_map_output_description_t map_desc = {};
     map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
@@ -221,7 +221,7 @@ TEST_F(BaseTest, BindMaterial) {
         ovrtx_fetch_results(renderer_, step_handle, ovrtx_timeout_infinite, &outputs);
     ASSERT_API_SUCCESS(result.status);
 
-    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "LdrColor");
+    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
     ASSERT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
     ovrtx_map_output_description_t map_desc = {};
     map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
@@ -300,11 +300,11 @@ TEST_F(BaseTest, SettingsRtptMaxBounces) {
     }
 }
 
-TEST_F(BaseTest, SettingsRtptMaxSpecularAndTransmissionBounces) {
+TEST_F(BaseTest, SettingsRtptExtraSpecularAndTransmissiveBounces) {
     docs_load_base();
     if (HasFatalFailure()) return;
 
-    // Bind glass to the logo so specular/transmission bounces are visible.
+    // Bind glass to the logo so extra specular/transmission bounces are visible.
     // Reuses the same relationship-path-id write as BindMaterial.
     {
         path_dictionary_instance_t* pd = ovstage_get_path_dictionary(stage_);
@@ -355,13 +355,13 @@ TEST_F(BaseTest, SettingsRtptMaxSpecularAndTransmissionBounces) {
     int bounce_values[] = {2, 3, 23};
     for (int bounces : bounce_values) {
         write_render_setting_uint32(stage_,
-                                     "omni:rtx:rtpt:maxSpecularAndTransmissionBounces",
+                                     "omni:rtx:rtpt:extraSpecularAndTransmissiveBounces",
                                      static_cast<uint32_t>(bounces),
                                      ordinal);
         ASSERT_NO_FATAL_FAILURE(docs_ovstage_advance_write_floor(stage_, ordinal));
 
         std::string name =
-            "settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-"
+            "settings_rtpt_extraSpecularAndTransmissiveBounces.Camera.LdrColor.extraSpecularAndTransmissiveBounces-"
             + std::to_string(bounces) + ".0001";
         render_and_save(renderer_, ordinal, name.c_str());
         ordinal++;

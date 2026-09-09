@@ -79,7 +79,7 @@ Currently also prints all Sdr property info to stderr for debugging.
 
 ### Attribute Writes
 
-- All writes use `OVRTX_BINDING_PRIM_MODE_CREATE_NEW` so non-authored properties can be created in Fabric on first edit.
+- All writes use `OVRTX_BINDING_PRIM_MODE_CREATE_NEW` so non-authored properties can be created in the runtime stage on first edit.
 - Material binding uses `ovrtx_set_path_attributes()` with `"material:binding"`.
 - Material binding and shader parameter changes wait for the enqueued mutation and call `ovrtx_reset()` to clear path tracer accumulated samples.
 - Float/color3f/int/bool/token writes use `ovrtx_write_attribute()` with `ovrtx_make_binding_desc()` and CPU DLPack tensors.

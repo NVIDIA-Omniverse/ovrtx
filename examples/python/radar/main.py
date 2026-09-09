@@ -13,12 +13,14 @@ from pathlib import Path
 
 import numpy as np
 import ovrtx
+import ovstage
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SCENE = SCRIPT_DIR / "radar_example.usda"
 OUTPUT_DIR = SCRIPT_DIR / "_output"
 RENDER_PRODUCT = "/World/Render/Products/RadarProduct"
+POINTCLOUD_RENDER_VAR = "/World/Render/Vars/PointCloud"
 WARMUP_STEPS = 3
 STEP_DT_SECONDS = 0.1
 
@@ -71,18 +73,20 @@ def log_radar_points(rr, step: int, points: np.ndarray, radial_velocity: np.ndar
 
 # [snippet:read-radar-pointcloud]
 def read_radar_pointcloud(frame) -> tuple[np.ndarray, np.ndarray]:
-    """Map the PointCloud composite tensor to CPU and return valid point channels."""
-    with frame.render_vars["PointCloud"].map(device=ovrtx.Device.CPU) as pointcloud:
+    """Map the PointCloud composite tensor to CPU and return valid detections."""
+    with frame.render_vars[POINTCLOUD_RENDER_VAR].map(device=ovrtx.Device.CPU) as pointcloud:
         coordinates = np.from_dlpack(pointcloud["Coordinates"])
         counts = np.from_dlpack(pointcloud["Counts"])
+        flags = np.from_dlpack(pointcloud["Flags"])
         radial_velocity = np.from_dlpack(pointcloud["RadialVelocityMs"])
 
-        # Counts contains the number of valid detections in the composite tensors.
-        valid_count = int(counts[0])
-        points = np.asarray(coordinates[:, :valid_count].T)
+        # Counts bounds delivered entries; Flags determines per-entry validity.
+        detection_count = int(counts[0])
+        valid = (np.asarray(flags[:detection_count]) & 0x40) != 0
+        points = np.asarray(coordinates[:, :detection_count].T)[valid]
         return (
             points.copy(),
-            np.asarray(radial_velocity[:valid_count]).copy(),
+            np.asarray(radial_velocity[:detection_count])[valid].copy(),
         )
 
 
@@ -139,29 +143,38 @@ def main(argv: list[str] | None = None) -> None:
         args.log.parent.mkdir(parents=True, exist_ok=True)
         log_file_path = str(args.log)
     renderer = ovrtx.Renderer(ovrtx.RendererConfig(
-        log_file_path=log_file_path, 
+        log_file_path=log_file_path,
         motion_bvh=ovrtx.MotionBvh.ENABLE))
+    stage = ovstage.Stage("ovrtx.example.radar")
+    renderer.attach_ovstage(stage)
     # [/snippet:create-renderer]
 
     # [snippet:load-radar-scene]
     # The USDA scene defines the radar, materials, render product, and animated cube.
     print(f"Loading radar scene from {args.scene}...")
-    renderer.open_usd(str(args.scene))
+    ordinal = 1
+    ovstage.population.open_usd(stage, str(args.scene), ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
     # [/snippet:load-radar-scene]
 
     # [snippet:warm-up-radar]
-    # Warm up the sensor before reading the animated frames.
-    renderer.update_from_usd_time(0.0)
+    # Warm up the sensor before reading the animated frames. Each USD-time
+    # update is a stage mutation, published under its own ordinal.
+    ordinal += 1
+    ovstage.population.update_from_usd_time(stage, ordinal, 0.0)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
     for _ in range(WARMUP_STEPS):
-        renderer.step(render_products={RENDER_PRODUCT}, delta_time=STEP_DT_SECONDS)
+        renderer.step(render_products={RENDER_PRODUCT}, delta_time=STEP_DT_SECONDS, ordinal=ordinal)
     # [/snippet:warm-up-radar]
 
     # [snippet:step-and-visualize-radar]
     # Step through the USD animation and color each detection by signed radial velocity.
     for step in range(1, args.steps + 1):
-        renderer.update_from_usd_time(step * STEP_DT_SECONDS)
+        ordinal += 1
+        ovstage.population.update_from_usd_time(stage, ordinal, step * STEP_DT_SECONDS)
+        stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
         products = renderer.step(
-            render_products={RENDER_PRODUCT}, delta_time=STEP_DT_SECONDS
+            render_products={RENDER_PRODUCT}, delta_time=STEP_DT_SECONDS, ordinal=ordinal
         )
         frame = products[RENDER_PRODUCT].frames[0]
         points, radial_velocity = read_radar_pointcloud(frame)
@@ -177,6 +190,11 @@ def main(argv: list[str] | None = None) -> None:
         if rr is not None:
             log_radar_points(rr, step, points, radial_velocity)
     # [/snippet:step-and-visualize-radar]
+
+    del frame, products
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
 
 
 if __name__ == "__main__":

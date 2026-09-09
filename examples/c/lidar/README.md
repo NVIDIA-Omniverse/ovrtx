@@ -14,6 +14,9 @@ The scene is Z-up and contains:
 - an asphalt ground plane spanning `X=-200..200` and `Y=-200..200`
 - a concrete cube at `(10, 0, 0.75)`
 
+The scene explicitly sets `includeInvalidPoints = false`, so invalid returns are
+dropped before the point cloud is delivered.
+
 ## Render Output
 
 The USD requests the lidar `PointCloud` render variable with these channels:
@@ -23,9 +26,10 @@ The USD requests the lidar `PointCloud` render variable with these channels:
 - `Counts`
 - `TimeOffsetNs`
 
-The executable maps the output to CPU, uses `Counts` as the number of valid
-point entries, and prints the mean `Intensity` and maximum `TimeOffsetNs` over
-the valid point range.
+The executable maps the output to CPU and uses `Counts` to bound the delivered
+point entries. Because the scene drops invalid returns, that range is also the
+valid-point range. It prints the mean `Intensity` and maximum `TimeOffsetNs`
+over those points.
 
 ## API Flow
 

@@ -41,6 +41,7 @@ TEST_BASE_LIGHT = TEST_DATA_DIR / "ovrtx-test-base-light.usda"
 
 GRID_SIZE = 3       # 3x3 grid
 SCENE_SPACING = 100  # Each scene instance covers ~100x100 units
+LDR_COLOR_PATH = "/Render/TiledCameras/LdrColor"
 
 
 def generate_tiled_scene_usda(scene_path: Path, light_path: Path) -> str:
@@ -181,7 +182,7 @@ def main():
     print("Fetching results...", file=sys.stderr)
     for _product_name, product in products.items():
         for frame in product.frames:
-            var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
+            var = frame.render_vars[LDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
             view = np.from_dlpack(var)
             pixels = view.copy()
             del view

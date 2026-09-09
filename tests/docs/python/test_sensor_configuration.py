@@ -16,6 +16,8 @@ import ovstage
 from PIL import Image
 
 SCENE_PATH = str((Path(__file__).parent / "../../../tests/data/simple_camera.usda").resolve())
+SHARED_LDR_COLOR_PATH = "/Render/Vars/LdrColor"
+CAMERA_LDR_COLOR_PATH = "/Render/Camera/LdrColor"
 
 MULTI_RENDER_PRODUCT_USDA = f"""#usda 1.0
 (
@@ -71,7 +73,7 @@ def test_step_multiple_render_products(renderer, stage, output_dir):
     for product_name, product in products.items():
         assert len(product.frames) > 0
         for frame in product.frames:
-            var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
+            var = frame.render_vars[SHARED_LDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
             ldr = np.from_dlpack(var)
             cam_name = product_name.rsplit("/", 1)[-1]
             Image.fromarray(ldr).save(output_dir / f"test_sensor_config.{cam_name}.LdrColor.png")
@@ -120,6 +122,6 @@ def test_add_render_config_layer(renderer, stage, output_dir):
 
     for product_name, product in products.items():
         for frame in product.frames:
-            var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
+            var = frame.render_vars[CAMERA_LDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
             ldr = np.from_dlpack(var)
             Image.fromarray(ldr).save(output_dir / "test_sensor_config.AddRenderConfigLayer.LdrColor.png")

@@ -8,23 +8,91 @@
 
 """Pytest configuration for ovrtx documentation tests."""
 
+import re
+import warnings
 from pathlib import Path
+
+import pytest
 
 import ovrtx
 import ovstage
-import pytest
+
+_OVRTX_DEPRECATION_MESSAGE = re.compile(r".* deprecated (since|in) ovrtx 0\.4\..*")
+_OVRTX_DEPRECATION_FILTER = f"ignore:{_OVRTX_DEPRECATION_MESSAGE.pattern}:DeprecationWarning"
+_UNAPPROVED_DEPRECATION_NODEIDS: set[str] = set()
+_FAILED_NODEIDS: set[str] = set()
+
+
+def pytest_configure(config):
+    """Register documentation-test markers."""
+    config.addinivalue_line(
+        "markers",
+        "allow_deprecated_ovrtx_api: mark a test of the deprecated renderer-owned API contract",
+    )
+
+
+def pytest_sessionstart(session):
+    """Clear the deprecation summary state before test collection."""
+    _UNAPPROVED_DEPRECATION_NODEIDS.clear()
+    _FAILED_NODEIDS.clear()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session):
+    """Reserve known OVRTX deprecations for the ovstage migration summary."""
+    terminalreporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if terminalreporter is None:
+        return
+
+    warning_reports = terminalreporter.stats.get("warnings")
+    if warning_reports:
+        terminalreporter.stats["warnings"] = [
+            report for report in warning_reports if not _OVRTX_DEPRECATION_MESSAGE.search(report.message)
+        ]
+
+
+def pytest_warning_recorded(warning_message: warnings.WarningMessage, when: str, nodeid: str):
+    """Record recognized OVRTX deprecations not suppressed by a compatibility opt-in."""
+    if issubclass(warning_message.category, DeprecationWarning) and _OVRTX_DEPRECATION_MESSAGE.search(
+        str(warning_message.message)
+    ):
+        _UNAPPROVED_DEPRECATION_NODEIDS.add(nodeid or f"<{when}>")
+
+
+def pytest_runtest_logreport(report):
+    """Track failures already represented by pytest's ordinary failure report."""
+    if report.failed:
+        _FAILED_NODEIDS.add(report.nodeid)
+
+
+def pytest_terminal_summary(terminalreporter):
+    """List tests whose deprecated API use requires migration to ovstage."""
+    nodeids = sorted(_UNAPPROVED_DEPRECATION_NODEIDS - _FAILED_NODEIDS)
+    if not nodeids:
+        return
+
+    terminalreporter.write_sep("=", f"tests requiring migration to ovstage ({len(nodeids)})")
+    for nodeid in nodeids:
+        terminalreporter.write_line(f"  - {nodeid}")
+
+
+def pytest_collection_modifyitems(items):
+    """Apply the centralized warning filter to explicitly marked compatibility tests."""
+    for item in items:
+        marker_nodes = list(item.iter_markers_with_node(name="allow_deprecated_ovrtx_api"))
+        if not marker_nodes:
+            continue
+        if any(marker_node is not item for marker_node, _marker in marker_nodes):
+            raise pytest.UsageError("allow_deprecated_ovrtx_api must be applied to individual tests")
+        item.add_marker(pytest.mark.filterwarnings(_OVRTX_DEPRECATION_FILTER))
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_teardown(item, nextitem):
     yield
 
-    # Fix: pytest caches every fixture's return value in ``item.funcargs`` and keeps the Function
-    # item in ``session.items`` for the whole run, so ``item.funcargs["renderer"]`` pins each
-    # ovrtx.Renderer alive until session end. Because Renderer's only teardown path is __del__
-    # (refcount-triggered), destroy_renderer + streaming-status unregister never run between
-    # tests and the busy clients accumulate. All fixtures for this item are finalized by now, so
-    # dropping funcargs lets the renderer's refcount reach zero and __del__ fire promptly.
+    # Pytest retains fixture return values in ``item.funcargs`` after fixture
+    # finalization. Clearing them releases each renderer before the next test.
     funcargs = getattr(item, "funcargs", None)
     if funcargs:
         funcargs.clear()
@@ -48,9 +116,8 @@ def renderer(output_dir):
     try:
         yield r
     finally:
-        # Deterministic teardown: the renderer participates in a reference cycle, so relying on
-        # __del__ (refcount) would defer native teardown to a GC pass. 
-        # destroy() is idempotent, so a later __del__ is a no-op.
+        # Explicit destruction provides deterministic native teardown despite
+        # the renderer's reference cycle. A later __del__ is a no-op.
         r.destroy()
 
 

@@ -23,8 +23,21 @@ DEFAULT_OUTPUT_DIR = Path("/tmp/ovrtx-skills")
 SNIPPET_START_RE = re.compile(r"\[\s*snippet:(?P<name>[A-Za-z0-9_.:-]+)\s*\]")
 SNIPPET_END_RE = re.compile(r"\[\s*/snippet:(?P<name>[A-Za-z0-9_.:-]+)\s*\]")
 SKILL_REFERENCE_RE = re.compile(
-    r"^(?P<indent>\s*)>\s*(?P<label>\*\*Source:\*\*|Followed by:)\s+"
-    r"`(?P<path>[^`]+)`\s+snippets?\s+(?P<tail>.*)$"
+    r"^(?P<indent>\s*)>\s*\*\*Source(?: \((?P<qualifier>[^)*\r\n]+)\))?:\*\*\s+"
+    r"`(?P<path>[^`\r\n]+)`\s+snippets?\s+(?P<tail>.*)$"
+)
+SUPPORTED_SOURCE_LABEL_RE = re.compile(
+    r"^\*\*Source(?: \([^)*\r\n]+\))?:\*\*$"
+)
+POTENTIAL_SKILL_REFERENCE_RE = re.compile(
+    r"^(?P<indent>\s*)>\s*"
+    r"(?P<label>\*\*[^*\r\n]+:\*\*|[A-Za-z][A-Za-z0-9 _-]*:)\s+"
+    r"`(?P<path>[^`\r\n]+)`\s+snippets?\s+(?P<tail>.*)$"
+)
+MALFORMED_SOURCE_REFERENCE_RE = re.compile(
+    r"^(?P<indent>\s*)>\s*"
+    r"(?P<label>\*\*Source(?: \([^)*\r\n]+\))?:\*\*)\s+"
+    r"`(?P<path>[^`\r\n]+)`(?P<tail>.*)$"
 )
 BACKTICK_CONTENT_RE = re.compile(r"`([^`]+)`")
 FENCE_RE = re.compile(r"`{3,}")
@@ -81,6 +94,7 @@ SOURCE_FILE_SUFFIXES = {
     ".lua",
     ".py",
     ".sh",
+    ".slang",
     ".toml",
     ".usd",
     ".usda",
@@ -404,13 +418,24 @@ def transform_skill_file(
             continue
         skip_quote_separator = False
 
-        if line.lstrip().startswith("```"):
+        if is_fence_line(line):
             inside_fence = not inside_fence
             output_lines.append(line)
             continue
 
+        if inside_fence:
+            output_lines.append(line)
+            continue
+
         match = SKILL_REFERENCE_RE.match(line)
-        if inside_fence or not match:
+        if not match:
+            potential_match = match_potential_skill_reference(line)
+            if potential_match:
+                missing.append(
+                    f"{skill_path.relative_to(skills_dir).as_posix()}:{line_number}: "
+                    f"{skill_reference_error(potential_match.group('label'))}"
+                )
+                unresolved_count += 1
             output_lines.append(line)
             continue
 
@@ -447,6 +472,26 @@ def transform_skill_file(
 
     trailing_newline = "\n" if text.endswith("\n") else ""
     return "\n".join(output_lines) + trailing_newline, expanded_count, unresolved_count, missing
+
+
+def is_fence_line(line: str) -> bool:
+    return line.lstrip().startswith("```")
+
+
+def match_potential_skill_reference(line: str) -> re.Match | None:
+    return (
+        POTENTIAL_SKILL_REFERENCE_RE.match(line)
+        or MALFORMED_SOURCE_REFERENCE_RE.match(line)
+    )
+
+
+def skill_reference_error(label: str) -> str:
+    if SUPPORTED_SOURCE_LABEL_RE.fullmatch(label):
+        return (
+            "malformed snippet reference; expected `**Source:**` (optionally qualified) "
+            "followed by a path and one or more snippet names"
+        )
+    return f"unsupported snippet-reference label `{label}`"
 
 
 def format_snippet_block(snippet: Snippet) -> str:

@@ -41,10 +41,7 @@ def picking_renderer(output_dir):
     # [snippet:doc-create-selection-outline-renderer-python]
     log_file_path = str(output_dir / "picking_selection.ovrtx.log")
 
-    config = ovrtx.RendererConfig(
-        selection_outline_enabled=True,
-        log_file_path=log_file_path,
-    )
+    config = ovrtx.RendererConfig(log_file_path=log_file_path)
     renderer = ovrtx.Renderer(config=config)
     stage = ovstage.Stage("ovrtx.docs.picking")
     renderer.attach_ovstage(stage)
@@ -61,7 +58,6 @@ def styled_selection_renderer(output_dir):
     log_file_path = str(output_dir / "picking_selection_styled.ovrtx.log")
 
     config = ovrtx.RendererConfig(
-        selection_outline_enabled=True,
         selection_outline_width=8,
         selection_fill_mode=ovrtx.SelectionFillMode.GROUP_FILL_COLOR,
         log_file_path=log_file_path,
@@ -166,7 +162,7 @@ def _render_ldr(renderer, ordinal):
         ordinal=ordinal,
     )
     frame = products["/Render/Camera"].frames[0]
-    mapping = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
+    mapping = frame.render_vars["/Render/Camera/LdrColor"].map(device=ovrtx.Device.CPU)
     pixels = np.from_dlpack(mapping).copy()
     mapping.unmap()
     assert pixels.dtype == np.uint8
@@ -215,22 +211,13 @@ def test_marquee_picks_multiple_prims(picking_renderer):
     assert "/World/RightCube" not in picked_paths
 
 
-@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
-def test_pickable_false_excludes_prim(output_dir):
-    renderer = ovrtx.Renderer(
-        ovrtx.RendererConfig(
-            selection_outline_enabled=True,
-            log_file_path=str(output_dir / "picking_selection_pickable.ovrtx.log"),
-        )
-    )
-    renderer.open_usd(TEST_PICKING_PATH)
-    renderer.reset()
-    for _ in range(2):
-        renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60.0)
+def test_pickable_false_excludes_prim(picking_renderer):
+    renderer, stage = picking_renderer
+    ordinal = _load_scene(renderer, stage)
 
     center_hits = _pick_hits(
         renderer,
-        None,
+        ordinal,
         CENTER_LEFT_NDC,
         CENTER_TOP_NDC,
         CENTER_RIGHT_NDC,
@@ -244,10 +231,9 @@ def test_pickable_false_excludes_prim(output_dir):
     renderer.set_pickable(center_path_ids, False)
     # [/snippet:doc-set-pickable-python]
 
-    picked_paths = _pick_paths(renderer, None, 0.0, 0.0, MARQUEE_RIGHT_NDC, 1.0)
+    picked_paths = _pick_paths(renderer, ordinal, 0.0, 0.0, MARQUEE_RIGHT_NDC, 1.0)
     assert "/World/LeftCube" in picked_paths
     assert "/World/CenterCube" not in picked_paths
-    renderer.destroy()
 
 
 def test_selection_outline_group_renders(picking_renderer, output_dir):

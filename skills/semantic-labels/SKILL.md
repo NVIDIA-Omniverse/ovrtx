@@ -15,7 +15,6 @@ description: >
   class/label metadata, configure semantic segmentation labels, or author SemanticsAPI
   overrides.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

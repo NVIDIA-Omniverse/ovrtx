@@ -48,6 +48,8 @@
 // Window dimensions
 constexpr int WINDOW_WIDTH = 1920;
 constexpr int WINDOW_HEIGHT = 1080;
+constexpr int32_t CUDA_DEVICE_ID = 0;
+static constexpr char ACTIVE_CUDA_GPUS[] = "0";
 
 // Selection outline group and its style. Picked prims are assigned to this
 // group; group 0 clears the outline. The style is the per-group outline and
@@ -199,7 +201,7 @@ static auto pending_pick_query_ndc(GLFWwindow* window,
                                    int tex_width,
                                    int tex_height) -> std::optional<PickQueryNdc>;
 static auto find_render_var_output(ovrtx_render_product_set_outputs_t const& outputs,
-                                   std::string_view render_var_name)
+                                   std::string_view render_var_path)
     -> ovrtx_render_var_output_handle_t;
 static bool process_pick_output(ovrtx_renderer_t* renderer,
                                 path_dictionary_instance_t* path_dictionary,
@@ -233,6 +235,9 @@ static auto find_color_output(ovrtx_render_product_set_outputs_t const& outputs,
     -> ovrtx_render_var_output_handle_t;
 
 int main(int argc, char* argv[]) {
+    // Must stay first: this only takes effect before the first CUDA context.
+    cuda_apply_scheduling_workaround();
+
     // Parse command-line arguments
     std::string usd_file_path;
     std::string render_product_path;
@@ -279,6 +284,17 @@ int main(int argc, char* argv[]) {
     ovstage_ordinal_t stage_ordinal = 1;
     ovstage_query_handle_t camera_query = OVSTAGE_INVALID_QUERY_HANDLE;
     GLFWwindow* window = nullptr;
+    bool glfw_initialized = false;
+    auto cleanup_window = [&]() {
+        if (window) {
+            glfwDestroyWindow(window);
+            window = nullptr;
+        }
+        if (glfw_initialized) {
+            glfwTerminate();
+            glfw_initialized = false;
+        }
+    };
 
     // ovrtx owns scene evaluation and rendering; the rest of this sample
     // bridges those results into Vulkan-presentable images.
@@ -289,8 +305,10 @@ int main(int argc, char* argv[]) {
     ovx_string_t ovrtx_package_root = {
         OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx",
         sizeof(OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx") - 1};
+    ovx_string_t active_cuda_gpus = {ACTIVE_CUDA_GPUS, sizeof(ACTIVE_CUDA_GPUS) - 1};
     ovrtx_config_entry_t ovrtx_config_entries[] = {
         ovrtx_config_entry_binary_package_root_path(ovrtx_package_root),
+        ovrtx_config_entry_active_cuda_gpus(active_cuda_gpus),
         ovrtx_config_entry_selection_outline_enabled(true),
         ovrtx_config_entry_selection_outline_width(4),
         ovrtx_config_entry_selection_fill_mode(OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR),
@@ -422,10 +440,10 @@ int main(int argc, char* argv[]) {
     render_products.render_products = &render_product_str;
     render_products.num_render_products = 1;
 
-    // ovrtx creates/uses CUDA internally; we query that context so Vulkan can
-    // be created on the exact same physical device for interop safety.
+    // ovrtx creates/uses CUDA internally. Resolve the configured CUDA ordinal
+    // through that context so Vulkan selects the exact same MIG device.
     CUuuid cuda_uuid;
-    if (!cuda_init(&cuda_uuid)) {
+    if (!cuda_init(CUDA_DEVICE_ID, &cuda_uuid)) {
         std::cerr << "Failed to get CUDA context" << std::endl;
         return cleanup(1);
     }
@@ -496,6 +514,16 @@ int main(int argc, char* argv[]) {
         return cleanup(1);
     }
     DLTensor const& dl = *rendered_output.tensors[0].dl;
+    // [snippet:validate-render-output-cuda-device]
+    if (dl.device.device_type != kDLCUDA || dl.device.device_id != CUDA_DEVICE_ID) {
+        std::cerr << "Render output is on DLPack device type " << dl.device.device_type
+                  << ", device " << dl.device.device_id << "; expected CUDA device "
+                  << CUDA_DEVICE_ID << std::endl;
+        ovrtx_unmap_render_var_output(renderer, rendered_output.map_handle, ovrtx_cuda_sync_t{});
+        ovrtx_destroy_results(renderer, step_result_handle);
+        return cleanup(1);
+    }
+    // [/snippet:validate-render-output-cuda-device]
     int tex_width = static_cast<int>(dl.shape[1]);
     int tex_height = static_cast<int>(dl.shape[0]);
 
@@ -522,6 +550,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Failed to initialize GLFW" << std::endl;
             return cleanup(1);
         }
+        glfw_initialized = true;
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
@@ -530,7 +559,7 @@ int main(int argc, char* argv[]) {
             WINDOW_WIDTH, WINDOW_HEIGHT, "ovrtx-Vulkan Interop", nullptr, nullptr);
         if (!window) {
             std::cerr << "Failed to create window" << std::endl;
-            glfwTerminate();
+            cleanup_window();
             return cleanup(1);
         }
 
@@ -648,8 +677,7 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Failed to import Vulkan image " << i
                           << " into CUDA" << std::endl;
                 cuda_cleanup();
-                glfwDestroyWindow(window);
-                glfwTerminate();
+                cleanup_window();
                 return cleanup(1);
             }
         }
@@ -700,8 +728,7 @@ int main(int argc, char* argv[]) {
                                                    &current_step_result);
             if (check_and_print_error(enqueue_result, "step")) {
                 cuda_cleanup();
-                glfwDestroyWindow(window);
-                glfwTerminate();
+                cleanup_window();
                 return cleanup(1);
             }
 
@@ -711,8 +738,7 @@ int main(int argc, char* argv[]) {
                                          &outputs);
             if (check_and_print_error(result, "fetch_results")) {
                 cuda_cleanup();
-                glfwDestroyWindow(window);
-                glfwTerminate();
+                cleanup_window();
                 return cleanup(1);
             }
 
@@ -727,8 +753,7 @@ int main(int argc, char* argv[]) {
                           << render_product_path << std::endl;
                 ovrtx_destroy_results(renderer, current_step_result);
                 cuda_cleanup();
-                glfwDestroyWindow(window);
-                glfwTerminate();
+                cleanup_window();
                 return cleanup(2);
             }
 
@@ -740,8 +765,7 @@ int main(int argc, char* argv[]) {
             if (check_and_print_error(result, "map_render_var_output")) {
                 ovrtx_destroy_results(renderer, current_step_result);
                 cuda_cleanup();
-                glfwDestroyWindow(window);
-                glfwTerminate();
+                cleanup_window();
                 return cleanup(1);
             }
 
@@ -777,15 +801,13 @@ int main(int argc, char* argv[]) {
             if (check_and_print_error(result, "unmap_render_var_output")) {
                 ovrtx_destroy_results(renderer, current_step_result);
                 cuda_cleanup();
-                glfwDestroyWindow(window);
-                glfwTerminate();
+                cleanup_window();
                 return cleanup(1);
             }
             result = ovrtx_destroy_results(renderer, current_step_result);
             if (check_and_print_error(result, "destroy_results")) {
                 cuda_cleanup();
-                glfwDestroyWindow(window);
-                glfwTerminate();
+                cleanup_window();
                 return cleanup(1);
             }
             has_mapped_output = false;
@@ -809,8 +831,7 @@ int main(int argc, char* argv[]) {
                                                        &current_step_result);
                 if (check_and_print_error(enqueue_result, "step")) {
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
 
@@ -820,24 +841,21 @@ int main(int argc, char* argv[]) {
                                              &outputs);
                 if (check_and_print_error(result, "fetch_results")) {
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
 
                 refresh_render_feedback(
-                    window, accumulation_status, outputs, render_product_path);
+                    nullptr, accumulation_status, outputs, render_product_path);
 
                 OutputType frame_output_type;
-                color_output_handle =
-                    find_color_output(outputs, frame_output_type);
+                color_output_handle = find_color_output(outputs, frame_output_type);
                 if (color_output_handle == OVRTX_INVALID_HANDLE) {
                     std::cerr << "ERROR: could not find output from "
                               << render_product_path << std::endl;
                     ovrtx_destroy_results(renderer, current_step_result);
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(2);
                 }
 
@@ -849,8 +867,7 @@ int main(int argc, char* argv[]) {
                 if (check_and_print_error(result, "map_render_var_output")) {
                     ovrtx_destroy_results(renderer, current_step_result);
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
 
@@ -886,15 +903,13 @@ int main(int argc, char* argv[]) {
                 if (check_and_print_error(result, "unmap_render_var_output")) {
                     ovrtx_destroy_results(renderer, current_step_result);
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
                 result = ovrtx_destroy_results(renderer, current_step_result);
                 if (check_and_print_error(result, "destroy_results")) {
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
                 has_mapped_output = false;
@@ -1064,8 +1079,7 @@ int main(int argc, char* argv[]) {
                                            transform_data) ||
                     commit_ovstage_ordinal(stage, stage_ordinal)) {
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
                 // [/snippet:write-camera-transform]
@@ -1094,8 +1108,7 @@ int main(int argc, char* argv[]) {
                     if (check_and_print_error(enqueue_result,
                                               "enqueue_pick_query")) {
                         cuda_cleanup();
-                        glfwDestroyWindow(window);
-                        glfwTerminate();
+                        cleanup_window();
                         return cleanup(1);
                     }
                     pick_query_submitted = true;
@@ -1115,8 +1128,7 @@ int main(int argc, char* argv[]) {
                                                        &current_step_result);
                 if (check_and_print_error(enqueue_result, "step")) {
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
 
@@ -1126,8 +1138,7 @@ int main(int argc, char* argv[]) {
                                              &outputs);
                 if (check_and_print_error(result, "fetch_results")) {
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
 
@@ -1143,8 +1154,7 @@ int main(int argc, char* argv[]) {
                                              selected_prim_path_ids)) {
                         ovrtx_destroy_results(renderer, current_step_result);
                         cuda_cleanup();
-                        glfwDestroyWindow(window);
-                        glfwTerminate();
+                        cleanup_window();
                         return cleanup(1);
                     }
                 }
@@ -1163,8 +1173,7 @@ int main(int argc, char* argv[]) {
                 if (check_and_print_error(result, "map_render_var_output")) {
                     ovrtx_destroy_results(renderer, current_step_result);
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
 
@@ -1205,15 +1214,13 @@ int main(int argc, char* argv[]) {
                 if (check_and_print_error(result, "unmap_render_var_output")) {
                     ovrtx_destroy_results(renderer, current_step_result);
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
                 result = ovrtx_destroy_results(renderer, current_step_result);
                 if (check_and_print_error(result, "destroy_results")) {
                     cuda_cleanup();
-                    glfwDestroyWindow(window);
-                    glfwTerminate();
+                    cleanup_window();
                     return cleanup(1);
                 }
                 has_mapped_output = false;
@@ -1403,15 +1410,13 @@ int main(int argc, char* argv[]) {
     } catch (std::exception const& e) {
         std::cerr << "Vulkan interop error: " << e.what() << std::endl;
         g_orbit_camera = nullptr;
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        cleanup_window();
         return cleanup(1);
     }
 
     g_orbit_camera = nullptr;
 
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    cleanup_window();
     int cleanup_result = cleanup(0);
     if (cleanup_result != 0) {
         return cleanup_result;
@@ -2179,7 +2184,7 @@ static auto pending_pick_query_ndc(GLFWwindow* window,
 }
 
 static auto find_render_var_output(ovrtx_render_product_set_outputs_t const& outputs,
-                                   std::string_view render_var_name)
+                                   std::string_view render_var_path)
     -> ovrtx_render_var_output_handle_t {
     for (size_t i = 0; i < outputs.output_count; ++i) {
         ovrtx_render_product_output_t const& product_output =
@@ -2190,7 +2195,7 @@ static auto find_render_var_output(ovrtx_render_product_set_outputs_t const& out
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const& var =
                     frame.output_render_vars[v];
-                if (ovx_string_equals(var.render_var_name, render_var_name)) {
+                if (ovx_string_equals(var.render_var_path, render_var_path)) {
                     return var.output_handle;
                 }
             }
@@ -2448,13 +2453,13 @@ static auto find_color_output(ovrtx_render_product_set_outputs_t const& outputs,
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const& var =
                     frame.output_render_vars[v];
-                if (!var.render_var_name.ptr) {
+                if (!var.render_var_path.ptr) {
                     continue;
                 }
 
-                if (ovx_string_equals(var.render_var_name, "HdrColor")) {
+                if (ovx_string_equals(var.source_name, "HdrColor")) {
                     hdr_handle = var.output_handle;
-                } else if (ovx_string_equals(var.render_var_name, "LdrColor")) {
+                } else if (ovx_string_equals(var.source_name, "LdrColor")) {
                     ldr_handle = var.output_handle;
                 }
             }

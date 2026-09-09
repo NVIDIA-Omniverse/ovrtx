@@ -8,6 +8,18 @@ The sample also demonstrates ovrtx viewport picking and selection: left-click pi
 
 Any scene used with picking must restrict the picked RenderProduct to CUDA-visible GPU 0 with `uint[] deviceIds = [0]`.
 
+> **Known driver scheduling interaction on Linux.** The per-frame CUDA wait this sample performs on the mapped output's `cuda_sync.wait_event` can disturb how the renderer's concurrent Vulkan work is scheduled, which stalls that work and reduces throughput. Windows is unaffected. On Linux the sample applies the recommended workaround itself: the first statement of `main()` sets `CUDA_DEVICE_MAX_CONNECTIONS=1`, which lands before ovrtx creates the first CUDA context. A value already present in the environment is left alone, so `CUDA_DEVICE_MAX_CONNECTIONS=8 ./ovrtx-interop` reproduces the original behavior without a rebuild. Either way the sample prints which path it took. Refer to the "CUDA and Vulkan Scheduling on Linux" page in the ovrtx documentation.
+>
+> Reproducing the interaction needs the renderer to be submitting Vulkan work *while* a CUDA wait is outstanding.
+
+## Selecting the Vulkan device
+
+CUDA ordinals in this sample are process-visible indices after `CUDA_VISIBLE_DEVICES` is applied. The sample configures ovrtx for CUDA device `0` and requires the RenderProduct to use `uint[] deviceIds = [0]`. It resolves that ordinal once with `cuDeviceGet()` and obtains its exact interop identity with `cuDeviceGetUuid_v2()`. Vulkan selects the `VkPhysicalDevice` whose `VkPhysicalDeviceIDProperties::deviceUUID` contains the same 16 bytes.
+
+Use `cuDeviceGetUuid_v2()` explicitly. On MIG systems, `cudaGetDeviceProperties().uuid` and the legacy `cuDeviceGetUuid()` can return the parent GPU UUID shared by sibling MIG devices. PCI bus identity is also parent-scoped and must not be used to distinguish MIG devices.
+
+Mapped CUDA outputs carry the actual process-visible CUDA ordinal in `DLTensor.device.device_id`. A simple application can validate that value once against its configured device. A multi-GPU application should use it to route each output to the Vulkan context cached for that CUDA ordinal.
+
 > _“Create a C++ interactive viewer that renders ovrtx camera output directly into a Vulkan presentation path through CUDA interop, with GPU selection, GPU image mapping, exported-image copies, explicit synchronization, double buffering, orbit camera controls, finite-frame capture, and click or marquee picking with selection outlines.”_
 
 ![example-vulkan-interop](../../../img/example-vulkan-interop.gif)

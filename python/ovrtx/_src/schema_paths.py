@@ -20,11 +20,9 @@ call, or implicitly from ``ovrtx_initialize`` / ``ovrtx_create_renderer``.
 This module previously duplicated the path-resolution and env-var-update
 logic in pure Python. The duplicate has been removed because USD's plug
 registry contract (one-shot per process during ``Plug_InitConfig``) made
-keeping two implementations in sync error-prone — when the C side picked up
-the renamed ``OV_PXR_PLUGINPATH_2511`` env-var via the ``OV_OPENUSD_PLUGINPATH``
-build macro, the Python copy silently diverged and broke schema discovery
-in co-load scenarios with peer subsystems. A single source of truth in C
-avoids that class of drift entirely.
+keeping two implementations in sync error-prone. A single source of truth in
+C avoids that class of drift entirely. :func:`usd_plugin_paths` exposes the
+same resolved directory list without mutating plugin-path environment vars.
 """
 
 from __future__ import annotations
@@ -38,39 +36,33 @@ from typing import Optional, Tuple
 from . import bindings as _bindings
 from .bindings import (
     OVRTX_LOADER_LIB_NAME,
+    ConfigStringKey,
+    ovrtx_config_entry_string,
     ovrtx_config_t,
     ovrtx_loader_candidate_dirs,
     ovrtx_result_t,
+    ovx_string_t,
 )
 
 # Highest-precedence root override env-var. The C resolver in
 # ``CRenderApiLibLoader::registerSchemaPathsIfNeeded`` consults this before
-# falling back to the loader's own location (``GetModuleFileName`` / ``dladdr``);
-# we forward ``binary_package_root`` through it because ovrtx_config_t doesn't
-# yet have a string-key for the binary package root.
+# falling back to the loader's own location (``GetModuleFileName`` / ``dladdr``).
+# ``register_schema_paths`` forwards ``binary_package_root`` through it (documented
+# side effect); ``usd_plugin_paths`` forwards through the
+# ``OVRTX_CONFIG_BINARY_PACKAGE_ROOT_PATH`` config entry instead and performs no
+# env mutation.
 _BASE_PATH_ENV_KEY: str = "OMNI_USD_PLUGINS_BASE_PATH"
 
 # Optional override for the RTX settings plugin directory name (consumed by the
 # ``OMNI_USD_RTX_SETTINGS_PATH`` lookup in ``registerUsdPluginPathsBody``).
 _RTX_SETTINGS_ENV_KEY: str = "OMNI_USD_RTX_SETTINGS_PATH"
 
-# Env-var keys USD's plug registry consults during ``Plug_InitConfig``. The
-# C-side body writes to ``OV_OPENUSD_PLUGINPATH`` (build-time-configured —
-# currently ``OV_PXR_PLUGINPATH_2511`` for the bundled OpenUSD 25.11; see
-# ``OV_OPENUSD_PLUGINPATH`` in ``rendering/premake5.lua`` and ``_BUNDLED_USD_VERSION``
-# in ``bindings.py``) and, only when ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1`` is
-# set, also to the OpenUSD upstream default ``PXR_PLUGINPATH_NAME`` for any
-# non-renamed peer USD that may also be co-loaded into the process.
-# Surfaced here so tests / integrators that want to snapshot env state don't
-# have to know which renamed key the C macro currently points at.
+# Env-var keys USD's plug registry consults during ``Plug_InitConfig``. The C
+# body always writes the renamed bundled-USD key and writes upstream
+# ``PXR_PLUGINPATH_NAME`` only when ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1``.
 #
-# Drift guard: the test
-# ``test.ovrtx.python/test_schema_auto_register.py::test_every_advertised_key_is_actually_written``
-# asserts (with the ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1`` opt-in set) that
-# every key in this tuple gets populated by the C body, so a USD version
-# bump that changes ``OV_OPENUSD_PLUGINPATH`` (or otherwise stops the C side
-# from writing to one of these keys) without updating this list will fail
-# in CI.
+# Drift guard: ``test.ovrtx.python/test_schema_auto_register.py`` uses this
+# tuple to check that every advertised key gets populated under the opt-in.
 _PXR_PLUGINPATH_ENV_KEYS: Tuple[str, ...] = (
     "OV_PXR_PLUGINPATH_2511",
     "PXR_PLUGINPATH_NAME",
@@ -80,10 +72,8 @@ _PXR_PLUGINPATH_ENV_KEYS: Tuple[str, ...] = (
 def usd_pluginpath_env_keys() -> Tuple[str, ...]:
     """Env-var keys that :func:`register_schema_paths` reads or writes.
 
-    Output keys (USD's plug registry reads these — see
-    ``_PXR_PLUGINPATH_ENV_KEYS``) followed by the input overrides the C
-    resolver consults. Tests use this to snapshot/restore env state without
-    hard-coding the list of keys.
+    Output keys are followed by the input overrides the C resolver consults.
+    Tests use this to snapshot/restore env state without hard-coding the list.
     """
     return (
         *_PXR_PLUGINPATH_ENV_KEYS,
@@ -240,3 +230,91 @@ def register_schema_paths(binary_package_root: Optional[str] = None) -> None:
                 os.environ[key] = os.fsdecode(raw)
     except Exception:  # noqa: BLE001 — see comment above
         pass
+
+
+def usd_plugin_paths(binary_package_root: Optional[str] = None) -> Tuple[str, ...]:
+    """Enumerate ovrtx's USD schema/plugin directories.
+
+    Thin wrapper over the C-side :c:func:`ovrtx_get_usd_plugin_path_count` and
+    :c:func:`ovrtx_get_usd_plugin_paths`. Returns the ordered list of directories
+    ovrtx contributes as USD schema/plugin discovery paths (bundled schema
+    plugins followed by the RTX settings directory).
+
+    Intended use: when the same process also uses an OpenUSD runtime outside
+    ovrtx (for example ``usd-core`` in Python), call this to obtain ovrtx's
+    contributions, filter out any directories that would collide with the host
+    runtime's built-in schemas (e.g. drop ``usd_particle_field`` on OpenUSD
+    versions that already ship ``UsdVol`` particle schemas), and append the
+    remainder to ``PXR_PLUGINPATH_NAME`` **before** that external runtime opens
+    its first stage. After the first stage open, USD's schema registry is
+    populated and later ``PXR_PLUGINPATH_NAME`` changes have no retroactive
+    effect.
+
+    Pinned-root behavior: if ovrtx has already registered plugin paths (via
+    ``import ovrtx`` auto-register, :func:`register_schema_paths`,
+    ``ovrtx_initialize``, or ``ovrtx_create_renderer``), this function returns
+    paths for the **pinned** effective root. If ``binary_package_root`` resolves
+    to a different root, the C side logs a mismatch warning to stderr and
+    substitutes the pinned root — the goal is to keep the directories you
+    publish to ``PXR_PLUGINPATH_NAME`` consistent with what ovrtx's bundled
+    OpenUSD actually registered.
+
+    Args:
+        binary_package_root: Optional override for the ovrtx binary package
+            root. Forwarded to the C resolver as the
+            ``OVRTX_CONFIG_BINARY_PACKAGE_ROOT_PATH`` config entry — no
+            environment variable is written. Matching the C API's precedence,
+            a set ``OMNI_USD_PLUGINS_BASE_PATH`` env var takes priority over
+            this argument; when ``None`` the C resolver uses the env var or
+            the loader library directory.
+
+            .. note::
+               Enumeration participates in the same first-call-wins root pin
+               as registration: the first of :func:`usd_plugin_paths`,
+               :func:`register_schema_paths`, ``ovrtx_initialize``, or
+               ``ovrtx_create_renderer`` to run pins the effective root for
+               the process; later calls resolving a different root warn on
+               stderr and act on the pinned root instead.
+
+    Returns:
+        Ordered tuple of directory paths (each an ``str``). Empty tuple if the
+        C API reports no paths (unexpected — signals a broken install).
+    """
+    lib = _load_loader_lib()
+
+    # ovrtx_get_usd_plugin_path_count(const ovrtx_config_t*) -> size_t
+    lib.ovrtx_get_usd_plugin_path_count.argtypes = [ctypes.POINTER(ovrtx_config_t)]
+    lib.ovrtx_get_usd_plugin_path_count.restype = ctypes.c_size_t
+    # ovrtx_get_usd_plugin_paths(const ovrtx_config_t*, ovx_string_t*, size_t) -> size_t
+    lib.ovrtx_get_usd_plugin_paths.argtypes = [
+        ctypes.POINTER(ovrtx_config_t),
+        ctypes.POINTER(ovx_string_t),
+        ctypes.c_size_t,
+    ]
+    lib.ovrtx_get_usd_plugin_paths.restype = ctypes.c_size_t
+
+    # Forward the root override through the config struct (the same
+    # OVRTX_CONFIG_BINARY_PACKAGE_ROOT_PATH entry a C caller would use) so this
+    # function performs no environment mutation at all.
+    config_ref = None
+    if binary_package_root:
+        config = ovrtx_config_t(
+            [ovrtx_config_entry_string(ConfigStringKey.BINARY_PACKAGE_ROOT_PATH, binary_package_root)]
+        )
+        config_ref = ctypes.byref(config)
+
+    count = lib.ovrtx_get_usd_plugin_path_count(config_ref)
+    if count == 0:
+        return ()
+
+    buffer = (ovx_string_t * count)()
+    # The count call above pinned the effective root (first-call-wins, shared with
+    # registration), so this fill call resolves the same root and `written == count`.
+    # Iterate `min` anyway so a future contract change cannot turn into a NULL deref.
+    written = lib.ovrtx_get_usd_plugin_paths(config_ref, buffer, count)
+    return tuple(
+        # os.fsdecode matches Python's normal filesystem-path decoding (fsencode
+        # round-trip via surrogateescape) instead of mangling non-UTF-8 bytes.
+        os.fsdecode(ctypes.string_at(buffer[i].ptr, buffer[i].length))
+        for i in range(min(count, written))
+    )

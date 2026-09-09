@@ -16,7 +16,6 @@ description: >
   Use when the user asks to upgrade from ovrtx 0.3 to 0.4, remove ovrtx 0.4
   deprecation warnings, or adopt ovstage interop in an existing ovrtx project.
 license: LicenseRef-NvidiaProprietary
-version: "0.4.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -125,7 +124,7 @@ schedule, and warnings remain enabled by default.
 ## Instructions
 
 1. Update dependencies first. Install the ovstage 0.1 Python wheel alongside ovrtx 0.4.
-2. Create one externally owned `ovstage.Stage` for scene data. Keep the instance alive until it has been detached from every renderer.
+2. Create one externally owned `ovstage.Stage` for scene data. A Stage may be attached to only one renderer at a time; detach it before attaching it to another renderer, and keep it alive until detached.
 3. Move USD population from `Renderer.open_usd*` to `ovstage.population.open_usd*`.
 4. Move reference add, remove, and reset operations to `ovstage.population`. Follow source edits with `apply_usd_changes` at the application-owned ordinal. Move time-sampled updates to ovstage population's USD-time operation.
 5. Publish each completed mutation by advancing the ovstage write floor to the operation's ordinal. Do not render an ordinal above the current write floor.

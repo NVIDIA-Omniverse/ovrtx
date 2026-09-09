@@ -22,6 +22,8 @@
 
 ---@class SpgArgWrapper  Wrapped kernel argument (returned by dtype call, TextureObject, SurfaceObject, array)
 
+---@class SpgStateful  The cuda.stateful marker
+
 ---@class SpgResourceDesc  Describes a GPU resource (texture/buffer) shape and type
 ---@field shape integer[]   Dimensions in [height, width] order (tensor convention)
 ---@field dtype SpgDtype    Data type of the resource
@@ -61,23 +63,29 @@
 ---@field half4 SpgDtype     Half x4 (16-bit float, 4 lanes) — HDR image format
 ---@field int64 SpgDtype     Int64 (64-bit, 1 lane)
 ---@field uint64 SpgDtype    Unsigned int64 (64-bit, 1 lane)
+---@field stateful SpgStateful  Marker: keep an output's memory across frames
 cuda = {}
 
 --- Create a 2D output image descriptor. Shape is stored as [height, width] (tensor convention).
+--- Pass `cuda.stateful` to keep the resource across frames.
 ---@param width integer   Image width in pixels
 ---@param height integer  Image height in pixels
 ---@param dtype SpgDtype  Pixel data type (e.g., `cuda.uchar4`)
+---@param flag? SpgStateful Pass `cuda.stateful` for a persistent output
 ---@return SpgResourceDesc
-function cuda.image(width, height, dtype) end
+function cuda.image(width, height, dtype, flag) end
 
 --- Create an output tensor descriptor from a shape table.
+--- Pass `cuda.stateful` to keep the resource across frames.
 ---@param shape integer[]  Dimensions (e.g., `{height, width}` for 2D)
 ---@param dtype SpgDtype   Element data type
+---@param flag? SpgStateful Pass `cuda.stateful` for a persistent output
 ---@return SpgResourceDesc
-function cuda.empty(shape, dtype) end
+function cuda.empty(shape, dtype, flag) end
 
 --- Define the CUDA kernel launch configuration.
----@param config { args: SpgArgWrapper[], block: integer[], grid: integer[] }
+--- `block` and `grid` are optional: left out, they are derived from the first output's shape.
+---@param config { args: SpgArgWrapper[], block?: integer[], grid?: integer[], sharedMemSize?: integer }
 ---@return SpgKernelConfig
 function cuda.kernel(config) end
 
@@ -91,11 +99,13 @@ function cuda.TextureObject(input) end
 ---@return SpgArgWrapper
 function cuda.SurfaceObject(output) end
 
---- Create an array argument. Two modes:
+--- Create an array argument. Four modes:
 --- - `cuda.array(resourceDesc)` — wrap a resource as a raw device pointer
 --- - `cuda.array(luaTable, dtype)` — create an array from Lua data (uploaded to GPU)
----@param data table|SpgResourceDesc  Lua table of values, or a resource descriptor
----@param dtype? SpgDtype             Element type (required for Lua table mode)
+--- - `cuda.array(assetInput, dtype)` — upload an `asset` value-input's raw bytes
+--- - `cuda.array(tokenInput)` — a `token` value-input as a null-terminated `const char*`
+---@param data table|SpgResourceDesc  Lua table of values, a resource descriptor, or a value-input
+---@param dtype? SpgDtype             Element type (required for Lua table and asset modes)
 ---@return SpgArgWrapper
 function cuda.array(data, dtype) end
 

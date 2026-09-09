@@ -14,7 +14,6 @@ description: >
   Use when user asks to create a lidar scene, configure an OmniLidar prim, choose lidar
   output frame/coordinate behavior, or request lidar PointCloud channels.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -102,7 +101,7 @@ These attributes, among others, live on the lidar prim with the `omni:sensor:Cor
 | `outputMotionCompensationState` | `NONCOMPENSATED`, `COMPENSATED` | Motion compensation state for all outputs, including auxiliary data. |
 | `outputFrameOfReference` | `SENSOR`, `WORLD`, `CUSTOM` | Frame of reference for all outputs. Prefer `SENSOR` when downstream consumers expect sensor-frame points. |
 | `customFrameOfReferenceTrafo` | `[x, y, z, roll, pitch, yaw]` | Custom transform used only with `outputFrameOfReference = CUSTOM`. |
-| `includeInvalidPoints` | `true`, `false` | When `false`, the model drops invalid lidar returns before output. When `true`, invalid returns are preserved in the point tensors and consumers must use the `Flags` channel's `VALID` bit to distinguish valid from invalid entries. |
+| `includeInvalidPoints` | `true`, `false` | When `false` (the default), the model drops invalid lidar returns before output. When `true`, invalid returns are preserved in the point tensors and consumers must use the `Flags` channel's `VALID` bit to distinguish valid from invalid entries. |
 
 OmniLidar prims expose many additional sensor, scan, and emitter attributes for range, angular coverage, resolution, timing, firing patterns, and model-specific behavior. Preserve existing attributes when editing a tuned sensor, and author model-specific values from the schema when the example defaults are not enough.
 
@@ -125,7 +124,7 @@ For the full schema-derived attribute list, read `schemas/omni_sensors/schema.us
 
 > **Source:** `examples/c/lidar/lidar_example.usda` snippet `configure-lidar-pointcloud-output`
 
-For public ovrtx examples, prefer `sourceName = "PointCloud"` when the application only needs selected point-cloud channels. Request only the channels needed by the consumer to keep memory use down.
+`sourceName = "PointCloud"` is the lidar sensor render output. Request only the channels needed by the consumer to keep memory use down.
 
 Common lidar channels:
 
@@ -139,15 +138,13 @@ Common lidar channels:
 | `MaterialId`, `ObjectId` | Hit material and object identifiers. |
 | `HitNormal`, `Velocity` | Surface normal and velocity at the hit point. |
 | `TickState` | State of the scan tick. |
-| `Counts` | ovrtx examples use this as the valid point count before reading per-point tensors. |
-
-Use `GenericModelOutput` only when a consumer specifically needs the traditional packed sensor model output. For composite tensor workflows, `PointCloud` is the clearer default.
+| `Counts` | Delivered point entry count used to bound every per-point tensor. With default invalid-point dropping, it is also the valid-point count. |
 
 ## Troubleshooting
 
 - Output-defining attributes are not intended for runtime mutation; author them in USD before loading the scene.
-- `PointCloud` only contains requested channels. If a downstream reader expects `Intensity` or `TimeOffsetNs`, include those names in `string[] channels`.
-- `Counts` defines the valid range in per-point tensors. Do not iterate over the full tensor allocation.
+- `PointCloud` contains requested payload channels plus model-added `Counts` and `Flags`. If a downstream reader expects `Intensity` or `TimeOffsetNs`, include those names in `token[] channels`.
+- `Counts` defines the delivered range in per-point tensors. Do not iterate over the full tensor allocation.
 - If `includeInvalidPoints = true`, `Counts` bounds the delivered entries, but entries inside that range can still be invalid; test `Flags[i] & VALID` before consuming point attributes that require a real return.
 - MotionBVH is required for correct lidar motion effects. Static scenes may run without it, but moving objects or motion compensation need MBVH enabled through the renderer configuration.
 - Lidar output frame and visualizer frame are separate concerns. If output is in `SENSOR` frame, configure the visualizer to interpret that frame instead of changing the sensor to `WORLD` unless world-frame output is actually desired.

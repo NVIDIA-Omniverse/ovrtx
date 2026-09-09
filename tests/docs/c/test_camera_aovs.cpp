@@ -113,7 +113,7 @@ def "Render" {
     // [snippet:doc-camera-aov-smoke-test-c]
     // LdrColor: RGBA uint8 -- shape (H, W, 4), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "LdrColor");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/LdrColor");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
@@ -134,7 +134,7 @@ def "Render" {
 
     // HdrColor: RGBA float16 -- shape (H, W, 4), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "HdrColor");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/HdrColor");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
@@ -154,7 +154,7 @@ def "Render" {
 
     // NormalSD: XYZA float32 -- shape (H, W, 4), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "NormalSD");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/NormalSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
@@ -174,7 +174,7 @@ def "Render" {
 
     // DepthSD: Z float32 -- shape (H, W, 1), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "DepthSD");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/DepthSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
@@ -195,7 +195,7 @@ def "Render" {
 
     // DistanceToCameraSD: Z float32 -- shape (H, W, 1), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "DistanceToCameraSD");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/DistanceToCameraSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
@@ -215,7 +215,7 @@ def "Render" {
 
     // DistanceToImagePlaneSD: Z float32 -- shape (H, W, 1), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "DistanceToImagePlaneSD");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/DistanceToImagePlaneSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
@@ -235,7 +235,7 @@ def "Render" {
 
     // DiffuseAlbedoSD: RGBA uint8 -- shape (H, W, 4), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "DiffuseAlbedoSD");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/DiffuseAlbedoSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,
@@ -256,7 +256,7 @@ def "Render" {
 
     // Camera3dPositionSD: XYZA float32 -- shape (H, W, 4), scalar lanes
     {
-        ovrtx_render_var_output_handle_t handle = find_output(outputs, "Camera3dPositionSD");
+        ovrtx_render_var_output_handle_t handle = find_output(outputs, "/Render/Camera/Camera3dPositionSD");
         ASSERT_NE(handle, OVRTX_INVALID_HANDLE);
         ovrtx_render_var_output_t output = {};
         result = ovrtx_map_render_var_output(renderer_, handle, &map_desc,

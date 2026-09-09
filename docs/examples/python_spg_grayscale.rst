@@ -16,10 +16,6 @@ The "hello world" of Sensor Processing Graphs. A custom CUDA kernel converts the
 ``LdrGrayscale`` AOV. This is the minimal three-file SPG shader (``.cu`` kernel, ``.cu.lua``
 launch script, ``.usda`` shader definition) wired into a ``RenderProduct``.
 
-This example uses the deprecated renderer scene-loading API so it can remain
-focused on SPG authoring. Use the 0.3-to-0.4 migration skill when moving scene
-management to ovstage.
-
 .. pull-quote::
 
    *“Create the smallest useful SPG example: a CUDA kernel that converts the LdrColor render output to grayscale, wired into a RenderProduct and read back from Python as a new AOV.”*
@@ -43,6 +39,11 @@ Running
    uv run main.py
 
 The first step compiles the CUDA kernel with NVRTC and can block for up to a minute on a fresh
-shader cache. A successful run writes ``_output/input.png`` and ``_output/grayscale.png``.
+shader cache. A successful run writes ``_output/input.png`` and ``_output/grayscale.png``, which
+is the same image with the colour taken out.
 
-See the :doc:`../spg/index` documentation for the full authoring reference.
+The run checks ``R == G == B`` in every pixel of the output, which the renderer's own
+``LdrColor`` does not satisfy, and tests the input as well so that a node which never ran cannot
+pass on a scene that was already grey. A failing check exits non-zero.
+
+See the :doc:`../spg/overview` documentation for the full authoring reference.

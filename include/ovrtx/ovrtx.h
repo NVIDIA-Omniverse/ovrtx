@@ -101,10 +101,10 @@ extern "C"
      * subsystems (for example ovrtx and ovphysx). USD's schema registry and several
      * TfEnvSettings are populated only once for the process, so every subsystem that
      * contributes schema/plugin paths or USD-facing path environment must publish them
-     * before the registry is first consulted (typically when the first stage is opened).
-     * Each subsystem calls its own equivalent (e.g.
-     * `ovphysx_prepare_usd_plugins()`, `ovrtx_register_schema_paths(...)`) before any of
-     * them initialize, after which the order of initialize calls no longer matters.
+     * before OpenUSD is loaded: USD reads its plugin-path variable as its libraries
+     * load, and anything published after that is never seen. Each subsystem calls its
+     * own equivalent first, after which the order of initialize calls no longer
+     * matters.
      *
      * Binary package root resolution (highest precedence first):
      *  1. The `OMNI_USD_PLUGINS_BASE_PATH` environment variable, if set.
@@ -121,9 +121,8 @@ extern "C"
      *
      * Notes:
      * - Safe to call before @ref ovrtx_initialize() and before @ref ovrtx_create_renderer().
-     * - Also publishes the same process environment that the ovrtx loader sets before
-     *   loading ovrtx.dylib (Hydra/USD toggles, MDL search paths, MaterialX search
-     *   paths, and resolver MDL-bypass env).
+     * - Publishes the process-global environment required before OpenUSD initializes:
+     *   Hydra/USD toggles, MDL and MaterialX search paths, and the resolver's MDL bypass.
      * - Idempotent for matching roots: the first call performs registration; subsequent
      *   calls with the same effective root are no-ops.
      * - **First-call wins.** Once schema/plugin paths have been registered against an
@@ -132,8 +131,11 @@ extern "C"
      *   warning to stderr and are no-ops; `PXR_PLUGINPATH_NAME` stays anchored at the
      *   first-registered root (the contract is one-shot per process, since USD's plug
      *   system reads it once during static initialization).
-     * - Calling this after USD has already been loaded and the schema registry populated
-     *   has no retroactive effect on previously-discovered schemas.
+     * - Also registers the same schemas with ovstage, when ovstage is loaded, so an
+     *   attached ovstage resolves them as it populates. Call before ovstage's first
+     *   populate. Never loads ovstage itself.
+     * - Calling this after USD has already been loaded has no retroactive effect on the
+     *   plugin-path keys, which were bound at load.
      * - This function does not allocate the ovrtx system, start Carbonite, load renderer
      *   plugins, or apply general Carb settings; it only adjusts process-global
      *   environment used by USD discovery and USD-facing MDL/MaterialX setup.
@@ -144,6 +146,70 @@ extern "C"
      *         return-value rule above.)
      */
     ovrtx_result_t ovrtx_register_schema_paths(const ovrtx_config_t* config);
+
+    /**
+     * Number of USD schema/plugin directories ovrtx contributes for @p config.
+     *
+     * Companion to @ref ovrtx_get_usd_plugin_paths(): use this to size the destination
+     * array, then fill it in a follow-up call. Does not touch any environment variable
+     * and does not initialize the renderer. Same root-resolution rules as
+     * @ref ovrtx_get_usd_plugin_paths() (see that function's docstring for the
+     * first-call-wins pin).
+     *
+     * @param config Optional configuration (may be NULL). Root resolution matches
+     *               @ref ovrtx_register_schema_paths().
+     * @return Number of directories that @ref ovrtx_get_usd_plugin_paths() will
+     *         populate when given sufficient capacity.
+     */
+    size_t ovrtx_get_usd_plugin_path_count(const ovrtx_config_t* config);
+
+    /**
+     * Enumerate ovrtx's USD schema/plugin directories for @p config into
+     * @p out_paths, without mutating any environment variable.
+     *
+     * Intended use: when a process co-loads a separate OpenUSD runtime that reads
+     * `PXR_PLUGINPATH_NAME` (for example `usd-core` in Python), the integrator calls
+     * this to obtain ovrtx's contributions, filters out any directories that would
+     * collide with the host runtime's built-in schemas (e.g. drop `usd_particle_field`
+     * on OpenUSD versions that already ship `UsdVol` particle schemas), and appends
+     * the remainder to `PXR_PLUGINPATH_NAME` **before** the external runtime opens
+     * its first stage. See the timing note on @ref ovrtx_register_schema_paths()
+     * for why "before the first stage open" is critical.
+     *
+     * Root resolution and first-call-wins pin:
+     *   Root resolution matches @ref ovrtx_register_schema_paths()
+     *   (`OMNI_USD_PLUGINS_BASE_PATH` env, then `OVRTX_CONFIG_BINARY_PACKAGE_ROOT_PATH`
+     *   from @p config, then the loader library directory). Enumeration participates
+     *   in the same first-call-wins pin as registration: whichever of this function,
+     *   @ref ovrtx_register_schema_paths(), @ref ovrtx_initialize(), or
+     *   @ref ovrtx_create_renderer() runs first pins the effective root for the
+     *   process. A later call resolving a different root logs a mismatch warning to
+     *   stderr and acts on the **pinned** root — enumeration returns the pinned
+     *   root's paths, and registration registers the pinned root. This keeps the
+     *   directories the integrator publishes to `PXR_PLUGINPATH_NAME` consistent
+     *   with what ovrtx's bundled OpenUSD actually registers, regardless of the
+     *   order the two APIs are called in.
+     *
+     * String lifetime:
+     *   Each returned @ref ovx_string_t points into storage owned by the ovrtx loader
+     *   and remains valid for the lifetime of the process. Callers must NOT free the
+     *   `ptr` fields or otherwise modify the underlying bytes.
+     *
+     * @param config              Optional configuration (may be NULL). Root
+     *                            resolution matches @ref ovrtx_register_schema_paths().
+     * @param out_paths           Destination array. May be NULL when @p out_paths_capacity
+     *                            is 0 — in that case only the count is returned. When
+     *                            non-NULL, the first `min(count, capacity)` entries are
+     *                            populated in a stable order (bundled schema plugins
+     *                            first, then the rtx_settings directory).
+     * @param out_paths_capacity  Number of `ovx_string_t` slots available in @p out_paths.
+     * @return                    The total number of ovrtx plugin directories available
+     *                            for @p config (unchanged by capacity — a return value
+     *                            greater than @p out_paths_capacity signals truncation).
+     */
+    size_t ovrtx_get_usd_plugin_paths(const ovrtx_config_t* config,
+                                      ovx_string_t* out_paths,
+                                      size_t out_paths_capacity);
 
     /**
      * Initialize the ovrtx loader or increase its ref count.
@@ -204,9 +270,11 @@ extern "C"
      * attached, the renderer renders the scene held by that ovstage instead of
      * one it builds itself.
      *
-     * Must be called before the first step, and matched by ovrtx_detach_ovstage()
-     * before either the renderer or the stage is destroyed. Re-attaching or
-     * swapping the attached stage is not currently supported.
+     * Must be matched by ovrtx_detach_ovstage() before either the renderer or
+     * the stage is destroyed. To switch stages, detach the current stage before
+     * attaching another.
+     * At most one ovrtx renderer may be attached to an ovstage instance at a
+     * time. The stage may be attached to another renderer after it is detached.
      *
      * Use ovrtx_update_from_stage() after ovstage population work and
      * ovrtx_step_with_stage() to render a committed stage state.
@@ -216,7 +284,8 @@ extern "C"
      * @return
      * - **OVRTX_API_SUCCESS** if the renderer was attached successfully,
      * - **OVRTX_API_ERROR** if the renderer is already attached, the stage is
-     *   invalid, or the attach failed.
+     *   already attached to another ovrtx renderer, the stage is invalid, or
+     *   the attach failed.
      */
     ovrtx_result_t ovrtx_attach_ovstage(ovrtx_renderer_t* renderer,
                                          ovstage_instance_t* stage);
@@ -227,7 +296,8 @@ extern "C"
      * The renderer returns to standalone mode and no longer renders data from
      * the detached stage.
      *
-     * Attaching a different stage after detach is not currently supported.
+     * After a successful detach, the renderer may attach the same or a different
+     * initialized stage.
      *
      * @param renderer Renderer instance previously passed to ovrtx_attach_ovstage().
      * @return
@@ -717,11 +787,12 @@ extern "C"
      * @param render_products Render products to simulate during this simulation step.
      *                        Accumulated sensor rendering history for all render products not in the
      *                        provided set will be discarded.
-     * @param delta_time Time step to simulate
+     * @param delta_time Finite, non-negative time step within the supported simulation time range
      * @param out_step_result_handle [out] Handle to the step result
      * @return
      * - **OVRTX_API_SUCCESS** if the step was enqueued successfully,
-     * - **OVRTX_API_ERROR** if the step enqueue failed.
+     * - **OVRTX_API_ERROR** if the step enqueue failed, or if @p render_products is malformed:
+     *   a null array with a non-zero count, or any entry with a null `ptr`.
      */
     ovrtx_enqueue_result_t ovrtx_step(ovrtx_renderer_t* instance,
                                     ovrtx_render_product_set_t render_products,
@@ -737,13 +808,14 @@ extern "C"
      *
      * @param instance Renderer instance (must be attached to an ovstage).
      * @param render_products Render products to simulate during this step.
-     * @param delta_time Time step to simulate.
+     * @param delta_time Finite, non-negative time step within the supported simulation time range.
      * @param ordinal ovstage ordinal selecting the committed state to render.
      * @param out_step_result_handle [out] Handle to the step result.
      * @return
      * - **OVRTX_API_SUCCESS** if the step was enqueued successfully,
      * - **OVRTX_API_ERROR** if the renderer is not attached, the ordinal is not
-     *   committed, or the enqueue failed.
+     *   committed, the enqueue failed, or @p render_products is malformed: a null
+     *   array with a non-zero count, or any entry with a null `ptr`.
      */
     ovrtx_enqueue_result_t ovrtx_step_with_stage(
         ovrtx_renderer_t* instance,
@@ -781,9 +853,9 @@ extern "C"
      * arrays of length @p path_count.
      * Duplicate prim path ids are allowed; the last occurrence wins.
      *
-     * The operation is renderer-only and stream-ordered: it does not write to Fabric
-     * or an attached ovstage, and it takes effect on the next @ref ovrtx_step or
-     * @ref ovrtx_step_with_stage that occurs after this op completes.
+     * The operation is renderer-only and stream-ordered: it does not write scene
+     * attributes or mutate an attached ovstage, and it takes effect on the next
+     * @ref ovrtx_step or @ref ovrtx_step_with_stage that occurs after this op completes.
      */
     ovrtx_enqueue_result_t ovrtx_set_selection_outline_group(ovrtx_renderer_t* instance,
                                                              const ovx_primpath_t* prim_path_ids,
@@ -815,9 +887,9 @@ extern "C"
      * arrays of length @p path_count.
      * False excludes a prim from viewport picking where supported.
      *
-     * The operation is renderer-only and stream-ordered: it does not write to Fabric
-     * or an attached ovstage, and it takes effect on the next @ref ovrtx_step or
-     * @ref ovrtx_step_with_stage that occurs after this op completes.
+     * The operation is renderer-only and stream-ordered: it does not write scene
+     * attributes or mutate an attached ovstage, and it takes effect on the next
+     * @ref ovrtx_step or @ref ovrtx_step_with_stage that occurs after this op completes.
      */
     ovrtx_enqueue_result_t ovrtx_set_pickable(ovrtx_renderer_t* instance,
                                               const ovx_primpath_t* prim_path_ids,
@@ -872,7 +944,7 @@ extern "C"
      * render products and start future sensor simulation steps at the provided time.
      * After the reset was executed, last_step_time will be updated to the provided time for the next call to ovrtx_step().
      * @param instance Renderer instance
-     * @param time Time to reset the simulation to
+     * @param time Finite, non-negative time within the supported simulation time range
      * @return
      * - **OVRTX_API_SUCCESS** if the reset was enqueued successfully,
      * - **OVRTX_API_ERROR** if the reset enqueue failed.
@@ -1061,16 +1133,18 @@ extern "C"
      */
 
     /**
-     * Query for an internal extension interface by name.
+     * Query for an extension interface by name.
+     *
+     * This query entry point is part of the public OVRTX C API.
+     * All extension names and vtable contracts are internal.
+     *
      * @param name The name of the extension
      * @param vtable [out] Vtable with function pointers for the extension
      * @return
      * - **OVRTX_API_SUCCESS** if the extension was queried successfully,
-     * - **OVRTX_API_ERROR** if the extension is unavailable or if the system is not initialized yet.
+     * - **OVRTX_API_ERROR** if unavailable, or if this extension requires initialization.
      */
-   ovrtx_result_t ovrtx_query_extension(const char* name,
-        const void** vtable);
-
+    ovrtx_result_t ovrtx_query_extension(const char* name, const void** vtable);
 
     /** @} */ // end of ovrtx_extension
 

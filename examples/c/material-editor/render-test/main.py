@@ -57,7 +57,7 @@ def main():
     # Map the final frame
     for _product_name, product in products.items():
         for frame in product.frames:
-            with frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU) as var:
+            with frame.render_vars["/Render/Camera/LdrColor"].map(device=ovrtx.Device.CPU) as var:
                 pixels = var.tensor.numpy()
                 img = Image.fromarray(pixels)
                 output = Path("render_test.png")

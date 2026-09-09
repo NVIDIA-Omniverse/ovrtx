@@ -15,7 +15,7 @@ Minimal mode uses lightweight rasterization with minimal GPU cost. Use this when
 
 .. code-block:: usda
 
-   token omni:rtx:rendermode = "Minimal"
+   token omni:rtx:rendermode = "MinimalRendering"
 
 Lighting Behavior
 -----------------

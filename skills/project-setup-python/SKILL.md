@@ -14,7 +14,6 @@ description: >
   Python project, set up ovrtx in Python, create a pyproject.toml, or scaffold a Python
   app.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -142,11 +141,30 @@ pip install ovrtx ovstage
 
 > **Source:** `examples/python/minimal/main.py` snippet `create-renderer`
 >
-> Followed by: `examples/python/minimal/main.py` snippet `add-usd`
+> **Source (continued):** `examples/python/minimal/main.py` snippet `add-usd`
 >
-> Followed by: `examples/python/minimal/main.py` snippet `step`
+> **Source (continued):** `examples/python/minimal/main.py` snippet `step`
 >
-> Followed by: `examples/python/minimal/main.py` snippet `read-render-output`
+> **Source (continued):** `examples/python/minimal/main.py` snippet `read-render-output`
+
+## ovrtx and ovstage Load Order
+
+Importing the modules does not load either OpenUSD-dependent runtime. Two flows
+are supported:
+
+- **Renderer first (the minimal example):** `ovrtx.Renderer()` opens the ovrtx
+  shared loader, registers schema paths, and loads the ovrtx runtime/OpenUSD.
+  `ovstage.Stage()` then opens the ovstage shared loader and loads the ovstage
+  runtime against that initialized OpenUSD.
+- **Stage first:** call `ovrtx.register_schema_paths()` before constructing the
+  first `ovstage.Stage`. Registration opens only the ovrtx shared loader and
+  publishes discovery paths. Stage construction then loads the ovstage runtime
+  and OpenUSD; later `ovrtx.Renderer()` loads the ovrtx runtime with the paths
+  already fixed.
+
+Treat `ovstage.library_version()` as ovstage initialization for ordering
+purposes because its version probe creates a temporary native instance. The
+schema call must precede it in a stage-first process.
 
 ### Run
 

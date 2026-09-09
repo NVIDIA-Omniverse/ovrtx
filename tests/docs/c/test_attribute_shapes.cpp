@@ -225,7 +225,7 @@ TEST_F(AttributeShapesTest, Mat4Array) {
     // dtype={kDLFloat, 64, 16}. The lane count is the matrix element count.
     // The USD row-vector convention places translation in the last row of the
     // matrix; ovstage stamps OVSTAGE_SEMANTIC_MATRIX on the column at creation
-    // so the semantic round-trips through Fabric.
+    // so the semantic round-trips through the runtime.
     double transforms[1][16] = {{
         1.0,  0.0,  0.0, 0.0,
         0.0,  1.0,  0.0, 0.0,

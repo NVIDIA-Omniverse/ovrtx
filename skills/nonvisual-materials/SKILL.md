@@ -14,7 +14,6 @@ description: >
   assign lidar/radar/acoustic material semantics, choose nonvisual base materials,
   coatings, or attributes, debug material IDs, or bind sensor-facing USD materials.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

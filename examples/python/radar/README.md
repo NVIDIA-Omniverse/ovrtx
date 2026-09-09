@@ -6,11 +6,6 @@ composite render variable to CPU memory, and visualizes detections in
 `RadialVelocityMs`: blue is approaching the sensor, green is near zero, and red
 is receding.
 
-This example retains the deprecated standalone population APIs because attached
-ovstage rendering in ovrtx 0.4 does not preserve the radar motion output
-demonstrated here. Use ovstage for CPU stage workflows that do not
-depend on radar motion history.
-
 > _“Create a Python sensor example that loads a scene containing a configured radar and moving target, advances scene time over multiple steps, reads valid detections and signed radial velocity, prints per-step summaries, and optionally visualizes detections with velocity-based colors.”_
 
 ## Scene
@@ -33,8 +28,12 @@ The USD requests the radar `PointCloud` render variable with these channels:
 - `Counts`
 - `RadialVelocityMs`
 
-The executable maps the output to CPU, uses `Counts` as the number of valid
-point entries, and colors `Coordinates` by `RadialVelocityMs`.
+The radar model also auto-enables `Flags`, which the example uses for validity
+filtering.
+
+The executable maps the output to CPU, uses `Counts` to bound the delivered
+detection entries, and filters that range with the `Flags` `VALID` bit. It
+colors the remaining `Coordinates` by `RadialVelocityMs`.
 
 ## Renderer Config
 

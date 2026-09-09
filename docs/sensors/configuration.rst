@@ -89,7 +89,7 @@ For more information about OpenUSD Relationships, refer to the `Learn OpenUSD pa
 RenderVar
 ---------
 
-A ``RenderVar`` prim declares a named output. The ``sourceName`` attribute specifies which renderer output to bind:
+A ``RenderVar`` prim declares a named output. Its USD prim path identifies the output in ovrtx step results; the ``sourceName`` attribute specifies which renderer output to bind:
 
 .. code-block:: usda
 
@@ -98,6 +98,8 @@ A ``RenderVar`` prim declares a named output. The ``sourceName`` attribute speci
    }
 
 The available source names depend on the sensor type. Refer to :doc:`cameras/outputs` for camera sensor outputs, :doc:`lidar` for lidar point-cloud channels, and :doc:`radar` for radar point-cloud channels.
+
+After stepping, Python ``frame.render_vars`` keys and C ``render_var_path`` values are full RenderVar prim paths such as ``/Render/Camera/LdrColor`` or ``/Render/Vars/LdrColor``. Use ``sourceName`` values such as ``LdrColor`` only when authoring the RenderVar or describing the semantic output type.
 
 For sensors that produce multi-tensor outputs -- lidar and radar point clouds, for example -- the ``RenderVar`` prim also carries a ``channels`` attribute that selects which tensors the output should include. Only listed channels are produced (the sensor model auto-enables a small set like ``Counts`` and ``Flags`` regardless):
 

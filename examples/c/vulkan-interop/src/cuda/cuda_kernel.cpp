@@ -11,6 +11,7 @@
 #include "cuda_kernel.hpp"
 #include <nvrtc.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <vector>
@@ -129,7 +130,61 @@ static CUexternalSemaphore g_timeline_semaphore = nullptr;
         }                                                                        \
     } while (0)
 
-bool cuda_init(CUuuid* out_uuid) {
+// [snippet:cuda-device-max-connections]
+// On Linux, a stream-ordered CUDA wait that is outstanding while the renderer
+// submits Vulkan work on the same device disturbs how that Vulkan work is
+// scheduled. Capping the driver's host-to-device connections at one makes
+// submissions across CUDA streams serialize in submission order, which stops
+// them forming unintended hardware dependencies against the concurrent graphics
+// work. Windows is unaffected, and the lost stream concurrency would be pure
+// cost there.
+//
+// The driver reads the variable when it initializes, so this has to run before
+// the process creates its first CUDA context. In this sample that context comes
+// from ovrtx_create_renderer(), so the call site is the first statement of
+// main(). An externally supplied value always wins, which is how a caller opts
+// out without rebuilding.
+void cuda_apply_scheduling_workaround() {
+#if defined(__linux__)
+    char const* const env_var = "CUDA_DEVICE_MAX_CONNECTIONS";
+
+    if (char const* existing = getenv(env_var)) {
+        fprintf(stderr, "%s=%s from the environment; leaving it unchanged\n", env_var, existing);
+        return;
+    }
+
+    if (setenv(env_var, "1", 0) != 0) {
+        fprintf(stderr,
+                "Failed to set %s; CUDA waits may stall the renderer's Vulkan work\n",
+                env_var);
+        return;
+    }
+
+    fprintf(stderr, "%s=1 applied for CUDA/Vulkan scheduling on Linux\n", env_var);
+#endif
+}
+// [/snippet:cuda-device-max-connections]
+
+// [snippet:resolve-cuda-device-uuid]
+bool cuda_get_device_uuid(int32_t device_id, CUuuid* out_uuid) {
+    if (!out_uuid) {
+        fprintf(stderr, "cuda_get_device_uuid: out_uuid must not be null\n");
+        return false;
+    }
+
+    CU_CHECK(cuInit(0));
+
+    CUdevice device;
+    CU_CHECK(cuDeviceGet(&device, device_id));
+
+    // Unlike the legacy entry point, cuDeviceGetUuid_v2 returns the subscribed
+    // MIG compute-instance UUID when device is a MIG device.
+    CU_CHECK(cuDeviceGetUuid_v2(out_uuid, device));
+    return true;
+}
+// [/snippet:resolve-cuda-device-uuid]
+
+bool cuda_init(int32_t device_id, CUuuid* out_uuid) {
     // Reuse the context that ovrtx already initialized so mapped ovrtx arrays and
     // imported Vulkan memory are visible in the same CUDA context.
     CU_CHECK(cuCtxGetCurrent(&g_context));
@@ -139,41 +194,54 @@ bool cuda_init(CUuuid* out_uuid) {
         return false;
     }
     
-    // Get device from context
-    CU_CHECK(cuCtxGetDevice(&g_device));
+    // Confirm the ovrtx-created context uses the configured CUDA ordinal.
+    CUdevice context_device;
+    CU_CHECK(cuCtxGetDevice(&context_device));
+    CU_CHECK(cuDeviceGet(&g_device, device_id));
+    if (context_device != g_device) {
+        fprintf(stderr,
+                "ovrtx CUDA context is on device %d, expected configured device %d\n",
+                context_device,
+                g_device);
+        return false;
+    }
     
     // Get device name
     char device_name[256];
     CU_CHECK(cuDeviceGetName(device_name, sizeof(device_name), g_device));
     printf("CUDA device: %s\n", device_name);
     
-    // Get UUID
-    CU_CHECK(cuDeviceGetUuid(out_uuid, g_device));
+    if (!cuda_get_device_uuid(device_id, out_uuid)) {
+        return false;
+    }
     
     return true;
 }
 
-bool cuda_init_standalone(CUuuid* out_uuid) {
+bool cuda_init_standalone(int32_t device_id, CUuuid* out_uuid) {
     CU_CHECK(cuInit(0));
     
     int device_count = 0;
     CU_CHECK(cuDeviceGetCount(&device_count));
     
-    if (device_count == 0) {
-        fprintf(stderr, "No CUDA devices found\n");
+    if (device_id < 0 || device_id >= device_count) {
+        fprintf(stderr,
+                "CUDA device %d is out of range (device count: %d)\n",
+                device_id,
+                device_count);
         return false;
     }
     
-    // Use device 0 by default
-    CU_CHECK(cuDeviceGet(&g_device, 0));
+    CU_CHECK(cuDeviceGet(&g_device, device_id));
     
     // Get device name
     char device_name[256];
     CU_CHECK(cuDeviceGetName(device_name, sizeof(device_name), g_device));
     printf("CUDA device: %s\n", device_name);
     
-    // Get UUID
-    CU_CHECK(cuDeviceGetUuid(out_uuid, g_device));
+    if (!cuda_get_device_uuid(device_id, out_uuid)) {
+        return false;
+    }
     
     // Create context
     #if CUDA_VERSION >= 13000
@@ -694,4 +762,3 @@ void cuda_cleanup() {
         g_context = nullptr;
     }
 }
-

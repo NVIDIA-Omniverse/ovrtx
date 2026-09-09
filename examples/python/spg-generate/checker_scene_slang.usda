@@ -1,0 +1,51 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "World"
+    upAxis = "Y"
+    metersPerUnit = 1
+)
+
+def Xform "World"
+{
+    def Camera "Camera"
+    {
+        double3 xformOp:translate = (0, 0, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+# [snippet:checker-slang-render-graph]
+def Scope "Render"
+{
+    def RenderProduct "CheckerDemo"
+    {
+        uniform int2 resolution = (512, 512)
+        rel camera = </World/Camera>
+        rel orderedVars = [ <Checker> ]
+
+        def RenderVar "Checker"
+        {
+            uniform string sourceName = "Checker"
+            opaque omni:rtx:aov.connect = <../CheckerKernel.outputs:Checker>
+        }
+
+        # No input is connected. The node has no `opaque inputs:` port to
+        # connect, and the values it needs are authored on it directly.
+        def Shader "CheckerKernel" (
+            references = @CheckerKernel.slang.usda@
+        )
+        {
+            int inputs:squareSize = 64
+        }
+    }
+}
+# [/snippet:checker-slang-render-graph]

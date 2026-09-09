@@ -96,7 +96,7 @@ class ConfigBoolKey(IntEnum):
     ENABLE_PROFILING = 1
     READ_GPU_TRANSFORMS = 2
     KEEP_SYSTEM_ALIVE = 3
-    USE_VULKAN = 4
+    DEPRECATED_4 = 4
     SELECTION_OUTLINE_ENABLED = 5
     ENABLE_GEOMETRY_STREAMING = 6
     ENABLE_GEOMETRY_STREAMING_LOD = 7
@@ -108,10 +108,14 @@ class ConfigBoolKey(IntEnum):
 class ConfigStringKey(IntEnum):
     """String-valued renderer configuration keys."""
 
+    # OVRTX_CONFIG_BINARY_PACKAGE_ROOT_PATH: used by schema_paths.usd_plugin_paths to
+    # forward an explicit root to the C resolver without mutating the process env.
+    BINARY_PACKAGE_ROOT_PATH = 0
     LOG_FILE_PATH = 1
     LOG_LEVEL = 2
     ACTIVE_CUDA_GPUS = 3
     DATASTORE_CACHE = 4
+    SENSORS_ALLOWED_DEPRECATION_BASE = 5
 
 
 # ovrtx_config_int64_t
@@ -122,8 +126,10 @@ class ConfigInt64Key(IntEnum):
     SELECTION_FILL_MODE = 1
     MOTION_BVH = 2
     _ATTACH_MODE = 3
-    DOME_BAKING_RESOLUTION = 4
+    # Retired slot; mirrors OVRTX_CONFIG_INT64_DEPRECATED_4. Do not renumber or reuse.
+    DEPRECATED_4 = 4
     TEXTURE_STREAMING_MODE = 5
+    AFTERMATH_MODE = 6
 
 
 # ovrtx_config_double_t
@@ -187,6 +193,23 @@ class TextureStreamingMode(IntEnum):
     """Texture streaming is enabled and texture feedback is processed asynchronously (default)."""
 
 
+# ovrtx_aftermath_mode_t
+class AftermathMode(IntEnum):
+    """NVIDIA Nsight Aftermath diagnostics mode selected at renderer creation.
+
+    ``DISABLE`` skips Aftermath initialization, ``ENABLE`` selects explicit diagnostics
+    initialization, and ``AUTO`` selects the initialization mode automatically.
+    The mode is process-global and must match all renderers sharing a live system.
+    """
+
+    DISABLE = 0
+    """Disable Aftermath explicitly."""
+    ENABLE = 1
+    """Initialize Aftermath with explicit diagnostics enabled."""
+    AUTO = 2
+    """Select the Aftermath initialization mode automatically."""
+
+
 # ovrtx_attach_mode_t
 class _AttachMode(IntEnum):
     """How an attached ovstage instance feeds data into the renderer.
@@ -195,9 +218,9 @@ class _AttachMode(IntEnum):
     """
 
     BORROW = 0
-    """Zero-copy: the renderer renders directly out of ovstage's Fabric (default)."""
+    """The renderer renders directly from ovstage's committed scene state (default)."""
     REPLICATE = 1
-    """The renderer keeps its own UsdStage / Fabric; update_from_stage pulls committed ovstage state into it."""
+    """The renderer maintains an internal runtime stage copy populated from committed ovstage state."""
 
 
 class ovrtx_config_key_type_t(ctypes.c_int):
@@ -516,10 +539,12 @@ ovrtx_render_var_output_handle_t = ctypes.c_uint64
 
 # Render output description structures
 class ovrtx_render_product_render_var_output_t(ctypes.Structure):
-    """Single render variable output (e.g., 'rgb', 'depth')."""
+    """Single render variable output."""
 
     _fields_ = [
-        ("render_var_name", ovx_string_t),
+        ("render_var_path", ovx_string_t),
+        ("source_name", ovx_string_t),
+        ("source_type", ovx_string_t),
         ("output_handle", ctypes.c_uint64),  # Plain c_uint64, not type alias
     ]
 
@@ -662,7 +687,7 @@ class ovrtx_render_var_output_t(ctypes.Structure):
         ("error_message", ovx_string_t),
         ("map_handle", ctypes.c_uint64),  # ovrtx_render_var_output_map_handle_t
         ("cuda_sync", ovrtx_cuda_sync_t),  # ONE shared sync, covers all tensors
-        ("name", ovx_string_t),  # Render variable name (e.g. "PointCloud", "HdrColor")
+        ("name", ovx_string_t),  # Full USD RenderVar prim path
         ("type", ovx_string_t),  # Semantic type identifier
         ("doc", ovx_string_t),  # Human-readable description
         ("version", ctypes.c_int),  # Output schema version (signed int per C)
@@ -1175,8 +1200,7 @@ class Bindings:
 
         The renderer must not have stepped or already be attached. The caller
         retains ownership of the stage and must detach it before destroying
-        either object. The renderer's configured attach mode determines whether
-        it borrows the stage directly or uses it as a source for explicit updates.
+        either object. A stage may be attached to only one renderer at a time.
 
         Args:
             renderer_handle: Renderer handle from create_renderer.
@@ -1192,9 +1216,9 @@ class Bindings:
         """Detach the ovstage instance currently attached to a renderer.
 
         The renderer returns to standalone mode with a fresh internal stage.
-        Any data copied in replicate mode is discarded; ownership of the
-        detached ovstage instance remains with the caller. Attaching a different
-        stage after detaching is not currently supported.
+        Attached scene data is discarded; ownership of the detached ovstage
+        instance remains with the caller. The renderer may then attach the same
+        or a different live stage.
 
         Args:
             renderer_handle: Renderer handle previously passed to attach_ovstage.
@@ -1207,11 +1231,9 @@ class Bindings:
     def update_from_stage(self, renderer_handle: Any, stage_ordinal: int) -> ovrtx_enqueue_result_t:
         """Enqueue an update from the attached ovstage at a committed ordinal.
 
-        In borrow mode it synchronizes the renderer's scene state with committed
-        population changes while attribute values remain shared with ovstage. In
-        replicate mode it copies committed attribute values at or before
-        ``stage_ordinal`` into the renderer's internal stage. In either mode, the
-        ordinal must not exceed the attached stage's write floor.
+        It synchronizes the renderer's scene state with committed changes at or
+        before ``stage_ordinal``. The ordinal must not exceed the attached stage's
+        write floor.
 
         Args:
             renderer_handle: Renderer handle from create_renderer.
@@ -1903,6 +1925,15 @@ class _LibraryLoader:
         """Cleanup function called at interpreter exit."""
         if self._lib is not None:
             try:
+                # Close the DLPack bridge before Python finalization. Late
+                # consumers retain it until they release their managed tensors.
+                try:
+                    from .dlpack import _close_native_dlpack_bridge
+
+                    _close_native_dlpack_bridge()
+                except Exception as e:
+                    print(f"Warning: Exception while closing ovrtx DLPack: {e}", file=sys.stderr)
+
                 # Private compatibility hook for the static OVRTX loader. This
                 # symbol is intentionally absent from the public C header.
                 shutdown = getattr(self._lib, "ovrtx_shutdown_process", self._lib.ovrtx_shutdown)
@@ -1957,6 +1988,9 @@ class _LibraryLoader:
                     )
 
                 # Configure function signatures
+                lib.ovrtx_query_extension.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_void_p)]
+                lib.ovrtx_query_extension.restype = ovrtx_result_t
+
                 lib.ovrtx_initialize.argtypes = [ctypes.POINTER(ovrtx_config_t)]
                 lib.ovrtx_initialize.restype = ovrtx_result_t
 
@@ -2251,17 +2285,35 @@ class _LibraryLoader:
                     error_msg = str(error) if error.ptr else "Unknown error"
                     raise RuntimeError(f"Failed to initialize ovrtx library: {error_msg}")
 
+                # Query the private native capsule/deleter engine only after
+                # successful OVRTX initialization, matching the extension API contract.
+                # Publish _lib first so an initialization failure follows the normal
+                # shutdown path in the exception handler below.
+                self._lib = lib
+                from .dlpack import _initialize_native_dlpack_bridge
+
+                _initialize_native_dlpack_bridge(lib)
+
                 # Make sure to properly shutdown the library when the interpreter exits (__del__ is unreliable)
                 import atexit
 
-                self._lib = lib
                 atexit.register(self._cleanup)
 
             except Exception as exc:
                 # Shutdown if initialize succeeded but subsequent setup failed.
                 if self._lib is not None:
-                    self._lib.ovrtx_shutdown()
-                    self._lib = None
+                    try:
+                        from .dlpack import _close_native_dlpack_bridge
+
+                        _close_native_dlpack_bridge()
+                    except Exception:
+                        pass
+                    try:
+                        self._lib.ovrtx_shutdown()
+                    except Exception:
+                        pass
+                    finally:
+                        self._lib = None
                 if isinstance(exc, AttributeError):
                     raise RuntimeError(
                         f"Function not found in {lib._name}. Binary version may not match Python bindings."
@@ -2293,8 +2345,8 @@ class _LibraryLoader:
             if lib_path.exists() and lib_path.is_file():
                 try:
                     # Windows only: set OMNI_PLUGINS_BASE_PATH and OMNI_USD_PLUGINS_BASE_PATH if not
-                    # already set. They're used to configure PATH, DLL directories and PXR_PLUGINPATH_NAME
-                    # for USD plugin loading. The library's parent directory is the natural base path.
+                    # already set. They're used to configure PATH, DLL directories and USD plugin
+                    # paths. The library's parent directory is the natural base path.
                     # Linux uses LD_LIBRARY_PATH/RPATH and doesn't need this workaround.
                     if sys.platform.startswith("win"):
                         if "OMNI_PLUGINS_BASE_PATH" not in os.environ:
@@ -2319,11 +2371,11 @@ class _LibraryLoader:
     def register_schema_paths(self) -> None:
         """Load the loader DLL transiently and call ovrtx_register_schema_paths(NULL).
 
-        Called from ``ovrtx/__init__.py`` so that ``import ovrtx; import ovphysx``
-        publishes both subsystems' USD plugin paths to PXR_PLUGINPATH_NAME before USD's
-        plug registry is consulted. The C side is idempotent for matching effective
-        roots (see ``ovrtx.h``) and Python does not expose a custom binary-package-root
-        config key, so the eager root and the lazy ``create_bindings`` root always agree.
+        Called from ``ovrtx/__init__.py`` so the bundled OpenUSD and any opted-in,
+        compatible co-loaded OpenUSD see ovrtx's plugin/schema directories before
+        the plug registry is consulted. The C side is idempotent for matching
+        effective roots (see ``ovrtx.h``); ``schema_paths.usd_plugin_paths`` provides
+        non-mutating enumeration for integrators that want to select the upstream paths.
 
         The loaded handle goes out of scope on return; ``create_bindings`` reloads the
         DLL when the user actually constructs a Renderer. ``_load_library`` already
@@ -2349,3 +2401,8 @@ class _LibraryLoader:
 
 
 _ovrtx_loader = _LibraryLoader()
+
+
+def ovrtx_loaded_bin_dir() -> Optional[Path]:
+    """Return the directory containing the OVRTX loader selected for this process."""
+    return Path(_ovrtx_loader._lib._name).resolve().parent if _ovrtx_loader._lib is not None else None

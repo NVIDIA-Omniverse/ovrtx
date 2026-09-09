@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -233,12 +234,12 @@ class AllAttributesTest : public DocsOvstageTestBase {
     // `semantic` defaults to OVSTAGE_SEMANTIC_NONE because every attribute
     // exercised here already has its column semantic stamped by the initial
     // populate (per ovstage_api_types.h:705, "Geometric semantics stamp the
-    // Fabric column's AttributeRole at creation and are surfaced back on
+    // runtime column's AttributeRole at creation and are surfaced back on
     // read"), and later writes with NONE preserve that stamp. The raw
     // `doc-write-usd-quatf-c` snippet elects to pass QUATERNION explicitly
     // as the idiomatic pattern for a fresh quaternion column; both paths
     // round-trip because the backend does not renormalize on QUATERNION.
-    // Callers that need semantic overrides (TOKEN_ID, ASSET_STRING) still
+    // Callers that need semantic overrides (TOKEN_ID, ASSET_PATH_ID) still
     // pass them through this argument.
     template <typename T>
     void write_values(char const *attribute, DLDataType dtype, bool is_array, std::vector<T> const &values,
@@ -334,14 +335,44 @@ class AllAttributesTest : public DocsOvstageTestBase {
         }
     }
 
-    // The linked ovstage package may predate the transitional scalar-asset
-    // read contract: such packages omit populated scalar assets from
-    // single-prim reads (the fetch ends without a group). The asset case
-    // skips against such packages and activates once the linked package
-    // serves the {kDLUInt, 64, 2} token pair; no test change is needed
-    // when it does.
-    void probe_asset_pair_contract(bool* available) {
+    // An asset value is one (authored, resolved) token id pair. The initial
+    // asset does not resolve, so its resolved half is token id 0.
+    void check_asset_case() {
+        DLDataType dtype = dl_type(kDLUInt, 64, 2);
+        std::vector<uint64_t> actual;
+
+        read_values("test:asset", dtype, false, 1, actual);
+        if (::testing::Test::HasFatalFailure()) return;
+        EXPECT_EQ(token_to_string(stage_, actual[0]), "initial_asset.usd");
+        EXPECT_EQ(actual[1], 0u);
+
+        std::vector<uint64_t> const updated = {create_token(stage_, "updated_asset.usd"),
+                                               create_token(stage_, "/abs/updated_asset.usd")};
+        write_values("test:asset", dtype, false, updated, kWorld, OVSTAGE_SEMANTIC_ASSET_PATH_ID);
+        if (::testing::Test::HasFatalFailure()) return;
+        read_values("test:asset", dtype, false, 1, actual);
+        if (::testing::Test::HasFatalFailure()) return;
+        EXPECT_EQ(actual, updated);
+        EXPECT_EQ(token_to_string(stage_, actual[0]), "updated_asset.usd");
+        EXPECT_EQ(token_to_string(stage_, actual[1]), "/abs/updated_asset.usd");
+    }
+
+    // Documentation tests can link an older ovstage package. Skip only those
+    // packages so malformed results from version 0.2 or later still fail.
+    void probe_asset_path_id_contract(bool* available) {
         *available = false;
+
+        // Old packages report 2.3.0 as a placeholder, so version ordering
+        // cannot classify that value.
+        uint32_t version_major = 0;
+        uint32_t version_minor = 0;
+        uint32_t version_patch = 0;
+        ovstage_get_version(stage_, &version_major, &version_minor, &version_patch);
+        const bool placeholder_version = version_major == 2 && version_minor == 3 && version_patch == 0;
+        const bool contract_required = !placeholder_version && (version_major > 0 || version_minor >= 2);
+        std::ostringstream version_failure;
+        version_failure << "test:asset: ovstage " << version_major << "." << version_minor << "." << version_patch
+                        << " must serve a populated scalar asset";
 
         DocsQueryAndToken q;
         docs_make_query_and_token(stage_, kWorld, "test:asset", &q);
@@ -356,12 +387,27 @@ class AllAttributesTest : public DocsOvstageTestBase {
         docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
         ovstage_read_group_t group{};
-        if (ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group) == OVSTAGE_OK) {
+        const ovstage_api_status_t fetch =
+            ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group);
+        if (fetch == OVSTAGE_OK) {
             if (group.data.tensor_count > 0) {
-                DLDataType dtype = group.data.tensors[0].dtype;
-                *available = dtype.code == kDLUInt && dtype.bits == 64 && dtype.lanes == 2;
+                DLTensor const &tensor = group.data.tensors[0];
+                bool id_pairs = group.semantic == OVSTAGE_SEMANTIC_ASSET_PATH_ID && !group.is_array &&
+                                tensor.dtype.code == kDLUInt && tensor.dtype.bits == 64 && tensor.dtype.lanes == 2;
+                *available = id_pairs && tensor.data != nullptr && tensor.shape != nullptr && tensor.shape[0] > 0;
+            }
+            if (!*available && contract_required) {
+                ADD_FAILURE() << version_failure.str()
+                              << " as an ASSET_PATH_ID id pair ('(authored_token, resolved_token)'), but the served "
+                                 "group does not match";
             }
             ovstage_release_group(stage_, &group);
+        } else if (fetch == OVSTAGE_ERROR_END_OF_ITERATION) {
+            if (contract_required) {
+                ADD_FAILURE() << version_failure.str() << ", but the read had no group";
+            }
+        } else {
+            ADD_FAILURE() << "test:asset: " << format_ovstage_last_error();
         }
         ovstage_release_read(stage_, read_handle);
         docs_release_query_and_token(stage_, &q);
@@ -410,14 +456,28 @@ class AllAttributesTest : public DocsOvstageTestBase {
     }
 };
 
+// Keep this separate so an old package skips only the asset contract.
+TEST_F(AllAttributesTest, SupportedAuthoredAssetRoundTrip) {
+    load_all_attributes();
+    if (HasFatalFailure()) return;
+
+    bool canonical_asset_contract = false;
+    probe_asset_path_id_contract(&canonical_asset_contract);
+    // Do not turn a malformed result from version 0.2 or later into a skip.
+    if (HasFailure()) return;
+    if (!canonical_asset_contract) {
+        GTEST_SKIP() << "linked ovstage package predates the canonical scalar-asset contract "
+                        "(ASSET_PATH_ID id pairs); link an ovstage package that serves this "
+                        "contract to run this test";
+    }
+
+    check_asset_case();
+}
+
 TEST_F(AllAttributesTest, SupportedAuthoredAttributesRoundTrip) {
     load_all_attributes();
     if (HasFatalFailure()) return;
 
-    // The scalar-asset case is exercised by the read half of
-    // AssetReadWriteSnippets; writing to a populated scalar asset attribute
-    // is not supported in ovstage 0.1.x, so this test covers the other
-    // authored attribute types.
     check_numeric_case<uint8_t>("test:bool", dl_type(kDLBool, 8), false, {1});
     check_numeric_case<uint8_t>("test:boolArray", dl_type(kDLBool, 8), true, {1, 0});
     check_numeric_case<double>("test:color3d", dl_type(kDLFloat, 64, 3), false, {1.1, 1.2, 1.3});
@@ -451,6 +511,7 @@ TEST_F(AllAttributesTest, SupportedAuthoredAttributesRoundTrip) {
     check_numeric_case<float>("test:float", dl_type(kDLFloat, 32), false, {23.5f});
     check_numeric_case<float>("test:float2", dl_type(kDLFloat, 32, 2), false, {24.1f, 24.2f});
     check_numeric_case<float>("test:float2Array", dl_type(kDLFloat, 32, 2), true, {24.1f, 24.2f, 25.1f, 25.2f});
+    check_numeric_case<float>("test:float3", dl_type(kDLFloat, 32, 3), false, {26.1f, 26.2f, 26.3f});
     check_numeric_case<float>("test:float3Array", dl_type(kDLFloat, 32, 3), true,
                               {26.1f, 26.2f, 26.3f, 27.1f, 27.2f, 27.3f});
     check_numeric_case<float>("test:float4", dl_type(kDLFloat, 32, 4), false, {28.1f, 28.2f, 28.3f, 28.4f});
@@ -545,23 +606,6 @@ TEST_F(AllAttributesTest, SupportedAuthoredAttributesRoundTrip) {
                                  half_values({104.0f, 104.5f, 105.0f}));
     check_numeric_case<uint16_t>("test:vector3hArray", dl_type(kDLFloat, 16, 3), true,
                                  half_values({104.0f, 104.5f, 105.0f, 105.5f, 106.0f, 106.5f}));
-}
-
-TEST_F(AllAttributesTest, ScalarFloat3PopulationBugIsExplicit) {
-    load_all_attributes();
-    if (HasFatalFailure()) return;
-
-    DLDataType dtype = dl_type(kDLFloat, 32, 3);
-    std::vector<float> values;
-    read_values("test:float3", dtype, false, 1, values);
-    if (HasFatalFailure()) return;
-    expect_values_near("test:float3 populated bug value", values, std::vector<float>{0.0f, 0.0f, 0.0f}, dtype);
-
-    write_values("test:float3", dtype, false, std::vector<float>{26.85f, 26.95f, 27.05f});
-    if (HasFatalFailure()) return;
-    read_values("test:float3", dtype, false, 1, values);
-    if (HasFatalFailure()) return;
-    expect_values_near("test:float3 updated", values, std::vector<float>{26.85f, 26.95f, 27.05f}, dtype);
 }
 
 TEST_F(AllAttributesTest, UnsupportedAuthoredAttributesAreNotPopulated) {
@@ -1112,26 +1156,17 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
 }
 
 TEST_F(AllAttributesTest, AssetReadWriteSnippets) {
-    // Transitional scalar-asset read contract (ovstage 0.1.x): one fixed
-    // {kDLUInt, 64, 2} element per prim carrying the {authored-path token,
-    // resolved-path token} pair (resolved token 0 when unresolved) with
-    // attribute semantic NONE, decoded through the shared path dictionary;
-    // planned to become canonical ASSET_STRING byte rows in the next minor
-    // release. Writing to a populated scalar `asset` attribute is not
-    // supported in 0.1.x, so the write half of this test skips
-    // below; the write snippet expresses the planned canonical byte-row
-    // payload as an intent document.
-
     load_all_attributes();
     if (HasFatalFailure()) return;
 
-    bool asset_pair_contract = false;
-    probe_asset_pair_contract(&asset_pair_contract);
-    if (HasFatalFailure()) return;
-    if (!asset_pair_contract) {
-        GTEST_SKIP() << "linked ovstage package predates the transitional scalar-asset read "
-                        "contract ({kDLUInt, 64, 2} token pairs); link ovstage 0.1.1 or later "
-                        "to run this test";
+    bool canonical_asset_contract = false;
+    probe_asset_path_id_contract(&canonical_asset_contract);
+    // Do not turn a malformed result from version 0.2 or later into a skip.
+    if (HasFailure()) return;
+    if (!canonical_asset_contract) {
+        GTEST_SKIP() << "linked ovstage package predates the canonical scalar-asset contract "
+                        "(ASSET_PATH_ID id pairs); link an ovstage package that serves this "
+                        "contract to run this test";
     }
 
     DocsQueryAndToken q_asset;
@@ -1155,49 +1190,44 @@ TEST_F(AllAttributesTest, AssetReadWriteSnippets) {
         << format_ovstage_last_error();
     ASSERT_GT(asset_group.data.tensor_count, 0u);
     DLTensor const &asset_tensor = asset_group.data.tensors[0];
-    // Transitional representation (ovstage 0.1.x): a populated scalar asset
-    // reads back as one fixed element per prim with dtype={kDLUInt, 64, 2}
-    // and semantic NONE. Lane 0 is the authored-path token, lane 1 the
-    // resolved-path token (0 when the asset path did not resolve). Decode
-    // tokens through the shared path dictionary.
-    uint64_t const *asset_pair = reinterpret_cast<uint64_t const *>(
-        static_cast<uint8_t const *>(asset_tensor.data) + asset_tensor.byte_offset);
-    path_dictionary_instance_t *asset_pd = ovstage_get_path_dictionary(stage_);
-    ovx_token_t asset_authored_token = asset_pair[0];
-    ovx_string_t asset_authored_string{};
-    ASSERT_EQ(path_dictionary_get_strings_from_tokens(asset_pd, &asset_authored_token, 1, &asset_authored_string).status,
-              OVX_API_SUCCESS);
-    std::string asset_value(asset_authored_string.ptr, asset_authored_string.length);
-    uint64_t asset_resolved_token = asset_pair[1];
+    // An asset value is one 16-byte (authored, resolved) token id pair.
+    uint64_t asset_pair[2] = {0, 0};
+    std::memcpy(asset_pair, static_cast<char const *>(asset_tensor.data) + asset_tensor.byte_offset,
+                sizeof(asset_pair));
     ovstage_release_group(stage_, &asset_group);
     ovstage_release_read(stage_, asset_read_handle);
-    // [/snippet:doc-read-usd-asset-c]
-    EXPECT_EQ(asset_value, "initial_asset.usd");
-    // The data directory carries no initial_asset.usd, so the authored path
-    // cannot resolve in this environment.
-    EXPECT_EQ(asset_resolved_token, 0u);
 
-    docs_release_query_and_token(stage_, &q_asset);
-    GTEST_SKIP() << "Writing to a populated scalar asset attribute is not "
-                    "supported in ovstage 0.1.x; the write snippet below "
-                    "expresses the planned canonical ASSET_STRING byte-row "
-                    "payload";
+    // Token id 0 is the empty token, so an unresolved asset resolves to "".
+    std::string asset_authored = token_to_string(stage_, asset_pair[0]);
+    std::string asset_resolved = token_to_string(stage_, asset_pair[1]);
+    // [/snippet:doc-read-usd-asset-c]
+    EXPECT_EQ(asset_authored, "initial_asset.usd");
+    EXPECT_EQ(asset_resolved, "");
 
     // [snippet:doc-write-usd-asset-c]
-    char const updated_asset[] = "updated_asset.usd";
-    int64_t asset_shape[1] = {static_cast<int64_t>(std::strlen(updated_asset))};
+    // ovstage does not resolve assets, so the caller interns both paths and
+    // writes their token ids. Use token id 0 when the path resolves to nothing.
+    path_dictionary_instance_t *asset_pd = ovstage_get_path_dictionary(stage_);
+    ovx_string_t updated_asset_strings[2] = {ovx_str("updated_asset.usd"), ovx_str("/abs/updated_asset.usd")};
+    ovx_token_t updated_asset_pair[2] = {0, 0};
+    ASSERT_EQ(path_dictionary_create_tokens_from_strings(asset_pd, updated_asset_strings, 2, updated_asset_pair)
+                  .status,
+              OVX_API_SUCCESS);
+
+    // One 16-byte element holds the pair, so the shape is one element.
+    int64_t asset_shape[1] = {1};
     DLTensor asset_write_tensor{};
-    asset_write_tensor.data = const_cast<char *>(updated_asset);
+    asset_write_tensor.data = updated_asset_pair;
     asset_write_tensor.device = {kDLCPU, 0};
     asset_write_tensor.ndim = 1;
-    asset_write_tensor.dtype = {kDLUInt, 8, 1};
+    asset_write_tensor.dtype = {kDLUInt, 64, 2};
     asset_write_tensor.shape = asset_shape;
 
     ovstage_write_data_t asset_write_data{};
     asset_write_data.tensors = &asset_write_tensor;
     asset_write_data.tensor_count = 1;
-    asset_write_data.is_array = true;
-    asset_write_data.semantic = OVSTAGE_SEMANTIC_ASSET_STRING;
+    asset_write_data.is_array = false;
+    asset_write_data.semantic = OVSTAGE_SEMANTIC_ASSET_PATH_ID;
 
     ovstage_ordinal_t asset_write_ordinal = ordinal_ + 1;
     ovstage_enqueue_result_t asset_write_eq = ovstage_write_attribute(
@@ -1209,9 +1239,10 @@ TEST_F(AllAttributesTest, AssetReadWriteSnippets) {
     // [/snippet:doc-write-usd-asset-c]
     docs_release_query_and_token(stage_, &q_asset);
 
-    std::vector<uint8_t> asset_values;
-    read_values("test:asset", dl_type(kDLUInt, 8, 1), true, std::strlen(updated_asset), asset_values);
-    EXPECT_EQ(std::string(asset_values.begin(), asset_values.end()), "updated_asset.usd");
+    std::vector<uint64_t> asset_values;
+    read_values("test:asset", dl_type(kDLUInt, 64, 2), false, 1, asset_values);
+    EXPECT_EQ(token_to_string(stage_, asset_values[0]), "updated_asset.usd");
+    EXPECT_EQ(token_to_string(stage_, asset_values[1]), "/abs/updated_asset.usd");
 }
 
 TEST_F(AllAttributesTest, ExtentAndWorldExtentAreReadable) {

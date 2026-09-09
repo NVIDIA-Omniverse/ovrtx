@@ -16,7 +16,6 @@ description: >
   "migrate my ovrtx app", or "port my application to ovstage". Reference
   implementations: `examples/c/minimal` and `examples/c/status-queries` (Recipe A).
 license: LicenseRef-NvidiaProprietary
-version: "0.4.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -39,7 +38,7 @@ Standalone ovrtx 0.3.x stage APIs -> ovrtx 0.4.x + ovstage 0.1.x attached mode, 
 
 | | Version | What changes |
 |---|---|---|
-| Source | ovrtx 0.3.x | Standalone stage ownership: `ovrtx_open_usd_*`, `ovrtx_write_attribute`, `ovrtx_query_prims`, `ovrtx_step` with the renderer's own Fabric |
+| Source | ovrtx 0.3.x | Standalone stage ownership: `ovrtx_open_usd_*`, `ovrtx_write_attribute`, `ovrtx_query_prims`, `ovrtx_step` with the renderer-owned runtime stage |
 | Target ovrtx | ovrtx 0.4.x | Attach APIs (`ovrtx_attach_ovstage`, `ovrtx_update_from_stage`, `ovrtx_step_with_stage`); `OVRTX_DEPRECATED` markers on stage-building/query/write/read entry points in [`../../include/ovrtx/ovrtx.h`](../../include/ovrtx/ovrtx.h) |
 | New dependency | ovstage 0.1.x | Scene data plane (`<ovstage/ovstage.h>`), population bridge (`<ovstage/ovstage_population.h>`), ordinal-keyed writes |
 
@@ -185,15 +184,15 @@ Copy `ovstage.cmake` from the examples tree — do not reduce it to "copy `ovsta
 
 ### Windows: `ovstage.dll` must not load at process init
 
-Attach mode needs **one** shared `omni.fabric` / USD runtime in-process. On Windows, `ovstage.dll` statically imports `ov_25.11usd_ms.dll` and `tbb12.dll`. If the OS loads `ovstage.dll` at process init (before `ovrtx_create_renderer` has loaded the single `plugins/ov_25.11usd_ms.dll` from ovrtx's package), you get a second USD module instance → split `PlugRegistry` / `TfType` state → crashes or subtle corruption.
+Attach mode needs **one** shared USD runtime in-process. On Windows, `ovstage.dll` statically imports `ov_25.11usd_ms.dll` and `tbb12.dll`. If the OS loads `ovstage.dll` at process init (before `ovrtx_create_renderer` has loaded the single `plugins/ov_25.11usd_ms.dll` from ovrtx's package), you get a second USD module instance → split `PlugRegistry` / `TfType` state → crashes or subtle corruption.
 
 Linking `ovstage::ovstage_static` avoids this by construction: nothing imports `ovstage.dll`, so the OS cannot load it at init. The static loader calls `LoadLibrary` on the first `ovstage_*` call, which in attach mode is always **after** `ovrtx_create_renderer`. `ovstage_setup_runtime()` in [`ovstage.cmake`](../../examples/c/cmake/ovstage.cmake) only junctions the package `bin/` beside the exe as `ovstage/`, which the app passes to `ovstage_initialize()`; there is no DLL copy and no link-option surgery.
 
-If you link the dynamic `ovstage::ovstage` instead, the import is real and must be deferred, so `ovstage_setup_runtime()` applies **`/DELAYLOAD:ovstage.dll`** (+ `delayimp`) on MSVC and copies only **`ovstage.dll`** and **`ovstage_usd_schemas/`** (data-only schema bundle) into the exe directory — **not** ovstage's flat dependency DLLs, since ovrtx's junctioned `plugins/` tree already provides the single USD closure. Non-MSVC Windows toolchains need an equivalent lazy-load strategy; see the warning in `ovstage_setup_runtime`.
+If you link the dynamic `ovstage::ovstage` instead, the import is real and must be deferred, so `ovstage_setup_runtime()` applies **`/DELAYLOAD:ovstage.dll`** (+ `delayimp`) on MSVC and copies only **`ovstage.dll`** into the exe directory — **not** ovstage's flat dependency DLLs, since ovrtx's junctioned `plugins/` tree already provides the single USD closure. ovstage ships no USD schema data; if your app needs schema families beyond the core `Usd*` ones, register them yourself with `ovstage_population_register_usd_schemas()` before your first populate call. Non-MSVC Windows toolchains need an equivalent lazy-load strategy; see the warning in `ovstage_setup_runtime`.
 
 ### Linux runtime
 
-`ovstage_setup_runtime` appends `OVSTAGE_BINARY_DIR` to the target rpath. Ovrtx and ovstage must be the **same release train** (matched `usd_ms` ABI). Confirm on hardware that only one `usd_ms` / `omni.fabric` is loaded when both packages are present.
+`ovstage_setup_runtime` appends `OVSTAGE_BINARY_DIR` to the target rpath. Ovrtx and ovstage must be the **same release train** (matched `usd_ms` ABI). Confirm on hardware that only one `usd_ms` is loaded when both packages are present.
 
 
 
@@ -217,21 +216,22 @@ Every `OVRTX_DEPRECATED` entry point in [`ovrtx.h`](../../include/ovrtx/ovrtx.h)
 | `ovrtx_query_prims` / `ovrtx_fetch_query_results` / `ovrtx_release_query_results` | `ovstage_query` + `ovstage_fetch_query_result` + `ovstage_release_query_result` + `ovstage_release_query`. |
 | `ovrtx_create_attribute_binding` / `ovrtx_destroy_attribute_binding` | No persistent-binding equivalent; reuse an `ovstage_query` handle across writes, release with `ovstage_release_query`. |
 
-`ovrtx_step` is **not** deprecated — it remains the standalone-mode step function. While a stage is attached it returns `OVRTX_API_ERROR`; use `ovrtx_step_with_stage(renderer, render_products, delta_time, ordinal, ...)` there instead. The deprecated `ovrtx_query_prims` / read APIs also still function against the borrowed Fabric while attached in the default mode, but new query call sites should be authored against `ovstage_query`.
+`ovrtx_step` is **not** deprecated — it remains the standalone-mode step function. While a stage is attached it returns `OVRTX_API_ERROR`; use `ovrtx_step_with_stage(renderer, render_products, delta_time, ordinal, ...)` there instead. The deprecated `ovrtx_query_prims` / read APIs also still function against attached ovstage scene state in the default mode, but new query call sites should be authored against `ovstage_query`.
 
 Non-deprecated ovrtx entry points — `ovrtx_get_path_dictionary`, `ovrtx_enqueue_pick_query`, `ovrtx_set_selection_group_styles`, `ovrtx_map_render_var_output` / `ovrtx_unmap_render_var_output`, `ovrtx_query_op_status` / `ovrtx_release_op_status`, `ovrtx_wait_op`, `ovrtx_set_log_callback`, and so on — remain on the renderer and do not migrate.
 
 ## Consumer Lifecycle Recipes
 
-Before either ovrtx or ovstage initializes a shared OpenUSD runtime, call
+Before either ovrtx or ovstage loads OpenUSD, call
 `ovrtx_register_schema_paths(config)` with the same ovrtx config that will be
-passed to `ovrtx_create_renderer`. USD's process-wide schema registry discovers
-plugins only once, so this explicit registration is required when ovstage or
-another USD subsystem may initialize or open a stage first. Otherwise
-`omni.rtx` can report missing `OmniRtx*` API prim definitions and fall back to
-schema defaults. The renderer-first ordering in Recipe A registers the paths
-implicitly, but ports should not rely on that side effect when initialization
-order can vary.
+passed to `ovrtx_create_renderer`. USD reads its plugin-path variable as its
+libraries load, and `ovstage.dll` statically imports OpenUSD — so loading ovstage
+settles it just as loading ovrtx does. That makes
+this explicit registration matter whenever ovstage or another USD subsystem may
+come up first. Otherwise `omni.rtx` can report missing `OmniRtx*` API prim
+definitions and fall back to schema defaults. The renderer-first ordering in
+Recipe A registers the paths implicitly, but ports should not rely on that side
+effect when initialization order can vary.
 
 ### Recipe A — Initial load (one-shot)
 
@@ -254,7 +254,7 @@ ovstage_destroy_instance(stage)
 ovrtx_destroy_renderer(renderer)
 ```
 
-`ovrtx_update_from_stage` is optional in this recipe: the write floor moves once, and the first `ovrtx_step_with_stage` acts as a safety net that binds Hydra to the shared Fabric (`CHANGELOG.md` `[0.4.0]` Changed on attach-time Hydra binding). Calling it explicitly is still safe and triggers a Hydra rebuild against the wholesale population op — it is not a no-op after wholesale open — but for one-shot loads that go straight to a step it can be omitted.
+`ovrtx_update_from_stage` is optional in this recipe: the write floor moves once, and the first `ovrtx_step_with_stage` acts as a safety net that binds Hydra to the attached ovstage scene state (`CHANGELOG.md` `[0.4.0]` Changed on attach-time Hydra binding). Calling it explicitly is still safe and triggers a Hydra rebuild against the wholesale population op — it is not a no-op after wholesale open — but for one-shot loads that go straight to a step it can be omitted.
 
 > **Source:** [`examples/c/minimal/main.cpp`](../../examples/c/minimal/main.cpp) snippets `create-renderer`, `load-usd-and-wait`, `step-renderer`, `fetch-results`, `map-rendered-output-cpu`, `unmap-and-cleanup`.
 
@@ -328,7 +328,7 @@ This skill has no scripts. Use repository search and targeted edits directly.
 - Shared migration behavior: [`../update-0_3-0_4-common/Reference.md`](../update-0_3-0_4-common/Reference.md).
 - Ported reference examples: [`examples/c/minimal/main.cpp`](../../examples/c/minimal/main.cpp), [`examples/c/status-queries/main.cpp`](../../examples/c/status-queries/main.cpp).
 - [`../../CHANGELOG.md`](../../CHANGELOG.md) `[0.4.0]` sections.
-- [`../../docs/core/ovstage_integration.rst`](../../docs/core/ovstage_integration.rst) for ordinals, and the shared-Fabric update loop.
+- [`../../docs/core/ovstage_integration.rst`](../../docs/core/ovstage_integration.rst) for ordinals and the attached update loop.
 - [`update-0_2-0_3`](../../skills/update-0_2-0_3/SKILL.md) — predecessor migration skill for user apps.
 - [`runtime-loop`](https://github.com/NVIDIA-Omniverse/ovstage/blob/main/skills/runtime-loop/SKILL.md) — headless ovstage populate/read/update loop patterns reused by attached-mode apps.
 - [`picking-selection`](../../skills/picking-selection/SKILL.md) — renderer-side picking and selection-outline APIs that stay on ovrtx.

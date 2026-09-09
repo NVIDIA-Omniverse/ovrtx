@@ -18,7 +18,9 @@ import ctypes
 import sys
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
+
+from .bindings import ovrtx_loaded_bin_dir
 
 # CUDA 12 is the lower bound (matches the version ovrtx has shipped with since initial release).
 # The upper bound is a forward-compat search window — bump if needed in the future.
@@ -26,44 +28,25 @@ _CUDART_MIN_MAJOR = 12
 _CUDART_MAX_MAJOR = 20
 
 _prefix, _suffix = ("cudart64_", ".dll") if sys.platform.startswith("win") else ("libcudart.so.", "")
-_LIB_NAMES = tuple(f"{_prefix}{v}{_suffix}" for v in reversed(range(_CUDART_MIN_MAJOR, _CUDART_MAX_MAJOR + 1)))
-
-# The build stages the runtime beside the renderer plugins rather than next to
-# ovrtx-dynamic, so each loader directory is probed with these suffixes too.
-_PLUGIN_SUBDIRS = (Path(), Path("plugins") / "rtx", Path("plugins") / "gpu.foundation")
+_LIB_CANDIDATES = tuple(f"{_prefix}{v}{_suffix}" for v in reversed(range(_CUDART_MIN_MAJOR, _CUDART_MAX_MAJOR + 1)))
 
 _lock = threading.Lock()
 _lib: Optional[ctypes.CDLL] = None
 
 
-def _library_candidates() -> tuple[str, ...]:
-    """Bundled CUDA runtimes as full paths, then the bare sonames for the system loader.
-
-    Directories come from :func:`ovrtx_loader_candidate_dirs` — the same resolver that
-    finds ovrtx-dynamic — so a layout in which the renderer loads can never be one in
-    which the runtime does not. The wheel, the deploy tree and in-tree builds each place
-    the runtime somewhere different, and only that resolver knows about all three.
-    """
-    # Imported lazily, as types.py does for this module, so importing ovrtx stays cheap.
-    from .bindings import _resolve_existing_dirs, ovrtx_loader_candidate_dirs
-
-    bundled: list[str] = []
-    seen: set[Path] = set()
-    # The resolver returns raw entries; _resolve_existing_dirs is how every other caller
-    # survives a PATH holding %LocalAppData%\Microsoft\WindowsApps, which raises
-    # PermissionError from is_dir(). The inner probes stay guarded for the same reason.
-    for base in _resolve_existing_dirs(ovrtx_loader_candidate_dirs()):
-        for directory in (base / sub for sub in _PLUGIN_SUBDIRS):
-            if directory in seen:
-                continue
-            seen.add(directory)
-            try:
-                if not directory.is_dir():
-                    continue
-                bundled.extend(str(path) for name in _LIB_NAMES if (path := directory / name).is_file())
-            except OSError:
-                continue
-    return (*bundled, *_LIB_NAMES)
+def _packaged_candidates() -> Iterable[Path]:
+    """Yield CUDART files paired with the OVRTX loader selected for this process."""
+    bin_dir = ovrtx_loaded_bin_dir()
+    if bin_dir is None:
+        return
+    for name in _LIB_CANDIDATES:
+        candidate = bin_dir / "plugins" / "gpu.foundation" / name
+        try:
+            candidate = candidate.resolve(strict=True)
+        except OSError:
+            continue
+        if candidate.is_file():
+            yield candidate
 
 
 def _load() -> ctypes.CDLL:
@@ -75,10 +58,10 @@ def _load() -> ctypes.CDLL:
             # Keep only the message: retaining an exception retains its traceback,
             # which would form a cycle through callers of the first sync operation.
             last_err: Optional[str] = None
-            candidates = _library_candidates()
+            candidates = (*_packaged_candidates(), *_LIB_CANDIDATES)
             for candidate in candidates:
                 try:
-                    lib = ctypes.CDLL(candidate)
+                    lib = ctypes.CDLL(str(candidate))
                     break
                 except OSError as err:
                     last_err = str(err)

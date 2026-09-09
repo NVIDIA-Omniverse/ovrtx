@@ -19,6 +19,41 @@ The example also demonstrates viewport picking, marquee selection, and styled se
 
 Any scene used with picking must restrict the picked RenderProduct to CUDA-visible GPU 0 with ``uint[] deviceIds = [0]``.
 
+.. note::
+
+   On Linux, the per-frame CUDA wait this example performs on the mapped output's
+   producer event is subject to a known driver scheduling interaction. The example
+   applies the recommended workaround itself. Refer to
+   :doc:`../core/cuda_vulkan_scheduling`.
+
+CUDA and Vulkan device selection
+--------------------------------
+
+CUDA device indices are process-visible ordinals after ``CUDA_VISIBLE_DEVICES`` is applied. Use the same ordinal for the ovrtx active-GPU configuration and the RenderProduct ``deviceIds``. Resolve that ordinal once with the CUDA Driver API and obtain its exact device identity with ``cuDeviceGetUuid_v2()``:
+
+.. literalinclude:: ../../examples/c/vulkan-interop/src/cuda/cuda_kernel.cpp
+   :language: cpp
+   :start-after: // [snippet:resolve-cuda-device-uuid]
+   :end-before: // [/snippet:resolve-cuda-device-uuid]
+
+Use ``cuDeviceGetUuid_v2()`` explicitly. On MIG systems, ``cudaGetDeviceProperties().uuid`` and the legacy ``cuDeviceGetUuid()`` can return the parent GPU UUID shared by sibling MIG devices. PCI bus identity is also parent-scoped and cannot identify a MIG instance.
+
+Enumerate Vulkan physical devices and select the one whose ``VkPhysicalDeviceIDProperties::deviceUUID`` contains the same 16 bytes:
+
+.. literalinclude:: ../../examples/c/vulkan-interop/src/vk/vulkan_context.cpp
+   :language: cpp
+   :start-after: // [snippet:select-vulkan-device-by-cuda-uuid]
+   :end-before: // [/snippet:select-vulkan-device-by-cuda-uuid]
+
+Each mapped CUDA output reports its actual process-visible ordinal in ``DLTensor.device.device_id``. A simple application can validate it once against the configured device during initialization:
+
+.. literalinclude:: ../../examples/c/vulkan-interop/src/main.cpp
+   :language: cpp
+   :start-after: // [snippet:validate-render-output-cuda-device]
+   :end-before: // [/snippet:validate-render-output-cuda-device]
+
+For multi-GPU rendering, use each output's ``device_id`` to route it to a Vulkan context cached for that CUDA ordinal.
+
 .. pull-quote::
 
    *“Create a C++ interactive viewer that renders ovrtx camera output directly into a Vulkan presentation path through CUDA interop, with GPU selection, GPU image mapping, exported-image copies, explicit synchronization, double buffering, orbit camera controls, finite-frame capture, and click or marquee picking with selection outlines.”*

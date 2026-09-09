@@ -16,6 +16,7 @@ def Xform "World"
     )
     {
         token omni:sensor:Core:elementsCoordsType = "CARTESIAN"
+        bool omni:sensor:Core:includeInvalidPoints = false
         double2 omni:sensor:frameRate = (10, 1)
 
         double3 xformOp:translate = (0, 0, 1)

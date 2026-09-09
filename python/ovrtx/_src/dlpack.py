@@ -21,7 +21,10 @@ Older NumPy versions default to read-only for safety.
 """
 
 import ctypes
-from typing import Any, Callable, Optional
+import operator
+import sys
+import threading
+from typing import Any, Optional
 
 __all__ = [
     "DLDeviceType",
@@ -32,7 +35,6 @@ __all__ = [
     "DLManagedTensor",
     "DLPackVersion",
     "DLManagedTensorVersioned",
-    "ManagedDLTensor",
     "DLPACK_MAJOR_VERSION",
     "DLPACK_MINOR_VERSION",
     "DLPACK_FLAG_BITMASK_READ_ONLY",
@@ -192,13 +194,17 @@ class DLDataType(ctypes.Structure):
         Args:
             type_name: Type name like "int32", "float32", "uint8x4".
             lanes: Optional lanes override for vector types. If provided, overrides
-                the default lanes from TYPE_MAP.
+                the default lanes from TYPE_MAP. Must be an integer in [1, 65535]:
+                the value lands in the DLPack uint16 lane field, so anything outside
+                that range raises instead of silently wrapping to a bogus lane count
+                (e.g. -1 becoming 65535).
 
         Returns:
             DLDataType instance.
 
         Raises:
-            ValueError: If type_name is not recognized.
+            ValueError: If type_name is not recognized, or lanes is outside [1, 65535].
+            TypeError: If lanes is not an integer.
 
         Example:
             >>> DLDataType.from_str("int32")           # int32, lanes=1
@@ -208,6 +214,10 @@ class DLDataType(ctypes.Structure):
         if type_name not in cls.TYPE_MAP:
             raise ValueError(f"Unknown type: {type_name}. Valid types: {list(cls.TYPE_MAP.keys())}")
         code, bits, default_lanes = cls.TYPE_MAP[type_name]
+        if lanes is not None:
+            lanes = operator.index(lanes)
+            if not 1 <= lanes <= 0xFFFF:
+                raise ValueError(f"DLDataType lanes must be in [1, 65535], got {lanes}")
         return cls(code=code, bits=bits, lanes=lanes if lanes is not None else default_lanes)
 
     def __str__(self) -> str:
@@ -234,96 +244,9 @@ class DLTensor(ctypes.Structure):
         ("byte_offset", ctypes.c_uint64),
     ]
 
-    @classmethod
-    def from_dlpack(cls, obj: Any, stream: Optional[int] = None) -> "DLTensor":
-        """Extract DLTensor from an object implementing the DLPack protocol.
-
-        This is useful for passing numpy arrays or other DLPack-compatible objects
-        to ovrtx APIs that expect DLTensor.
-
-        Args:
-            obj: Object with __dlpack__() method (e.g., numpy array).
-            stream: CUDA stream handle to pass to the DLPack producer for synchronization.
-                When supplied and ``obj`` reports a CUDA device via ``__dlpack_device__``, the
-                producer is instructed to make this stream wait for any pending work on ``obj``
-                so the consumer can safely read the tensor on that stream. Ignored for CPU
-                tensors and for producers that don't advertise ``__dlpack_device__``.
-
-        Returns:
-            DLTensor with copied shape/strides (safe to use after capsule is freed).
-
-        Raises:
-            TypeError: If object does not support DLPack protocol.
-            RuntimeError: If capsule extraction fails.
-
-        Note:
-            The returned DLTensor's data pointer references memory owned by the
-            original object. Keep the original object alive while using the DLTensor.
-            The shape and strides arrays are deep-copied for safety.
-        """
-        if not hasattr(obj, "__dlpack__"):
-            raise TypeError(f"Object of type {type(obj).__name__} does not support DLPack protocol")
-
-        # Forward the consumer stream only for CUDA tensors (CPU __dlpack__ rejects stream args).
-        pass_stream = False
-        if stream is not None and hasattr(obj, "__dlpack_device__"):
-            device_type, _ = obj.__dlpack_device__()
-            pass_stream = device_type in (DLDeviceType.kDLCUDA, DLDeviceType.kDLCUDAManaged)
-
-        capsule = obj.__dlpack__(stream=stream) if pass_stream else obj.__dlpack__()
-
-        # Extract pointer to DLManagedTensor from capsule
-        ptr = PyCapsule_GetPointer(capsule, b"dltensor")
-        if not ptr:
-            raise RuntimeError("Failed to get DLManagedTensor pointer from capsule")
-
-        # Cast to DLManagedTensor and extract dl_tensor
-        managed = ctypes.cast(ptr, ctypes.POINTER(DLManagedTensor)).contents
-        src = managed.dl_tensor
-
-        # Create new DLTensor with copied shape/strides (capsule memory may be freed)
-        result = cls()
-        result.data = src.data
-        result.device = src.device
-        result.ndim = src.ndim
-        result.dtype = src.dtype
-        result.byte_offset = src.byte_offset
-
-        # Deep-copy shape/strides arrays and keep source object alive as instance
-        # attributes so their lifetime is tied to this DLTensor.
-        result._source_obj = obj
-        if src.ndim > 0 and src.shape:
-            result._shape_storage = (ctypes.c_int64 * src.ndim)()
-            for i in range(src.ndim):
-                result._shape_storage[i] = src.shape[i]
-            result.shape = ctypes.cast(result._shape_storage, ctypes.POINTER(ctypes.c_int64))
-        else:
-            result.shape = None
-
-        if src.ndim > 0 and src.strides:
-            result._strides_storage = (ctypes.c_int64 * src.ndim)()
-            for i in range(src.ndim):
-                result._strides_storage[i] = src.strides[i]
-            result.strides = ctypes.cast(result._strides_storage, ctypes.POINTER(ctypes.c_int64))
-        else:
-            result.strides = None
-
-        # Mark capsule as consumed per DLPack protocol (prevents double-consumption)
-        PyCapsule_SetName(capsule, b"used_dltensor")
-
-        # Release the managed tensor descriptor. capsule_destructor will no-op via name check
-        # when the consumed capsule is later GC'd (name is now "used_dltensor*").
-        if managed.deleter:
-            managed.deleter(ptr)
-
-        return result
-
 
 class DLManagedTensor(ctypes.Structure):
-    """C structure for managed DLPack 0.x tensor.
-
-    Layout: dl_tensor is FIRST (offset 0).
-    """
+    """C structure for managed DLPack 0.x tensor."""
 
     _fields_ = [
         ("dl_tensor", DLTensor),
@@ -357,29 +280,6 @@ class DLManagedTensorVersioned(ctypes.Structure):
     ]
 
 
-# Python C API bindings for capsule protocol
-PyMem_Malloc = ctypes.pythonapi.PyMem_Malloc
-PyMem_Malloc.argtypes = [ctypes.c_size_t]
-PyMem_Malloc.restype = ctypes.c_void_p
-
-PyMem_Free = ctypes.pythonapi.PyMem_Free
-PyMem_Free.argtypes = [ctypes.c_void_p]
-PyMem_Free.restype = None
-
-Py_IncRef = ctypes.pythonapi.Py_IncRef
-Py_IncRef.argtypes = [ctypes.py_object]
-Py_IncRef.restype = None
-
-Py_DecRef = ctypes.pythonapi.Py_DecRef
-Py_DecRef.argtypes = [ctypes.py_object]
-Py_DecRef.restype = None
-
-PyCapsule_Destructor = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
-
-PyCapsule_New = ctypes.pythonapi.PyCapsule_New
-PyCapsule_New.argtypes = [ctypes.c_void_p, ctypes.c_char_p, PyCapsule_Destructor]
-PyCapsule_New.restype = ctypes.py_object
-
 PyCapsule_IsValid = ctypes.pythonapi.PyCapsule_IsValid
 PyCapsule_IsValid.argtypes = [ctypes.py_object, ctypes.c_char_p]
 PyCapsule_IsValid.restype = ctypes.c_int
@@ -392,43 +292,265 @@ PyCapsule_SetName = ctypes.pythonapi.PyCapsule_SetName
 PyCapsule_SetName.argtypes = [ctypes.py_object, ctypes.c_char_p]
 PyCapsule_SetName.restype = ctypes.c_int
 
-# Separate bindings that accept capsule as c_void_p (raw pointer) rather than py_object,
-# for use inside capsule_destructor where the capsule refcount is already zero.
-_PyCapsule_IsValid_raw = ctypes.pythonapi["PyCapsule_IsValid"]
-_PyCapsule_IsValid_raw.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-_PyCapsule_IsValid_raw.restype = ctypes.c_int
 
-_PyCapsule_GetPointer_raw = ctypes.pythonapi["PyCapsule_GetPointer"]
-_PyCapsule_GetPointer_raw.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-_PyCapsule_GetPointer_raw.restype = ctypes.c_void_p
+class _ManagedTensorLease:
+    """Keep a consumed foreign managed tensor alive."""
 
-PyCapsule_SetContext = ctypes.pythonapi.PyCapsule_SetContext
-PyCapsule_SetContext.argtypes = [ctypes.py_object, ctypes.c_void_p]
-PyCapsule_SetContext.restype = ctypes.c_int
+    __slots__ = ("_deleter", "_managed_ptr", "_tensor")
 
-_PyCapsule_GetContext_raw = ctypes.pythonapi["PyCapsule_GetContext"]
-_PyCapsule_GetContext_raw.argtypes = [ctypes.c_void_p]
-_PyCapsule_GetContext_raw.restype = ctypes.c_void_p
+    def __init__(self, managed_ptr: int, deleter: Any) -> None:
+        self._managed_ptr = managed_ptr
+        self._deleter = deleter
+        self._tensor = None
+
+    @property
+    def tensor(self) -> DLTensor:
+        """The foreign tensor, valid while this lease is alive."""
+        if self._tensor is None:
+            raise RuntimeError("DLPack tensor has been released")
+        return self._tensor
+
+    def __del__(self) -> None:
+        # Clear this lease before a foreign deleter can re-enter Python.
+        managed_ptr = self._managed_ptr
+        deleter = self._deleter
+        self._managed_ptr = 0
+        self._deleter = None
+        self._tensor = None
+
+        try:
+            if managed_ptr and deleter:
+                deleter(managed_ptr)
+        except BaseException:
+            # Destructors have no error channel. The producer must still obey
+            # DLPack's noexcept deleter contract; never replace an outer error.
+            pass
 
 
-class _CapsuleCtx:
-    """Internal keepalive for DLPack capsule callbacks and the caller's manager_ctx."""
+def _from_dlpack(obj: Any, stream: Optional[int] = None, *, writable: bool = False) -> _ManagedTensorLease:
+    """Consume a foreign DLPack export and retain its managed tensor."""
+    if not hasattr(obj, "__dlpack__"):
+        raise TypeError(f"Object of type {type(obj).__name__} does not support DLPack protocol")
 
-    __slots__ = ("manager_ctx", "deleter_callback", "c_deleter", "capsule_destructor")
+    kwargs = {"max_version": (DLPACK_MAJOR_VERSION, DLPACK_MINOR_VERSION)}
+    if stream is not None and hasattr(obj, "__dlpack_device__"):
+        device_type, _ = obj.__dlpack_device__()
+        if device_type in (DLDeviceType.kDLCUDA, DLDeviceType.kDLROCM, DLDeviceType.kDLCUDAManaged):
+            kwargs["stream"] = stream
 
-    def __init__(self, manager_ctx: Any, deleter_callback: Optional[Callable]) -> None:
-        self.manager_ctx = manager_ctx
-        self.deleter_callback = deleter_callback
-        self.c_deleter = None
-        self.capsule_destructor = None
+    try:
+        capsule = obj.__dlpack__(**kwargs)
+    except TypeError:
+        kwargs.pop("max_version")
+        capsule = obj.__dlpack__(**kwargs)
+
+    if PyCapsule_IsValid(capsule, _c_str_dltensor):
+        capsule_name = _c_str_dltensor
+        used_name = _c_str_used_dltensor
+        managed_type = DLManagedTensor
+    elif PyCapsule_IsValid(capsule, _c_str_dltensor_versioned):
+        capsule_name = _c_str_dltensor_versioned
+        used_name = _c_str_used_dltensor_versioned
+        managed_type = DLManagedTensorVersioned
+    else:
+        raise RuntimeError("DLPack producer returned an invalid or already-consumed capsule")
+
+    ptr = PyCapsule_GetPointer(capsule, capsule_name)
+    if not ptr:
+        raise RuntimeError("Failed to get managed DLPack tensor pointer from capsule")
+
+    managed = ctypes.cast(ptr, ctypes.POINTER(managed_type)).contents
+    deleter = managed.deleter
+    if PyCapsule_SetName(capsule, used_name) != 0:
+        raise RuntimeError("Failed to mark DLPack capsule as consumed")
+
+    try:
+        lease = _ManagedTensorLease(ptr, deleter)
+    except BaseException:
+        # Ownership transferred when the capsule was renamed, so allocation
+        # failure has no object whose destructor could release the descriptor.
+        try:
+            if deleter:
+                deleter(ptr)
+        except BaseException:
+            pass
+        raise
+
+    if managed_type is DLManagedTensorVersioned:
+        if managed.version.major != DLPACK_MAJOR_VERSION:
+            producer_major = managed.version.major
+            del lease
+            raise RuntimeError(
+                f"DLPack producer major version {producer_major} is incompatible with {DLPACK_MAJOR_VERSION}"
+            )
+        if writable and managed.flags & DLPACK_FLAG_BITMASK_READ_ONLY:
+            del lease
+            raise BufferError("DLPack destination is read-only")
+        if writable and managed.flags & DLPACK_FLAG_BITMASK_IS_COPIED:
+            del lease
+            raise BufferError("DLPack destination export is a copy")
+
+    lease._tensor = managed.dl_tensor
+    return lease
+
+
+class _NativePythonApiV1(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", ctypes.c_uint32),
+        ("abi_version", ctypes.c_uint32),
+        ("python_hexversion", ctypes.c_uint32),
+        ("py_gil_state_ensure", ctypes.c_void_p),
+        ("py_gil_state_release", ctypes.c_void_p),
+        ("py_inc_ref", ctypes.c_void_p),
+        ("py_dec_ref", ctypes.c_void_p),
+        ("py_capsule_new", ctypes.c_void_p),
+        ("py_capsule_is_valid", ctypes.c_void_p),
+        ("py_capsule_get_pointer", ctypes.c_void_p),
+        ("py_capsule_set_name", ctypes.c_void_p),
+        ("py_err_fetch", ctypes.c_void_p),
+        ("py_err_restore", ctypes.c_void_p),
+        ("py_err_clear", ctypes.c_void_p),
+        ("py_err_occurred", ctypes.c_void_p),
+        ("py_err_set_string", ctypes.c_void_p),
+        ("py_err_no_memory", ctypes.c_void_p),
+        ("py_exc_runtime_error", ctypes.py_object),
+        ("py_exc_value_error", ctypes.py_object),
+    ]
+
+
+class _NativeCreateV1(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", ctypes.c_uint32),
+        ("max_version", DLPackVersion),
+        ("dlpack_flags", ctypes.c_uint64),
+        ("tensor", ctypes.POINTER(DLTensor)),
+        ("owner", ctypes.py_object),
+    ]
+
+
+class _NativeExtensionV1(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", ctypes.c_uint32),
+        ("abi_version", ctypes.c_uint32),
+        ("create_bridge", ctypes.c_void_p),
+        ("close_bridge", ctypes.c_void_p),
+        ("create_capsule", ctypes.c_void_p),
+    ]
+
+
+def _python_api_address(name: str) -> int:
+    return ctypes.cast(getattr(ctypes.pythonapi, name), ctypes.c_void_p).value
+
+
+class _NativeDLPackBridge:
+    _SUCCESS = 0
+    _INCOMPATIBLE_RUNTIME = 4
+
+    def __init__(self, extension_ptr: int) -> None:
+        extension = ctypes.cast(extension_ptr, ctypes.POINTER(_NativeExtensionV1)).contents
+        if extension.struct_size < ctypes.sizeof(_NativeExtensionV1) or extension.abi_version != 1:
+            raise RuntimeError("Unsupported ovrtx native DLPack extension ABI")
+
+        self._extension = extension
+        self._create_bridge = ctypes.PYFUNCTYPE(
+            ctypes.c_uint32, ctypes.POINTER(_NativePythonApiV1), ctypes.POINTER(ctypes.c_void_p)
+        )(extension.create_bridge)
+        # Closing drains foreign threads that may be waiting for the GIL,
+        # so this outbound call must release the calling Python thread's GIL.
+        self._close_bridge = ctypes.CFUNCTYPE(None, ctypes.c_void_p)(extension.close_bridge)
+        self._create_capsule = ctypes.PYFUNCTYPE(ctypes.py_object, ctypes.c_void_p, ctypes.POINTER(_NativeCreateV1))(
+            extension.create_capsule
+        )
+
+        api = _NativePythonApiV1(
+            struct_size=ctypes.sizeof(_NativePythonApiV1),
+            abi_version=1,
+            python_hexversion=sys.hexversion,
+            py_gil_state_ensure=_python_api_address("PyGILState_Ensure"),
+            py_gil_state_release=_python_api_address("PyGILState_Release"),
+            py_inc_ref=_python_api_address("Py_IncRef"),
+            py_dec_ref=_python_api_address("Py_DecRef"),
+            py_capsule_new=_python_api_address("PyCapsule_New"),
+            py_capsule_is_valid=_python_api_address("PyCapsule_IsValid"),
+            py_capsule_get_pointer=_python_api_address("PyCapsule_GetPointer"),
+            py_capsule_set_name=_python_api_address("PyCapsule_SetName"),
+            py_err_fetch=_python_api_address("PyErr_Fetch"),
+            py_err_restore=_python_api_address("PyErr_Restore"),
+            py_err_clear=_python_api_address("PyErr_Clear"),
+            py_err_occurred=_python_api_address("PyErr_Occurred"),
+            py_err_set_string=_python_api_address("PyErr_SetString"),
+            py_err_no_memory=_python_api_address("PyErr_NoMemory"),
+            py_exc_runtime_error=RuntimeError,
+            py_exc_value_error=ValueError,
+        )
+        bridge = ctypes.c_void_p()
+        status = self._create_bridge(ctypes.byref(api), ctypes.byref(bridge))
+        if status == self._INCOMPATIBLE_RUNTIME:
+            raise RuntimeError("ovrtx native DLPack is already bound to a different CPython runtime")
+        if status != self._SUCCESS or not bridge.value:
+            raise RuntimeError(f"Failed to create the ovrtx DLPack bridge (status={status})")
+        self._api = api
+        self._lock = threading.Lock()
+        self._bridge = bridge
+        self._active = True
+
+    def close(self) -> None:
+        with self._lock:
+            if not self._active:
+                return
+            self._active = False
+            bridge = self._bridge
+            self._bridge = ctypes.c_void_p()
+        # Draining may enter Python; the retired handle no longer needs the lock.
+        self._close_bridge(bridge)
+
+    def create_capsule(
+        self, dl_tensor: DLTensor, owner: Any, *, max_version: Optional[tuple[int, int]], readonly: bool
+    ) -> Any:
+        version = DLPackVersion(0, 0) if max_version is None else DLPackVersion(*max_version)
+        create = _NativeCreateV1(
+            struct_size=ctypes.sizeof(_NativeCreateV1),
+            max_version=version,
+            dlpack_flags=DLPACK_FLAG_BITMASK_READ_ONLY if readonly else 0,
+            tensor=ctypes.pointer(dl_tensor),
+            owner=owner,
+        )
+        with self._lock:
+            if not self._active:
+                raise RuntimeError("ovrtx native DLPack bridge is closed")
+            return self._create_capsule(self._bridge, ctypes.byref(create))
+
+
+_native_dlpack_bridge: Optional[_NativeDLPackBridge] = None
+
+
+def _initialize_native_dlpack_bridge(lib: ctypes.CDLL) -> None:
+    """Query and create the private native DLPack bridge."""
+    global _native_dlpack_bridge
+    if _native_dlpack_bridge is not None:
+        return
+
+    extension_ptr = ctypes.c_void_p()
+    result = lib.ovrtx_query_extension(b"ovrtx.python.dlpack.v1", ctypes.byref(extension_ptr))
+    if result.status != 0 or not extension_ptr.value:
+        raise RuntimeError("Loaded ovrtx library does not provide the native DLPack extension")
+    _native_dlpack_bridge = _NativeDLPackBridge(extension_ptr.value)
+
+
+def _close_native_dlpack_bridge() -> None:
+    global _native_dlpack_bridge
+    bridge = _native_dlpack_bridge
+    _native_dlpack_bridge = None
+    if bridge is not None:
+        bridge.close()
 
 
 def _to_dlpack_capsule(
     dl_tensor: DLTensor,
     manager_ctx: Any,
-    deleter_callback: Optional[Callable] = None,
     *,
-    versioned: bool = False,
+    dl_device: Optional[tuple[int, int]],
+    max_version: Optional[tuple[int, int]] = None,
     readonly: bool = True,
 ) -> Any:
     """Create DLPack capsule from DLTensor.
@@ -436,8 +558,8 @@ def _to_dlpack_capsule(
     Args:
         dl_tensor: The tensor to wrap
         manager_ctx: Python object to keep alive (prevents GC of underlying data)
-        deleter_callback: Optional callback when tensor is released
-        versioned: If True, create DLPack 1.0 DLManagedTensorVersioned capsule
+        dl_device: Requested target device, or None to use the tensor's current device
+        max_version: Maximum DLPack version supported by the consumer
         readonly: If True and versioned, set DLPACK_FLAG_BITMASK_READ_ONLY flag
 
     Returns:
@@ -445,198 +567,91 @@ def _to_dlpack_capsule(
 
     Note:
         Per DLPack spec: Consumer renames capsule to "used_*" after extraction.
-        Capsule destructor checks name and calls deleter only if unconsumed.
-        manager_ctx is kept alive for the lifetime of the capsule.
+        The Python owner remains alive until the consumer releases the managed
+        tensor or an unconsumed capsule is destroyed.
     """
-    # Handle vectorized dtypes (lanes > 1) by expanding to an extra shape dimension
-    actual_ndim = dl_tensor.ndim + (1 if dl_tensor.dtype.lanes > 1 else 0)
-
-    # Choose struct type and capsule name based on version
-    if versioned:
-        ManagedTensor = DLManagedTensorVersioned
-        capsule_name = _c_str_dltensor_versioned
-    else:
-        ManagedTensor = DLManagedTensor
-        capsule_name = _c_str_dltensor
-
-    # Allocate managed tensor + shape array in one block
-    managed_size = ctypes.sizeof(ManagedTensor)
-    shape_size = actual_ndim * ctypes.sizeof(ctypes.c_int64)
-    total_size = managed_size + shape_size
-
-    mem_ptr = PyMem_Malloc(total_size)
-    if not mem_ptr:
-        raise MemoryError("Failed to allocate DLManagedTensor")
-
-    managed_tensor = ManagedTensor.from_address(mem_ptr)
-
-    # Set version and flags for versioned struct
-    if versioned:
-        managed_tensor.version.major = DLPACK_MAJOR_VERSION
-        managed_tensor.version.minor = DLPACK_MINOR_VERSION
-        managed_tensor.flags = DLPACK_FLAG_BITMASK_READ_ONLY if readonly else 0
-
-    # Copy DLTensor fields (shallow copy - pointers reference C memory)
-    managed_tensor.dl_tensor.data = dl_tensor.data
-    managed_tensor.dl_tensor.device = dl_tensor.device
-    managed_tensor.dl_tensor.ndim = actual_ndim
-    managed_tensor.dl_tensor.byte_offset = dl_tensor.byte_offset
-
-    # Copy dtype, adjusting lanes if expanded
-    managed_tensor.dl_tensor.dtype.code = dl_tensor.dtype.code
-    managed_tensor.dl_tensor.dtype.bits = dl_tensor.dtype.bits
-    managed_tensor.dl_tensor.dtype.lanes = 1 if dl_tensor.dtype.lanes > 1 else dl_tensor.dtype.lanes
-
-    # Set up shape array after the managed tensor struct
-    shape_ptr = ctypes.cast(mem_ptr + managed_size, ctypes.POINTER(ctypes.c_int64))
-    for i in range(dl_tensor.ndim):
-        shape_ptr[i] = dl_tensor.shape[i]
-    if dl_tensor.dtype.lanes > 1:
-        shape_ptr[dl_tensor.ndim] = dl_tensor.dtype.lanes
-    managed_tensor.dl_tensor.shape = shape_ptr
-    managed_tensor.dl_tensor.strides = None
-
-    # Two manual refs keep _capsule_ctx (and its CFUNCTYPEs) alive: one for c_deleter,
-    # one for capsule_destructor stored in the capsule context.
-    _capsule_ctx = _CapsuleCtx(manager_ctx, deleter_callback)
-    Py_IncRef(_capsule_ctx)  # held by c_deleter
-    managed_tensor.manager_ctx = id(_capsule_ctx)
-
-    @DLPACK_DELETER
-    def c_deleter(managed_ptr):
-        mt = ManagedTensor.from_address(managed_ptr)
-        ctx = ctypes.cast(mt.manager_ctx, ctypes.py_object).value
+    if dl_device is not None:
+        if not isinstance(dl_device, tuple) or len(dl_device) != 2:
+            raise TypeError("dl_device must be a (device_type, device_id) tuple of integers")
         try:
-            if ctx.deleter_callback is not None:
-                ctx.deleter_callback(ctx.manager_ctx)
-        finally:
-            Py_DecRef(ctx)
-            PyMem_Free(managed_ptr)
+            requested_device = (operator.index(dl_device[0]), operator.index(dl_device[1]))
+        except TypeError as exc:
+            raise TypeError("dl_device must be a (device_type, device_id) tuple of integers") from exc
 
-    @PyCapsule_Destructor
-    def capsule_destructor(capsule_ptr):
-        ctx_id = _PyCapsule_GetContext_raw(capsule_ptr)
-        if ctx_id:
-            ctx = ctypes.cast(ctx_id, ctypes.py_object).value
-            Py_DecRef(ctx)
+        current_device = (dl_tensor.device.device_type.value, dl_tensor.device.device_id)
+        if requested_device != current_device:
+            raise BufferError(
+                f"dl_device={requested_device!r} does not match tensor device "
+                f"{current_device!r}; cross-device copy is not supported"
+            )
 
-        # Use raw c_void_p bindings to avoid incrementing refcount on an object under deallocation.
-        # IsValid check skips the deleter when the capsule was already consumed (renamed by consumer).
-        if not _PyCapsule_IsValid_raw(capsule_ptr, capsule_name):
-            return
-        managed_ptr = _PyCapsule_GetPointer_raw(capsule_ptr, capsule_name)
-        if managed_ptr:
-            mt = ManagedTensor.from_address(managed_ptr)
-            if mt.deleter:
-                mt.deleter(managed_ptr)
-
-    _capsule_ctx.c_deleter = c_deleter
-    _capsule_ctx.capsule_destructor = capsule_destructor
-    managed_tensor.deleter = c_deleter
-
-    capsule = PyCapsule_New(mem_ptr, capsule_name, capsule_destructor)
-    Py_IncRef(_capsule_ctx)  # held by capsule_destructor
-    PyCapsule_SetContext(capsule, id(_capsule_ctx))
-    return capsule
+    bridge = _native_dlpack_bridge
+    if bridge is None:
+        raise RuntimeError("The native ovrtx DLPack bridge requires an initialized OVRTX runtime")
+    return bridge.create_capsule(
+        dl_tensor,
+        manager_ctx,
+        max_version=max_version,
+        readonly=readonly,
+    )
 
 
-class ManagedDLTensor:
-    """Managed DLPack tensor wrapper with protocol version support.
+class _DLPackable:
+    """Shared DLPack protocol implementation for OVRTX tensor views."""
 
-    Obtained from :attr:`AttributeMapping.tensor` (for attribute maps).
-    Pass the instance to ``np.from_dlpack()`` / ``wp.from_dlpack()`` /
-    ``torch.from_dlpack()`` for zero-copy array access, or call
-    :meth:`numpy` / :meth:`to_bytes` directly.
-
-    Supports both DLPack 0.x and 1.0 protocols. When a consumer (e.g. NumPy 2.1+)
-    requests a versioned capsule via ``__dlpack__(max_version=...)``, this returns a
-    ``DLManagedTensorVersioned`` with proper read-only/writeable flags.
-    """
+    __slots__ = ("_dltensor", "_dlpack_error", "_owner", "_readonly")
 
     def __init__(
         self,
-        dl_tensor: DLTensor,
-        manager_ctx: Any,
-        deleter_callback: Optional[Callable] = None,
+        dltensor: Optional[DLTensor],
+        error: Optional[str] = None,
+        *,
+        owner: Any = None,
         readonly: bool = True,
     ):
-        self._dl_tensor = dl_tensor
-        self._manager_ctx = manager_ctx
-        self._deleter_callback = deleter_callback
-        self._cleanup_done = False
+        if not isinstance(readonly, bool):
+            raise TypeError(f"readonly must be bool, got {type(readonly).__name__}")
+        self._dltensor = dltensor
+        self._dlpack_error = error
+        self._owner = owner
         self._readonly = readonly
 
     @property
+    def _dlpack_tensor(self) -> DLTensor:
+        if self._dltensor is None:
+            raise RuntimeError(self._dlpack_error or "DLPack tensor is unavailable")
+        return self._dltensor
+
+    @property
     def shape(self) -> tuple[int, ...]:
-        """Shape as Python tuple."""
-        return tuple(self._dl_tensor.shape[i] for i in range(self._dl_tensor.ndim))
+        """Tensor shape."""
+        tensor = self._dlpack_tensor
+        return tuple(tensor.shape[i] for i in range(tensor.ndim))
+
+    @property
+    def dtype(self) -> DLDataType:
+        """Tensor data type."""
+        return self._dlpack_tensor.dtype
 
     @property
     def ndim(self) -> int:
-        """Number of dimensions."""
-        return self._dl_tensor.ndim
-
-    @property
-    def dtype(self):
-        """Data type descriptor."""
-        return self._dl_tensor.dtype
+        """Tensor rank."""
+        return self._dlpack_tensor.ndim
 
     @property
     def data(self) -> int:
-        """Data pointer address."""
-        return self._dl_tensor.data
+        """Tensor data pointer."""
+        return self._dlpack_tensor.data
 
     @property
-    def device(self):
-        """Device info."""
-        return self._dl_tensor.device
-
-    @property
-    def raw_dltensor(self) -> DLTensor:
-        """Access underlying DLTensor (advanced use)."""
-        return self._dl_tensor
-
-    def to_bytes(self) -> bytes:
-        """Get pixel data as bytes (creates copy)."""
-        size = self._calculate_byte_size()
-        buffer = (ctypes.c_uint8 * size).from_address(self.data)
-        return bytes(buffer)
-
-    def _calculate_byte_size(self) -> int:
-        """Calculate total buffer size in bytes."""
-        total_elements = 1
-        for dim in self.shape:
-            total_elements *= dim
-        bytes_per_element = (self.dtype.bits // 8) * self.dtype.lanes
-        return total_elements * bytes_per_element
-
-    def numpy(self) -> "numpy.ndarray":
-        """Get NumPy array view of this tensor.
-
-        Returns:
-            NumPy ndarray view of the tensor data (zero-copy).
-
-        Note:
-            Writeability is controlled by the ``readonly`` flag passed to the
-            ``ManagedDLTensor`` constructor, which sets the DLPack 1.0
-            ``DLPACK_FLAG_BITMASK_READ_ONLY`` flag in the versioned capsule.
-
-            **NumPy 2.1+ behavior:** Calls ``__dlpack__(max_version=(1, 0))``,
-            receives versioned capsule with flags, and respects
-            ``DLPACK_FLAG_BITMASK_READ_ONLY`` — the returned array is writeable
-            only when the flag is not set.
-
-            **NumPy <2.1 behavior:** Calls ``__dlpack__()`` without ``max_version``,
-            receives legacy (unversioned) capsule, and always marks external
-            buffers as read-only regardless of flags.
-        """
-        import numpy as np
-
-        return np.from_dlpack(self)
+    def device(self) -> DLDevice:
+        """Tensor device."""
+        return self._dlpack_tensor.device
 
     def __dlpack_device__(self) -> tuple[int, int]:
-        """Return (device_type, device_id) tuple."""
-        return (self._dl_tensor.device.device_type.value, self._dl_tensor.device.device_id)
+        """Report the tensor device through the DLPack Python protocol."""
+        device = self._dlpack_tensor.device
+        return (device.device_type.value, device.device_id)
 
     def __dlpack__(
         self,
@@ -646,62 +661,14 @@ class ManagedDLTensor:
         dl_device: Optional[tuple[int, int]] = None,
         copy: Optional[bool] = None,
     ) -> Any:
-        """Create DLPack capsule for tensor exchange.
-
-        Args:
-            stream: CUDA stream hint from consumer. Accepted but ignored - caller
-                is responsible for synchronization before accessing the data.
-                Per DLPack: None=legacy, -1=no sync needed, 1=null stream,
-                positive=actual stream handle.
-            max_version: Maximum DLPack version supported by consumer, e.g. (1, 0)
-            dl_device: Target device (not supported, must match tensor device)
-            copy: Whether to copy data (not supported, must be None or False)
-
-        Returns:
-            PyCapsule containing DLManagedTensor or DLManagedTensorVersioned
-        """
-        # Note: stream parameter is accepted but ignored - we don't track which
-        # stream produced the data. Caller must ensure proper synchronization.
-        _ = stream
-
+        """Export the tensor through the DLPack Python protocol for zero-copy interop."""
+        _ = stream  # synchronization is the caller's responsibility
         if copy is True:
             raise BufferError("copy=True not supported")
-
-        # Return versioned capsule when consumer supports same major and at least (1, 0). DLPack
-        # minor version changes are ABI-compatible (same DLManagedTensorVersioned layout); only
-        # major version changes the layout. Same major ensures the consumer can use our struct;
-        # (1, 0) minimum ensures they support the versioned protocol. NumPy 2.1+ requests
-        # max_version=(1, 0) and then respects the read-only flag; legacy capsules are read-only.
-        use_versioned = max_version is not None and max_version[0] == DLPACK_MAJOR_VERSION and max_version >= (1, 0)
-
-        # Wrap deleter_callback so that c_deleter's invocation marks _cleanup_done on this
-        # ManagedDLTensor, preventing __del__ from re-invoking the callback.
-        if self._deleter_callback is not None:
-            original_cb = self._deleter_callback
-
-            def wrapped_cb(ctx, _self=self, _cb=original_cb):
-                _cb(ctx)
-                _self._cleanup_done = True
-
-        else:
-            wrapped_cb = None
-
         return _to_dlpack_capsule(
-            self._dl_tensor,
-            self._manager_ctx,
-            wrapped_cb,
-            versioned=use_versioned,
+            self._dlpack_tensor,
+            self,
+            dl_device=dl_device,
+            max_version=max_version,
             readonly=self._readonly,
         )
-
-    def __del__(self):
-        """Call cleanup callback on destruction."""
-        if not self._cleanup_done and self._deleter_callback is not None:
-            try:
-                self._deleter_callback(self._manager_ctx)
-                self._cleanup_done = True
-            except Exception:
-                pass
-
-    def __repr__(self) -> str:
-        return f"ManagedDLTensor(shape={self.shape}, dtype={self.dtype}, device={self.device})"

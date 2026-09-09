@@ -48,7 +48,7 @@ void read_xform_matrix(ovrtx_renderer_t* renderer, char const* prim_path, double
 
 void read_reset_xform_stack(ovrtx_renderer_t* renderer, char const* prim_path, bool* out_value) {
     ovx_string_t prim = ovx_str(prim_path);
-    DLDataType bool_type = {kDLUInt, 8, 1};
+    DLDataType bool_type = {kDLBool, 8, 1};
     ovrtx_binding_desc_or_handle_t binding = ovrtx_make_binding_desc(
         &prim, 1, ovx_str("omni:resetXformStack"), OVRTX_SEMANTIC_NONE, bool_type);
 

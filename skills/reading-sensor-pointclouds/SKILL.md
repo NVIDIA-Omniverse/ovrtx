@@ -16,7 +16,6 @@ description: >
   move sensor point clouds through CPU/CUDA memory. For channel meanings and units,
   use the interpreting-lidar-pointclouds or interpreting-radar-pointclouds skills.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -38,7 +37,7 @@ Use this skill when the user asks how to access PointCloud output data, map Coor
 Resolve inputs in this order: existing repository files and referenced snippets, explicit user request, then broader agent context.
 
 - Target API surface: Python, C/C++, or both.
-- Sensor modality, RenderProduct path, PointCloud RenderVar/output name, and requested tensor channels.
+- Sensor modality, RenderProduct path, PointCloud RenderVar prim path, and requested tensor channels.
 - Mapping target: CPU, linear CUDA memory, or host copy after map.
 - Valid-entry handling: `Counts`, `Flags`, desired slice/copy behavior, and whether data must outlive the mapping.
 - Repository source snippets referenced below. Treat these snippets as the API source of truth.
@@ -52,7 +51,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 ## Instructions
 
-1. Identify the sensor modality, RenderProduct, PointCloud output, target device, and named tensors to map.
+1. Identify the sensor modality, RenderProduct, full PointCloud RenderVar prim path, target device, and named tensors to map.
 2. Read the matching Python or C/C++ source snippet before writing API usage.
 3. Map the composite `PointCloud` output, access tensors by exact channel name, and use `Counts[0]` to bound per-point/per-detection tensors.
 4. Handle lifetime by language: in Python the mapping is consumer-owned — a held DLPack consumer view (e.g. a NumPy array) keeps the buffer valid past `unmap`, so lifetime isn't a manual concern; in C, copy data before unmapping if later code needs it. Keep CUDA synchronization aligned with the selected mapping target.
@@ -74,9 +73,11 @@ This skill has no scripts.
 
 ## Overview
 
-Sensor `PointCloud` render vars are composite outputs: mapping one render var exposes one named tensor per channel. `Counts` tensor's content is the number of valid points per tile.
+Sensor `PointCloud` render vars are composite outputs: mapping one render var exposes one named tensor per channel. `Counts[0]` is the delivered-entry count; delivered indices are `[0, Counts[0])`. It is not, by itself, proof that every delivered entry is valid.
 
 CPU mapping is simplest for examples and printing. GPU mapping is also supported for point-cloud pipelines: Python uses `map(device=ovrtx.Device.CUDA)`, and C uses `OVRTX_MAP_DEVICE_TYPE_CUDA`. GPU-mapped tensors must be consumed as CUDA DLTensors by GPU-aware code, not as host pointers.
+
+Explicit CPU and CUDA mappings report `kDLCPU` and linear `kDLCUDA` tensors, respectively. In C, `OVRTX_MAP_DEVICE_TYPE_DEFAULT` lets the runtime choose the most efficient representation; inspect each returned DLTensor's `device` field. Params remain CPU-resident for every mapping mode.
 
 ## Python
 
@@ -84,13 +85,13 @@ CPU mapping is simplest for examples and printing. GPU mapping is also supported
 
 > **Source:** `examples/python/lidar/main.py` snippet `read-lidar-pointcloud`
 
-The lidar example maps `PointCloud` to CPU, reads `Coordinates`, `Counts`, `Intensity`, and `TimeOffsetNs`, then copies the valid range out of the mapping for visualization.
+The lidar example maps the full `PointCloud` RenderVar prim path to CPU, reads `Coordinates`, `Counts`, `Intensity`, and `TimeOffsetNs`, then copies the delivered range out of the mapping for visualization. Its scene explicitly sets `includeInvalidPoints = false`, so every delivered entry is valid.
 
 ### Radar PointCloud
 
 > **Source:** `examples/python/radar/main.py` snippet `read-radar-pointcloud`
 
-The radar example maps `PointCloud` to CPU, reads `Coordinates`, `Counts`, and `RadialVelocityMs`, then slices the valid detections. Approaching radar detections can have negative radial velocity.
+The radar example maps the full `PointCloud` RenderVar prim path to CPU, reads `Coordinates`, `Counts`, `Flags`, and `RadialVelocityMs`, then filters the delivered detection range with the `VALID` bit. Approaching radar detections can have negative radial velocity.
 
 ## C
 
@@ -99,7 +100,7 @@ The radar example maps `PointCloud` to CPU, reads `Coordinates`, `Counts`, and `
 > **Source:** `examples/c/lidar/main.cpp` snippet `step-lidar-pointcloud`
 > **Source:** `examples/c/lidar/main.cpp` snippet `read-lidar-pointcloud`
 
-The lidar C example fetches the stepped render results, finds `PointCloud`, maps it to CPU, reads named tensors, and unmaps after computing summary values.
+The lidar C example fetches the stepped render results, finds the full `PointCloud` RenderVar prim path, maps it to CPU, reads named tensors, and unmaps after computing summary values.
 
 ### Radar PointCloud
 
@@ -112,16 +113,17 @@ The radar C example uses the same map/read/unmap flow and additionally reads rad
 
 | Channel | Meaning |
 |---|---|
-| `Counts` | Scalar valid point count. Always use it to bound per-point channel access. |
+| `Counts` | Scalar delivered-entry count. Always use it to bound per-point or per-detection channel access. |
 | `Coordinates` | Point coordinates, commonly packed as `3 x N`; transpose or index according to the mapped tensor shape. |
-| `Flags` | Model-delivered per-point status flags. |
+| `Flags` | Model-delivered per-entry status flags. The `VALID` bit is `0x40`. |
 | `TimeOffsetNs` | Per-point time offset in nanoseconds. |
 
 The model auto-enables `Counts` and `Flags`, and they are delivered as ordinary `PointCloud` channel tensors. Other payload channels must be requested by the sensor `PointCloud` `RenderVar`. There are additional modality specific channels, see `configuring-lidar-sensors` and `configuring-radar-sensors`.
 
 ## Troubleshooting
 
-- Do not iterate over the full tensor allocation; only the first `Counts[0]` entries are valid.
+- Do not iterate over the full tensor allocation; only the first `Counts[0]` entries are delivered.
+- When invalid entries may be present, filter the delivered range with `(Flags[i] & 0x40) != 0`.
 - **Lifetime.** In Python the mapping is consumer-owned: a held DLPack consumer view (e.g. a NumPy array) keeps the buffer valid even after `unmap`, so lifetime is not a manual concern — copy only if you need data beyond the last view. In C, mapped tensors are valid until `unmap` — copy before unmapping if the data must outlive it.
 - CPU examples can use NumPy or raw host pointers. GPU mappings require DLPack-compatible CUDA consumers or custom CUDA code plus correct unmap synchronization.
 - For point-cloud tensors in C, use `OVRTX_MAP_DEVICE_TYPE_CUDA` for linear CUDA memory; `OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY` is intended for image-style outputs.

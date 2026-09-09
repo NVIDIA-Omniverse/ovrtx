@@ -22,7 +22,7 @@ Python and USD suites each have their own `pyproject.toml` and run via `uv run p
 
 ### ovrtx 0.4 port status
 
-- Stage-owning tests in `python/` request the attached ovstage fixture. Focused compatibility tests still exercise deprecated renderer wrappers in `test_all_attributes.py`, `test_attribute_bindings.py`, `test_attribute_read.py`, `test_base.py`, `test_picking_selection.py`, and `test_stage_query.py`.
+- New tests and snippets in `python/` always use attached ovstage. The `@pytest.mark.allow_deprecated_ovrtx_api` marker is reserved for retained tests whose subject is the deprecated renderer-owned API contract; other deprecated use remains in the ovstage migration summary.
 - `c/` has not been ported to attached ovstage and remains compatibility coverage for deprecated standalone renderer stage APIs.
 - `usd/` validates USD content directly and does not exercise either stage-ownership model.
 
@@ -62,7 +62,7 @@ tests/docs/
 │   ├── pyproject.toml                           # ovrtx + pytest
 │   ├── conftest.py                              # Pytest configuration
 │   ├── test_all_attributes.py                   # Authored USD attribute read/write snippets and coverage
-│   ├── test_camera_aovs.py                      # Smoke tests for all camera AOVs
+│   ├── test_camera_aovs.py                      # Smoke tests for all camera AOVs (SDG snippet + full RTPT catalog, 82 AOVs)
 │   ├── test_camera_sensors.py                   # Snippets for camera_sensors.rst
 │   ├── test_render_modes.py                     # Tests for camera render modes
 │   └── test_sensor_configuration.py             # Snippets for sensor_configuration.rst
@@ -178,7 +178,7 @@ See `skills/adding-doc-snippets/SKILL.md` for the step-by-step workflow.
 | `doc-camera-sensor-render-product` | `usd/data/camera_sensor_render_product.usda` | `camera_sensors.rst` |
 | `doc-camera-sensor-render-product-python` | `usd/test_usd_python_examples.py` | `camera_sensors.rst` |
 | `doc-step-and-map-camera-outputs` | `python/test_camera_sensors.py` | `camera_sensors.rst` |
-| `doc-camera-aov-smoke-test` | `python/test_camera_aovs.py` | _(test only)_ |
+| `doc-camera-aov-smoke-test` | `python/test_camera_aovs.py` | _(test only — SDG AOVs; see also `test_all_rtpt_aovs` in same file for full RTPT catalog)_ |
 | `doc-camera-aov-smoke-test-c` | `c/test_camera_aovs.cpp` | _(test only)_ |
 | `doc-minimal-render-product` | `usd/data/minimal_render_product.usda` | `sensor_configuration.rst` |
 | `doc-minimal-render-product-python` | `usd/test_usd_python_examples.py` | `sensor_configuration.rst` |
@@ -190,12 +190,18 @@ See `skills/adding-doc-snippets/SKILL.md` for the step-by-step workflow.
 | `doc-step-multiple-render-products-c` | `c/test_sensor_configuration.cpp` | `sensor_configuration.rst` |
 | `doc-add-render-config-layer-c` | `c/test_sensor_configuration.cpp` | `sensor_configuration.rst` |
 | `doc-path-tracing-render-product` | `python/test_render_modes.py` | `sensors/cameras/render_modes.rst` |
-| `doc-bind-material` | `python/test_base.py` | `scene/material_binding.rst` |
-| `doc-bind-material-c` | `c/test_base.cpp` | `scene/material_binding.rst` |
+| `doc-bind-material` | `python/test_base.py` | `materials/material_binding.rst` |
+| `doc-bind-material-c` | `c/test_base.cpp` | `materials/material_binding.rst` |
+| `doc-uv-projector-api` | `examples/python/projectors/projectors.usda` | `materials/projectors.rst` |
+| `doc-uv-projector-binding` | `examples/python/projectors/projectors.usda` | `materials/projectors.rst` |
+| `doc-create-decal` | `usd/data/decal.usda` | `materials/decals.rst` |
+| `doc-bind-decal` | `usd/data/decal_binding.usda` | `materials/decals.rst` |
 | `doc-set-render-setting` | `python/test_base.py` | `sensors/configuration.rst` |
 | `doc-set-render-setting-c` | `c/test_base.cpp` | `sensors/configuration.rst` |
+| `doc-set-view-lighting` | `python/test_base.py` | _(skill only)_ |
 | `doc-warmup` | `python/test_base.py` | _(skill only)_ |
 | `doc-warmup-c` | `c/test_base.cpp` | _(skill only)_ |
+| `doc-sliced-rendering` | `python/test_base.py` | `examples/python_sliced_rendering.rst` |
 | `doc-query-prims-basic` | `python/test_stage_query.py` | _(skill only)_ |
 | `doc-query-prims-by-type` | `python/test_stage_query.py` | _(skill only)_ |
 | `doc-query-prims-with-attributes` | `python/test_stage_query.py` | _(skill only)_ |
@@ -219,6 +225,7 @@ See `skills/adding-doc-snippets/SKILL.md` for the step-by-step workflow.
 | `doc-wait-op-no-release-errors-c` | `c/test_error_handling.cpp` | _(skill only)_ |
 | `doc-log-callback-prefix-filter-c` | `c/test_logging.cpp` | _(skill only)_ |
 | `doc-step-async` | `python/test_camera_sensors.py` | _(skill only)_ |
+| `doc-reset-simulation-clock` | `python/test_camera_sensors.py` | _(skill only)_ |
 | `doc-shape-scalar-int32` | `python/test_attribute_shapes.py` | _(skill only)_ |
 | `doc-shape-float3-array` | `python/test_attribute_shapes.py` | _(skill only)_ |
 | `doc-shape-mat4-array` | `python/test_attribute_shapes.py` | _(skill only)_ |
@@ -257,7 +264,7 @@ See `skills/adding-doc-snippets/SKILL.md` for the step-by-step workflow.
 | `doc-reset-stage-async` | `python/test_support_api.py` | _(skill only)_ |
 | `doc-version-and-config-c` | `c/test_support_api.cpp` | _(skill only)_ |
 | `doc-query-op-status-c` | `c/test_support_api.cpp` | _(skill only)_ |
-| `doc-get-last-error-c` | `c/test_support_api.cpp` | _(skill only)_ |
+| `doc-get-last-error-c` | `c/test_support_api.cpp` | `c_api/practical_patterns.rst` |
 | `doc-query-require-any-exclude` | `python/test_stage_query.py` | _(skill only)_ |
 | `doc-query-specific-empty-attributes` | `python/test_stage_query.py` | _(skill only)_ |
 | `doc-query-inline-sublayer-composition` | `python/test_stage_query.py` | _(skill only)_ |
@@ -271,6 +278,7 @@ See `skills/adding-doc-snippets/SKILL.md` for the step-by-step workflow.
 | `doc-query-require-any-exclude-c` | `c/test_stage_query.cpp` | _(skill only)_ |
 | `doc-query-specific-empty-attributes-c` | `c/test_stage_query.cpp` | _(skill only)_ |
 | `doc-map-render-output-cuda` | `python/test_camera_sensors.py` | _(skill only)_ |
+| `doc-map-render-output-cuda-array` | `python/test_camera_sensors.py` | _(skill only)_ |
 | `doc-map-render-output-cuda-c` | `c/test_camera_sensors.cpp` | _(skill only)_ |
 | `doc-map-render-output-cuda-array-c` | `c/test_camera_sensors.cpp` | _(skill only)_ |
 | `doc-set-xform-mat-c` | `c/test_transform_helpers.cpp` | _(skill only)_ |

@@ -15,7 +15,6 @@ description: >
   RenderProduct to CUDA-visible GPU 0 or another explicit set of CUDA-visible GPUs,
   especially for multi-GPU CI or viewport picking.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -135,6 +134,8 @@ removed.
 - `picking-selection` for viewport picking, marquee selection, and selection
   outline drawing.
 - `renderer-creation` for renderer-level CUDA device selection.
+- `cuda-interop` for mapping a selected CUDA-visible ordinal to the exact Vulkan
+  physical device, including sibling MIG instances.
 
 ## References
 

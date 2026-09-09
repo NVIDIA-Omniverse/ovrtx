@@ -13,7 +13,6 @@ description: >
   Running a simulation step to produce rendered frames. Use when user asks to render a
   frame, step the renderer, simulate a sensor, or get an image from ovrtx.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -80,11 +79,27 @@ ovrtx tracks **two independent clocks** — a frequent point of confusion:
 
 `step()` does **not** advance USD animation, and `update_from_usd_time()` does **not** advance the simulation/sensor clock. To render an animated frame at time *t*: call `update_from_usd_time(t)` first, then `step(...)`. `reset(time)` resets simulation time only (not USD time, and distinct from `reset_stage()`). Remember `update_from_usd_time` takes **seconds**, not timecodes — see `loading-usd` for the `timeCodesPerSecond` conversion.
 
+### Step window vs. frame capture time
+
+`reset(time=T)` re-bases the clock so the next `step(dt)` simulates `[T, T + dt]`; it does not emit a frame at `T`.
+
+Python exposes both:
+
+| Field | Where | Meaning after `reset(T)` + `step(dt)` |
+|-------|-------|----------------------------------------|
+| `RenderProductSetOutputs.simulation_start_time` | step result | `T` — the step clock base |
+| `RenderProductSetOutputs.simulation_end_time` | step result | `T + dt` |
+| `FrameOutput.start_time` / `end_time` | per frame | sensor capture inside `[T, T + dt]` |
+
+A default viewport camera captures instantaneously at the *end* of the step window, so its `FrameOutput.start_time` is `T + dt`, not `T`. That is expected, not a clock bug — assert `products.simulation_start_time` when checking the clock base.
+
 ## Python
 
 ### Single frame
 
 > **Source:** `examples/python/minimal/main.py` snippet `step`
+>
+> **Source (local-scene example):** `examples/python/projectors/main.py` snippet `projectors-render`
 
 ### Iterate over results
 
@@ -100,13 +115,18 @@ ovrtx tracks **two independent clocks** — a frequent point of confusion:
 >
 > `renderer.reset(time=0.0)` resets accumulated simulation time (distinct from `reset_stage()`).
 
+> **Source:** `tests/docs/python/test_camera_sensors.py` snippet `doc-reset-simulation-clock`
+>
+> Assert the clock base via `products.simulation_start_time` after the next step
+> (distinct from `FrameOutput.start_time`).
+
 ## C
 
 ### Step, wait, fetch
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `step-renderer`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `fetch-results`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `fetch-results`
 
 ### Iterate over C results
 
@@ -127,9 +147,11 @@ ovrtx tracks **two independent clocks** — a frequent point of confusion:
 Result hierarchy:
 ```
 RenderProductSetOutputs
+  .simulation_start_time / .simulation_end_time   # step window [t, t+dt]
   -> ProductOutput (one per render product path)
     -> FrameOutput (one per frame produced during the step)
-      -> RenderVarOutput (one per output variable: LdrColor, HdrColor, depth, etc.)
+      .start_time / .end_time                     # sensor capture inside the window
+      -> RenderVarOutput (one per full RenderVar prim path: /Render/Camera/LdrColor, /Render/Camera/HdrColor, etc.)
 ```
 
 ## Troubleshooting
@@ -147,7 +169,7 @@ When ovrtx is attached to ovstage, step through
 (Python: ``renderer.step(products, dt, ordinal=n)``). The ``ordinal`` is a
 committed-publication gate — the renderer observes ovstage state at or above
 that ordinal. Call ``ovrtx_update_from_stage(ordinal)`` first to pull committed
-prim/attribute state into ovrtx's Fabric, then step. See
+prim/attribute state into the renderer, then step. See
 ``docs/core/ovstage_integration.rst`` "Ordinals and Write-Floor Gates" for the
 ordinal model.
 

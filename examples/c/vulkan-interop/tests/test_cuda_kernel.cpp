@@ -20,7 +20,7 @@ protected:
     static void SetUpTestSuite() {
         // Initialize CUDA once for all tests
         if (!cuda_initialized) {
-            cuda_initialized = cuda_init_standalone(&cuda_uuid);
+            cuda_initialized = cuda_init_standalone(0, &cuda_uuid);
         }
         if (cuda_initialized && !kernel_compiled) {
             kernel_compiled = cuda_compile_kernel();
@@ -56,6 +56,18 @@ TEST_F(CudaKernelTest, CudaUuidIsNonZero) {
         }
     }
     EXPECT_FALSE(all_zero) << "CUDA UUID should not be all zeros";
+}
+
+TEST_F(CudaKernelTest, CudaUuidUsesMigAwareDriverIdentity) {
+    ASSERT_TRUE(cuda_initialized);
+
+    CUdevice device;
+    ASSERT_EQ(cuCtxGetDevice(&device), CUDA_SUCCESS);
+
+    CUuuid mig_aware_uuid = {};
+    ASSERT_EQ(cuDeviceGetUuid_v2(&mig_aware_uuid, device), CUDA_SUCCESS);
+    EXPECT_EQ(memcmp(cuda_uuid.bytes, mig_aware_uuid.bytes, sizeof(cuda_uuid.bytes)), 0)
+        << "CUDA/Vulkan matching must use the MIG-aware CUDA device UUID";
 }
 
 TEST_F(CudaKernelTest, KernelCompilationSucceeds) {
@@ -138,4 +150,3 @@ TEST_F(CudaKernelTest, MemoryAllocationWorks) {
         cuMemFree(ptr);
     }
 }
-

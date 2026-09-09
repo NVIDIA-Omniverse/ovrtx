@@ -40,7 +40,7 @@ A RenderProduct that outputs both ``LdrColor`` and ``HdrColor`` from a camera:
 Accessing Outputs in Code
 -------------------------
 
-After stepping the renderer with a RenderProduct path, the outputs are available by name:
+After stepping the renderer with a RenderProduct path, the outputs are available by full RenderVar prim path:
 
 .. tab-set::
 

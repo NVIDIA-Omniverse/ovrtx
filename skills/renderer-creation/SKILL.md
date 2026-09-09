@@ -13,7 +13,6 @@ description: >
   Creating and configuring an ovrtx renderer instance. Use when user asks to create a
   renderer, initialize ovrtx, configure renderer options, or set up ovrtx.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -74,6 +73,8 @@ The renderer is the central object in ovrtx. You must create one before loading 
 Create a renderer with default settings:
 
 > **Source:** `examples/python/minimal/main.py` snippet `create-renderer`
+>
+> **Source (local-scene example):** `examples/python/projectors/main.py` snippet `projectors-create-renderer`
 
 Or with configuration:
 
@@ -131,14 +132,17 @@ Config helpers in C (`ovrtx_config.h`):
 - `ovrtx_config_entry_read_gpu_transforms(bool)`
 - `ovrtx_config_entry_keep_system_alive(bool)` -- keep shared GPU resources alive after the last renderer is destroyed, so a subsequent `ovrtx_create_renderer` reuses them
 - `ovrtx_config_entry_active_cuda_gpus(ovx_string_t)` -- comma-separated CUDA-visible device indices (e.g., `"0,1,2"`), after `CUDA_VISIBLE_DEVICES` filtering/remapping, to select which GPUs the renderer may use
-- `ovrtx_config_entry_use_vulkan(bool)` -- select Vulkan rendering backend where supported
-- `ovrtx_config_entry_dome_baking_resolution(int)` -- DomeLight MDL baking resolution in texels (renderer-wide, range `1..8192`; when omitted the setting is left untouched, default `4096` on a fresh renderer); Python `RendererConfig(dome_baking_resolution=...)`
+- `ovrtx_config_entry_sensors_allowed_deprecation_base(ovx_string_t)` -- allow all soft-deprecated sensor versions while pinned to the exact OVRTX `"<major>.<minor>.<patch>"` version (e.g. `"0.5.0"`); any non-matching value (or unset) allows none
+- `ovrtx_config_entry_datastore_cache(ovx_string_t)` -- configure the UJITSO datastore cache with a `grpcdns://`, `grpcdns_notls://`, or `local://` value; Python `RendererConfig(datastore_cache=...)`
+- `ovrtx_config_entry_enable_geometry_streaming(bool)` -- opt in to geometry streaming, which is disabled by default when omitted; Python `RendererConfig(enable_geometry_streaming=...)`
 - `ovrtx_config_entry_texture_streaming_mode(ovrtx_texture_streaming_mode_t)` -- select disabled, synchronous, or asynchronous texture streaming (asynchronous by default); Python `RendererConfig(texture_streaming_mode=ovrtx.TextureStreamingMode.*)`
 - `ovrtx_config_entry_suppress_deprecation_warnings(bool)` -- suppress native runtime warnings from deprecated APIs; Python `RendererConfig(suppress_deprecation_warnings=True)`
 
 Texture streaming mode is process-global and applies to all active renderer
 instances. `OVRTX_TEXTURE_STREAMING_SYNCHRONOUS` controls texture-feedback
 processing; it does not make all texture loading operations synchronous.
+
+> **Source:** `tests/docs/python/test_support_api.py` snippet `doc-renderer-config`
 
 Deprecation warnings remain enabled by default. Suppression is useful during a
 phased migration, but does not suppress compile-time C/C++ diagnostics or
@@ -149,7 +153,7 @@ change the deprecated APIs' removal schedule.
 - **First-run shader compilation:** The first time an ovrtx application runs on a system (or after a driver update), the renderer compiles and caches GPU shaders. This can take several minutes. Subsequent runs reuse the cached shaders and start quickly. If you're running tests or examples for the first time and see a long pause after creating the renderer, this is expected.
 - In C, forgetting to call `ovrtx_destroy_renderer()` will leak GPU resources.
 - `binary_package_root_path` is only required when static linking ovrtx, or when your install layout breaks apart the ovrtx `bin/` directory.
-- With dynamic linking, ovrtx expects runtime directories under `bin/` (`cache/`, `library/`, `libs/`, `mdl/`, `plugins/`, `rendering-data/`, `usd_plugins/`) to be found next to `ovrtx-dynamic.dll` / `libovrtx-dynamic.so`.
+- With the shared-loader model, ovrtx expects runtime directories under `bin/` (`cache/`, `library/`, `libs/`, `mdl/`, `plugins/`, `rendering-data/`, `usd_plugins/`) to be found next to `ovrtx-dynamic.dll` / `libovrtx-dynamic.so`.
 - If you call `ovrtx_initialize()` explicitly, pair it with a matching `ovrtx_shutdown()`.
 - **Linux headless multi-renderer lifecycle:** On Linux systems with no display, repeatedly creating and destroying renderers may result in a crash with the stack trace pointing into `libEGL.so` when shared graphics resources are torn down between renderers. This can happen if `keep_system_alive` is configured to `false`, or if `ovrtx_initialize()` is not called before the multi-renderer lifecycle. In the implicit-initialization pattern (when `ovrtx_initialize()` is not called), the `keep_system_alive` config setting is effectively ignored. Avoid this by both configuring `keep_system_alive` to `true` (`RendererConfig(keep_system_alive=True)` in Python, `ovrtx_config_entry_keep_system_alive(true)` in C) and calling `ovrtx_initialize()` before creating renderers. If this is not possible, or the crash persists, a further workaround is to set the environment variable `VK_LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=1`.
 - Error strings from `ovrtx_get_last_error()` are only valid until the next API call on the same thread.

@@ -344,7 +344,7 @@ A.3 “DGX Systems” means NVIDIA-branded DGX systems, except for DGX Spark whi
 
 A.4 “Enterprise Products” is amended to include the following: Software in NVIDIA AI Enterprise, NVIDIA Base Command Manager software, NVIDIA AI Workbench software, NVIDIA Run:ai, NVIDIA DGX Software (as defined) and NVIDIA Mission Control.
 
-A.5 “NVIDIA AI Enterprise” means NVIDIA AI software in the NVIDIA NGC AI Enterprise catalog at [https://ngc.nvidia.com/nvaie-supported](https://nam11.safelinks.protection.outlook.com/?url=https%3A%2F%2Fngc.nvidia.com%2Fnvaie-supported&data=05%7C01%7Catjernlund%40nvidia.com%7C40e1ca74bf6b4e85726408db2cb14ca6%7C43083d15727340c1b7db39efd9ccc17a%7C0%7C0%7C638152912235786472%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&sdata=LpbfpU%2F%2F%2BC0MFxoL813233lNEItvwc44wY5D5knwNnk%3D&reserved=0), including NVIDIA NIMs, NVIDIA NeMo, NVIDIA Omniverse (including Kit) and NVIDIA Run:ai (except as otherwise expressly permitted under these AI Product Terms), as updated from time to time.
+A.5 “NVIDIA AI Enterprise” means NVIDIA AI software in the NVIDIA NGC AI Enterprise catalog at [https://ngc.nvidia.com/nvaie-supported](https://ngc.nvidia.com/nvaie-supported), including NVIDIA NIMs, NVIDIA NeMo, NVIDIA Omniverse (including Kit) and NVIDIA Run:ai (except as otherwise expressly permitted under these AI Product Terms), as updated from time to time.
 
 A.6 “NVIDIA DGX Software” means NVIDIA-provided operating system and software specific for DGX Systems as indicated by NVIDIA in documentation, including the following if delivered: NVIDIA Base Command Manager, NVIDIA Magnum IO, NVIDIA Unified Fabric Manager, and other software and materials.
 

@@ -14,7 +14,6 @@ description: >
   move an object, set a transform, update position, animate a transform, or set a
   camera transform.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -71,7 +70,7 @@ This skill has no scripts.
 
 ## Overview
 
-Transforms control the position, rotation, and scale of prims in the scene. ovrtx supports three transform representations. The most common is a 4x4 matrix of doubles using the USD row-vector convention: translation is in the last row (`[3][0..2]`). The canonical transform attribute name is `"omni:xform"` (used by the C convenience helpers in `ovrtx_attributes.h`). The legacy name `"omni:fabric:localMatrix"` is also accepted.
+Transforms control the position, rotation, and scale of prims in the scene. ovrtx supports three transform representations. The most common is a 4x4 matrix of doubles using the USD row-vector convention: translation is in the last row (`[3][0..2]`). Use the `"omni:xform"` attribute name, which is also used by the C convenience helpers in `ovrtx_attributes.h`.
 
 ## Python
 
@@ -135,7 +134,7 @@ Python semantic: `Semantic.XFORM_MAT4x4` (from `from ovrtx import Semantic`). Fo
 ## Troubleshooting
 
 - Matrices use the **USD row-vector convention** (same as `GfMatrix4d`). Translation is in the last row: `v[12]`, `v[13]`, `v[14]` (or `matrix[3][0..2]` in Python/C).
-- The canonical transform attribute name is `"omni:xform"`. The legacy name `"omni:fabric:localMatrix"` is also accepted. New code should prefer `"omni:xform"` to match the C convenience helpers (`ovrtx_set_xform_mat`, etc.).
+- Use the `"omni:xform"` attribute name to match the C convenience helpers (`ovrtx_set_xform_mat`, etc.).
 - Transform dtype is `float64` (doubles), not float32. Using the wrong dtype will cause errors.
 - For repeated per-frame transform updates, use attribute bindings or mapping for better performance (see `attribute-bindings` and `mapping-attributes` skills).
 - Earlier code may use `ovrtx.math.Matrix4d` for single-prim writes; the `ovrtx.math` module and the `Matrix4d` class have been removed. Pass an `(N, 4, 4)` `float64` array (NumPy, Warp, or any DLPack-compatible tensor) directly to `write_attribute`, or use `dtype="float64", shape=(4, 4)` with `bind_attribute` / `map_attribute`.

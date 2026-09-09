@@ -14,7 +14,7 @@ Extends ``literalinclude`` with two filtering options:
 
 ``:exclude-pattern:``
     Strips lines matching a regular expression.  The primary use-case is
-    removing ``# [snippet:...]`` / ``// [snippet:...]`` markers that are
+    removing ``# [snippet:<name>]`` / ``// [snippet:<name>]`` markers that are
     present in example files for skill references but should not appear in
     rendered documentation.
 
@@ -28,6 +28,7 @@ Extends ``literalinclude`` with two filtering options:
 
 import re
 
+from docutils import nodes as docutils_nodes
 from sphinx.directives.code import LiteralInclude
 
 
@@ -78,13 +79,16 @@ class FilteredLiteralInclude(LiteralInclude):
         if not has_filters:
             return nodes
 
+        # With :caption:, Sphinx wraps the literal_block in a container whose first
+        # child is the caption. Filter the literal_block wherever it sits, so a
+        # captioned include is not left with its caption replaced by code text.
         for node in nodes:
-            if node.rawsource or hasattr(node, "astext"):
-                filtered = self._apply_filters(node.astext())
+            for block in node.findall(docutils_nodes.literal_block):
+                filtered = self._apply_filters(block.astext())
                 # Update both rawsource (used by Pygments for highlighting)
                 # and the child Text node (used for plain-text output)
-                node.rawsource = filtered
-                node.children[0] = node.children[0].__class__(filtered)
+                block.rawsource = filtered
+                block.children[0] = block.children[0].__class__(filtered)
 
         return nodes
 

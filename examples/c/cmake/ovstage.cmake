@@ -10,9 +10,9 @@
 
 # ovstage.cmake - Fetch and configure the ovstage library as its own package
 #
-# ovstage ships an independent, self-contained C++ package (headers + import lib
-# + shared library + CMake config) parallel to ovrtx. This module fetches that
-# package and exposes both the dynamic ovstage::ovstage and the static
+# ovstage ships an independent, self-contained C++ package parallel to ovrtx.
+# This module fetches that package and exposes both the shared
+# ovstage::ovstage loader and the static
 # ovstage::ovstage_static imported targets via find_package.
 #
 # Usage:
@@ -27,13 +27,15 @@
 #   # exposed as a single side-by-side link (ovrtx/ and ovstage/) and main.cpp
 #   # hands each loader its own binary package root.
 #   target_link_libraries(myapp PRIVATE ovrtx::ovrtx_static ovstage::ovstage_static)
-#   # Dynamic ovstage is also supported: link ovstage::ovstage instead and
-#   # ovstage_setup_runtime replicates the dll + schemas/plugins beside the exe.
+#   # Shared loaders are also supported: link ovrtx::ovrtx and
+#   # ovstage::ovstage instead.
 #   ovrtx_setup_runtime(myapp)
 #   ovstage_setup_runtime(myapp)
 #
-# Attach mode requires ONE shared omni.fabric/USD runtime; see the
+# Attach mode requires ONE shared USD runtime; see the
 # ovstage_setup_runtime() doc below for how that single-runtime guarantee is met.
+# Both shared targets defer their runtimes until the first API initialization
+# call, so applications can register schema paths before OpenUSD is loaded.
 
 # Capture this file's directory at parse time (before macro expansion);
 # CMAKE_CURRENT_LIST_DIR inside a macro would refer to the caller's directory.
@@ -49,7 +51,7 @@ endif()
 # Detect whether TARGET links the static ovstage loader (ovstage::ovstage_static).
 # The examples link it directly before calling ovstage_setup_runtime, so it shows
 # up in LINK_LIBRARIES. When present we deploy ovstage as a single side-by-side
-# ovstage/ link (mirroring ovrtx model #1) instead of the dynamic copy/junction
+# ovstage/ link (mirroring ovrtx model #1) instead of the shared-loader deployment
 # path. Mirrors _ovrtx_target_uses_static_loader.
 function(_ovstage_target_uses_static_loader TARGET_NAME OUT_VAR)
     get_target_property(_libs ${TARGET_NAME} LINK_LIBRARIES)
@@ -82,14 +84,14 @@ macro(ovstage_fetch)
         # deps/ovrtx_deps.yaml; do not hand-edit.
         if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             set(OVSTAGE_PACKAGE_SYSTEM "windows-x86_64")
-            set(OVSTAGE_HASH "21ec62c2eb94ff346678e3fd2a41c4068a08a35d240341f95ec4e2ce1f23cf08")
+            set(OVSTAGE_HASH "2ca9a39310f6a0622166c4bca2affbe11695c592ec6b22e74a7a1b5dacd0cdff")
         elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
                 set(OVSTAGE_PACKAGE_SYSTEM "manylinux_2_35_aarch64")
-                set(OVSTAGE_HASH "7892d2e8139b6aaae14b993f9a9b0c08b36cf53b7c00767a46ed0e5036222051")
+                set(OVSTAGE_HASH "1ff3b64ccc17c4cf7f99636d1f8648c98f7de73e0e6308aa5daf5aec3a030994")
             elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
                 set(OVSTAGE_PACKAGE_SYSTEM "manylinux_2_35_x86_64")
-                set(OVSTAGE_HASH "34703875ac9ec81d8f12ea8695d90fe16ebe9921c610f66202c8b6ee2729c49f")
+                set(OVSTAGE_HASH "e5dc1738d632f35407259d68bf3edb9d012d00900f0fa50e44f730e76a93e4a5")
             else()
                 message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}")
             endif()
@@ -114,7 +116,7 @@ macro(ovstage_fetch)
         FetchContent_Declare(
             ovstage
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-            URL "https://github.com/NVIDIA-Omniverse/ovstage/releases/download/v0.1.1/ovstage@0.1.1.355824.553acd42.${OVSTAGE_PACKAGE_SYSTEM}.zip"
+            URL "https://github.com/NVIDIA-Omniverse/ovstage/releases/download/v0.2.0/ovstage@0.2.0.377349.70d78229.${OVSTAGE_PACKAGE_SYSTEM}.zip"
             URL_HASH SHA256=${OVSTAGE_HASH}
         )
 
@@ -137,46 +139,24 @@ endmacro()
 #    model #1: expose the package as a SINGLE link `ovstage/` next to the exe
 #    (junction on Windows, symlink on Linux) -> the package bin/, which main.cpp
 #    hands to ovstage_initialize() as the binary package root. The static loader
-#    loads ovstage.dll from that link on the first ovstage call and self-locates
-#    its own plugins/ + ovstage_usd_schemas/ under it, so there is NO dll copy, NO
-#    /DELAYLOAD, and NO separate schemas/plugins junction. The dll still loads
-#    lazily (after ovrtx_create_renderer loaded the shared usd_ms/tbb), so imports
-#    dedupe by base name - one usd_ms, one tbb, one ovstage.
+#    loads the runtime from that link on the first ovstage call and self-locates
+#    its plugins/ under it.
 #
-#  * DYNAMIC (ovstage::ovstage). ovstage ships an import lib (ovstage.lib) for
-#    ovstage.dll and has no "binary root" config (ovstage_instance_desc_t carries
-#    only a name). Unlike the static loader we cannot tell ovstage where its
-#    package is - ovstage.dll self-locates its bundled carb plugins (omni.fabric /
-#    usdrt.* / gpucompute / ...) RELATIVE TO THE DIRECTORY ovstage.dll IS LOADED
-#    FROM, i.e. it expects a sibling plugins/ tree. This is the ovstage team's own
-#    deployment contract; see rendering/ovstage/examples/smoke (CMakeLists.txt +
-#    run_smoke_test.py).
+#  * SHARED loader (ovstage::ovstage). The operating system loads only the small
+#    ovstage shared loader at process startup. Its first initialize/create call
+#    opens the colocated ovstage runtime, after the application has had a chance
+#    to register schema paths. On Windows we copy both loader and runtime beside
+#    the executable and junction the required package directories. On Linux an
+#    rpath keeps both in the package bin directory.
 #
-# So (dynamic only) we copy ovstage.dll next to the exe (its module dir becomes the
-# exe dir) and junction its data-only ovstage_usd_schemas/ beside it. The plugins/
+# The plugins/
 # name is shared with ovrtx, so its treatment depends on the ovrtx model (detected
 # via ovrtx::ovrtx_static on the target):
 #   - Model #1: ovrtx's runtime stays under the single `ovrtx/` link, so <exe>/plugins
 #     is free and we junction ovstage's own plugins/ closure there.
 #   - Model #2: ovrtx replicates its plugins/ at the exe root, so <exe>/plugins is
-#     ovrtx's; ovstage.dll shares that single tree (which carries ovstage's closure)
+#     ovrtx's; the ovstage runtime shares that single tree
 #     and we do NOT junction a second, colliding plugins/.
-#
-# Single usd_ms (why delay-load): ovstage.dll STATICALLY imports ov_25.11usd_ms.dll
-# and tbb12.dll (see `dumpbin /dependents ovstage.dll`), which the OS loader would
-# resolve the instant ovstage.dll loads. A normal load-time import would load at
-# process init - before ovrtx has loaded usd_ms, and while the junctioned plugins/
-# is not on any DLL search path - and fail. We therefore DELAY-LOAD ovstage.dll: it
-# loads on the first ovstage_* call, which in attach mode is always AFTER
-# ovrtx_create_renderer has loaded the single usd_ms (and tbb12) from the ovrtx
-# package. ovstage.dll's static imports then bind to those already-loaded modules by
-# base name - one usd_ms, one tbb, one ovstage. (The static loader gets the same
-# single-usd_ms guarantee for free: it loads ovstage.dll lazily on the first call.)
-#
-# NOTE: matched-train assumption (one usd_ms ABI shared by ovrtx + ovstage). The
-# open item is that ovrtx (its package) and ovstage (junctioned here) each carry a
-# carb plugin set; usd_ms/tbb dedupe by name, but a single Fabric/USD runtime in
-# attach mode still needs on-hardware confirmation (Linux rpath path too).
 #
 # OVSTAGE_BINARY_DIR is exported by ovstageConfig.cmake (the package's bin/ dir).
 function(ovstage_setup_runtime TARGET_NAME)
@@ -205,34 +185,27 @@ function(ovstage_setup_runtime TARGET_NAME)
         return()
     endif()
 
-    # --- Dynamic ovstage::ovstage below ---
+    # --- Shared ovstage::ovstage below ---
     # Under ovrtx model #2 the exe root's plugins/ is ovrtx's; ovstage shares it.
     # Only under model #1 do we junction ovstage's own plugins/ beside the exe.
     _ovrtx_target_uses_static_loader(${TARGET_NAME} _ovstage_static_model)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        # /DELAYLOAD + delayimp are MSVC/clang-cl features; a non-MSVC Windows
-        # toolchain (MinGW) would need its own lazy-load mechanism.
-        if(MSVC)
-            target_link_options(${TARGET_NAME} PRIVATE "/DELAYLOAD:ovstage.dll")
-            target_link_libraries(${TARGET_NAME} PRIVATE delayimp)
-        else()
-            message(WARNING "ovstage_setup_runtime: non-MSVC Windows toolchain detected; "
-                            "ovstage.dll is not delay-loaded and may load a second usd_ms at "
-                            "process init. Use MSVC/clang-cl, or load ovstage lazily yourself.")
-        endif()
-
-        # Copy ovstage.dll next to the exe so its module directory is the exe dir.
+        # The executable imports only ovstage-dynamic.dll. Copy the loader and
+        # its runtime together so the first ovstage call can resolve the latter.
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${OVSTAGE_BINARY_DIR}/ovstage-dynamic.dll"
                 "${OVSTAGE_BINARY_DIR}/ovstage.dll"
                 "$<TARGET_FILE_DIR:${TARGET_NAME}>"
-            COMMENT "Copying ovstage.dll to build directory"
+            COMMENT "Copying the ovstage shared loader and runtime to the build directory"
         )
 
-        # Junction the data-only usd schemas always (unique name), and ovstage's own
-        # plugins/ closure only under model #1 (model #2 shares ovrtx's plugins/).
-        set(OVSTAGE_RUNTIME_DIRS ovstage_usd_schemas)
+        # Junction ovstage's own plugins/ closure only under model #1 (model #2
+        # shares ovrtx's plugins/). ovstage ships no USD schema data of its own:
+        # a consumer that needs extra schema families registers them itself with
+        # ovstage_population_register_usd_schemas(), from wherever it keeps them.
+        set(OVSTAGE_RUNTIME_DIRS)
         if(_ovstage_static_model)
             list(APPEND OVSTAGE_RUNTIME_DIRS plugins)
         endif()
@@ -244,12 +217,9 @@ function(ovstage_setup_runtime TARGET_NAME)
             endif()
         endforeach()
     else()
-        # Linux consumes ovstage in place: libovstage.so is self-describing
-        # (RUNPATH=$ORIGIN:$ORIGIN/plugins set by patchelf at build time), so an
-        # rpath entry pointing at the package bin/ lets the executable find
-        # libovstage.so there, and the .so then resolves its own plugins/ closure
-        # relative to $ORIGIN inside the package - no copy/junction needed. See the
-        # function header for the single-Fabric runtime-validation note.
+        # Linux consumes the loader and runtime in place. An rpath entry pointing
+        # at the package bin/ lets the executable find the loader; the loader then
+        # finds the colocated runtime and package closure.
         set_property(TARGET ${TARGET_NAME} APPEND PROPERTY
             BUILD_RPATH "${OVSTAGE_BINARY_DIR}")
         set_property(TARGET ${TARGET_NAME} APPEND PROPERTY

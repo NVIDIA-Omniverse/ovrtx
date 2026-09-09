@@ -1,0 +1,41 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "RangeHistogramKernel"
+)
+
+# [snippet:histogram-shader-definition]
+# A composite input is declared as an ordinary opaque resource port. Nothing in
+# the shader definition says "composite". That follows from the RenderVar it gets
+# connected to, and the launch script discovers it through .isComposite, so the
+# same node can be pointed at a different sensor without editing the shader.
+def Shader "RangeHistogramKernel"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:spg:sourceAsset = @RangeHistogramKernel.cu@
+    uniform token info:spg:sourceAsset:subIdentifier = "rangeHistogram"
+
+    # The two chart axes, in scene units (metres here) and in returns per bin.
+    # main.py prints the sweep's furthest return and busiest bin so both can be
+    # retuned for another sensor or scene.
+    float inputs:maxRange = 12.8
+    float inputs:maxCount = 15000.0
+
+    # Distance bins across the chart. The output is 512 wide, so this must
+    # divide 512 evenly. 32 bins over 12.8 m are 0.4 m wide, which puts each
+    # box's front face inside a bin rather than on a boundary, where the
+    # sensor's range noise would split one bar into two.
+    int inputs:numBins = 32
+
+    opaque inputs:PointCloud
+    opaque outputs:Histogram
+}
+# [/snippet:histogram-shader-definition]

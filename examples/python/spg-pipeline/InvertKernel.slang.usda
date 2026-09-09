@@ -1,0 +1,30 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "InvertKernel"
+)
+
+# [snippet:invert-slang-shader-definition]
+# Slang implementation of the invert node. The port declarations are identical
+# to InvertKernel.usda, including the typed value-input: how a value reaches
+# the GPU differs per backend, but how it is declared in USD does not.
+def Shader "InvertKernel"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:spg:sourceAsset = @InvertKernel.slang@
+    uniform token info:spg:sourceAsset:subIdentifier = "invert"
+
+    float inputs:strength = 1.0
+
+    opaque inputs:Image
+    opaque outputs:Inverted
+}
+# [/snippet:invert-slang-shader-definition]

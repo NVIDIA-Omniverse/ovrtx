@@ -11,8 +11,8 @@
 #define OVRTX_TYPES_H
 
 #define OVRTX_VERSION_MAJOR 0
-#define OVRTX_VERSION_MINOR 4
-#define OVRTX_VERSION_PATCH 1
+#define OVRTX_VERSION_MINOR 5
+#define OVRTX_VERSION_PATCH 0
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -141,7 +141,16 @@ extern "C"
         uint64_t time_out_ns;
     } ovrtx_timeout_t;
 
-    /** Represents a CUDA event to wait for on a particular stream. */
+    /** Represents a CUDA event to wait for on a particular stream.
+     *
+     * @note **Known driver scheduling interaction on Linux.** A non-zero @c stream creates a
+     * stream-ordered CUDA wait that can reduce throughput when it is concurrent with the
+     * renderer's Vulkan work; correct API use still triggers it. Windows is not affected. This
+     * applies to every @c ovrtx_cuda_sync_t and @c sync_stream field in the API. Refer to the
+     * "CUDA and Vulkan Scheduling on Linux" page in the ovrtx documentation for more details.
+
+
+     */
     typedef struct
     {
         uintptr_t stream; /**< Cuda stream to synchronize to. 0 = no synchronization. 1 = default cuda stream, >1 specific stream */
@@ -215,9 +224,9 @@ extern "C"
         OVRTX_SEMANTIC_XFORM_POS3d_ROT3x3f = 3, /**< Transform of a prim expressed as 3xdouble position, 3x3float row-major rotation matrix (kDLUInt, 8, 64) */
         OVRTX_SEMANTIC_PATH_STRING = 4, /**< Prim paths expressed as ovx_string_t (kDLUInt, 128, 1). The strings must be valid for the duration of the write_attribute call. Only synchronous data access is supported.*/
         OVRTX_SEMANTIC_TOKEN_STRING = 5,  /**< String token expressed as ovx_string_t (kDLUInt, 128, 1). The strings must be valid for the duration of the write_attribute call. Only synchronous data access is supported.*/
-        OVRTX_SEMANTIC_TOKEN_ID = 6, /**< Raw token identifier (kDLUInt, 64, 1). Returned by query for attributes whose Fabric base type is Token. Resolve to a string via the path dictionary. */
-        OVRTX_SEMANTIC_PATH_ID = 7, /**< Raw path identifier (kDLUInt, 64, 1). Returned by query for attributes whose Fabric base type is Path. Resolve to a string via the path dictionary. */
-        OVRTX_SEMANTIC_TAG = 8, /**< Name-only attribute with no value or storage. Returned by query for Fabric tag attributes. No data should be read. */
+        OVRTX_SEMANTIC_TOKEN_ID = 6, /**< Raw token identifier (kDLUInt, 64, 1). Returned by query for token-valued attributes. Resolve to a string via the path dictionary. */
+        OVRTX_SEMANTIC_PATH_ID = 7, /**< Raw path identifier (kDLUInt, 64, 1). Returned by query for path-valued attributes. Resolve to a string via the path dictionary. */
+        OVRTX_SEMANTIC_TAG = 8, /**< Name-only attribute with no value or storage. Returned by query for tag attributes. No data should be read. */
     }ovrtx_attribute_semantic_t;
 
     /*
@@ -333,6 +342,7 @@ extern "C"
      * caller-provided buffer instead of allocating internal storage.  The tensor
      * must be pre-allocated with shape [prim_count] and a matching element size,
      * including @c DLTensor::dtype.lanes for multi-component attributes.
+     * Its layout must be C-contiguous with @c DLTensor::byte_offset set to zero.
      * For GPU tensors (@c kDLCUDA) the data is copied via cudaMemcpy.
      * Must be NULL for array attributes (variable-length per prim).
      */
@@ -505,10 +515,12 @@ extern "C"
         OVRTX_RENDERER_EVENT_FAILED = 2 /**< Operation failed with error */
     } ovrtx_renderer_event_status_t;
 
-    /** Name an associated handle of a particular RenderVar's output in a RenderProduct output.  */
+    /** Associates a RenderVar output handle with the RenderVar that produced it. */
     typedef struct
     {
-        ovx_string_t render_var_name; /**< Name of the associated render var */
+        ovx_string_t render_var_path; /**< Full USD RenderVar prim path, or a reserved OVRTX synthetic output name. */
+        ovx_string_t source_name; /**< RenderVar sourceName, e.g. "LdrColor". */
+        ovx_string_t source_type; /**< RenderVar sourceType, e.g. "raw" or "lpe". */
         ovrtx_render_var_output_handle_t output_handle; /**< Handle to the rendered output. */
     } ovrtx_render_product_render_var_output_t;
 
@@ -716,7 +728,7 @@ extern "C"
         ovrtx_render_var_output_map_handle_t map_handle; /**< Handle to use for unmap */
         ovrtx_cuda_sync_t cuda_sync; /**< Single sync covering all tensors */
 
-        ovx_string_t name; /**< Render variable name (e.g., "PointCloud", "HdrColor") */
+        ovx_string_t name; /**< Full USD prim path of the associated RenderVar */
         ovx_string_t type; /**< Semantic type identifier */
         ovx_string_t doc; /**< Human-readable description */
         int version; /**< Output schema version */
@@ -826,6 +838,18 @@ extern "C"
         OVRTX_TEXTURE_STREAMING_ASYNCHRONOUS = 2,
     } ovrtx_texture_streaming_mode_t;
 
+    /** NVIDIA Nsight Aftermath mode. Set via @ref OVRTX_CONFIG_AFTERMATH_MODE at renderer creation.
+     *  This is process-global because Aftermath initialization is shared by active renderers. */
+    typedef enum ovrtx_aftermath_mode_t
+    {
+        /** Disable Aftermath explicitly. */
+        OVRTX_AFTERMATH_DISABLE = 0,
+        /** Initialize Aftermath with explicit diagnostics enabled. */
+        OVRTX_AFTERMATH_ENABLE = 1,
+        /** Select the Aftermath initialization mode automatically. */
+        OVRTX_AFTERMATH_AUTO = 2,
+    } ovrtx_aftermath_mode_t;
+
     /** Key type tag for @ref ovrtx_config_entry_t; selects which key and value union members are valid. */
     typedef enum ovrtx_config_key_type_t
     {
@@ -849,13 +873,13 @@ extern "C"
         OVRTX_CONFIG_READ_GPU_TRANSFORMS,
         /** If true, keeps the renderer system alive after all instances are destroyed (for reuse). Create_renderer. */
         OVRTX_CONFIG_KEEP_SYSTEM_ALIVE,
-        /** If true, uses Vulkan; if false, uses DX12 (Windows only). Create_renderer.
-         *  When not specified, defaults to platform default (DX12 on Windows, Vulkan on Linux). */
-        OVRTX_CONFIG_USE_VULKAN,
+        /** Retired OVRTX_CONFIG_USE_VULKAN slot. Passing this key returns an error. */
+        OVRTX_CONFIG_DEPRECATED_4 = 4,
         /** If true, enables the selection outline postprocessing pass. Create_renderer.
+         *  When not specified, defaults to true. */
+        OVRTX_CONFIG_SELECTION_OUTLINE_ENABLED = 5,
+        /** If true, enables geometry streaming. Create_renderer.
          *  When not specified, defaults to false. */
-        OVRTX_CONFIG_SELECTION_OUTLINE_ENABLED,
-        /** API key for the geometry streaming opt-in flag. Create_renderer. */
         OVRTX_CONFIG_ENABLE_GEOMETRY_STREAMING,
         /** API key for the geometry streaming LOD opt-in flag. Create_renderer. */
         OVRTX_CONFIG_ENABLE_GEOMETRY_STREAMING_LOD,
@@ -883,8 +907,11 @@ extern "C"
         /** Protocol-prefixed datastore cache configuration used by UJITSO.
          * Supported values: "grpcdns://host:port", "grpcdns_notls://host:port", and "local://path".
          * System-level; init and create_renderer values must match when both are specified. */
-        OVRTX_CONFIG_DATASTORE_CACHE,
-        OVRTX_CONFIG_STRING_COUNT
+        OVRTX_CONFIG_DATASTORE_CACHE = 4,
+        /** Allow all soft-deprecated sensor versions, but only while pinned to a specific framework release:
+         * "<major>.<minor>.<patch>". (e.g. "0.4.0"). Any other value (or unset) allows none. */
+        OVRTX_CONFIG_SENSORS_ALLOWED_DEPRECATION_BASE = 5,
+        OVRTX_CONFIG_STRING_COUNT = 6
     } ovrtx_config_string_t;
 
     /** Int64 config keys. Value type: int64_t. Used at create_renderer. */
@@ -902,18 +929,23 @@ extern "C"
          *  Init-time only; changing requires renderer recreation.
          *  When not specified, defaults to @ref OVRTX_MOTION_BVH_DISABLE. */
         OVRTX_CONFIG_MOTION_BVH,
-        /** DomeLight baking resolution (texels) used when an MDL material drives a DomeLight's image
-         *  source. Applies renderer-wide to all dome lights. Valid range 1..8192; out-of-range values
-         *  are clamped by the renderer. When provided it takes precedence; when omitted the renderer
-         *  leaves the setting untouched (default 4096 on a fresh renderer).
-         *  Init-time only; changing requires renderer recreation. */
-        OVRTX_CONFIG_DOME_BAKING_RESOLUTION = 4,
+        /** Retired OVRTX_CONFIG_DOME_BAKING_RESOLUTION slot, replaced by the per-RenderProduct
+         *  'omni:rtx:lights:dome:baking:resolution' attribute. Passing this key returns an error.
+         *  It shipped as 4 in ovrtx 0.4.1, so do not reuse the value for a new key: a config array
+         *  built against those headers would then be misread as that key instead of rejected. */
+        OVRTX_CONFIG_INT64_DEPRECATED_4 = 4,
         /** Texture streaming mode. Value type: @ref ovrtx_texture_streaming_mode_t.
          *  Invalid values cause renderer creation to fail. When omitted, defaults to
          *  @ref OVRTX_TEXTURE_STREAMING_ASYNCHRONOUS.
          *  Process-global; changing affects all active renderer instances. */
         OVRTX_CONFIG_TEXTURE_STREAMING_MODE = 5,
-        OVRTX_CONFIG_INT64_COUNT = 6
+        /** NVIDIA Nsight Aftermath mode. Value type: @ref ovrtx_aftermath_mode_t.
+         *  @ref OVRTX_AFTERMATH_DISABLE skips Aftermath initialization,
+         *  @ref OVRTX_AFTERMATH_ENABLE selects explicit diagnostics initialization, and omitted or
+         *  @ref OVRTX_AFTERMATH_AUTO selects the initialization mode automatically. This setting is
+         *  process-global and must match the first renderer while the renderer system is alive. */
+        OVRTX_CONFIG_AFTERMATH_MODE = 6,
+        OVRTX_CONFIG_INT64_COUNT = 7
     } ovrtx_config_int64_t;
 
     /** Uint64 config keys (reserved for future use). Value type: uint64_t. */

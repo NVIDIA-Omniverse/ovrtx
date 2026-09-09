@@ -15,7 +15,6 @@ description: >
   RenderProducts to an existing USD layer, add referenced content, or create runtime
   geometry.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -85,6 +84,8 @@ There are two common composition patterns:
 ### Open from file or URL
 
 > **Source:** `examples/python/minimal/main.py` snippet `add-usd`
+>
+> **Source (local file):** `examples/python/projectors/main.py` snippet `projectors-load-usd`
 
 ### Open from inline USDA string
 
@@ -96,11 +97,11 @@ Useful for creating RenderProducts, cameras, or runtime geometry without editing
 
 When a USD layer has the scene content but lacks render configuration or sensors, compose a new inline root layer: add `subLayers = [@existing_scene.usda@]`, author the missing Camera / RenderProduct / RenderVar prims in that same inline layer, and populate it with `ovstage.population.open_usd_from_string()`.
 
-> **USDA source:** `tests/docs/usd/data/inline_sublayers_camera_renderproduct.usda` snippet `doc-usda-inline-sublayers-camera-renderproduct`
+> **Source (USDA):** `tests/docs/usd/data/inline_sublayers_camera_renderproduct.usda` snippet `doc-usda-inline-sublayers-camera-renderproduct`
 >
 > **Source:** `tests/docs/python/test_sensor_configuration.py` snippet `doc-add-render-config-layer`
 >
-> **Query check:** `tests/docs/python/test_stage_query.py` snippet `doc-query-inline-sublayer-composition`
+> **Source (query check):** `tests/docs/python/test_stage_query.py` snippet `doc-query-inline-sublayer-composition`
 
 ### Add a USD reference with a path prefix
 
@@ -146,7 +147,7 @@ Or block indefinitely:
 
 When a USD layer has the scene content but lacks render configuration or sensors, pass one inline root USDA string to `ovrtx_open_usd_from_string()`. That inline root can sublayer the existing scene and author missing Camera / RenderProduct / RenderVar prims.
 
-> **USDA source:** `tests/docs/usd/data/inline_sublayers_camera_renderproduct.usda` snippet `doc-usda-inline-sublayers-camera-renderproduct`
+> **Source (USDA):** `tests/docs/usd/data/inline_sublayers_camera_renderproduct.usda` snippet `doc-usda-inline-sublayers-camera-renderproduct`
 >
 > **Source:** `tests/docs/c/test_sensor_configuration.cpp` snippet `doc-add-render-config-layer-c`
 

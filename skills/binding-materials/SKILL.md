@@ -13,7 +13,6 @@ description: >
   Binding materials to prims at runtime. Use when user asks to assign a material,
   change a material, set material binding, or swap materials on a prim.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx

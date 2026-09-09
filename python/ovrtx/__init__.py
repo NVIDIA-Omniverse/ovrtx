@@ -16,30 +16,24 @@ from ._src.bindings import (
     OVRTX_PICK_HIT_MAGIC,
     OVRTX_PICK_HIT_VERSION,
     OVRTX_RENDER_VAR_PICK_HIT,
+    AftermathMode,
     AttributeFilterMode,
     FilterKind,
     _ovrtx_loader,
 )
-from ._src.schema_paths import register_schema_paths, usd_pluginpath_env_keys
+from ._src.schema_paths import register_schema_paths, usd_plugin_paths, usd_pluginpath_env_keys
 
-# Optionally auto-register ovrtx's USD plugin paths at import time so that
-#   import ovrtx
-#   import ovphysx
-# publishes both subsystems' paths before USD loads. The registration logic
-# itself lives in CRenderApiLibLoader.cpp (single source of truth); the Python
-# call here is a thin ctypes shim that loads the ovrtx loader DLL and invokes
-# the exported `ovrtx_register_schema_paths` C entry point. The C body
-# publishes to the env-vars USD's plug registry consults (the bundled-USD-
-# renamed `OV_PXR_PLUGINPATH_2511` always, and the OpenUSD upstream default
-# `PXR_PLUGINPATH_NAME` under the same opt-in) so a non-renamed peer USD
-# co-loaded into the same process picks up our plugin/schema contributions
-# too. Failures are logged at WARNING (no silent except: pass) so
-# misconfigured deployments — e.g. a source checkout where ovrtx-dynamic was
-# never built — surface in normal log output. The hook is opt-in: it only
-# runs when OVRTX_PXR_SCHEMA_AUTO_REGISTER=1 is set. By default (unset)
-# `import ovrtx` leaves the process env untouched; integrators that want the
-# paths published call register_schema_paths() themselves before USD
-# initialization.
+# Optionally auto-register ovrtx's USD plugin paths at import time. The registration
+# logic lives in CRenderApiLibLoader.cpp (single source of truth); this Python hook is
+# a thin ctypes shim over `ovrtx_register_schema_paths`. The C implementation always
+# publishes to the renamed key used by ovrtx's bundled OpenUSD and, under this same
+# opt-in, also publishes to upstream `PXR_PLUGINPATH_NAME` for a compatible co-loaded
+# OpenUSD runtime. Integrators that want to select the upstream entries themselves can
+# use `ovrtx.usd_plugin_paths()` without mutating plugin-path environment variables.
+#
+# Failures are logged at WARNING so misconfigured deployments surface in normal log
+# output. Only the exact value OVRTX_PXR_SCHEMA_AUTO_REGISTER=1 enables the hook; by
+# default `import ovrtx` leaves the process environment untouched.
 if _os.environ.get("OVRTX_PXR_SCHEMA_AUTO_REGISTER", "0") == "1":
     try:
         register_schema_paths()
@@ -52,7 +46,7 @@ if _os.environ.get("OVRTX_PXR_SCHEMA_AUTO_REGISTER", "0") == "1":
             _exc,
         )
 
-from ._src.dlpack import DLDataType, ManagedDLTensor
+from ._src.dlpack import DLDataType, DLDevice, DLDeviceType
 from ._src.renderer import Renderer
 from ._src.types import (
     AttributeBinding,
@@ -82,7 +76,7 @@ from ._src.types import (
     TextureStreamingMode,
 )
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 __all__ = [
     "__version__",
@@ -95,12 +89,15 @@ __all__ = [
     "OVRTX_PICK_HIT_VERSION",
     # USD schema/plugin path registration
     "register_schema_paths",
+    "usd_plugin_paths",
     "usd_pluginpath_env_keys",
     # enums
     "BindingFlag",
     "DataAccess",
     "Device",
     "DLDataType",
+    "DLDevice",
+    "DLDeviceType",
     "EventStatus",
     "PrimMode",
     "SelectionFillMode",
@@ -108,6 +105,7 @@ __all__ = [
     "TextureStreamingMode",
     "Semantic",
     "AttributeFilterMode",
+    "AftermathMode",
     "FilterKind",
     # dataclasses
     "AttributeInfo",
@@ -122,7 +120,6 @@ __all__ = [
     "AttributeBinding",
     "AttributeMapping",
     "FrameOutput",
-    "ManagedDLTensor",
     "MappedRenderVar",
     "Operation",
     "ProductOutput",

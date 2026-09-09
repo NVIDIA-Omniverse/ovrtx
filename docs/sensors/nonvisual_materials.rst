@@ -40,7 +40,7 @@ supported prefix is ``inputs:nonvisual``, selected by
 author both prefixes so scenes work with either runtime setting.
 
 Labels belong on the ``Material`` prim that geometry binds through
-``material:binding``. Use :doc:`../scene/material_binding` when the geometry
+``material:binding``. Use :doc:`../materials/material_binding` when the geometry
 still needs to be bound to the material.
 
 Base Materials

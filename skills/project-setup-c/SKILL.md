@@ -14,7 +14,6 @@ description: >
   new C project, set up CMake with ovrtx, scaffold a C++ app, or configure build
   dependencies.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -84,38 +83,19 @@ my-ovrtx-app/
 
 ## CMakeLists.txt
 
-```cmake
-cmake_minimum_required(VERSION 3.16)
-project(my-ovrtx-app)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Fetch ovrtx library
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-include(ovrtx)
-ovrtx_fetch()
-
-add_executable(my-ovrtx-app main.cpp)
-# Static loader (model #1): all shipped C examples link ovrtx::ovrtx_static and
-# pass the package root at renderer creation (see the minimal snippet below).
-target_link_libraries(my-ovrtx-app PRIVATE ovrtx::ovrtx_static)
-
-if(MSVC)
-    # The package ships a release-only static loader (compiled /MD); force the
-    # release CRT so a Debug config links cleanly.
-    set_target_properties(my-ovrtx-app PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
-endif()
-
-# Stage the side-by-side `ovrtx/` link the loader resolves at runtime.
-ovrtx_setup_runtime(my-ovrtx-app)
-```
+> **Source:** `examples/c/minimal/CMakeLists.txt` snippet `project-setup`
+>
+> **Source (continued):** `examples/c/minimal/CMakeLists.txt` snippet `linking-models`
+>
+> The canonical example builds both loader models with ovstage attached. For an
+> ovrtx-only application, omit the ovstage fetch, link target, and setup call.
 
 ## ovrtx.cmake
 
 Copy `examples/c/cmake/ovrtx.cmake` into your project's `cmake/` directory. The key macro it provides:
 
-- `ovrtx_fetch()` -- downloads the ovrtx package via FetchContent and makes both `ovrtx::ovrtx` (dynamic) and `ovrtx::ovrtx_static` (static loader) available.
-- `ovrtx_setup_runtime(TARGET)` -- auto-selects the runtime layout from how the target links ovrtx. For `ovrtx::ovrtx_static` (model #1, used by all shipped examples) it stages a single side-by-side `ovrtx/` link (symlink on Linux, junction on Windows) pointing at the package `bin/`. For the dynamic `ovrtx::ovrtx` (model #2) it configures rpath (Linux) or copies DLLs and creates per-runtime-dir junctions (Windows).
+- `ovrtx_fetch()` -- downloads the ovrtx package via FetchContent and makes both `ovrtx::ovrtx` (shared loader) and `ovrtx::ovrtx_static` (static loader) available.
+- `ovrtx_setup_runtime(TARGET)` -- auto-selects the runtime layout from how the target links ovrtx. For `ovrtx::ovrtx_static` (model #1) it stages a single side-by-side `ovrtx/` link pointing at the package `bin/`. For `ovrtx::ovrtx` (model #2) it configures rpath (Linux) or copies DLLs and creates runtime-directory junctions (Windows).
 
 Update the `FetchContent_Declare` URL inside `ovrtx.cmake` to point to the appropriate GitHub Releases package for your platform.
 
@@ -123,9 +103,9 @@ Update the `FetchContent_Declare` URL inside `ovrtx.cmake` to point to the appro
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `check-error-helper`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `create-renderer`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `create-renderer`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `load-usd-and-wait`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `load-usd-and-wait`
 >
 > See the full minimal example for the complete flow including step, fetch, map, and cleanup.
 
@@ -153,7 +133,7 @@ bin/
   usd_plugins/
 ```
 
-**Static loader (model #1, used by all shipped C examples and doc tests).** Link
+**Static loader (model #1).** Link
 `ovrtx::ovrtx_static` and pass the package root to `ovrtx_create_renderer()` via
 `ovrtx_config_entry_binary_package_root_path()`. Build the path from
 `OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovrtx"` so the loader resolves it against the
@@ -163,7 +143,9 @@ exe directory self-contained without baking an absolute path into the binary:
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `create-renderer`
 
-**Dynamic linking (model #2).** Link `ovrtx::ovrtx`; ovrtx then expects the `bin/`
+**Shared loader (model #2).** Link `ovrtx::ovrtx`; the operating system loads
+only the forwarding loader. The loader opens the ovrtx runtime on the first
+initialization call. ovrtx expects the `bin/`
 runtime directories (`cache/`, `library/`, `libs/`, `mdl/`, `plugins/`,
 `rendering-data/`, `usd_plugins/`) next to `ovrtx-dynamic.dll` /
 `libovrtx-dynamic.so`, and `ovrtx_setup_runtime()` configures rpath (Linux) or
@@ -193,53 +175,27 @@ structure. The config-entry pattern is identical either way:
 
 ## In Attached Mode (ovrtx 0.4+)
 
-The standalone section above already uses the static ovrtx loader (model #1) with
-a renderer-owned scene. Attached mode (used by `examples/c/minimal/`) keeps that
-same ovrtx loader model but additionally pairs ovrtx with an independent ovstage
-package that owns the scene. The two loader concerns are independent: every shipped
-example is on model #1; only the ovstage examples add the ovstage runtime below.
+Attached mode pairs independent ovrtx and ovstage packages. Use the same model
+for both unless your deployment has a specific reason to mix them:
 
-- **ovrtx — static loader + binary package root (model #1).** Link
-  `ovrtx::ovrtx_static` and pass the package's binary root to `ovrtx_create_renderer`
-  via `ovrtx_config_entry_binary_package_root_path()`. The statically linked loader
-  then `LoadLibrary`s `ovrtx-dynamic` from the package in place and resolves all of
-  ovrtx's runtime resources there. To keep the exe directory self-contained without
-  baking an absolute path into the binary, `ovrtx_setup_runtime()` creates a single
-  link `ovrtx/` next to the exe (a junction on Windows, a symlink on Linux) pointing at
-  the package `bin/`, and the app resolves the root at runtime as
-  `<dir of exe>/ovrtx` (see `main.cpp`'s `executable_dir()`).
-- **ovstage — static loader + binary package root.** Link `ovstage::ovstage_static` and
-  `ovstage_setup_runtime()` exposes the package as a single link `ovstage/` next to the exe
-  (a junction on Windows, a symlink on Linux) pointing at the package `bin/`, which the app
-  hands to `ovstage_initialize()` as the ovstage binary package root. The static loader
-  loads `ovstage.dll` from that link on the first ovstage call and self-locates its own
-  `plugins/` and `ovstage_usd_schemas/` beneath it, so there is no DLL copy, no
-  `/DELAYLOAD`, and no separate schemas or plugins junction. Every C example here that uses
-  ovstage links this static loader.
+- **Model #1 — static loaders.** Link `ovrtx::ovrtx_static` and
+  `ovstage::ovstage_static`. Pass each package root in its initialization config.
+  Each loader opens its runtime on the first initialization call.
+- **Model #2 — shared loaders.** Link `ovrtx::ovrtx` and `ovstage::ovstage`.
+  The operating system resolves the two small loader libraries; neither imports
+  OpenUSD. Each loader opens its runtime on the first initialization call.
 
-`ovstage.dll` is loaded lazily on the first `ovstage_*` call, so its static `usd_ms`/`tbb`
-imports bind by base name to the single instance ovrtx has already loaded from its package.
-ovrtx and ovstage must come from the same release train (matched `usd_ms` ABI); a single
-Fabric/USD runtime in attach mode still needs on-hardware confirmation.
+For both models, call `ovrtx_register_schema_paths()` before the first
+`ovstage_initialize()` / `ovstage_create_instance()` if ovstage may initialize
+first. The call only publishes discovery paths; it does not load the renderer or
+OpenUSD. The minimal example demonstrates both link models and this ordering:
 
-The ovstage package also exports a dynamic `ovstage::ovstage` target, and
-`ovstage_setup_runtime()` still supports it, but the ovrtx + ovstage setup documented here
-uses the static loader.
+ovrtx and ovstage must come from the same release train (matched `usd_ms` ABI);
+a single USD runtime in attach mode still needs on-hardware confirmation.
 
-```cmake
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake")
-include(ovrtx)
-include(ovstage)
-ovrtx_fetch()
-ovstage_fetch()
-
-add_executable(my-ovrtx-app main.cpp)
-# Static loaders for both packages, as in every ovstage-using C example here.
-target_link_libraries(my-ovrtx-app PRIVATE ovrtx::ovrtx_static ovstage::ovstage_static)
-
-ovrtx_setup_runtime(my-ovrtx-app)   # links ovrtx/ beside the exe (main.cpp resolves it)
-ovstage_setup_runtime(my-ovrtx-app) # links ovstage/ beside the exe
-```
+> **Source:** `examples/c/minimal/CMakeLists.txt` snippet `linking-models`
+>
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `create-renderer`
 
 See `docs/core/ovstage_integration.rst` for the attached-mode overview and
 `examples/c/minimal/` for a complete attach-mode project.

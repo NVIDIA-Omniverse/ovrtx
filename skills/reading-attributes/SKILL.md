@@ -14,7 +14,6 @@ description: >
   asks to read an attribute value, fetch mesh data (points, faceVertexCounts, etc.),
   inspect a render setting, or sample transforms.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -99,7 +98,7 @@ Use this table to answer "how do I read USD type X?" Ovstage uses `stage.read_at
 | `extent`, `_worldExtent` | `np.float64`, shape `(N, 6)` | `{kDLFloat, 64, 6}` | `extent` is local-space; `_worldExtent` is world-space. |
 | `string` | `uint8` byte array, decode as UTF-8 | `{kDLUInt, 8, 1}` with `is_array=true` | Scalar USD strings are represented as byte arrays. This is not `string[]`; string arrays are not supported. Use `token[]` for string-like arrays. |
 | `token` / `token[]` | raw `uint64` token IDs | `{kDLUInt, 64, 1}` | Resolve token IDs with `ovstage.PathDictionary.token_to_string()`. |
-| `asset` | raw `uint64` token pairs, one `{authored, resolved}` pair per prim | `{kDLUInt, 64, 2}` | Transitional (ovstage 0.1.x, RENDERING population domain): a populated scalar asset reads back as two token IDs per prim — the authored path token and the resolved path token (`0` when unresolved) — with attribute semantic `NONE`. Resolve tokens with `ovstage.PathDictionary.token_to_string()`. Planned to become UTF-8 `ASSET_STRING` byte rows in a future minor release. Deprecated C compatibility reads use the same token-pair layout. |
+| `asset` | `uint64` token id pairs with `AttributeSemantic.ASSET_PATH_ID` | `{kDLUInt, 64, 2}` with `is_array=false` | One `(authored, resolved)` pair per prim. Resolve each id with `ovstage.PathDictionary.token_to_string()`. Token id 0 is the empty token, so a resolved id of 0 means the path resolved to nothing. |
 | `relationship` | raw `uint64` path IDs | path IDs / path-list semantics | Resolve path IDs with `ovstage.PathDictionary.path_to_string()`. Use relationship-specific skills for schema-specific behavior. |
 | `timecode` / `timecode[]` | unsupported | unsupported | |
 
@@ -135,7 +134,7 @@ Allocate the destination on the GPU via any DLPack-compatible allocator (e.g. Wa
 
 > **Source:** `tests/docs/python/test_attribute_read.py` snippet `doc-read-attribute-cuda-dest`
 
-### Deprecated compatibility: authored attribute matrix
+### Authored attribute matrix
 
 Python raw snippets:
 
@@ -155,7 +154,9 @@ Python raw snippets:
 
 The snippets listed in this table live in `tests/docs/python/test_all_attributes.py`.
 
-The exhaustive raw snippets remain compatibility coverage for the deprecated renderer wrappers. New Python code should intern names through `ovstage.PathDictionary` and read through an ovstage query.
+These examples use `ovstage.PathDictionary` to obtain attribute-name tokens,
+read through a reusable ovstage query, copy each returned tensor, and release
+its result group.
 
 ### Local and world-space extents
 
@@ -191,11 +192,11 @@ C raw snippets:
 | token | `doc-read-usd-token-c` |
 | token array | `doc-read-usd-token-array-c` |
 | string bytes | `doc-read-usd-string-c` |
-| scalar asset token pair | `doc-read-usd-asset-c` |
+| scalar asset id pair | `doc-read-usd-asset-c` |
 
 The snippets listed in this table live in `tests/docs/c/test_all_attributes.cpp`.
 
-C token and asset snippets include path-dictionary resolution because the C API exposes `ovstage_get_path_dictionary()`. As of ovstage 0.1.1, reading a scalar `asset` populated through the RENDERING domain returns one fixed `{kDLUInt, 64, 2}` element per prim carrying the `{authored-path token, resolved-path token}` pair (resolved token `0` when unresolved), with attribute semantic `NONE`; decode tokens via `path_dictionary_get_strings_from_tokens()` — the `doc-read-usd-asset-c` snippet demonstrates exactly this and is runtime-validated. This representation is **transitional** and planned to become UTF-8 `ASSET_STRING` byte rows in a future minor release — do not build long-lived tooling against the token-pair layout without tracking that change. (On ovstage 0.1.0, single-prim scalar-asset reads returned END_OF_ITERATION with no rows; multi-prim reads already returned token pairs.)
+C token snippets include path-dictionary resolution because the C API exposes `ovstage_get_path_dictionary()`. As of ovstage 0.2, reading a scalar `asset` returns `ASSET_PATH_ID` token id pairs (`{kDLUInt, 64, 2}`, `is_array=false`, one `(authored, resolved)` pair per prim). Resolve both ids through the path dictionary. A resolved id of 0 is the empty token, which means the path resolved to nothing. On ovstage 0.1.x the same read returned `{kDLUInt, 64, 2}` pairs with semantic `NONE`, and on 0.1.0 single-prim reads failed with END_OF_ITERATION. The `doc-read-usd-asset-c` / `doc-write-usd-asset-c` snippets are runtime-validated by `AllAttributesTest.AssetReadWriteSnippets`.
 
 ### Local and world-space extents in C
 
@@ -214,7 +215,7 @@ Ovstage C result layout (`ovstage_read_group_t`):
 - `.data.tensors` / `.data.tensor_count` — DLTensor array. `tensor_count==1` under the packed-uniform layout every snippet uses; always assert `tensor_count > 0` before dereferencing `tensors[0]`.
 - Each `DLTensor` in the group: `shape=[prim_count]` for scalar reads and `shape=[element_count]` for array reads, with `dtype.lanes` carrying the tuple width (matrix4d → `{kDLFloat, 64, 16}`, point3f → `{kDLFloat, 32, 3}`, etc.).
 - `.prims.list` / `.prims.count` / `.prims.offset` / `.prims.index_map` — enumerate the matched prims via the group's prim list; index_map applies gather/reorder semantics.
-- `.attribute` — the token that identifies which of the caller's requested attributes this group corresponds to. Route multi-attribute reads (e.g. `doc-extent-world-extent-c`) by comparing to the interned tokens.
+- `.attribute` — the token that identifies which of the caller's requested attributes this group corresponds to. Route multi-attribute reads (e.g. `doc-extent-world-extent-c`) by comparing to the interned tokens. One token can yield more than one group: when the queried prims use the name for several column types and no ovstage write has given the name an identity, each prim is served with the type of its own column, so the groups differ in `dtype` and `is_array`. Read the shape off each group rather than off the first one. Such a name cannot be served to a GPU destination, so a device read returns no group for it and serves the rest of the read normally (ovstage >= 0.2).
 
 Deprecated C compat result layout (`ovrtx_read_output_t`):
 - Scalar reads: `buffer_count == 1`, single tensor with shape `[prim_count]`.

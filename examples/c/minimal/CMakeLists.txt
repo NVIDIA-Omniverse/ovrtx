@@ -8,6 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+# [snippet:project-setup]
 cmake_minimum_required(VERSION 3.16)
 project(minimal)
 
@@ -26,20 +27,40 @@ include(ovrtx)
 include(ovstage)
 ovrtx_fetch()
 ovstage_fetch()
+# [/snippet:project-setup]
 
+# [snippet:linking-models]
 add_executable(minimal main.cpp)
 # Static-loader model for BOTH packages: link the static ovrtx and ovstage
 # loaders. main.cpp / *_setup_runtime hand each loader its own package root at
 # runtime (a side-by-side `ovrtx/` and `ovstage/` link beside the exe) instead of
 # replicating either package next to the exe.
 target_link_libraries(minimal PRIVATE ovrtx::ovrtx_static ovstage::ovstage_static)
+target_compile_definitions(minimal PRIVATE OVRTX_EXAMPLE_STATIC_LOADERS=1)
+
+# Shared-loader model for BOTH packages. The operating system resolves only the
+# loader libraries; each runtime is opened by its first initialization call.
+add_executable(minimal-dynamic main.cpp)
+target_link_libraries(minimal-dynamic PRIVATE ovrtx::ovrtx ovstage::ovstage)
+
+# Keep each loader model's runtime deployment isolated. In particular, the
+# shared-loader DLLs copied beside minimal-dynamic must not affect minimal's
+# static-loader package-root test.
+set_target_properties(minimal PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/static")
+set_target_properties(minimal-dynamic PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shared")
 
 # The ovrtx/ovstage packages ship release-only static loaders (compiled /MD).
 # Force the release CRT so the Debug config links cleanly.
 if(MSVC)
     set_target_properties(minimal PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    set_target_properties(minimal-dynamic PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 endif()
 
 # Setup runtime dependencies (DLL copying, junctions, rpath)
 ovrtx_setup_runtime(minimal)
 ovstage_setup_runtime(minimal)
+ovrtx_setup_runtime(minimal-dynamic)
+ovstage_setup_runtime(minimal-dynamic)
+# [/snippet:linking-models]

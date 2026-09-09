@@ -8,7 +8,7 @@
 
 """Tests for ovstage attribute reads used with an attached renderer.
 
-Reads target schema-known attributes the runtime exposes to Fabric:
+Reads target schema-known attributes exposed on the runtime stage:
 ``omni:rtx:rtpt:maxBounces`` on the RenderProduct (a 32-bit integer; the
 runtime may report it as either int32 or uint32) and ``points`` on
 ``/World/Plane`` (a float3 array authored in ``ovrtx-test-base-geometry.usda``).
@@ -68,7 +68,7 @@ def test_read_scalar_attribute_cpu(stage):
     assert int(values[0]) == 17
 
 
-@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
+@pytest.mark.allow_deprecated_ovrtx_api
 def test_read_scalar_attribute_into_dest(renderer):
     """Pass a pre-allocated tensor as ``dest``; verify data lands in it."""
     _load_base_legacy(renderer)
@@ -147,7 +147,7 @@ def test_read_attribute_async(stage):
     assert int(values[0]) == 5
 
 
-@pytest.mark.filterwarnings("ignore:.* is deprecated in ovrtx 0\\.4\\..*:DeprecationWarning")
+@pytest.mark.allow_deprecated_ovrtx_api
 def test_read_attribute_cuda_dest(renderer):
     """Read directly into a GPU (CUDA) destination tensor via DLPack."""
     import warp as wp  # via warp-lang; provides DLPack-compatible CUDA arrays

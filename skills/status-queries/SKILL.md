@@ -15,7 +15,6 @@ description: >
   counters, use Operation.query_status(), or call
   ovrtx_query_op_status()/ovrtx_release_op_status().
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -102,6 +101,12 @@ available for that `Operation`.
 > **Source:** `examples/python/status-queries/main.py` snippet `wait-operation-with-status`
 
 ### Load USD with status
+
+USD population runs on the attached ovstage. Population operations expose no
+`OperationStatus` counters; poll them with a bounded `wait(timeout=...)` loop
+(nanoseconds, `None` return means still pending) and publish the ordinal once
+the load completes. Renderer operations (step, shader warm-up) keep the full
+status-counter API shown below.
 
 > **Source:** `examples/python/status-queries/main.py` snippet `load-usd-with-status`
 

@@ -314,7 +314,7 @@ def build_aov_blueprint(rrb, grid_columns: int):
 
 
 def _map_render_var(frame, name: str) -> np.ndarray:
-    mapped = frame.render_vars[name].map(device=ovrtx.Device.CPU)
+    mapped = frame.render_vars[f"/Render/Camera/{name}"].map(device=ovrtx.Device.CPU)
     view = np.from_dlpack(mapped)
     pixels = view.copy()
     del view, mapped
@@ -380,7 +380,7 @@ def _decode_id_map(tensor: np.ndarray) -> dict[bytes, str]:
 
 
 def _map_id_map(frame, name: str) -> dict[bytes, str]:
-    mapped = frame.render_vars[name].map(device=ovrtx.Device.CPU)
+    mapped = frame.render_vars[f"/Render/Camera/{name}"].map(device=ovrtx.Device.CPU)
     view = np.from_dlpack(mapped)
     tensor = view.copy()
     del view, mapped
@@ -531,14 +531,14 @@ def log_aovs_to_rerun(rr, frame) -> int:
     logged = 0
     semantic_id_map = None
 
-    if "SemanticIdMap" in frame.render_vars:
+    if "/Render/Camera/SemanticIdMap" in frame.render_vars:
         semantic_id_map = _map_id_map(frame, "SemanticIdMap")
         _print_logged_id_map("SemanticIdMap", semantic_id_map)
         logged += 1
     else:
         _print_missing("SemanticIdMap")
 
-    if "LdrColor" in frame.render_vars:
+    if "/Render/Camera/LdrColor" in frame.render_vars:
         ldr_color = _map_render_var(frame, "LdrColor")
         _log_raw_tensor(rr, "LdrColor", ldr_color)
         rr.log("render/aovs/LdrColor/display", rr.Image(np.ascontiguousarray(ldr_color)))
@@ -547,7 +547,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("LdrColor")
 
-    if "HdrColor" in frame.render_vars:
+    if "/Render/Camera/HdrColor" in frame.render_vars:
         hdr_color = _map_render_var(frame, "HdrColor")
         _log_raw_tensor(rr, "HdrColor", hdr_color)
         rr.log("render/aovs/HdrColor/display", rr.Image(_visualize_hdr(hdr_color)))
@@ -556,7 +556,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("HdrColor")
 
-    if "NormalSD" in frame.render_vars:
+    if "/Render/Camera/NormalSD" in frame.render_vars:
         normal_sd = _map_render_var(frame, "NormalSD")
         _log_raw_tensor(rr, "NormalSD", normal_sd)
         rr.log("render/aovs/NormalSD/display", rr.Image(_visualize_normal(normal_sd)))
@@ -565,7 +565,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("NormalSD")
 
-    if "DepthSD" in frame.render_vars:
+    if "/Render/Camera/DepthSD" in frame.render_vars:
         depth_sd = _map_render_var(frame, "DepthSD")
         depth_scalar = np.ascontiguousarray(np.squeeze(depth_sd, axis=-1))
         _log_raw_tensor(rr, "DepthSD", depth_sd)
@@ -577,7 +577,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("DepthSD")
 
-    if "DistanceToCameraSD" in frame.render_vars:
+    if "/Render/Camera/DistanceToCameraSD" in frame.render_vars:
         distance_to_camera = _map_render_var(frame, "DistanceToCameraSD")
         distance_to_camera_scalar = np.ascontiguousarray(np.squeeze(distance_to_camera, axis=-1))
         _log_raw_tensor(rr, "DistanceToCameraSD", distance_to_camera)
@@ -589,7 +589,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("DistanceToCameraSD")
 
-    if "DistanceToImagePlaneSD" in frame.render_vars:
+    if "/Render/Camera/DistanceToImagePlaneSD" in frame.render_vars:
         distance_to_image_plane = _map_render_var(frame, "DistanceToImagePlaneSD")
         distance_to_image_plane_scalar = np.ascontiguousarray(np.squeeze(distance_to_image_plane, axis=-1))
         _log_raw_tensor(rr, "DistanceToImagePlaneSD", distance_to_image_plane)
@@ -604,7 +604,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("DistanceToImagePlaneSD")
 
-    if "DiffuseAlbedoSD" in frame.render_vars:
+    if "/Render/Camera/DiffuseAlbedoSD" in frame.render_vars:
         diffuse_albedo = _map_render_var(frame, "DiffuseAlbedoSD")
         _log_raw_tensor(rr, "DiffuseAlbedoSD", diffuse_albedo)
         rr.log("render/aovs/DiffuseAlbedoSD/display", rr.Image(np.ascontiguousarray(diffuse_albedo)))
@@ -613,7 +613,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("DiffuseAlbedoSD")
 
-    if "Camera3dPositionSD" in frame.render_vars:
+    if "/Render/Camera/Camera3dPositionSD" in frame.render_vars:
         camera_position = _map_render_var(frame, "Camera3dPositionSD")
         _log_raw_tensor(rr, "Camera3dPositionSD", camera_position)
         rr.log("render/aovs/Camera3dPositionSD/display", rr.Image(_visualize_vector3(camera_position)))
@@ -622,7 +622,7 @@ def log_aovs_to_rerun(rr, frame) -> int:
     else:
         _print_missing("Camera3dPositionSD")
 
-    if "SemanticSegmentation" in frame.render_vars:
+    if "/Render/Camera/SemanticSegmentation" in frame.render_vars:
         semantic_segmentation = _map_render_var(frame, "SemanticSegmentation")
         _log_raw_tensor(rr, "SemanticSegmentation", semantic_segmentation)
         if semantic_id_map is not None:
@@ -768,7 +768,7 @@ def export_aov_pngs(frame, output_dir: Path) -> int:
 
     exported = 0
     for name, converter in converters.items():
-        if name not in frame.render_vars:
+        if f"/Render/Camera/{name}" not in frame.render_vars:
             continue
 
         pixels = _map_render_var(frame, name)

@@ -19,13 +19,21 @@
 // UInt8_4: 4 channels of 8-bit unsigned int (LdrColor) - 4 bytes per pixel
 enum class CudaImageFormat { Half4, UInt8_4 };
 
+// Work around the Linux CUDA/Vulkan scheduling interaction by capping the CUDA
+// driver's host-to-device connections. Must be called before the process creates
+// its first CUDA context; no-op on platforms other than Linux.
+void cuda_apply_scheduling_workaround();
+
+// Resolve a process-visible CUDA device ordinal to its MIG-aware CUDA UUID.
+bool cuda_get_device_uuid(int32_t device_id, CUuuid* out_uuid);
+
 // Initialize CUDA Driver API using existing context (created by ovrtx) and return the device UUID
 // Returns true on success, false on failure
-bool cuda_init(CUuuid* out_uuid);
+bool cuda_init(int32_t device_id, CUuuid* out_uuid);
 
 // Initialize CUDA Driver API by creating a new context (for tests without ovrtx)
 // Returns true on success, false on failure
-bool cuda_init_standalone(CUuuid* out_uuid);
+bool cuda_init_standalone(int32_t device_id, CUuuid* out_uuid);
 
 // Compile the UV gradient kernel using NVRTC
 // Must be called after cuda_init()
@@ -119,4 +127,3 @@ std::vector<uint8_t> cuda_read_surface_rgba8(
 
 // Cleanup CUDA resources
 void cuda_cleanup();
-

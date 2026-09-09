@@ -208,9 +208,9 @@ TEST_F(SemanticLabelsTest, SemanticClassesAreRendered) {
     map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
     ovrtx_cuda_sync_t no_sync = {};
 
-    ovrtx_render_var_output_handle_t id_map_handle = find_output(outputs, "SemanticIdMap");
+    ovrtx_render_var_output_handle_t id_map_handle = find_output(outputs, "/Render/SemanticCamera/SemanticIdMap");
     ovrtx_render_var_output_handle_t segmentation_handle =
-        find_output(outputs, "SemanticSegmentation");
+        find_output(outputs, "/Render/SemanticCamera/SemanticSegmentation");
     ASSERT_NE(id_map_handle, OVRTX_INVALID_HANDLE);
     ASSERT_NE(segmentation_handle, OVRTX_INVALID_HANDLE);
 

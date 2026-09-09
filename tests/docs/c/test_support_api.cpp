@@ -78,7 +78,8 @@ TEST_F(SupportApiTest, QueryOperationStatus) {
     docs_wait_no_errors(renderer_, eq.op_index);
 }
 
-TEST_F(SupportApiTest, QueryMissingExtensionError) {
+TEST_F(SupportApiTest, QueryMissingExtensionError)
+{
     // [snippet:doc-get-last-error-c]
     const void* vtable = nullptr;
     ovrtx_result_t result = ovrtx_query_extension("ovrtx.docs.missing_extension", &vtable);

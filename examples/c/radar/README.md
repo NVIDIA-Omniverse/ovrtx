@@ -32,9 +32,13 @@ The USD requests the radar `PointCloud` render variable with these channels:
 - `RCS`
 - `RadialVelocityMs`
 
-The executable maps the output to CPU, uses `Counts` as the number of valid
-point entries, and prints min/max `RCS` and `RadialVelocityMs` values for each
-step.
+The radar model also auto-enables `Flags`, which the example uses for validity
+filtering.
+
+The executable maps the output to CPU, uses `Counts` to bound the delivered
+detection entries, and filters that range with the `Flags` `VALID` bit. It
+prints min/max `RCS` and `RadialVelocityMs` values for the remaining detections
+on each step.
 
 ## API Flow
 

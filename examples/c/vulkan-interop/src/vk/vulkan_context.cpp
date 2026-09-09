@@ -658,6 +658,7 @@ auto VulkanContext::_create_instance() -> void {
     _validation_enabled = enable_validation;
 }
 
+// [snippet:select-vulkan-device-by-cuda-uuid]
 auto VulkanContext::_select_physical_device(const CUuuid& cuda_uuid, uint32_t requested_sampler_capacity) -> void {
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(_instance, &device_count, nullptr);
@@ -704,6 +705,7 @@ auto VulkanContext::_select_physical_device(const CUuuid& cuda_uuid, uint32_t re
     
     throw std::runtime_error("No Vulkan device matches CUDA device UUID");
 }
+// [/snippet:select-vulkan-device-by-cuda-uuid]
 
 auto VulkanContext::_find_queue_family() -> void {
     uint32_t queue_family_count = 0;

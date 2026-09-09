@@ -11,15 +11,14 @@ BUILDDIR      = _build
 # Project root (absolute so paths work after cd)
 PROJECT_ROOT  = $(abspath ..)
 
-# Python package directory (where pyproject.toml lives)
-PYTHON_DIR    = $(PROJECT_ROOT)/python
-
-# uv command and docs dependencies (cd into python/ for pyproject.toml, use absolute paths for sphinx)
-UV            ?= uv
-UVRUN         = cd $(PYTHON_DIR) && $(UV) run --extra docs
-
-# Sphinx source and build dirs as absolute paths (needed because UVRUN changes cwd)
+# Sphinx source and build dirs as absolute paths
 DOCS_DIR      = $(PROJECT_ROOT)/docs
+
+# The docs toolchain is declared standalone rather than as a pyproject.toml extra: it
+# needs Sphinx >= 8.2, which needs Python >= 3.11, while ovrtx itself supports 3.10.
+# See requirements.txt.
+UV            ?= uv
+UVRUN         = $(UV) run --no-project --python '>=3.11' --with-requirements $(DOCS_DIR)/requirements.txt
 
 # Put it first so that "make" without argument is like "make help".
 help:

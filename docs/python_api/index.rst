@@ -40,7 +40,24 @@ Version and Constants
 USD Schema Path Registration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+When ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1`` is set, ``import ovrtx`` publishes ovrtx's USD
+schema/plugin directories to the ovrtx-namespaced plugin-path env var and upstream
+``PXR_PLUGINPATH_NAME``. The hook is disabled by default; call
+:func:`ovrtx.register_schema_paths` explicitly when you need bundled-OpenUSD registration
+without enabling the import hook. Integrations that want to select or filter the paths
+for an external OpenUSD runtime can use :func:`ovrtx.usd_plugin_paths`, which enumerates
+the directories without mutating plugin-path env vars. Append any desired subset to
+``PXR_PLUGINPATH_NAME`` **before** that external runtime opens its first stage.
+
+In an ovrtx + ovstage process, creating ``ovrtx.Renderer`` first registers these
+paths automatically before OpenUSD loads. If ``ovstage.Stage`` (or
+``ovstage.library_version()``) runs first, call ``ovrtx.register_schema_paths()``
+before it. The registration call loads only the ovrtx shared loader; the ovrtx
+runtime remains deferred until renderer initialization.
+
 .. autofunction:: ovrtx.register_schema_paths
+
+.. autofunction:: ovrtx.usd_plugin_paths
 
 .. autofunction:: ovrtx.usd_pluginpath_env_keys
 
@@ -109,16 +126,14 @@ Render Outputs
 .. autoclass:: ovrtx.MappedRenderVar
    :members:
    :undoc-members:
+   :inherited-members:
 
 .. autoclass:: ovrtx.RenderVarTensor
    :members:
    :undoc-members:
+   :inherited-members:
 
 .. autoclass:: ovrtx.RenderVarParam
-   :members:
-   :undoc-members:
-
-.. autoclass:: ovrtx.ManagedDLTensor
    :members:
    :undoc-members:
 
@@ -132,6 +147,7 @@ Attribute Bindings and Mappings
 .. autoclass:: ovrtx.AttributeMapping
    :members:
    :undoc-members:
+   :inherited-members:
 
 .. autoclass:: ovrtx.AttributeInfo
    :members:
@@ -183,5 +199,13 @@ Enums
    :undoc-members:
 
 .. autoclass:: ovrtx.DLDataType
+   :members:
+   :undoc-members:
+
+.. autoclass:: ovrtx.DLDevice
+   :members:
+   :undoc-members:
+
+.. autoclass:: ovrtx.DLDeviceType
    :members:
    :undoc-members:

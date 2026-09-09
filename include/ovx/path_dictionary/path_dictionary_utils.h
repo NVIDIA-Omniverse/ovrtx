@@ -10,7 +10,7 @@
 #ifndef PATH_DICTIONARY_UTILS_H
 #define PATH_DICTIONARY_UTILS_H
 
-#include "path_dictionary_types.h"
+#include "path_dictionary_vtable.h"
 
 #ifdef __cplusplus
 extern "C"

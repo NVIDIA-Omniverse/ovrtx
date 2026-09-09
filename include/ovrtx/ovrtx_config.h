@@ -117,9 +117,9 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_read_gpu_transforms(bool r
 /**
  * Keep the renderer system alive after all instances are destroyed.
  *
- * When enabled, the shared RendererWrapperSystem (common GPU resources) is not destroyed
+ * When enabled (default), the shared RendererWrapperSystem (common GPU resources) is not destroyed
  * when the last renderer instance is destroyed, so a subsequent create_renderer reuses it.
- * When disabled (default), the system is destroyed when the last renderer instance is destroyed.
+ * When disabled, the system is destroyed when the last renderer instance is destroyed.
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_keep_system_alive(bool keep_system_alive)
 {
@@ -127,18 +127,9 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_keep_system_alive(bool kee
 }
 
 /**
- * Select graphics API.
- *
- * When true, the renderer uses Vulkan. When false, it uses DX12 (Windows only).
- * If this entry is not provided, the platform default is used (DX12 on Windows, Vulkan on Linux).
- */
-static inline ovrtx_config_entry_t ovrtx_config_entry_use_vulkan(bool use_vulkan)
-{
-    return ovrtx_config_entry_bool(OVRTX_CONFIG_USE_VULKAN, use_vulkan);
-}
-
-/**
  * Build a config entry for the geometry streaming opt-in flag.
+ *
+ * Geometry streaming is disabled when this entry is not specified.
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_enable_geometry_streaming(bool enable_geometry_streaming)
 {
@@ -202,6 +193,21 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_texture_streaming_mode(
 }
 
 /**
+ * Configure NVIDIA Nsight Aftermath diagnostics.
+ *
+ * @param mode One of @ref ovrtx_aftermath_mode_t. @ref OVRTX_AFTERMATH_DISABLE skips
+ *             Aftermath initialization, @ref OVRTX_AFTERMATH_ENABLE selects explicit
+ *             diagnostics initialization, and omitted or @ref OVRTX_AFTERMATH_AUTO selects
+ *             the initialization mode automatically. This is process-global and must be
+ *             selected before the first renderer is created; subsequent renderer
+ *             configurations must use the same mode while the renderer system is alive.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_aftermath_mode(ovrtx_aftermath_mode_t mode)
+{
+    return ovrtx_config_entry_int(OVRTX_CONFIG_AFTERMATH_MODE, (int64_t)mode);
+}
+
+/**
  * Configure log file path for carb logging.
  *
  * This setting should be passed to ovrtx_initialize(). The log file is created when the first
@@ -248,6 +254,20 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_active_cuda_gpus(ovx_strin
 }
 
 /**
+ * Allow all soft-deprecated sensor versions while pinned to a specific framework release.
+ *
+ * Soft-deprecated sensor versions are rejected by default. This opt-in allows them only while
+ * the value matches the current framework version, so it must be revisited on every framework
+ * upgrade (upgrading stops soft-deprecated sensors from loading, forcing migration).
+ *
+ * @param base "<major>.<minor>.<patch>" (e.g. "0.4.0"). Any non-matching value (or unset) allows none.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_sensors_allowed_deprecation_base(ovx_string_t base)
+{
+    return ovrtx_config_entry_string(OVRTX_CONFIG_SENSORS_ALLOWED_DEPRECATION_BASE, base);
+}
+
+/**
  * Configure the datastore cache used by UJITSO.
  *
  * Supported protocol-prefixed values are:
@@ -270,7 +290,8 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_datastore_cache(ovx_string
  *
  * When enabled, prims marked with a non-zero selection group (via ovrtx_set_selection_outline_group)
  * will have a visible outline drawn in the rendered image.
- * When disabled (default), selection groups are tracked but no outline is rendered.
+ * Selection outlines are enabled by default. Pass false to disable them. When disabled, selection 
+ * groups are tracked but no outline is rendered.
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_selection_outline_enabled(bool enabled)
 {
@@ -298,21 +319,6 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_selection_outline_width(in
 static inline ovrtx_config_entry_t ovrtx_config_entry_selection_fill_mode(ovrtx_selection_fill_mode_t mode)
 {
     return ovrtx_config_entry_int(OVRTX_CONFIG_SELECTION_FILL_MODE, (int64_t)mode);
-}
-
-/**
- * Configure the DomeLight baking resolution (texels).
- *
- * Controls the resolution of the environment texture baked from an MDL material assigned to a
- * DomeLight's image source. Applies renderer-wide to all dome lights. Valid range is 1..8192;
- * out-of-range values are clamped by the renderer. If this entry is not provided, the renderer
- * leaves the setting untouched (the default is 4096 on a fresh renderer).
- *
- * Init-time only; changing requires renderer recreation.
- */
-static inline ovrtx_config_entry_t ovrtx_config_entry_dome_baking_resolution(int resolution)
-{
-    return ovrtx_config_entry_int(OVRTX_CONFIG_DOME_BAKING_RESOLUTION, (int64_t)resolution);
 }
 
 /** @} */ // end of ovrtx_config_helpers

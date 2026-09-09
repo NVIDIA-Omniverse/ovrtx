@@ -31,14 +31,15 @@ set _OVRTX_BUILD_HTML=1
 goto run_doxygen
 
 :setup_sphinx
-REM Install docs dependencies from pyproject.toml via repo.bat if available
+REM The docs toolchain lives in requirements.txt rather than a pyproject.toml extra: it
+REM needs Sphinx >= 8.2, which needs Python >= 3.11, while ovrtx itself supports 3.10.
+set _OVRTX_UV_ARGS=run --no-project --python ">=3.11" --with-requirements requirements.txt
+REM Provision docs dependencies via repo.bat if available
 if not exist "..\repo.bat" goto skip_repo
 REM Respect a user-provided %SPHINXBUILD%; only override when we set the default.
 if not "%_OVRTX_SPHINXBUILD_DEFAULT%" == "1" goto check_sphinx
-echo Installing docs dependencies from pyproject.toml [docs] extra...
-call ..\repo.bat uv -- pip install -e "..\python[docs]"
-if errorlevel 1 goto error
-set SPHINXBUILD=call ..\repo.bat uv -- run sphinx-build
+echo Provisioning docs dependencies from requirements.txt...
+set SPHINXBUILD=call ..\repo.bat uv -- %_OVRTX_UV_ARGS% sphinx-build
 goto check_sphinx
 
 :skip_repo
@@ -46,8 +47,8 @@ REM No repo.bat: fall back to uv on PATH so users only need uv installed.
 if not "%_OVRTX_SPHINXBUILD_DEFAULT%" == "1" goto check_sphinx
 where uv >NUL 2>NUL
 if errorlevel 1 goto check_sphinx
-echo Using uv-managed environment from python\pyproject.toml [docs] extra...
-set SPHINXBUILD=uv run --project ..\python --extra docs sphinx-build
+echo Using uv-managed environment from docs\requirements.txt...
+set SPHINXBUILD=uv %_OVRTX_UV_ARGS% sphinx-build
 
 :check_sphinx
 %SPHINXBUILD% >NUL 2>NUL
@@ -62,7 +63,7 @@ if errorlevel 9009 (
 	echo.https://www.sphinx-doc.org/
 	echo.
 	echo.Tip: install uv from https://docs.astral.sh/uv/ and re-run; this script
-	echo.will automatically use uv to provision Sphinx from python\pyproject.toml.
+	echo.will automatically use uv to provision Sphinx from docs\requirements.txt.
 	set _OVRTX_EXIT_CODE=1
 	goto end
 )

@@ -64,11 +64,11 @@ Path Tracing
        Maximum number of ray bounces for any ray type. Higher values give more accurate results, but worse performance.
      - ``uint``
      - ``4``
-   * - ``omni:rtx:pt:limits:maxGlossyBounces``
+   * - ``omni:rtx:pt:limits:extraSpecularAndTransmissiveBounces``
 
-       Maximum number of ray bounces for specular and transmission.
+       Additional number of specular and transmission ray bounces beyond ``maxBounces``.
      - ``uint``
-     - ``6``
+     - ``2``
    * - ``omni:rtx:pt:maxVolumeBounces``
 
        Maximum number of ray bounces for SSS.

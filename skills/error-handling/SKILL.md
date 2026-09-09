@@ -13,7 +13,6 @@ description: >
   Error checking patterns for both C and Python. Use when user asks about error
   handling, checking errors, debugging ovrtx failures, or troubleshooting.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -100,7 +99,7 @@ Errors from async operations surface when you call `wait()`:
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `create-renderer`
 >
-> Followed by: `examples/c/minimal/main.cpp` snippet `load-usd-and-wait`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `load-usd-and-wait`
 >
 > Every API call returns a status code. Check with the `check-error-helper` snippet pattern.
 

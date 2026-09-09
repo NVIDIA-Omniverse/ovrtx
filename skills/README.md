@@ -33,7 +33,6 @@ name: skill-name
 description: >
   What this skill covers. Use when user asks to [trigger phrases].
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -114,12 +113,23 @@ def "Render" {
 
 Snippet names are kebab-case, prefixed with `doc-`, and unique across the `tests/docs/` tree. Full examples under `examples/` may still be referenced for complete application structure, but skill-level API and USDA patterns should come from the tested docs snippets above.
 
+**Deliberate exception: the `spg` skill.** It sources every snippet from `examples/python/spg-*` rather than from `tests/docs/`. The unit of teaching there is a three-file contract (`.cu`/`.slang` + `.cu.lua`/`.slang.lua` + `.usda`) that only holds together as a whole node, which a per-call docs snippet cannot express. Those examples are self-checking: each asserts its own result and exits non-zero on failure, and CI runs every one of them in `run_ovrtx_python_doc_tests()`, so they are executable coverage rather than merely compiled. Their `.usda` files are additionally covered by `tests/docs/usd/test_spg_usda.py`, and every `> **Source:**` reference in the skill is validated by `tests/test_inline_skill_snippets.py`.
+
 ### Reference format in SKILL.md
 
 Replace inline code blocks with a blockquote directive:
 
 ```markdown
 > **Source:** `tests/docs/python/test_attribute_read.py` snippet `doc-read-attribute-scalar`
+```
+
+Use an optional parenthesized qualifier when several references have distinct
+roles. The `Source` prefix remains mandatory:
+
+```markdown
+> **Source (USDA):** `tests/docs/usd/data/scene.usda` snippet `doc-scene`
+> **Source (query check):** `tests/docs/python/test_query.py` snippet `doc-query`
+> **Source (continued):** `examples/c/minimal/main.cpp` snippet `destroy-renderer`
 ```
 
 Agents read the referenced file between the `# [snippet:name]` and `# [/snippet:name]` markers to get the current code.
@@ -139,9 +149,9 @@ Use Sphinx `literalinclude` with marker-based selectors:
 
 Starting with ovrtx 0.4, ovrtx can use optional **ovstage** integration for
 runtime scene management. Skills in this directory retain **standalone mode**
-compatibility behavior where ovrtx owns the USD stage and Fabric runtime. Those
-renderer-owned scene APIs are deprecated as scene ownership transitions entirely
-to ovstage in a future release.
+compatibility behavior where ovrtx owns the USD stage and runtime scene storage.
+Those renderer-owned scene APIs are deprecated as scene ownership transitions
+entirely to ovstage in a future release.
 
 **In attached mode**, ovstage is authoritative for scene data. The two-library
 ownership split is:
@@ -172,7 +182,7 @@ example, `cloning-prims` documents legacy `renderer.clone_usd()`, while current 
 | `mapping-attributes` | Map ovstage buffers by ordinal; provide `element_sizes` for ragged arrays |
 | `attribute-bindings` | Write ordering governed by ovstage ordinals |
 | `project-setup-python` | Declare `ovstage>=0.1` dependency alongside ovrtx |
-| `project-setup-c` | Link `ovstage::ovstage_static`; see ovstage's `project-setup-c` skill |
+| `project-setup-c` | Choose matching static or shared ovrtx/ovstage loaders; see ovstage's `project-setup-c` skill |
 
 When working in attached-mode contexts, also consult the ovstage agent context
 (`AGENTS.md` and skills shipped with the ovstage package).
@@ -180,6 +190,10 @@ When working in attached-mode contexts, also consult the ovstage agent context
 For the full mode overview: `docs/core/ovstage_integration.rst`.
 
 For existing ovrtx 0.3 projects, use `skills/update-0_3-0_4-c/SKILL.md` or `skills/update-0_3-0_4-python/SKILL.md` to move deprecated scene operations to ovstage without broadly refactoring the application. Shared behavior changes for both languages live in `skills/update-0_3-0_4-common/Reference.md`.
+
+For existing ovrtx 0.4 projects, use `skills/update-0-4-to-0-5/SKILL.md` to migrate
+the public OVRTX 0.5 API and authored-USD changes, including the OVStage 0.2
+data-contract changes that affect attached applications.
 
 ## Adding a New Skill
 

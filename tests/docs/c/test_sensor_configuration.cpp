@@ -87,7 +87,7 @@ def "Render" {
     ovrtx_cuda_sync_t no_sync = {};
     for (size_t i = 0; i < outputs.output_count; ++i) {
         ovrtx_render_var_output_handle_t ldr_handle =
-            find_product_output(outputs.outputs[i], "LdrColor");
+            find_product_output(outputs.outputs[i], "/Render/Vars/LdrColor");
         if (ldr_handle != OVRTX_INVALID_HANDLE) {
             ovrtx_render_var_output_t ldr_output = {};
             ovrtx_result_t map_result = ovrtx_map_render_var_output(
@@ -158,7 +158,7 @@ def "Render" {
     ASSERT_API_SUCCESS(result.status);
     EXPECT_GE(outputs.output_count, 1u);
 
-    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "LdrColor");
+    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
     if (ldr_handle != OVRTX_INVALID_HANDLE) {
         ovrtx_map_output_description_t md = {};
         md.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;

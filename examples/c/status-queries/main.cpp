@@ -398,9 +398,9 @@ int main() {
         return cleanup(1);
     }
 
-    // Find LdrColor in outputs
+    // Find LdrColor by its authored RenderVar prim path.
     ovrtx_render_var_output_handle_t ldrcolor_output_handle =
-        find_output(outputs, "LdrColor");
+        find_output(outputs, "/Render/Camera/LdrColor");
     if (ldrcolor_output_handle == OVRTX_INVALID_HANDLE) {
         std::cerr << "LdrColor output not found" << std::endl;
         ovrtx_destroy_results(renderer, step_result_handle);
@@ -484,10 +484,9 @@ find_output(ovrtx_render_product_set_outputs_t const& outputs,
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const& var =
                     frame.output_render_vars[v];
-                if (var.render_var_name.ptr &&
-                    strncmp(var.render_var_name.ptr,
-                            output_to_find,
-                            var.render_var_name.length) == 0) {
+                if (var.render_var_path.ptr &&
+                    std::string_view(var.render_var_path.ptr, var.render_var_path.length) ==
+                        std::string_view(output_to_find)) {
                     return var.output_handle;
                 }
             }

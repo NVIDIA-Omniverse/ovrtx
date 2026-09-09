@@ -62,7 +62,9 @@ Click any example image to enlarge it.
            - Z
            - float32
            - ``(H, W, 1)``
-           - Unitless depth mapped from 1 (near clip plane) to 0 (far clip plane). Known C API issue: currently returns all zeros through C readback.
+           - **Deprecated.** Unitless raster depth mapped from 1 (near clip plane) to 0 (far clip plane).
+             Use ``DistanceToImagePlaneSD`` or ``DistanceToCameraSD`` instead.
+             Known C API issue: currently returns all zeros through C readback.
            - .. image:: ../../img/aovs/rt2/DepthSD.avif
                 :width: 100%
          * - ``DistanceToCameraSD``

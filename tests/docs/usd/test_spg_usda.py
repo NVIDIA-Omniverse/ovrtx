@@ -31,10 +31,70 @@ USDA_FILES = [
     "spg-pipeline/InvertKernel.usda",
     "spg-pipeline/pipeline_scene.usda",
     "spg-builtin-nodes/stdlib_scene.usda",
+    "spg-stateful/TrailKernel.usda",
+    "spg-stateful/TrailKernel.slang.usda",
+    "spg-stateful/trail_scene.usda",
+    "spg-stateful/trail_scene_slang.usda",
+    "spg-composite-aov/RangeHistogramKernel.usda",
+    "spg-composite-aov/RangeHistogramKernel.slang.usda",
+    "spg-composite-aov/lidar_scene.usda",
+    "spg-composite-aov/lidar_scene_slang.usda",
+    "spg-raygen/RaygenCornellBox.slang.usda",
+    "spg-raygen/RaygenCornellBoxPipeline.slang.usda",
+    "spg-raygen/cornell_box_scene.usda",
+    "spg-raygen/cornell_box_pipeline_scene.usda",
+    "spg-blur/BlurHorizontal.usda",
+    "spg-blur/BlurHorizontal.slang.usda",
+    "spg-blur/BlurVertical.usda",
+    "spg-blur/BlurVertical.slang.usda",
+    "spg-blur/blur_scene.usda",
+    "spg-blur/blur_scene_slang.usda",
+    "spg-generate/CheckerKernel.usda",
+    "spg-generate/CheckerKernel.slang.usda",
+    "spg-generate/checker_scene.usda",
+    "spg-generate/checker_scene_slang.usda",
+    "spg-previous-frame/MotionKernel.usda",
+    "spg-previous-frame/MotionKernel.slang.usda",
+    "spg-previous-frame/motion_scene.usda",
+    "spg-previous-frame/motion_scene_slang.usda",
 ]
 
 # scene file, render product path, prims that must compose, expected (shader, subIdentifier).
 SCENES = [
+    (
+        "spg-blur/blur_scene.usda",
+        "/Render/BlurDemo",
+        [
+            "/World/Camera",
+            "/Render/BlurDemo/LdrColor",
+            "/Render/BlurDemo/LdrBlurH",
+            "/Render/BlurDemo/LdrBlurred",
+        ],
+        [("BlurH", "blurHorizontal"), ("BlurV", "blurVertical")],
+    ),
+    (
+        "spg-generate/checker_scene.usda",
+        "/Render/CheckerDemo",
+        ["/World/Camera", "/Render/CheckerDemo/Checker"],
+        [("CheckerKernel", "checker")],
+    ),
+    (
+        "spg-previous-frame/motion_scene.usda",
+        "/Render/MotionDemo",
+        [
+            "/World/Camera",
+            "/Render/MotionDemo/LdrColor",
+            "/Render/MotionDemo/PreviousColor",
+            "/Render/MotionDemo/Motion",
+        ],
+        [("MotionShader", "motion")],
+    ),
+    (
+        "spg-raygen/cornell_box_pipeline_scene.usda",
+        "/Render/CornellBox",
+        ["/World/Camera", "/Render/CornellBox/LdrColor", "/Render/CornellBox/Cornell"],
+        [("RaygenCornellBoxPipeline", "rayGenCornellBoxPipeline")],
+    ),
     (
         "spg-grayscale/grayscale_scene.usda",
         "/Render/GrayscaleDemo",
@@ -52,6 +112,52 @@ SCENES = [
         "/Render/StdlibDemo",
         ["/World/Camera", "/Render/StdlibDemo/LdrColor", "/Render/StdlibDemo/Downscaled"],
         [],  # built-in factory nodes: no sourceAsset subIdentifier
+    ),
+    (
+        "spg-stateful/trail_scene.usda",
+        "/Render/TrailDemo",
+        [
+            "/World/Camera",
+            "/World/Ball",
+            "/Render/TrailDemo/HdrColor",
+            "/Render/TrailDemo/LdrLive",
+            "/Render/TrailDemo/LdrTrail",
+        ],
+        [("TrailKernel", "trail")],
+    ),
+    (
+        # The Slang scene references the CUDA one for the rendered world, so
+        # composing it also proves that reference resolves.
+        "spg-stateful/trail_scene_slang.usda",
+        "/Render/TrailDemo",
+        [
+            "/World/Camera",
+            "/World/Ball",
+            "/Render/TrailDemo/HdrColor",
+            "/Render/TrailDemo/LdrLive",
+            "/Render/TrailDemo/LdrTrail",
+        ],
+        [("TrailKernel", "trail")],
+    ),
+    (
+        "spg-composite-aov/lidar_scene.usda",
+        "/Render/LidarProduct",
+        ["/Render/LidarProduct/PointCloud", "/Render/LidarProduct/Histogram"],
+        [("RangeHistogramKernel", "rangeHistogram")],
+    ),
+    (
+        # A ray-generation node: it has no resource inputs at all, because the scene
+        # acceleration structure and the camera transform are provided implicitly.
+        "spg-raygen/cornell_box_scene.usda",
+        "/Render/CornellBox",
+        ["/World/Camera", "/World/Floor", "/Render/CornellBox/Cornell"],
+        [("RaygenCornellBox", "rayGenCornellBox")],
+    ),
+    (
+        "spg-composite-aov/lidar_scene_slang.usda",
+        "/Render/LidarProduct",
+        ["/Render/LidarProduct/PointCloud", "/Render/LidarProduct/Histogram"],
+        [("RangeHistogramKernel", "rangeHistogram")],
     ),
 ]
 

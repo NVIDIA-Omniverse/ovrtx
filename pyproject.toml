@@ -1,6 +1,6 @@
 [project]
 name = "ovrtx"
-version = "0.4.1"
+version = "0.5.0"
 description = "Physically accurate, real-time, sensor simulation and visualization using NVIDIA Omniverse RTX"
 requires-python = ">=3.10,<3.14"
 dependencies = [
@@ -34,16 +34,10 @@ readme = "README.md"
 Repository = "https://github.com/NVIDIA-Omniverse/ovrtx"
 Changelog = "https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/CHANGELOG.md"
 
+# Note: the documentation toolchain is intentionally not declared here. It requires
+# Sphinx >= 8.2, which requires Python >= 3.11, and declaring that would force this
+# package's requires-python up to 3.11. See docs/requirements.txt.
 [project.optional-dependencies]
-docs = [
-    "sphinx>=7.0",
-    "nvidia-sphinx-theme",
-    "sphinx-autodoc-typehints",
-    "sphinx-copybutton",
-    "sphinx-design",
-    "sphinx-mdinclude",
-    "breathe",
-]
 test = [
     "pytest==9.0.2",
     "Pillow==12.1.1",

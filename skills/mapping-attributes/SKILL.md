@@ -15,7 +15,6 @@ description: >
   repeated mapped updates. Use attribute-bindings for repeated writes with
   caller-owned tensors when a copy is acceptable.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -125,7 +124,7 @@ Tensor layout follows the lane-based attribute rules in the `writing-attributes`
 ## Troubleshooting
 
 - **Tensor lifetime:** A tensor fetched from an ovstage mapping group is valid only while the mapping is active. Copy data that must outlive unmap.
-- The canonical transform attribute name is `"omni:xform"`. The legacy name `"omni:fabric:localMatrix"` (used in examples above) is also accepted. New code should prefer `"omni:xform"`.
+- Use the `"omni:xform"` attribute name for local transforms.
 - For ragged array mappings, pass the per-prim element counts through `element_sizes`. The number of entries must match the query's prim count; omit it for fixed-size attributes.
 - Data must be fully written before calling `unmap()`, and the write floor must advance before rendering that ordinal.
 - Deprecated renderer CUDA mappings require stream or event synchronization on unmap.

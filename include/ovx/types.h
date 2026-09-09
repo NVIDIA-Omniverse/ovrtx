@@ -10,8 +10,9 @@
 #ifndef OVX_TYPES_H
 #define OVX_TYPES_H
 
-#include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* ovx_string_t, ovx_token_t and ovx_string_or_token_t live in the shared header
  * so the ovrtx and ovstage public headers can coexist in one translation unit. */
@@ -19,7 +20,11 @@
 
 /* Macro for creating ovx_string_t from string literals. Concatenating with an
  * empty literal makes non-literal arguments fail to compile. */
-#define literal_to_ovx_string(str) ovx_string_t{ (str), sizeof("" str) - 1 }
+#ifdef __cplusplus
+    #define literal_to_ovx_string(str) ovx_string_t{ (str), sizeof("" str) - 1 }
+#else
+    #define literal_to_ovx_string(str) ((ovx_string_t){ (str), sizeof("" str) - 1 })
+#endif
 
 static inline bool is_ovx_string_empty(const ovx_string_t* str)
 {

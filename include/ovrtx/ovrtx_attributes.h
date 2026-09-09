@@ -13,6 +13,7 @@
 #include "ovrtx.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 /** @defgroup ovrtx_attribute_helpers Attribute helper functions
@@ -251,13 +252,28 @@ static inline ovrtx_enqueue_result_t ovrtx_set_xform_pos_rot3x3(
     return ovrtx_write_attribute(instance, &binding_desc, &buffer, OVRTX_DATA_ACCESS_SYNC);
 }
 
-static inline ovrtx_enqueue_result_t ovrtx_set_reset_xform_stack(ovrtx_renderer_t* instance, const ovx_string_t* paths, size_t path_count, const bool* values)
+static inline ovrtx_enqueue_result_t ovrtx_set_reset_xform_stack(ovrtx_renderer_t* instance,
+                                                                 const ovx_string_t* paths,
+                                                                 size_t path_count,
+                                                                 const bool* values)
 {
-    DLDataType type{ kDLUInt, 8, 1 };
-    DLTensor tensor = ovrtx_make_write_cpu_tensor(values, &path_count, type);
-    ovrtx_input_buffer_t buffer = { &tensor, 1, nullptr, {} };
-    ovrtx_binding_desc_or_handle_t binding_desc =
-        ovrtx_make_binding_desc(paths, path_count, literal_to_ovx_string("omni:resetXformStack"), OVRTX_SEMANTIC_NONE, type);
+    DLDataType type;
+    DLTensor tensor;
+    ovrtx_input_buffer_t buffer;
+    ovrtx_binding_desc_or_handle_t binding_desc;
+
+    type.code = kDLBool;
+    type.bits = 8;
+    type.lanes = 1;
+
+    tensor = ovrtx_make_write_cpu_tensor(values, &path_count, type);
+
+    memset(&buffer, 0, sizeof(buffer));
+    buffer.tensors = &tensor;
+    buffer.tensor_count = 1;
+
+    binding_desc = ovrtx_make_binding_desc(
+        paths, path_count, literal_to_ovx_string("omni:resetXformStack"), OVRTX_SEMANTIC_NONE, type);
     return ovrtx_write_attribute(instance, &binding_desc, &buffer, OVRTX_DATA_ACCESS_SYNC);
 }
 
@@ -292,8 +308,15 @@ static inline ovrtx_enqueue_result_t ovrtx_set_path_attributes(
     ovx_string_t attribute_name,
     const ovx_string_t* path_values)
 {
+    ovrtx_enqueue_result_t result;
+    ovrtx_input_buffer_t buffer;
+    ovrtx_binding_desc_or_handle_t binding_desc;
     OVRTX_STATIC_ASSERT(sizeof(ovx_string_t) == 16, "ovx_string_t must be 16 bytes (128 bits)");
-    DLDataType type{ kDLUInt, 128, 1 };  /* ovx_string_t = ptr(8 bytes) + length(8 bytes) = 16 bytes = 128 bits */
+    DLDataType type;
+
+    type.code = kDLUInt;
+    type.bits = 128; /* ovx_string_t = ptr(8 bytes) + length(8 bytes) = 16 bytes = 128 bits */
+    type.lanes = 1;
 
     /*
     *   Path attributes are USD relationships, which must be arrays.
@@ -304,14 +327,30 @@ static inline ovrtx_enqueue_result_t ovrtx_set_path_attributes(
     int64_t stackShapes[OVRTX_PATH_ATTR_STACK_TENSOR_COUNT];
     DLTensor* tensors = stackTensors;
     int64_t* shapes = stackShapes;
-    
+
     /* Allocate heap storage if needed */
-    DLTensor* heapTensors = nullptr;
-    int64_t* heapShapes = nullptr;
+    DLTensor* heapTensors = NULL;
+    int64_t* heapShapes = NULL;
     if (path_count > OVRTX_PATH_ATTR_STACK_TENSOR_COUNT)
     {
-        heapTensors = new DLTensor[path_count];
-        heapShapes = new int64_t[path_count];
+        if (path_count > SIZE_MAX / sizeof(*heapTensors) || path_count > SIZE_MAX / sizeof(*heapShapes))
+        {
+            result.status = OVRTX_API_ERROR;
+            result.op_index = OVRTX_INVALID_HANDLE;
+            return result;
+        }
+
+        heapTensors = (DLTensor*)malloc(path_count * sizeof(*heapTensors));
+        heapShapes = (int64_t*)malloc(path_count * sizeof(*heapShapes));
+        if (heapTensors == NULL || heapShapes == NULL)
+        {
+            free(heapTensors);
+            free(heapShapes);
+            result.status = OVRTX_API_ERROR;
+            result.op_index = OVRTX_INVALID_HANDLE;
+            return result;
+        }
+
         tensors = heapTensors;
         shapes = heapShapes;
     }
@@ -320,34 +359,28 @@ static inline ovrtx_enqueue_result_t ovrtx_set_path_attributes(
     for (size_t i = 0; i < path_count; ++i)
     {
         shapes[i] = 1;  /*Each array has 1 element*/
-        tensors[i] = {};
-        tensors[i].data = const_cast<ovx_string_t*>(&path_values[i]);
-        tensors[i].device = { kDLCPU, 0 };
+        memset(&tensors[i], 0, sizeof(tensors[i]));
+        tensors[i].data = (void*)&path_values[i]; /* dltensor is non-const even for read-only */
+        tensors[i].device.device_type = kDLCPU;
+        tensors[i].device.device_id = 0;
         tensors[i].ndim = 1;
         tensors[i].dtype = type;
         tensors[i].shape = &shapes[i];
-        tensors[i].strides = nullptr;
-        tensors[i].byte_offset = 0;
     }
 
-    ovrtx_input_buffer_t buffer = { tensors, path_count, nullptr, {} };
+    memset(&buffer, 0, sizeof(buffer));
+    buffer.tensors = tensors;
+    buffer.tensor_count = path_count;
 
     /*Build binding descriptor with is_array=true for relationship attribute*/
-    ovrtx_binding_desc_or_handle_t binding_desc{};
-    binding_desc.binding_desc.prim_list = { prim_paths, path_count };
-    binding_desc.binding_desc.attribute_name = { {}, attribute_name };
-    binding_desc.binding_desc.attribute_type = { type, true, OVRTX_SEMANTIC_PATH_STRING };  /*is_array=true*/
-    binding_desc.binding_desc.prim_mode = OVRTX_BINDING_PRIM_MODE_EXISTING_ONLY;
-    binding_desc.binding_desc.flags = OVRTX_BINDING_FLAG_NONE;
+    binding_desc = ovrtx_make_binding_desc(prim_paths, path_count, attribute_name, OVRTX_SEMANTIC_PATH_STRING, type);
+    binding_desc.binding_desc.attribute_type.is_array = true;
 
-    ovrtx_enqueue_result_t result = ovrtx_write_attribute(instance, &binding_desc, &buffer, OVRTX_DATA_ACCESS_SYNC);
+    result = ovrtx_write_attribute(instance, &binding_desc, &buffer, OVRTX_DATA_ACCESS_SYNC);
 
     /*Clean up heap storage if allocated*/
-    if (heapTensors)
-    {
-        delete[] heapTensors;
-        delete[] heapShapes;
-    }
+    free(heapTensors);
+    free(heapShapes);
 
     return result;
 }

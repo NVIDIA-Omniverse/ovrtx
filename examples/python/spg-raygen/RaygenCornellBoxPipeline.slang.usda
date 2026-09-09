@@ -1,0 +1,47 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+(
+    defaultPrim = "RaygenCornellBoxPipeline"
+)
+
+# [snippet:pipeline-shader-definition]
+def Shader "RaygenCornellBoxPipeline"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:spg:sourceAsset = @RaygenCornellBoxPipeline.slang@
+    uniform token info:spg:sourceAsset:subIdentifier = "rayGenCornellBoxPipeline"
+
+    # Camera-space shading parameters. The scene acceleration structure and the camera-to-trace-space
+    # transform are provided implicitly because the shader lives under a RenderProduct -- no authored
+    # input or connection for either.
+    #
+    # The light sits just under the ceiling, slightly in front of the blocks, so both cast a visible
+    # shadow. Camera space = world space translated by the camera position (0, 0, 400): the light's world
+    # position (0, 180, -50) is (0, 180, -450) from the camera.
+    float3 inputs:lightPosCamera = (0, 180, -450)
+
+    # Field of view chosen so the whole frame, corners included, looks into the room: at the open front
+    # (300 units ahead) the view spans +-180 < the room's +-200 half extent, so no ray escapes past the
+    # opening and the image has no black border.
+    float inputs:tanHalfFov = 0.6
+    float inputs:maxRange = 100000.0
+    float inputs:shadowFactor = 0.35   # brightness where the light is blocked
+    float inputs:ambient = 0.22        # ambient floor so shadowed surfaces stay readable
+
+    # Sideways offset of the two normal probes, as a fraction of the hit distance. Large enough for a
+    # well-conditioned cross product, small enough that probes rarely cross a triangle edge.
+    float inputs:normalEpsilon = 0.002
+
+    # NxN rendered image.
+    opaque outputs:image
+}
+# [/snippet:pipeline-shader-definition]

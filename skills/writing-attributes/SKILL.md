@@ -13,7 +13,6 @@ description: >
   Writing scalar and array attribute data to prims. Use when user asks to write an
   attribute, set a property, change a material, set a color, or modify mesh data.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -134,7 +133,7 @@ Use this table to answer "how do I write USD type X?" For ovstage, pass `is_arra
 | `extent`, `_worldExtent` | `np.float64`, shape `(N, 6)` | `{kDLFloat, 64, 6}` | Usually read-only from population; `extent` is local-space, `_worldExtent` is world-space. |
 | `string` | UTF-8 `np.uint8` byte rows with `is_array=True` and `AttributeSemantic.STRING` | `{kDLUInt, 8, 1}` with `is_array=true` | One byte row represents one USD string value. |
 | `token` / `token[]` | `np.uint64` IDs from `PathDictionary.intern_token()` with `AttributeSemantic.TOKEN_ID` | `{kDLUInt, 64, 1}` raw IDs with `OVRTX_SEMANTIC_TOKEN_ID`, or compatibility string helpers | Set `is_array` to match the USD attribute kind. |
-| `asset` | not supported for populated attributes (see note below) | not supported for populated attributes | Writing to a USD-populated scalar `asset` attribute is not supported in ovstage 0.1.x: `ASSET_STRING` byte-row payloads are rejected with a type mismatch, and raw token-pair writes are not validated end-to-end; asset write support is planned for a future minor release. Fresh (non-populated) attributes can be created with UTF-8 byte rows and `AttributeSemantic.ASSET_STRING`. Deprecated C compatibility writes represent scalar assets as `{kDLUInt, 64, 2}` token pairs. |
+| `asset` | `np.uint64` id pairs from `PathDictionary.intern_token()` with `AttributeSemantic.ASSET_PATH_ID` | `{kDLUInt, 64, 2}` with `is_array=false` | One `(authored, resolved)` pair per prim. ovstage does not resolve assets, so intern both paths yourself. Use token id 0 for the resolved half when the path resolves to nothing. Works for both fresh attributes and USD-populated asset columns (ovstage >= 0.2). On 0.1.x a write of this shape created a second same-named column instead of updating the populated one. |
 | `relationship` | `np.uint64` IDs from `PathDictionary.intern_path()` with `is_array=True` and `AttributeSemantic.RELATIONSHIP_PATH_ID` | path string/path ID semantics | Use relationship-specific skills for schema-specific behavior. |
 | `timecode` / `timecode[]` | unsupported | unsupported | |
 
@@ -160,7 +159,7 @@ Use this table to answer "how do I write USD type X?" For ovstage, pass `is_arra
 
 > **Source:** `tests/docs/python/test_base.py` snippet `doc-bind-material`
 
-### Deprecated compatibility: authored attribute matrix
+### Authored attribute matrix
 
 Python raw snippets:
 
@@ -182,10 +181,12 @@ Python raw snippets:
 
 The snippets listed in this table live in `tests/docs/python/test_all_attributes.py`.
 
-Use `ovstage.PathDictionary` to intern token and relationship strings, then write
-the resulting IDs with `AttributeSemantic.TOKEN_ID` or
-`AttributeSemantic.RELATIONSHIP_PATH_ID`. String and asset payloads use byte rows
-with `AttributeSemantic.STRING` or `AttributeSemantic.ASSET_STRING`.
+They write through a reusable ovstage query, wait for each write, and advance
+the write floor before reading the updated value. Use `ovstage.PathDictionary`
+to intern token and relationship strings, then write the resulting IDs with
+`AttributeSemantic.TOKEN_ID`, `AttributeSemantic.RELATIONSHIP_PATH_ID` or
+`AttributeSemantic.ASSET_PATH_ID`. String payloads use byte rows with
+`AttributeSemantic.STRING`.
 
 ## C
 
@@ -209,9 +210,9 @@ C raw snippets:
 | token | `doc-write-usd-token-c` |
 | token array | `doc-write-usd-token-array-c` |
 | string bytes | `doc-write-usd-string-c` |
-| scalar asset byte row (write half SKIPPED — writes unsupported) | `doc-write-usd-asset-c` |
+| scalar asset id pair | `doc-write-usd-asset-c` |
 
-The snippets listed in this table live in `tests/docs/c/test_all_attributes.cpp`. **Writing to a USD-populated scalar `asset` attribute is not supported in ovstage 0.1.x** (the read side is fixed as of 0.1.1 and returns token pairs — see the reading-attributes skill; the `doc-read-usd-asset-c` snippet is runtime-validated). The write half of `AllAttributesTest.AssetReadWriteSnippets` skips with that reason, so treat `doc-write-usd-asset-c` as *provisional*: it expresses the planned canonical `ASSET_STRING` byte-row payload that lands with asset write support in the next minor release.
+The snippets listed in this table live in `tests/docs/c/test_all_attributes.cpp`. As of ovstage 0.2, writing `ASSET_PATH_ID` id pairs to a USD-populated scalar `asset` attribute is supported and updates the existing column in place. On 0.1.x a write of this shape created a second same-named column of a conflicting type instead. The scalar-asset snippets are runtime-validated by `AllAttributesTest.AssetReadWriteSnippets`. Intern both paths through the path dictionary before the write, and use token id 0 for the resolved half when the path resolves to nothing.
 
 ## Key Types / Functions
 
@@ -233,7 +234,7 @@ Semantics (Python: `ovstage.AttributeSemantic`; C ovstage: `ovstage_attribute_se
 - `AttributeSemantic.RELATIONSHIP_PATH_ID` / `OVSTAGE_SEMANTIC_RELATIONSHIP_PATH_ID` -- interned relationship path IDs (write `is_array=true`).
 - `AttributeSemantic.TOKEN_ID` / `OVSTAGE_SEMANTIC_TOKEN_ID` / `OVRTX_SEMANTIC_TOKEN_ID` -- interned token IDs.
 - `AttributeSemantic.STRING` / `OVSTAGE_SEMANTIC_STRING` -- UTF-8 USD string bytes (write `is_array=true`, dtype `{kDLUInt, 8, 1}`).
-- `AttributeSemantic.ASSET_STRING` / `OVSTAGE_SEMANTIC_ASSET_STRING` -- UTF-8 asset bytes (same shape as STRING).
+- `AttributeSemantic.ASSET_PATH_ID` / `OVSTAGE_SEMANTIC_ASSET_PATH_ID` -- interned `(authored, resolved)` asset token ids (write `is_array=false`, dtype `{kDLUInt, 64, 2}`).
 
 In C, `ovstage_write_attribute` returns `ovstage_enqueue_result_t` which contains both `.status` (check for `OVSTAGE_OK`) and `.op_index` (for async tracking via `ovstage_wait_op`). Every doc-test snippet uses the shared `docs_wait_ovstage_no_errors(stage, op_index)` helper from `tests/docs/c/helpers.h` to wait + assert on op errors.
 
@@ -247,7 +248,7 @@ Deprecated renderer data access modes (Python: `from ovrtx import DataAccess`):
 
 - Array attribute dtype must exactly match the USD schema. Using numpy's default `float64` for a `float3[]` attribute (which expects `float32`) will cause errors.
 - In the current runtime, authored scalar USD `float3` values may be created but populated as zero by `populateAllAuthoredAttributes`. If a value needs to come from USD, author it as a role-bearing type such as `vector3f`, `point3f`, `normal3f`, or `color3f`. Direct runtime writes to scalar `float3` still work.
-- Quaternion tensors use ovrtx/Fabric lane order `(i, j, k, real)`. USDA `quat*` values are authored as `(real, i, j, k)`, so reading `quatd`, `quatf`, or `quath` attributes reorders the components into `(i, j, k, real)`, and writes should use that runtime tensor order.
+- Quaternion tensors use ovrtx runtime lane order `(i, j, k, real)`. USDA `quat*` values are authored as `(real, i, j, k)`, so reading `quatd`, `quatf`, or `quath` attributes reorders the components into `(i, j, k, real)`, and writes should use that runtime tensor order.
 - Deprecated renderer string writes using `Semantic.PATH_STRING` or `Semantic.TOKEN_STRING` require `DataAccess.SYNC`.
 - Deprecated renderer compatibility writes do not support string arrays, asset arrays, or timecode attributes.
 - Custom relationships are not populated by the generic authored-attribute path. Specific relationships used by supported schemas, such as `material:binding` and shader connections, are handled by their schema/population code paths; arbitrary custom relationships are ignored today.

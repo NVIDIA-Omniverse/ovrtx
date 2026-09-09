@@ -26,9 +26,8 @@ the runtime stage, prim hierarchy, attribute storage, and the ordinal-keyed
 change model that records which writes happened at which simulation step. It is
 the authoritative owner of scene state when both libraries are used together.
 
-ovrtx was originally self-contained, managing its own internal USD stage and
-Fabric. With the optional ovstage integration (0.4+), ovrtx can operate in two
-modes:
+ovrtx was originally self-contained, managing its own internal runtime stage.
+With the optional ovstage integration (0.4+), ovrtx can operate in two modes:
 
 - **Standalone** — ovrtx owns its own runtime stage, loaded through
   ``open_usd`` / :c:func:`ovrtx_open_usd_from_file`. This compatibility mode is
@@ -36,8 +35,18 @@ modes:
   deprecated in 0.4 as scene ownership transitions entirely to ovstage in a
   future release.
 - **Attached** — ovrtx renders scene state from an external ovstage instance.
-  The application creates and drives the ovstage instance; ovrtx reads from
-  it.
+  The application creates and drives the ovstage instance; ovrtx reads from it.
+
+Attachment Ownership
+--------------------
+
+An ovstage instance may be attached to only one ovrtx renderer at a time. A
+second attachment fails immediately; Python raises ``RuntimeError`` and the C
+API returns ``OVRTX_API_ERROR``. Detach the stage before attaching it to another
+renderer.
+
+This restriction prevents multiple renderers from concurrently consuming stage
+and history state that the current integration expects to have a single owner.
 
 Responsibility Split
 --------------------
@@ -95,7 +104,10 @@ fetches its results:
 A per-attribute write-floor gate in ovstage makes repeated calls to
 :c:func:`ovrtx_update_from_stage` at the same ordinal a fast no-op: if no
 attribute has a new write at or after the current floor, the update returns
-immediately without touching Fabric.
+immediately without applying scene-data changes.
+
+The update applies committed population changes while retaining shared
+attribute storage. Python performs this update automatically before stepping.
 
 Ordinals and Write-Floor Gates
 -------------------------------
@@ -147,7 +159,8 @@ Detaching From ovstage
 Call :c:func:`ovrtx_detach_ovstage` to return the renderer to standalone mode.
 Detach resets the renderer's stage, dropping all prims and attributes sourced
 from the attached ovstage. After detach, the
-renderer can use the deprecated standalone scene APIs for compatibility.
+renderer can attach the same or a different ovstage, or use the deprecated
+standalone scene APIs for compatibility.
 
 Related Docs
 ------------

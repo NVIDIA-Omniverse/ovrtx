@@ -26,7 +26,7 @@ protected:
     static SampledImageHandle shared_images[SHARED_IMAGE_COUNT];
     
     static void SetUpTestSuite() {
-        cuda_initialized = cuda_init_standalone(&cuda_uuid);
+        cuda_initialized = cuda_init_standalone(0, &cuda_uuid);
         ASSERT_TRUE(cuda_initialized) << "Failed to initialize CUDA";
         
         VulkanContextConfig config;

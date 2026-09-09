@@ -16,10 +16,6 @@ Shaders are chained by connecting one shader's output directly to the next shade
 intermediate grayscale result stays internal to the chain and only the final image is published
 as an AOV. SPG runs the shaders in topological order of the connection graph.
 
-This example uses the deprecated renderer scene-loading API so it can remain
-focused on SPG authoring. Use the 0.3-to-0.4 migration skill when moving scene
-management to ovstage.
-
 .. pull-quote::
 
    *“Chain two SPG shaders so the renderer's color output is converted to grayscale and then inverted in a single RenderProduct, reading back only the final result.”*
@@ -43,5 +39,9 @@ Running
    uv run main.py
 
 The first step compiles both CUDA kernels with NVRTC. A successful run writes
-``_output/input.png`` and ``_output/inverted_grayscale.png``. See :doc:`../spg/index` for
-the chaining and intermediate-AOV patterns.
+``_output/input.png`` and ``_output/inverted_grayscale.png``.
+
+The intermediate grayscale image is never published, so the run recomputes it from the input with
+the kernel's own weights; inverting that at full strength is exactly ``255 - grey``. Grey but not
+inverted means the second node did not run, and inverted but still coloured means the first did
+not. See :doc:`../spg/overview` for the chaining and intermediate-AOV patterns.

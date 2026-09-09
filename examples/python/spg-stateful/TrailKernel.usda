@@ -1,0 +1,40 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "TrailKernel"
+)
+
+# [snippet:trail-shader-definition]
+# Three outputs. History is the feedback framebuffer: it is carried to the next
+# execution and never published, so it has no RenderVar and nothing in the scene
+# refers to it. Live and Trail are both published and are tone-mapped
+# identically, so the only thing separating them is the previous frame.
+#
+# Nothing here marks History as state. That is decided in the launch script, by
+# the allocator it is created with.
+def Shader "TrailKernel"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:spg:sourceAsset = @TrailKernel.cu@
+    uniform token info:spg:sourceAsset:subIdentifier = "trail"
+
+    # Fraction of the previous frame kept, which sets the whole length of the
+    # tail: a pixel the ball crossed k frames ago still holds decay^k of the
+    # light it left. Values closer to 1 give longer tails, and 0.0 keeps nothing
+    # and makes Trail identical to Live.
+    float inputs:decay = 0.7
+
+    opaque inputs:Image
+    opaque outputs:History
+    opaque outputs:Live
+    opaque outputs:Trail
+}
+# [/snippet:trail-shader-definition]

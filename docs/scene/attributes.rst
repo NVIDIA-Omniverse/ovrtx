@@ -163,8 +163,9 @@ Type Notes
   not supported; use ``token[]`` for string-like arrays.
 - Python ovstage code interns token and relationship values through
   ``ovstage.PathDictionary``.
-- Ovstage asset values use byte rows with ``AttributeSemantic.ASSET_STRING``.
-  Deprecated C compatibility writes represent scalar assets as token pairs.
+- Ovstage asset values are ``(authored, resolved)`` token id pairs with
+  ``AttributeSemantic.ASSET_PATH_ID``. Resolve each id through
+  ``ovstage.PathDictionary``.
 
 C Convenience Helpers
 ---------------------

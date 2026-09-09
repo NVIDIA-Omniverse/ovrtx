@@ -26,6 +26,42 @@ include(ovstage)
 ovrtx_fetch()
 ovstage_fetch()
 
+# Compile every header shipped by the ovrtx package as the first and only
+# include in isolated C11 and C++17 translation units. This catches language
+# incompatibilities and hidden include-order dependencies in the public API.
+file(GLOB_RECURSE OVRTX_PUBLIC_HEADERS
+    LIST_DIRECTORIES FALSE
+    RELATIVE "${OVRTX_INCLUDE_DIR}"
+    "${OVRTX_INCLUDE_DIR}/*.h")
+list(SORT OVRTX_PUBLIC_HEADERS)
+
+set(OVRTX_HEADER_SWEEP_DIR "${CMAKE_CURRENT_BINARY_DIR}/header-standalone")
+file(MAKE_DIRECTORY "${OVRTX_HEADER_SWEEP_DIR}")
+
+foreach(header IN LISTS OVRTX_PUBLIC_HEADERS)
+    string(MAKE_C_IDENTIFIER "${header}" header_id)
+    set(c_source "${OVRTX_HEADER_SWEEP_DIR}/${header_id}.c")
+    set(cxx_source "${OVRTX_HEADER_SWEEP_DIR}/${header_id}.cpp")
+    file(WRITE "${c_source}" "#include <${header}>\n")
+    file(WRITE "${cxx_source}" "#include <${header}>\n")
+    list(APPEND OVRTX_HEADER_C_SOURCES "${c_source}")
+    list(APPEND OVRTX_HEADER_CXX_SOURCES "${cxx_source}")
+endforeach()
+
+add_library(ovrtx_public_headers_c OBJECT ${OVRTX_HEADER_C_SOURCES})
+target_include_directories(ovrtx_public_headers_c PRIVATE "${OVRTX_INCLUDE_DIR}")
+set_target_properties(ovrtx_public_headers_c PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF)
+
+add_library(ovrtx_public_headers_cxx OBJECT ${OVRTX_HEADER_CXX_SOURCES})
+target_include_directories(ovrtx_public_headers_cxx PRIVATE "${OVRTX_INCLUDE_DIR}")
+set_target_properties(ovrtx_public_headers_cxx PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF)
+
 # Fetch GoogleTest
 include(FetchContent)
 FetchContent_Declare(

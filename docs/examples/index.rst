@@ -69,6 +69,36 @@ Example Projects
       +++
       Build and run in: :doc:`Python → <python_tiled_rendering>`
 
+   .. grid-item-card:: Crop Window
+      :img-top: ../../img/example-crop-window.png
+      :img-alt: Center crop rendered with dataWindowNDC
+
+      .. container:: example-prompt
+
+         *“Create an example that renders a centered dataWindowNDC crop from a full-resolution RenderProduct, verifies the cropped output dimensions, and saves or displays the result.”*
+      +++
+      Build and run in: :doc:`Python → <python_crop_window>`
+
+   .. grid-item-card:: Sliced Rendering
+      :img-top: ../../img/example-sliced-rendering.png
+      :img-alt: Full image stitched from four rendered crops
+
+      .. container:: example-prompt
+
+         *“Render one image as four successive dataWindowNDC crops, warm up each crop, and stitch the captured TL, TR, BL, and BR tiles into a full-resolution image.”*
+      +++
+      Build and run in: :doc:`Python → <python_sliced_rendering>`
+
+   .. grid-item-card:: Projectors
+      :img-top: ../img/projectors-lineup.avif
+      :img-alt: Projectors example output
+
+      .. container:: example-prompt
+
+         *“Create an example that loads an authored projector-mapping scene without editing it, warms up the renderer, renders one frame, and saves the result as a PNG.”*
+      +++
+      Build and run in: :doc:`Python → <python_projectors>`
+
    .. grid-item-card:: Semantic Segmentation
       :img-top: ../../img/example-semantic-segmentation.avif
       :img-alt: Semantic Segmentation example output
@@ -139,12 +169,75 @@ Example Projects
       +++
       Build and run in: :doc:`Python → <python_spg_builtin_nodes>`
 
+   .. grid-item-card:: SPG: Generating Node
+      :img-top: ../../img/example-spg-generate.png
+      :img-alt: SPG generating node example output
+
+      .. container:: example-prompt
+
+         *“Write an SPG node with no input AOV that draws a checkerboard from typed USD attributes, and publish it as a render output.”*
+      +++
+      Build and run in: :doc:`Python → <python_spg_generate>`
+
+   .. grid-item-card:: SPG: Separable Blur
+      :img-top: ../../img/example-spg-blur.png
+      :img-alt: SPG separable blur example output, sharp on the left and blurred on the right
+
+      .. container:: example-prompt
+
+         *“Chain two SPG nodes into a separable blur whose tap weights are built once in the launch script, and retune the radius from the host between renders.”*
+      +++
+      Build and run in: :doc:`Python → <python_spg_blur>`
+
+   .. grid-item-card:: SPG: Stateful Node
+      :img-top: ../../img/example-spg-stateful.png
+      :img-alt: SPG stateful node example output
+
+      .. container:: example-prompt
+
+         *“Make an SPG node read back its own previous output, so a moving object drags a fading trail behind it.”*
+      +++
+      Build and run in: :doc:`Python → <python_spg_stateful>`
+
+   .. grid-item-card:: SPG: Previous Frame
+      :img-top: ../../img/example-spg-previous-frame.png
+      :img-alt: SPG previous-frame example output, the rendered ball beside the frame-to-frame difference
+
+      .. container:: example-prompt
+
+         *“Have an SPG node read the same AOV twice, once live and once a frame back, and publish the difference so only what moved lights up.”*
+      +++
+      Build and run in: :doc:`Python → <python_spg_previous_frame>`
+
+   .. grid-item-card:: SPG: Composite AOV
+      :img-top: ../../img/example-spg-composite-aov.png
+      :img-alt: SPG composite AOV example output
+
+      .. container:: example-prompt
+
+         *“Feed an SPG node from a lidar instead of a camera, reading the point cloud's named channels and publishing a histogram of returns by distance.”*
+      +++
+      Build and run in: :doc:`Python → <python_spg_composite_aov>`
+
+   .. grid-item-card:: SPG: Ray Generation
+      :img-top: ../../img/example-spg-raygen.png
+      :img-alt: SPG ray-generation example output
+
+      .. container:: example-prompt
+
+         *“Have an SPG node trace the scene itself: a Cornell box with ray-traced shadows and the geometric normal recovered from probe rays alone.”*
+      +++
+      Build and run in: :doc:`Python → <python_spg_raygen>`
+
 .. toctree::
    :hidden:
 
    python_minimal
    python_planet_system
    python_tiled_rendering
+   python_crop_window
+   python_sliced_rendering
+   python_projectors
    python_status_queries
    python_semantic_segmentation
    python_sensor_lidar
@@ -152,6 +245,12 @@ Example Projects
    python_spg_grayscale
    python_spg_pipeline
    python_spg_builtin_nodes
+   python_spg_generate
+   python_spg_blur
+   python_spg_stateful
+   python_spg_previous_frame
+   python_spg_composite_aov
+   python_spg_raygen
    c_minimal
    c_vulkan_interop
    c_status_queries

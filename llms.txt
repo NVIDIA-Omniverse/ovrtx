@@ -9,16 +9,16 @@ data, path dictionary, ordinal-keyed writes, and write-floor gates. ovrtx owns
 rendering, GPU resources, and sensor outputs.
 
 - Attached-mode reference: docs/core/ovstage_integration.rst
-- Attach-mode config: docs/core/renderer_configuration.rst (Attached-Mode Configuration section)
-- Changelog: CHANGELOG.md §0.4 (attach/BORROW/REPLICATE, update_from_stage, write-floor gates)
+- Changelog: CHANGELOG.md §0.4 (ovstage attachment, update_from_stage, write-floor gates)
 
 ## Primary Docs
 
 - README.md: product overview, package source, runtime verification, quick starts, releases, support
 - AGENTS.md: coding-agent guide, ovstage relationship, runtime validation rules, repo layout, task-to-skill routing
-- docs/core/ovstage_integration.rst: ovstage dependency, attach modes, ordinals, update loop
+- docs/core/ovstage_integration.rst: ovstage dependency, attachment, ordinals, update loop
 - docs/index.rst: Sphinx docs entrypoint
 - docs/driver_requirements.rst: supported NVIDIA driver versions for runtime validation
+- docs/core/cuda_vulkan_scheduling.rst: known Linux driver scheduling interaction where CUDA stream waits disturb Vulkan scheduling, and the CUDA_DEVICE_MAX_CONNECTIONS=1 workaround
 - examples/README.md: Python and C example index
 - skills/README.md: task-level agent skills and snippet rules
 
@@ -32,8 +32,8 @@ rendering, GPU resources, and sensor outputs.
 - Application lifecycle skill: skills/application-flow/SKILL.md
 - Python project setup skill: skills/project-setup-python/SKILL.md
 - C project setup skill: skills/project-setup-c/SKILL.md
-- Sensor Processing Graphs (SPG) authoring skill: skills/spg-usd-lua-authoring/SKILL.md
-- Sensor Processing Graphs (SPG) docs: docs/spg/index.rst
+- Sensor Processing Graphs (SPG) skill: skills/spg/SKILL.md
+- Sensor Processing Graphs (SPG) docs: docs/spg/overview.rst
 
 ## Runtime Validation
 

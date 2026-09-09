@@ -53,6 +53,22 @@ A successful run writes ``_output/render.png``. The output should match the refe
 
 The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
 
+ovrtx and ovstage Load Order
+----------------------------
+
+Importing ``ovrtx`` and ``ovstage`` does not load either OpenUSD-dependent
+runtime. The minimal example creates ``ovrtx.Renderer`` first; renderer creation
+registers ovrtx's schema paths and loads the ovrtx runtime/OpenUSD, after which
+``ovstage.Stage`` loads the ovstage runtime against the same initialized OpenUSD.
+
+If an application must create ``ovstage.Stage`` first, call
+``ovrtx.register_schema_paths()`` before stage construction. That call loads only
+the ovrtx shared loader and publishes discovery paths; it does not initialize the
+renderer or OpenUSD. Creating the stage may then load the ovstage runtime/OpenUSD,
+and a later ``ovrtx.Renderer`` uses the paths that were already registered.
+``ovstage.library_version()`` also creates a temporary native instance, so make
+the schema call before that probe in a stage-first process.
+
 Minimal Example
 ---------------
 

@@ -76,30 +76,33 @@ Maximum number of ray bounces for any ray type. Higher values give more accurate
       :link: ../../../_images/settings_rtpt_maxBounces.Camera.LdrColor.maxBounces-23.0001.avif
       :link-type: url
 
-``omni:rtx:rtpt:maxSpecularAndTransmissionBounces``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``omni:rtx:rtpt:extraSpecularAndTransmissiveBounces``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Maximum number of ray bounces for specular and transmission. Affects reflections and refractions through transparent materials like glass.
+Additional number of specular and transmission ray bounces beyond ``maxBounces``. Affects reflections and refractions through transparent materials like glass.
 
-| Type: ``uint`` | Default: ``3``
+| Type: ``uint`` | Default: ``0``
 
-.. grid:: 3
-   :class-container: setting-comparison
+..
+   The comparisons below use ``maxBounces = 2``.
 
-   .. grid-item-card:: maxSpecularAndTransmissionBounces = 2
-      :img-top: ../../../img/settings/rtpt/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-2.0001.avif
-      :link: ../../../_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-2.0001.avif
-      :link-type: url
+   .. grid:: 3
+      :class-container: setting-comparison
 
-   .. grid-item-card:: maxSpecularAndTransmissionBounces = 3
-      :img-top: ../../../img/settings/rtpt/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-3.0001.avif
-      :link: ../../../_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-3.0001.avif
-      :link-type: url
+      .. grid-item-card:: extraSpecularAndTransmissiveBounces = 0
+         :img-top: ../../../img/settings/rtpt/settings_rtpt_extraSpecularAndTransmissiveBounces.Camera.LdrColor.extraSpecularAndTransmissiveBounces-0.0001.avif
+         :link: ../../../_images/settings_rtpt_extraSpecularAndTransmissiveBounces.Camera.LdrColor.extraSpecularAndTransmissiveBounces-0.0001.avif
+         :link-type: url
 
-   .. grid-item-card:: maxSpecularAndTransmissionBounces = 23
-      :img-top: ../../../img/settings/rtpt/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-23.0001.avif
-      :link: ../../../_images/settings_rtpt_maxSpecularAndTransmissionBounces.Camera.LdrColor.maxSpecularAndTransmissionBounces-23.0001.avif
-      :link-type: url
+      .. grid-item-card:: extraSpecularAndTransmissiveBounces = 2
+         :img-top: ../../../img/settings/rtpt/settings_rtpt_extraSpecularAndTransmissiveBounces.Camera.LdrColor.extraSpecularAndTransmissiveBounces-2.0001.avif
+         :link: ../../../_images/settings_rtpt_extraSpecularAndTransmissiveBounces.Camera.LdrColor.extraSpecularAndTransmissiveBounces-2.0001.avif
+         :link-type: url
+
+      .. grid-item-card:: extraSpecularAndTransmissiveBounces = 23
+         :img-top: ../../../img/settings/rtpt/settings_rtpt_extraSpecularAndTransmissiveBounces.Camera.LdrColor.extraSpecularAndTransmissiveBounces-23.0001.avif
+         :link: ../../../_images/settings_rtpt_extraSpecularAndTransmissiveBounces.Camera.LdrColor.extraSpecularAndTransmissiveBounces-23.0001.avif
+         :link-type: url
 
 Other Ray Bounce and Shading Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

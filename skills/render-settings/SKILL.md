@@ -14,7 +14,6 @@ description: >
   render settings, set max bounces, configure path tracing, change render quality, or
   modify RTX settings on a RenderProduct.
 license: LicenseRef-NvidiaProprietary
-version: "0.3.0"
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -99,7 +98,7 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `omni:rtx:rendermode` | `token` | `"RealTimePathTracing"` | Render mode: `"RealTimePathTracing"`, `"PathTracing"`, or `"Minimal"` |
+| `omni:rtx:rendermode` | `token` | `"RealTimePathTracing"` | Render mode: `"RealTimePathTracing"`, `"PathTracing"`, or `"MinimalRendering"` |
 
 ## Real-Time Path-Tracing Settings (`rtpt:`)
 
@@ -116,7 +115,7 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 | Setting | Type | Default |
 |---------|------|---------|
 | `omni:rtx:rtpt:maxBounces` | `uint` | `3` |
-| `omni:rtx:rtpt:maxSpecularAndTransmissionBounces` | `uint` | `3` |
+| `omni:rtx:rtpt:extraSpecularAndTransmissiveBounces` | `uint` | `0` |
 | `omni:rtx:rtpt:maxVolumeBounces` | `uint` | `3` |
 | `omni:rtx:pt:fractionalCutoutOpacity` | `bool` | `true` |
 | `omni:rtx:rtpt:maxRoughness` | `float` | `0.3` |
@@ -150,7 +149,7 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 | `omni:rtx:pt:samplesPerIteration` | `int` | `1` |
 | `omni:rtx:pt:adaptiveSampling:enabled` | `bool` | `true` |
 | `omni:rtx:pt:limits:maxBounces` | `uint` | `4` |
-| `omni:rtx:pt:limits:maxGlossyBounces` | `uint` | `6` |
+| `omni:rtx:pt:limits:extraSpecularAndTransmissiveBounces` | `uint` | `2` |
 | `omni:rtx:pt:maxVolumeBounces` | `uint` | `15` |
 | `omni:rtx:pt:limits:maxFogBounces` | `uint` | `2` |
 | `omni:rtx:pt:fractionalCutoutOpacity` | `bool` | `true` |
@@ -227,6 +226,46 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 |---------|------|---------|
 | `omni:rtx:pt:pixelFilter:filter` | `token` | `"triangle"` |
 | `omni:rtx:pt:pixelFilter:radius` | `float` | `1.0` |
+
+## View Lighting Mode (Camera Light)
+
+View Lighting Mode replaces all scene lights with a single camera light. By default the camera light is a distant headlight aligned with the view direction; it can be switched to a spot light positioned at the camera. The spot-only settings (radius, cone angle, cone softness) have no effect when the light type is `"distant"`; the angle setting has no effect when the light type is `"spot"`.
+
+> **Source:** `tests/docs/python/test_base.py` snippet `doc-set-view-lighting`
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `omni:rtx:scene:useViewLightingMode` | `bool` | `false` | Enable View Lighting Mode (camera light) |
+| `omni:rtx:viewLighting:lightType` | `token` | `"distant"` | Camera light type: `"distant"` or `"spot"` |
+| `omni:rtx:viewLighting:color` | `color3f` | `(1, 1, 1)` | Color of the camera light |
+| `omni:rtx:viewLighting:intensity` | `float` | `3000.0` | Intensity of the camera light |
+| `omni:rtx:viewLighting:normalize` | `bool` | `true` | UsdLux `inputs:normalize` semantics: intensity independent of the spot radius / distant angle. Disable to treat intensity as surface radiance, which grows with the light size |
+| `omni:rtx:viewLighting:angle` | `float` | `0.0` | Angular diameter in degrees (distant only) |
+| `omni:rtx:viewLighting:radius` | `float` | `0.05` | Sphere radius in world units; larger radii soften its specular highlights (spot only) |
+| `omni:rtx:viewLighting:coneAngle` | `float` | `90.0` | Degrees from the view direction to the cone edge, UsdLux `shaping:cone:angle` semantics (spot only) |
+| `omni:rtx:viewLighting:coneSoftness` | `float` | `0.0` | Softness of the cone falloff, 0 = hard edge (spot only) |
+
+Note: Minimal mode and SDG simple-shading outputs always render the camera light as its distant variant, so the light type and the spot-only settings have no effect there. Camera lights never cast shadows (the light is collocated with the camera, so it is effectively shadowless).
+
+## DomeLight MDL Material Baking
+
+When a `DomeLight`'s image source is an MDL material rather than a texture, RTX bakes the material into a lat-long map once and derives importance sampling data from it. These settings control that bake. They are authored per RenderProduct but consumed per scene, as the scoping note below explains.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `omni:rtx:lights:dome:baking:resolution` | `int` | `4096` | Texel width of the baked lat-long map; height is half the width |
+| `omni:rtx:domeLight:baking:spp` | `int` | `4` | Samples per texel |
+| `omni:rtx:lights:dome:baking:denoising:enabled` | `bool` | `false` | Run the OptiX denoiser over the baked map, so a low `spp` still yields a clean texture |
+
+Both integers are raised to `1` if authored lower, so `0` cannot produce a degenerate bake. Neither has a renderer-side ceiling: the baked texture is capped at 8192 texels *after* `omni:rtx:domeLight:resolutionFactor` is applied, so how large an `omni:rtx:lights:dome:baking:resolution` is usable depends on that factor.
+
+Changing any of the three re-triggers the bake for every affected dome light.
+
+Important: a baked dome light is a **scene-level** resource, not a per-view one. RTX resolves these three settings from the scene's *reference* view (its first view), so when several RenderProducts share a scene only the reference view's opinion is used and the others are silently ignored. Author the same values on every product that shares a dome light. This mirrors how the rest of MDL material baking already behaves.
+
+Denoising trades transient GPU memory for a much lower `spp`. It is worth enabling whenever the MDL material is procedural and noisy; leaving `spp` high instead makes the bake proportionally slower.
+
+Note: `omni:rtx:domeLight:baking:spp` lives on `OmniRtxDebugSettingsAPI_1`, while the other two live on `OmniRtxSettingsCommonAdvancedAPI_1`. A RenderProduct must apply the debug API to author the sample count.
 
 ## Minimal Settings
 

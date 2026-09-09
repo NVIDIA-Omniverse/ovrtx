@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
         }
 
         // Symmetric ovstage initialize with its own side-by-side `ovstage/` link
-        // (created by ovstage_setup_runtime). ovstage is delay-loaded and binds
+        // (created by ovstage_setup_runtime). The runtime loads on this first call and binds
         // to ovrtx's already-loaded USD runtime by base name.
         ovx_string_t ovstage_package_root = {
             OVX_CONFIG_EXECUTABLE_DIR_TOKEN "/ovstage",

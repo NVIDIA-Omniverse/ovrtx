@@ -17,6 +17,7 @@ import pytest
 from PIL import Image
 
 OUTPUT_DIR = Path(__file__).parent / "_output"
+LDR_COLOR_PATH = "/Render/Camera/LdrColor"
 
 USDA = """#usda 1.0
 (
@@ -74,7 +75,7 @@ def test_path_tracing_mode():
 
     for product_name, product in products.items():
         for frame in product.frames:
-            var = frame.render_vars["LdrColor"].map(device=ovrtx.Device.CPU)
+            var = frame.render_vars[LDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
             view = np.from_dlpack(var)
             ldr_color = view.copy()
             del view

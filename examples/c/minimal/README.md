@@ -1,6 +1,8 @@
 # Minimal Example
 
-This example shows basic initialization of the renderer, rendering a single frame from an RGB camera, mapping the output and writing the result to disk as a PNG.
+This example builds the same renderer flow with both supported link models:
+`minimal` uses the static loaders (model #1), while `minimal-dynamic` uses the
+shared loaders (model #2). Both render a single RGB frame and write `out.png`.
 
 The example loads a scene from S3 and writes the resulting image to `out.png`. A successful output should match the reference image below.
 
@@ -36,7 +38,8 @@ cmake --build build
 ### Running
 
 ```bash
-./build/minimal
+./build/static/minimal
+./build/shared/minimal-dynamic
 ```
 
 ## Windows
@@ -61,7 +64,8 @@ cmake --build build --config Release
 ### Running
 
 ```pwsh
-.\build\Release\minimal.exe
+.\build\static\Release\minimal.exe
+.\build\shared\Release\minimal-dynamic.exe
 ```
 
 # Licensing

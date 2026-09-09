@@ -13,8 +13,9 @@
 Animated planetary system demo using ovrtx Python bindings.
 
 Demonstrates:
-- Loading a USD scene and injecting additional geometry via add_usd_reference_from_string
-- Using bind_attribute/map_attribute for zero-copy transform updates
+- Loading a USD scene into an attached ovstage and injecting additional geometry
+  via ovstage.population.add_usd_reference_from_string
+- Reusing one ovstage query for ordinal-keyed per-frame transform writes
 - GPU-accelerated animation using Warp kernels
 - Hierarchical animation (orbit parent rotation + planet self-spin)
 
@@ -34,7 +35,8 @@ from pathlib import Path
 import numpy as np
 import warp as wp
 
-from ovrtx import Device, PrimMode, Renderer, RendererConfig
+import ovstage
+from ovrtx import Device, Renderer, RendererConfig
 
 # Script directory for output
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -43,6 +45,7 @@ OUTPUT_DIR = SCRIPT_DIR / "_output"
 # USD scene path (relative to rendering tree root)
 RENDERING_ROOT = SCRIPT_DIR.parents[2].resolve()  # [0]examples -> [1]source -> [2]rendering
 USD_SCENE = "simple_scene.usda"
+LDR_COLOR_PATH = "/Render/Vars/LdrColor"
 
 
 def generate_orbit_layer_usda(num_planets: int, orbit_radius: float, planet_scale: float) -> str:
@@ -167,10 +170,12 @@ def run_animation(device: Device, num_planets: int, save_png: bool, enable_log: 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         from PIL import Image
 
-    # Build renderer config
+    # Build renderer config and attach the stage that owns scene data
     log_path = str(OUTPUT_DIR / "anim_planet_system.log") if enable_log else None
     config = RendererConfig(log_file_path=log_path)
     renderer = Renderer(config)
+    stage = ovstage.Stage("ovrtx.example.planet-system")
+    renderer.attach_ovstage(stage)
 
     print(f"Device: {device.name}")
     print(f"USD scene: {USD_SCENE}")
@@ -178,64 +183,78 @@ def run_animation(device: Device, num_planets: int, save_png: bool, enable_log: 
     print(f"Animation: {num_planets} planets, orbit={orbit_radius}, scale={planet_scale:.1f}")
 
     # 1. Load base scene (cube is our "sun")
-    renderer.open_usd(str(USD_SCENE))
+    ordinal = 1
+    ovstage.population.open_usd(stage, str(USD_SCENE), ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
     # 2. Inject orbit layer under /World/Cube (inherits cube's transform automatically)
     orbit_usda = generate_orbit_layer_usda(num_planets, orbit_radius, planet_scale)
-    renderer.add_usd_reference_from_string(orbit_usda, "/World/Cube/Orbit")
+    ovstage.population.add_usd_reference_from_string(stage, orbit_usda, "/World/Cube/Orbit")
+    ordinal += 1
+    ovstage.population.apply_usd_changes(stage, ordinal=ordinal)
+    stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
-    # 3. Create SINGLE binding for all prims (1 orbit + N planets)
+    # 3. Create a SINGLE reusable query for all prims (1 orbit + N planets); every
+    # per-frame transform write goes through it at its own ordinal.
     all_prim_paths = ["/World/Cube/Orbit"] + [f"/World/Cube/Orbit/Planet_{i}" for i in range(num_planets)]
-    system_binding = renderer.bind_attribute(
-        prim_paths=all_prim_paths,
-        attribute_name="omni:xform",
-        dtype="float64",
-        shape=(4, 4),
-        prim_mode=PrimMode.MUST_EXIST,
-    )
+    paths = ovstage.PathDictionary(stage)
+    path_list = paths.create_path_list_from_strings(all_prim_paths)
+    query = stage.query_from_path_list(path_list)
+    xform_token = paths.intern_token("omni:xform")
 
-    # 4. Animation loop - simulation at 100 Hz, renderer produces at 60 fps
-    # Binding is persistent, but mapping is per-frame (writes flush to Fabric on unmap)
-    cuda_stream = None
+    # 4. Animation loop - simulation at 100 Hz, renderer produces at 60 fps.
+    # The Warp transforms buffer is persistent; each frame's kernel launch fills
+    # it and an ordinal-keyed copy-in write publishes it to the stage.
+    wp_device = "cuda:0" if device == Device.CUDA else "cpu"
+    transforms = wp.empty(num_transforms, dtype=wp.mat44d, device=wp_device)
+    cuda_stream = wp.Stream(device=transforms.device) if device == Device.CUDA else None
     rendered_frame_count = 0
     for sim_step in range(NUM_SIM_STEPS):
         sim_time = sim_step * SIM_DELTA_TIME  # Current frame's time
 
-        # Map, compute transforms, unmap (writes back to renderer scene)
-        with system_binding.map(device=device, device_id=0) as attr_mapping:
-            wp_transforms = wp.from_dlpack(attr_mapping.tensor, dtype=wp.mat44d)
-            if cuda_stream is None and device == Device.CUDA:
-                cuda_stream = wp.Stream(device=wp_transforms.device)
+        wp.launch(
+            kernel=compute_system_transforms,
+            dim=num_transforms,
+            inputs=[
+                transforms,
+                wp.float64(sim_time),
+                wp.float64(ORBIT_SPEED),
+                wp.float64(SPIN_SPEED),
+                wp.float64(orbit_radius),
+                wp.float64(math.tau),
+                num_planets,
+            ],
+            device=transforms.device,
+            stream=cuda_stream,
+        )
 
-            wp.launch(
-                kernel=compute_system_transforms,
-                dim=num_transforms,
-                inputs=[
-                    wp_transforms,
-                    wp.float64(sim_time),
-                    wp.float64(ORBIT_SPEED),
-                    wp.float64(SPIN_SPEED),
-                    wp.float64(orbit_radius),
-                    wp.float64(math.tau),
-                    num_planets,
-                ],
-                device=wp_transforms.device,
-            )
-            attr_mapping.unmap(stream=cuda_stream.cuda_stream if cuda_stream else None)
+        # Publish this frame's transforms under a fresh ordinal, then render it.
+        ordinal += 1
+        stage.write_attribute(
+            query,
+            xform_token,
+            ordinal=ordinal,
+            tensors=transforms,
+            is_array=False,
+            cuda_stream=cuda_stream.cuda_stream if cuda_stream else None,
+        ).wait()
+        stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
-        # Step renderer - uses transforms computed above for current sim_time
+        # Step renderer - uses transforms committed above for current sim_time
         products = renderer.step(
-            render_products={"/Render/OmniverseKit/HydraTextures/ViewportTexture0"}, delta_time=SIM_DELTA_TIME
+            render_products={"/Render/OmniverseKit/HydraTextures/ViewportTexture0"},
+            delta_time=SIM_DELTA_TIME,
+            ordinal=ordinal,
         )
 
         # Process rendered frames (requires --png or --rr to produce visible output)
         for product_name, product in products.items():
             for frame in product.frames:
                 rendered_frame_count += 1
-                if "LdrColor" not in frame.render_vars:
+                if LDR_COLOR_PATH not in frame.render_vars:
                     continue
 
-                var = frame.render_vars["LdrColor"].map(device=device)
+                var = frame.render_vars[LDR_COLOR_PATH].map(device=device)
                 np_array = wp.from_dlpack(var).numpy()
 
                 # Save/stream frame
@@ -248,11 +267,13 @@ def run_animation(device: Device, num_planets: int, save_png: bool, enable_log: 
 
     print(f"Simulation: {NUM_SIM_STEPS} steps @ {SIM_HZ} Hz -> {rendered_frame_count} rendered frames @ 60 fps")
 
-    # 5. Cleanup - unbind
-    system_binding.unbind()
+    # 5. Cleanup - release the reusable query and its caller-owned path list
+    query.release().wait()
+    paths.destroy_path_list(path_list)
+    paths.destroy()
 
     # 6. Save final state via debug dump
-    products = renderer.step(render_products={"ovrtx_debug_dump_stage"}, delta_time=0.0)
+    products = renderer.step(render_products={"ovrtx_debug_dump_stage"}, delta_time=0.0, ordinal=ordinal)
     frame = products["ovrtx_debug_dump_stage"].frames[0]
     var = frame.render_vars["debug"].map(device=Device.CPU)
     dump = np.from_dlpack(var).tobytes().decode("utf-8")
@@ -262,6 +283,11 @@ def run_animation(device: Device, num_planets: int, save_png: bool, enable_log: 
     print(f"Animated {num_planets} planets on {device.name}: {NUM_SIM_STEPS} sim steps @ {SIM_HZ} Hz")
     if save_png:
         print(f"  Frames saved to: {OUTPUT_DIR}")
+
+    del var, frame, products
+    renderer.detach_ovstage()
+    stage.destroy()
+    renderer.destroy()
 
 
 def main():
