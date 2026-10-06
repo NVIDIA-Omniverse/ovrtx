@@ -47,14 +47,14 @@ macro(ovrtx_fetch)
         # Platform-specific package selection
         if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             set(OVRTX_PACKAGE_SYSTEM "windows-x86_64")
-            set(OVRTX_HASH "3662d6da47b9817dac623010acd67fac3a2ff838bb21c93c20fab36e65e8ffd0")
+            set(OVRTX_HASH "a79ea8db7f3f138139c272748a69a4f4e7c34c7204f9e63ac0720b3e1bb33596")
         elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_aarch64")
-                set(OVRTX_HASH "693911daa75d184ad3af61bc98e65735e8d2a95336856549d66e3cab49dfa556")
+                set(OVRTX_HASH "c3aa4cb2e13200079f66b6cce11f8525ca62ec4965af27443f57e77c5a915ea2")
             elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_x86_64")
-                set(OVRTX_HASH "598bb1147b71483e104d236a0ad56b369f42a2bf78111272f60d0a7d74c37e6a")
+                set(OVRTX_HASH "591d382a7f6af0310b646e306d067eb1d4fc6bb94e2f22486f0ec7887c9b9247")
             else()
                 message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}")
             endif()
@@ -79,7 +79,7 @@ macro(ovrtx_fetch)
         FetchContent_Declare(
             ovrtx
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.5.0/ovrtx@0.5.0.377615.868bf616.${OVRTX_PACKAGE_SYSTEM}.zip"
+            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.5.1/ovrtx@0.5.1.385782.d4f26803.${OVRTX_PACKAGE_SYSTEM}.zip"
             URL_HASH SHA256=${OVRTX_HASH}
         )
 

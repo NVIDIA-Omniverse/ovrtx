@@ -4,11 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-10-05
+
+### Changed
+
+- Increased the tiled-rendering limit to 32,768 view tiles, with memory allocated on demand.
+- Added structured-radiance support for DLSS Ray Reconstruction Preset F.
+
+### Fixed
+
+- Fixed scene-loading hangs involving cached assets and streaming.
+- Fixed motion vectors during multi-tick rendering and cutout opacity in RTX Minimal.
+- Fixed missing simultaneous solid-state lidar emissions and Gaussian-splat fallback rendering.
+- Fixed cloned-instance transforms, partial attribute writes, and GPU transform initialization in ovstage integration.
+- Fixed MaterialX DLL conflicts on Windows.
+- Updated bundled dependencies to address security vulnerabilities.
+
 ## [0.5.0] - 2026-09-03
 
 ### Highlights
 
-- Sensor Processing Graphs (SPG) now have [much improved documentation and examples](https://nvidia-omniverse.github.io/ovrtx/spg/overview.html). SPG also adds  ["stateful nodes"](https://nvidia-omniverse.github.io/ovrtx/spg/do/state.html) - the ability to keep data across frames so that graphs can refer to previous frames' data, and  [raygen shaders](https://nvidia-omniverse.github.io/ovrtx/spg/do/raygen.html), allowing graphs to trace rays against the scene.
+- Sensor Processing Graphs (SPG) now have [much improved documentation and examples](https://nvidia-omniverse.github.io/ovrtx/spg). SPG also adds  ["stateful nodes"](https://nvidia-omniverse.github.io/ovrtx/spg/do/state.html) - the ability to keep data across frames so that graphs can refer to previous frames' data, and  [raygen shaders](https://nvidia-omniverse.github.io/ovrtx/spg/do/raygen.html), allowing graphs to trace rays against the scene.
 - [UV Projectors](https://nvidia-omniverse.github.io/ovrtx/materials/projectors.html) allow defining procedural UV texture coordinates on geometry with multiple projection modes including planar, cylindrical, spherical, and triplanar. This allows textured materials to work on assets without texture coordinate primvars. Projectors can be especially helpful for CAD data with no authored texture coordinates, and for very large scenes where texture coordinate primvars can consume a significant amount of memory.
 - [Decals](https://nvidia-omniverse.github.io/ovrtx/materials/decals.html) project materials onto geometry with a projection and a bounding region. Decals can be used to add multiple layers of labels, stickers, dirt, or wear on top of existing materials without adjusting the base material or its textures.
 
@@ -17,8 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Python `RenderProductSetOutputs.simulation_start_time` / `simulation_end_time` expose the step simulation window from the C API. After `Renderer.reset(time=T)`, the next step reports `simulation_start_time == T`. These values are distinct from per-frame `FrameOutput.start_time` (sensor capture inside `[T, T + delta_time]`).
 - RTX acoustic, radar, lidar, and IDS sensors now resolve a `{schema, model}` version at creation. The schema version comes from the applied `OmniSensorGeneric*` API (`_N` suffix, or `1` when unsuffixed), while `omni:sensor:modelVersion` accepts a supported positive integer string scoped to that schema or `"latest"`. Malformed, unsupported, and runtime-changing requests are rejected with diagnostics.
 - Added `OVRTX_CONFIG_SENSORS_ALLOWED_DEPRECATION_BASE`, `ovrtx_config_entry_sensors_allowed_deprecation_base()`, and Python `RendererConfig.sensors_allowed_deprecation_base`. Soft-deprecated sensor versions remain rejected by default and are accepted only when this plain `<major>.<minor>.<patch>` value exactly matches the running OVRTX version; the opt-in must be revisited after every OVRTX upgrade.
-- [SPG](https://nvidia-omniverse.github.io/ovrtx/spg/overview.html) [Slang shaders](https://nvidia-omniverse.github.io/ovrtx/spg/ref/lua_slang.html) now work on Windows (Vulkan) as well as Linux.
-- [SPG](https://nvidia-omniverse.github.io/ovrtx/spg/overview.html) [Slang nodes](https://nvidia-omniverse.github.io/ovrtx/spg/ref/lua_slang.html) now have feature parity with CUDA.
+- [SPG](https://nvidia-omniverse.github.io/ovrtx/spg) [Slang shaders](https://nvidia-omniverse.github.io/ovrtx/spg/ref/lua_slang.html) now work on Windows (Vulkan) as well as Linux.
+- [SPG](https://nvidia-omniverse.github.io/ovrtx/spg) [Slang nodes](https://nvidia-omniverse.github.io/ovrtx/spg/ref/lua_slang.html) now have feature parity with CUDA.
 - MDL can now be packaged in USDZ, including UDIM support.
 - Improved multi-rate sensor rendering so moving instances, materials, and attached lights are evaluated consistently at each sensor’s capture time.
 - Added missing `bool omni:rtx:post:bloom:apertureShapeCircular` to `OmniRtxPostBloomPhysicalAPI_1` to allow selecting a circular aperture for the post bloom effect.
