@@ -1,0 +1,44 @@
+#usda 1.0
+
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+def Xform "World"
+{
+    # [snippet:doc-physical-lighting]
+    def RectLight "LumenPanel" (
+        prepend apiSchemas = ["PhotometricAreaLightAPI"]
+    )
+    {
+        # Set total luminous power and use a 3000 K blackbody spectrum.
+        float photometric:power = 1600
+        token physical:illuminant = "blackbody"
+        float inputs:colorTemperature = 3000
+    }
+
+    def SphereLight "LuxTarget" (
+        prepend apiSchemas = ["PhotometricAreaLightAPI"]
+    )
+    {
+        # Target 500 lux two meters from the light instead of using power.
+        float photometric:power = 0
+        float photometric:illuminance = 500
+        float photometric:illuminance:distance = 2
+    }
+
+    def DistantLight "Sun" (
+        prepend apiSchemas = ["PhotometricDistantLightAPI"]
+    )
+    {
+        # Specify illuminance on a surface perpendicular to the light.
+        float photometric:illuminance = 10000
+        token physical:illuminant = "illuminant D"
+        float inputs:colorTemperature = 6504
+    }
+    # [/snippet:doc-physical-lighting]
+}

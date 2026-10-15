@@ -154,19 +154,66 @@ The output may not be fully written when `map` returns. Check the wait event:
 >
 > Check `rendered_output.cuda_sync.wait_event` and call `cuStreamWaitEvent` before accessing.
 
+Both `ovrtx_fetch_results()` and `ovrtx_map_render_var_output()` take a timeout,
+and passing 0 turns either into a non-blocking poll that returns
+`OVRTX_API_TIMEOUT`. Polling both is what lets an interactive loop keep
+presenting the previous frame instead of stalling on the renderer.
+
+Which of the two absorbs the render wait is not part of the contract:
+
+- **Guaranteed.** Either call can report `OVRTX_API_TIMEOUT`. A successful fetch
+  does not promise the output frames are mappable. Poll both and handle a
+  timeout from each.
+- **Observed, in the vulkan-interop sample.** The wait lands in the fetch: once
+  the fetch succeeds every output frame of that step is already mappable, and
+  the map poll effectively never reports a timeout. This is why the sample
+  attributes renderer time to its `Step` metric and not to `MapCopy`.
+
+Write against the guarantee, not the observation. The sample keeps the map poll
+even though it never trips, because the ordering is a renderer implementation
+detail that is free to change.
+
+The same applies to any other output of the step, not just color. The
+vulkan-interop sample polls its `OVRTX_RENDER_VAR_PICK_HIT` map on the same
+terms, since a blocking map on a CPU-mapped output would stall presentation for
+a whole readback. Keep the query pending and retry rather than waiting, and keep
+the step result alive until every output you asked for has been read — mappings
+and reads are what the result has to outlive, not the other way round.
+
 ### Signal when CUDA work is done, then unmap
 
-> **Source:** `examples/c/vulkan-interop/src/main.cpp` snippet `write-camera-transform`
+> **Source:** `examples/c/vulkan-interop/src/main.cpp` snippet `map-rendered-output-cuda-array`
 >
 > Record a CUDA event after your kernel, then pass it via `ovrtx_cuda_sync_t.wait_event` on unmap.
 
-### Double-buffered async pattern (from vulkan-interop example)
+Be aware of when that unmap blocks. `ovrtx_unmap_render_var_output()` can defer
+the wait onto the stream only when the mapping owns buffers it has to free
+asynchronously. An `OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY` mapping is zero-copy and
+owns none, so ovrtx waits for `before_destroy_cuda_sync.wait_event` on the CPU
+inside the unmap call. Because the copy is stream-ordered behind the renderer's
+own `cuda_sync.wait_event`, unmapping right after queueing the copy moves the
+render wait out of the map and into the unmap rather than removing it.
 
-For maximum throughput, use two shared images and ping-pong between them.
-CUDA writes to one while a consumer (e.g., Vulkan) reads the other.
+To keep that wait out of the loop, hold the `map_handle` and unmap only once
+`cuEventQuery()` reports the copy event complete. The mapping lifetime is
+independent of `ovrtx_destroy_results()`, so the step result can be destroyed
+first. This requires one event per in-flight frame: a single shared event is only
+safe while the unmap blocks the loop until each copy has landed.
 
-See `examples/c/vulkan-interop/src/main.cpp` for the full double-buffered async
-rendering pattern with timeline semaphores and CUDA-Vulkan shared images.
+### Ring-buffered async pattern (from vulkan-interop example)
+
+For maximum throughput, use several shared images and cycle through them. CUDA
+writes to one while a consumer (e.g., Vulkan) reads another.
+
+Two images are enough only when one step yields one frame. With DLSS Frame
+Generation a step yields `N + 1` frames that all become mappable at once, and
+showing them one at a time on a schedule means the ring has to hold the image
+being displayed, the frames waiting their turn, and the one being written. With
+only two, holding a frame back to pace it also blocks the next copy, which
+throttles the renderer.
+
+See `examples/c/vulkan-interop/src/main.cpp` for the full async rendering pattern
+with timeline semaphores and CUDA-Vulkan shared images.
 
 ### Map with sync_stream (auto-sync)
 

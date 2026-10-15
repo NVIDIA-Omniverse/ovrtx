@@ -14,7 +14,11 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import os
+import re
 import sys
+
+from docutils import nodes
+from sphinx.errors import ExtensionError
 
 # Add the package to the path for autodoc
 sys.path.insert(0, os.path.abspath("../python"))
@@ -39,7 +43,6 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
-    "sphinx.ext.graphviz",
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx_mdinclude",
@@ -48,13 +51,6 @@ extensions = [
 ]
 
 # -- Options for Breathe (C API documentation) -------------------------------
-# -- Options for graphviz (SPG graph diagrams) -------------------------------
-# SVG so the diagrams stay sharp at any zoom. Node fills carry the meaning: data
-# resources in slate, SPG nodes in green, so a reader can tell them apart at a
-# glance and the colours read on both the light and the dark theme.
-graphviz_output_format = "svg"
-graphviz_dot_args = ["-Gbgcolor=transparent"]
-
 breathe_projects = {"ovrtx": "_doxygen/xml"}
 breathe_default_project = "ovrtx"
 breathe_default_members = ("members", "undoc-members")
@@ -248,6 +244,59 @@ def hide_dlpack_methods(app, what, name, obj, skip, options):
     return None
 
 
+GRAPHVIZ_DIRECTIVE = re.compile(
+    r"^\s*\.\.\s+(graphviz|graph|digraph)\s*::", re.MULTILINE
+)
+
+
+def reject_graphviz_directives(app, docname, source):
+    """Fail the build on Graphviz directives.
+
+    The machines that build the published docs have no Graphviz, so these
+    directives cannot be drawn there. Diagrams are committed as SVG images
+    under img/, next to the Graphviz source they are drawn from.
+    """
+    match = GRAPHVIZ_DIRECTIVE.search(source[0])
+    if match:
+        raise ExtensionError(
+            f"{docname}: '.. {match.group(1)}::' cannot be drawn by the docs build. "
+            "Draw the diagram with Graphviz, commit the SVG under img/, "
+            "and show it with '.. image::'."
+        )
+
+
+def expand_aov_descriptions(app, doctree):
+    """Keep AOV source tables readable while displaying descriptions across the full width."""
+    for table in doctree.findall(nodes.table):
+        if "aov-table" not in table["classes"]:
+            continue
+        group = table.next_node(nodes.tgroup)
+        if group["cols"] != 6:
+            continue
+
+        # Remove the description column; keep metadata and previews on the first row.
+        specs = list(group.findall(nodes.colspec))
+        group.remove(specs[4])
+        group["cols"] = 5
+        for spec, width in zip((specs[0], specs[1], specs[2], specs[3], specs[5]), (24, 10, 10, 16, 40)):
+            spec["colwidth"] = width
+        header = group.next_node(nodes.thead)[0]
+        header.remove(header[4])
+
+        # A spanning second row shares the first row's visual border and can contain snippets.
+        body = group.next_node(nodes.tbody)
+        for row in list(body.children):
+            description = row[4]
+            row.remove(description)
+            row["classes"].append("aov-info")
+            description["morecols"] = 4
+            description_row = nodes.row(classes=["aov-description"])
+            description_row += description
+            body.insert(body.index(row) + 1, description_row)
+
+
 def setup(app):
+    app.connect("doctree-read", expand_aov_descriptions)
+    app.connect("source-read", reject_graphviz_directives)
     app.connect("autodoc-skip-member", hide_dlpack_methods, priority=100)
     app.connect("autodoc-process-docstring", convert_markdown_codeblocks)

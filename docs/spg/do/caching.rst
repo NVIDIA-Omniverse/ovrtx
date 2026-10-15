@@ -96,9 +96,9 @@ When It Goes Wrong
 
 - It runs every frame: an argument is changing, often because a value-input is being passed as
   the wrapper rather than as ``.value``.
-- The script is stopped part way through: it exceeded the sandbox's instruction budget. That
-  budget is fixed and renewed each frame, so heavy work belongs in the GPU code rather than in
-  Lua.
+- The node stops after its first run: the script reached a sandbox limit, such as one million
+  instructions per call, and the node was stopped. The limits are fixed and renewed each frame,
+  so heavy work belongs in the GPU code rather than in Lua.
 
 Related
 -------

@@ -676,10 +676,8 @@ def Scope "Render" (
                 token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
                 token omni:rtx:background:source:type = "domeLight"
                 bool omni:rtx:debug:view:pixelDebug:enableFixedTextPos = 1
-                token omni:rtx:directLighting:sampledLighting:denoisingTechnique = "None"
                 bool omni:rtx:dlss:frameGeneration = 1
                 float3 omni:rtx:domeLight:rotationAxis = (0, 1, 0)
-                bool omni:rtx:indirectDiffuse:denoiser:enabled = 0
                 bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
                 bool omni:rtx:post:registeredCompositing:invertToneMap = 1
                 bool omni:rtx:pt:adaptiveSampling:filterError = 0

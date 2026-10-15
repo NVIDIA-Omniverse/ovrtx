@@ -1,0 +1,28 @@
+#usda 1.0
+
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+def Xform "World"
+{
+    # [snippet:doc-projector-light]
+    def RectLight "Projector"
+    {
+        bool isProjector = true
+        float inputs:width = 1.5
+        float inputs:height = 1
+        float inputs:intensity = 10000
+
+        # This is the color image being projected.
+        asset inputs:texture:file = @../../data/chelsea.png@
+
+        # This optional direction lookup reshapes the projection.
+        asset projector:directionTexture:file = @../../data/projector-fisheye-direction.exr@
+    }
+    # [/snippet:doc-projector-light]
+}

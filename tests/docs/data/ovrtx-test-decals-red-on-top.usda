@@ -1,0 +1,19 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+(
+    subLayers = [@./ovrtx-test-decals.usda@]
+)
+
+# [snippet:doc-decal-ordering-usda]
+over "World"
+{
+    over "RedRTXA"
+    {
+        # Silver stays at 10. Raising red from 0 to 20 puts red on top.
+        # RedRTXB and RedRTXC inherit this value from RedRTXA.
+        int omni:decal:priority = 20
+    }
+}
+# [/snippet:doc-decal-ordering-usda]

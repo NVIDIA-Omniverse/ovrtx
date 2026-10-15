@@ -94,6 +94,12 @@ Build and Run
 
          ./build/ovrtx-interop
 
+      For non-interactive validation without a GLFW window or Vulkan swapchain:
+
+      .. code-block:: bash
+
+         ./build/ovrtx-interop --headless --num-frames 100
+
    .. tab-item:: Windows
 
       **Prerequisites**
@@ -120,6 +126,12 @@ Build and Run
       .. code-block:: pwsh
 
          .\build\Release\ovrtx-interop.exe
+
+      For non-interactive validation without a GLFW window or Vulkan swapchain:
+
+      .. code-block:: pwsh
+
+         .\build\Release\ovrtx-interop.exe --headless --num-frames 100
 
 Scene Configuration
 -------------------

@@ -42,9 +42,8 @@ Any task where the user's own GPU code has to run inside the renderer, over the 
 sensor data the renderer produces. Trigger vocabulary: SPG, `.cu.lua`, `.slang.lua`,
 `info:spg:sourceAsset`, `subIdentifier`, `omni:rtx:aov`, `orderedVars`, `cuda.kernel`,
 `slang.dispatch`, `spg:rtx.spg.stdlib/...`, "post-process the AOV", "custom kernel on the
-render output", "my SPG AOV is black".
-
-Not this skill: reading a finished AOV back on the host. Use `reading-render-output`.
+render output", "my SPG AOV is black". Not this skill: reading a finished AOV back on the host,
+which is `reading-render-output`.
 
 ## Task → Sections
 
@@ -61,6 +60,7 @@ Read **The Model**, **Instructions** and **The Traps** for any task. Then only w
 | Lidar or radar point cloud input | Sensor Composites |
 | A node that traces the scene | Ray Generation |
 | Pre-compiled `.ptx` / `.slang-module` / `.spv` | Pre-Compiled Sources |
+| A node that reads its camera, a prim of the scene, or its product | Scene Queries |
 | An output that is empty, black or wrong | Troubleshooting |
 
 ## Prerequisites
@@ -81,13 +81,9 @@ have not said, choose by what the node needs: **Choosing a Backend**.
 
 Precedence when facts conflict: the code under `examples/python/spg-*` first, then the pages
 under `docs/spg/`, then this skill. Every code reference below names a snippet marker in a
-runnable example. Read the file between the markers rather than relying on memory; this skill
-is not the source of truth for API shape. Markers are paired comments carrying the name:
-
-    // [snippet:grayscale-kernel-template]   ... // [/snippet:grayscale-kernel-template]
-
-`//` in `.cu` and `.slang`, `--` in `.lua`, `#` in `.py` and `.usda`. Conventions in
-`skills/README.md`.
+runnable example, a pair of comments `// [snippet:name]` and `// [/snippet:name]` (`--` in
+`.lua`, `#` in `.py` and `.usda`). Read the file between the markers rather than relying on
+memory; this skill is not the source of truth for API shape. Conventions in `skills/README.md`.
 
 ## The Model
 
@@ -394,6 +390,17 @@ index, and nothing else, so the example recovers geometric normals from two extr
 
 Depth: `docs/spg/do/raygen.rst`.
 
+## Scene Queries
+
+Read the scene through `rtx.product`, `rtx.stage.prim` and `rtx.stage.query_attributes`. Wrong
+values without an error: a custom attribute is absent unless the load names its prim, a custom
+`string` reads as a number (author a `token`), a world position is at 13 to 15 of a matrix.
+
+> **Source (launch script):** `examples/python/spg-scene-query/MarkerOverlayKernel.cu.lua` snippets `scene-query-camera`, `scene-query-prim`, `scene-query-batch`
+> **Source (publish your own prim):** `examples/python/spg-scene-query/main.py` snippet `scene-query-populate`
+
+Depth: `docs/spg/do/scene_queries.rst`, `docs/spg/ref/lua_rtx.rst`.
+
 ## Pre-Compiled Sources
 
 The extension on `info:spg:sourceAsset` decides what happens: CUDA takes `.cu`, `.ptx`,
@@ -420,10 +427,9 @@ These bite across every task, and each produces a plausible result rather than a
 2. **Argument order is unchecked.** CUDA `args` is matched against the C signature by
    position and a mismatch is not diagnosed: the kernel reads whatever occupies that slot.
 3. **A value input is a wrapper**, so arithmetic on it raises. Use `.value`.
-4. **The launch script has a fixed VM instruction budget**, about a thousand, renewed each
-   frame and not adjustable. Loops over attributes or large tables exceed it and fail the node
-   with an execution-limit error. Build assert messages as plain literals, since a concatenated
-   message costs its instructions whether or not it fires.
+4. **The launch script has fixed limits**: one million VM instructions and 64 KB of log output
+   per call, and 10 MB of memory, not adjustable. Reaching one logs an execution-limit error and
+   stops the node until the stage's SPG setup changes, so heavy work belongs in the GPU code.
 5. **The sandbox scans the script's text before running it**, as a plain substring match
    over the whole file including comments. A comment mentioning a forbidden construct is
    enough to reject the script, which surfaces as an output that is never written.
@@ -447,8 +453,8 @@ This skill has no scripts. Every `spg-*` example runs itself with `uv run main.p
 
 - No geometry, materials or vertex data reach a node, including a ray-generation node.
 - No node reaches the CPU mid-frame, and no launch script reads pixel or point data.
-- A launch script cannot read the scene: no prim attributes, no camera transform, no product
-  layout. A node gets what its ports carry and its authored value inputs.
+- A launch script reads the scene and cannot write it. Custom attributes arrive only when the
+  load names their prim.
 - A shader output binds to one RenderVar at a time; a node cannot read an AOV and republish
   under that same name in one product.
 - Previous-frame reads reach 8 frames back.
@@ -460,7 +466,8 @@ This skill has no scripts. Every `spg-*` example runs itself with `uv run main.p
 
 ## Troubleshooting
 
-Start from what was observed. Full index: `docs/spg/diagnose/symptoms.rst`.
+Start from what was observed; the full index is `docs/spg/diagnose/symptoms.rst`. The renderer
+writes its log to standard output, where launch-script `warning()` lines appear prefixed `Lua:`.
 
 | Symptom | Most likely cause |
 |---|---|
@@ -474,9 +481,6 @@ Start from what was observed. Full index: `docs/spg/diagnose/symptoms.rst`.
 | Values right on frame one only | A cache key is changing every frame, often a value input passed as its wrapper |
 | Lidar output empty | The sweep returned nothing; check `Counts`, and that motion BVH is enabled |
 
-The renderer writes its log to standard output. Launch-script `warning()` lines appear there
-prefixed `Lua:`.
-
 ## References
 
 Docs are the depth behind every section here, under `docs/spg/`: `overview.rst` for what SPG
@@ -487,7 +491,7 @@ symptom index and the limitations.
 Runnable examples, each self-checking: `spg-grayscale` (smallest node), `spg-pipeline`
 (chaining, value inputs), `spg-builtin-nodes`, `spg-generate` (no input), `spg-blur` (uploads,
 caching, launch geometry, runtime changes, fan-out), `spg-stateful`, `spg-previous-frame`,
-`spg-composite-aov`, `spg-raygen`.
+`spg-composite-aov`, `spg-raygen`, `spg-scene-query`.
 
 Related skills: `reading-render-output` for getting an AOV back on the host, `loading-usd` and
 `stepping-and-rendering` for the surrounding loop, `cuda-interop` for sharing GPU memory.

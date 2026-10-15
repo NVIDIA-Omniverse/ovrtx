@@ -42,25 +42,9 @@ Every SPG node is defined by three files:
      - **USD shader definition.** Declares the SPG node with its inputs and outputs in USD and references the GPU source.
        Wired into the render graph.
 
-.. graphviz::
+.. image:: ../img/spg/overview-node-files.svg
    :align: center
-
-   digraph {
-      rankdir=TB
-      bgcolor="transparent"
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      src  [label="GPU source\n.cu / .slang" fillcolor="#76b900" fontcolor="#1b1b1b"]
-      lua  [label="launch script\n.lua" fillcolor="#76b900" fontcolor="#1b1b1b"]
-      usda [label="shader definition\n.usda" fillcolor="#76b900" fontcolor="#1b1b1b"]
-      spg  [label="SPG" fillcolor="#3b4252" fontcolor="white"]
-      out  [label="Output AOV" fillcolor="#4c566a" fontcolor="white"]
-      { rank=same; src lua usda }
-      src -> spg
-      lua -> spg
-      usda -> spg
-      spg -> out
-   }
+   :alt: The GPU source, the launch script and the shader definition feed SPG, which writes the output AOV.
 
 
 Finding Your Way

@@ -19,6 +19,7 @@
 #include <ovx/path_dictionary/path_dictionary.h>
 
 #define GLFW_INCLUDE_VULKAN
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #include <glm/gtc/type_ptr.hpp>
@@ -33,6 +34,8 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <numeric>
+#include <thread>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -123,6 +126,11 @@ static constexpr char const* DEFAULT_CAMERA_PRIM_PATH = "/World/Camera";
 static constexpr UpAxis DEFAULT_UP_AXIS = UpAxis::Z;
 static constexpr Units DEFAULT_SCENE_UNITS = Units::Meters;
 
+// Interpolated frames inserted per rendered frame when DLSS Frame Generation is
+// on. 0 leaves the count up to the renderer; any other value is clamped to what
+// the GPU supports (1 on Ada, 3 on Blackwell).
+static constexpr int DEFAULT_DLSSG_INTERPOLATED_FRAMES = 0;
+
 static auto get_executable_dir() -> std::filesystem::path;
 static void
 mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
@@ -130,6 +138,7 @@ static void
 cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 static void print_usage(char const* program_name);
+static bool parse_present_mode(std::string_view value, PresentMode& mode);
 static bool parse_args(int argc,
                        char* argv[],
                        std::string& usd_file,
@@ -138,7 +147,11 @@ static bool parse_args(int argc,
                        UpAxis& up_axis,
                        Units& units,
                        int& num_frames,
-                       bool& headless);
+                       bool& headless,
+                       bool& dlssg_enabled,
+                       int& dlssg_interpolated_frames,
+                       PresentMode& present_mode,
+                       bool& pace_frames);
 static bool print_ovstage_error(ovstage_instance_t* stage,
                                 ovstage_api_status_t status,
                                 std::string_view operation);
@@ -150,13 +163,18 @@ static bool wait_population_op(ovstage_instance_t* stage,
                                std::string_view operation);
 static bool commit_ovstage_ordinal(ovstage_instance_t* stage,
                                    ovstage_ordinal_t ordinal);
-static bool create_validated_camera_query(ovstage_instance_t* stage,
-                                          std::string_view camera_prim_path,
-                                          ovstage_query_handle_t* out_query);
+static bool create_validated_prim_query(ovstage_instance_t* stage,
+                                        std::string_view prim_path,
+                                        ovstage_query_handle_t* out_query);
 static bool write_camera_transform(ovstage_instance_t* stage,
                                    ovstage_query_handle_t camera_query,
                                    ovstage_ordinal_t ordinal,
                                    double const* transform_data);
+static bool author_dlssg_settings(ovstage_instance_t* stage,
+                                  std::string_view render_product_path,
+                                  ovstage_ordinal_t ordinal,
+                                  bool enabled,
+                                  int interpolated_frames);
 static auto find_accumulation_status(
     ovrtx_render_product_set_outputs_t const& outputs,
     std::string_view render_product_path) -> std::optional<ovrtx_accumulation_status_t>;
@@ -203,10 +221,20 @@ static auto pending_pick_query_ndc(GLFWwindow* window,
 static auto find_render_var_output(ovrtx_render_product_set_outputs_t const& outputs,
                                    std::string_view render_var_path)
     -> ovrtx_render_var_output_handle_t;
-static bool process_pick_output(ovrtx_renderer_t* renderer,
-                                path_dictionary_instance_t* path_dictionary,
-                                ovrtx_render_var_output_handle_t pick_output_handle,
-                                std::vector<ovx_primpath_t>& selected_prim_path_ids);
+// Outcome of one pick-output map attempt, mirroring CopyOutputResult. NotReady
+// means the pick hit is not mappable yet and the caller should retry later.
+enum class PickOutputResult {
+    Read,
+    NotReady,
+    Failed
+};
+
+static PickOutputResult process_pick_output(
+    ovrtx_renderer_t* renderer,
+    path_dictionary_instance_t* path_dictionary,
+    ovrtx_render_var_output_handle_t pick_output_handle,
+    ovrtx_timeout_t map_timeout,
+    std::vector<ovx_primpath_t>& selected_prim_path_ids);
 static bool configure_selection_style(ovrtx_renderer_t* renderer);
 static bool update_selection_outline(ovrtx_renderer_t* renderer,
                                      std::vector<ovx_primpath_t> const& previous_selection,
@@ -214,10 +242,12 @@ static bool update_selection_outline(ovrtx_renderer_t* renderer,
 static bool write_selection_outline_group(ovrtx_renderer_t* renderer,
                                           std::vector<ovx_primpath_t> const& prim_path_ids,
                                           uint8_t group_id);
-static auto read_picked_prims(ovrtx_renderer_t* renderer,
-                              path_dictionary_instance_t* path_dictionary,
-                              ovrtx_render_var_output_handle_t pick_output_handle)
-    -> std::optional<PickedPrims>;
+static PickOutputResult read_picked_prims(
+    ovrtx_renderer_t* renderer,
+    path_dictionary_instance_t* path_dictionary,
+    ovrtx_render_var_output_handle_t pick_output_handle,
+    ovrtx_timeout_t map_timeout,
+    PickedPrims& picked_prims);
 static auto resolve_primpath(path_dictionary_instance_t* path_dictionary,
                              ovx_primpath_t prim_path) -> std::string;
 static void print_picked_prims(std::vector<std::string> const& prim_paths);
@@ -228,11 +258,280 @@ static auto find_render_var_param(ovrtx_render_var_output_t const& output,
                                   std::string_view param_name) -> DLTensor const*;
 static auto checksum_pixels(std::vector<uint8_t> const& pixels) -> uint64_t;
 
-// Search for color output in ovrtx results, preferring HdrColor over LdrColor
-// Returns the output handle and sets the output_type
-static auto find_color_output(ovrtx_render_product_set_outputs_t const& outputs,
-                              OutputType& output_type)
-    -> ovrtx_render_var_output_handle_t;
+// Search ovrtx results for the color output of every frame the render product
+// produced, in presentation order, preferring HdrColor over LdrColor. The output
+// type is only reported during the startup probe: the Vulkan image format and
+// `cuda_format` are fixed from it, so the steady-state loops must not re-derive
+// it and silently disagree with the buffers they copy into.
+static bool collect_color_outputs(
+    ovrtx_render_product_set_outputs_t const& outputs,
+    std::string_view render_product_path,
+    std::vector<ovrtx_render_var_output_handle_t>& color_outputs,
+    OutputType* detected_type = nullptr);
+// Outcome of one map-copy attempt. NotReady means the renderer has not finished
+// producing that output frame yet and the caller should retry later.
+enum class CopyOutputResult {
+    Copied,
+    NotReady,
+    Failed
+};
+
+static CopyOutputResult copy_output_to_surface(
+    ovrtx_renderer_t* renderer,
+    ovrtx_render_var_output_handle_t color_output,
+    int image_index,
+    CudaImageFormat cuda_format,
+    CUstream cuda_stream,
+    CUevent copy_done_event,
+    ovrtx_timeout_t map_timeout,
+    ovrtx_render_var_output_map_handle_t* out_map_handle);
+static bool release_mapped_output(
+    ovrtx_renderer_t* renderer,
+    ovrtx_render_var_output_map_handle_t map_handle,
+    CUevent copy_done_event);
+
+// One shared image plus the CUDA and ovrtx state that decides when it may be
+// shown and when its mapping may be released.
+//
+// Writing  - a copy into this image has been queued on the CUDA stream
+// Ready    - the copy has landed; the image may be shown
+// Showing  - Vulkan is sampling this image
+// Free     - available for the next copy
+//
+// Each slot owns its own copy_done event because several copies are in flight at
+// once; a single shared event was only safe while the unmap blocked the loop
+// until each copy had landed.
+struct FrameSlot {
+    // Per-slot events: several copies are in flight at once, so a shared pair
+    // could not attribute a duration to a particular frame, and a shared
+    // completion event was only safe while the unmap blocked the loop.
+    CUevent copy_start = nullptr;
+    CUevent copy_done = nullptr;
+    ovrtx_render_var_output_map_handle_t map_handle = 0;
+    bool mapped = false;
+    uint64_t timeline_value = 0;
+    // `--num-frames` must save a real rendered frame, never an interpolated one.
+    bool holds_real_frame = false;
+
+    enum class State { Free, Writing, Ready, Showing };
+    State state = State::Free;
+};
+
+// The frames produced by one ovrtx step, consumed one per presented frame. With
+// DLSS Frame Generation enabled a step produces several; the next step is only
+// enqueued once they have all been copied out.
+struct PendingFrames {
+    ovrtx_step_result_handle_t step_result = 0;
+    std::vector<ovrtx_render_var_output_handle_t> color_outputs;
+    size_t next = 0;
+    // A step result is fetched before its output frames are necessarily
+    // mappable, so the fetch and the per-frame maps are polled as two stages.
+    bool results_fetched = false;
+    // A pick query is enqueued before the step and its output is read from the
+    // step's results, so the flag has to survive until the fetch succeeds. The
+    // map is polled like the color one, so it also has to survive however many
+    // iterations the pick hit takes to become mappable.
+    bool pick_query_submitted = false;
+    // Resolved at fetch time and held until the pick is read, because the
+    // outputs struct it came from is reused by the next step's fetch.
+    ovrtx_render_var_output_handle_t pick_output = OVRTX_INVALID_HANDLE;
+    std::chrono::steady_clock::time_point step_start;
+
+    bool in_flight() const { return step_result != 0; }
+    bool drained() const {
+        return results_fetched && next >= color_outputs.size();
+    }
+    // The pick output belongs to the step result, so the result has to outlive
+    // the pick read as well as the last color copy.
+    bool retirable() const { return drained() && !pick_query_submitted; }
+};
+
+// State for the one-time report of whether frame generation actually engaged.
+// DLSS-G interpolates between two rendered frames, so the steps right after a
+// history reset legitimately produce a single frame; only report a failure once
+// a short warmup has passed without extra frames appearing.
+struct DlssgReport {
+    int steps_observed = 0;
+    bool reported = false;
+};
+static constexpr int DLSSG_WARMUP_STEPS = 8;
+
+// A zero timeout turns the blocking ovrtx waits into non-blocking polls that
+// report OVRTX_API_TIMEOUT when the result is not ready yet.
+static constexpr ovrtx_timeout_t OVRTX_TIMEOUT_POLL = {0};
+
+static void report_dlssg_frame_count(bool dlssg_enabled,
+                                     int requested_interpolated_frames,
+                                     size_t produced_frames,
+                                     DlssgReport& report);
+
+// Where wall-clock time goes in one report interval. `step` covers
+// ovrtx_step_with_stage through a successful ovrtx_fetch_results, which is
+// where the wait on the renderer is observed to land: by the time the fetch
+// reports success, every output frame of that step is already mappable.
+// `map_copy` covers copy_output_to_surface, so it is only the map poll plus
+// the copy submission, and stays cheap because the frame is already there and
+// the unmap is deferred to release_mapped_output. The two are measured apart
+// to show that split rather than to assert it, since which of the two calls
+// absorbs the wait is a renderer implementation detail.
+//
+// Steps and presents are counted apart because DLSS Frame Generation makes them
+// diverge: one step yields N + 1 presentable frames.
+struct LoopMetrics {
+    double step_ms = 0.0;
+    double map_copy_ms = 0.0;
+    int steps = 0;
+    int copies = 0;
+    // Iterations that found the next output frame still unmappable. These are
+    // the stalls the blocking map used to hide inside a single long call.
+    int map_polls = 0;
+    int promotions = 0;
+
+    // Gaps between successive frame promotions. Pacing aims to make these
+    // uniform, so the spread matters more than the mean.
+    std::vector<double> promotion_gaps_ms;
+    std::chrono::steady_clock::time_point last_promotion;
+    bool has_last_promotion = false;
+
+    // map_copy cost split by a frame's position within its step. Interpolated
+    // frames occupy the leading slots and the real rendered frame the last one,
+    // so this shows whether a step's frames become mappable all at once or
+    // progressively, and whether an interpolated frame is cheaper to map.
+    std::vector<double> map_copy_ms_by_slot;
+    std::vector<int> frames_by_slot;
+
+    // A new frame became visible. Once the map is polled rather than waited on,
+    // the loop re-presents the same image while a frame is still rendering, so
+    // presents no longer count distinct frames; these promotions do, and their
+    // spacing is what smoothness actually depends on.
+    void record_frame_promotion(
+        std::chrono::steady_clock::time_point const& at) {
+        ++promotions;
+        if (has_last_promotion) {
+            promotion_gaps_ms.push_back(
+                std::chrono::duration<double, std::milli>(at - last_promotion)
+                    .count());
+        }
+        last_promotion = at;
+        has_last_promotion = true;
+    }
+
+    void record_map_copy(size_t slot, double ms) {
+        map_copy_ms += ms;
+        ++copies;
+        if (slot >= map_copy_ms_by_slot.size()) {
+            map_copy_ms_by_slot.resize(slot + 1, 0.0);
+            frames_by_slot.resize(slot + 1, 0);
+        }
+        map_copy_ms_by_slot[slot] += ms;
+        ++frames_by_slot[slot];
+    }
+
+    void reset() {
+        step_ms = 0.0;
+        map_copy_ms = 0.0;
+        steps = 0;
+        copies = 0;
+        map_polls = 0;
+        promotions = 0;
+        promotion_gaps_ms.clear();
+        std::fill(map_copy_ms_by_slot.begin(), map_copy_ms_by_slot.end(), 0.0);
+        std::fill(frames_by_slot.begin(), frames_by_slot.end(), 0);
+    }
+};
+
+// Spaces frame promotions evenly instead of showing a whole step's frames back
+// to back and then idling.
+//
+// The target spacing is derived from the observed step period divided by the
+// number of frames a step produces. Pacing deliberately aims slightly faster
+// than that (PACE_SAFETY): promoting a frame is what frees the buffer for the
+// next copy, so a target slower than the renderer's actual output rate would
+// throttle production, which would in turn lengthen the measured step period
+// and feed back on itself. Undershooting keeps the renderer, not the pacer, as
+// the rate limiter.
+class FramePacer {
+public:
+    explicit FramePacer(bool enabled) : _enabled(enabled) {}
+
+    // Called once per step enqueue to track how fast steps actually come.
+    void on_step(std::chrono::steady_clock::time_point const& at) {
+        if (_has_last_step) {
+            double const period =
+                std::chrono::duration<double, std::milli>(at - _last_step)
+                    .count();
+            _step_period_ms = (_step_period_ms == 0.0)
+                                  ? period
+                                  : (1.0 - PERIOD_SMOOTHING) * _step_period_ms +
+                                        PERIOD_SMOOTHING * period;
+        }
+        _last_step = at;
+        _has_last_step = true;
+    }
+
+    void set_frames_per_step(size_t frames) {
+        _frames_per_step = (frames > 0) ? frames : 1;
+    }
+
+    void on_promotion(std::chrono::steady_clock::time_point const& at) {
+        _last_promotion = at;
+        _has_last_promotion = true;
+    }
+
+    // Nothing to spread out when a step yields a single frame, so pacing only
+    // engages once frame generation is actually producing extra frames.
+    bool active() const { return _enabled && _frames_per_step > 1; }
+
+    double target_gap_ms() const {
+        if (!active() || _step_period_ms == 0.0) {
+            return 0.0;
+        }
+        return PACE_SAFETY * _step_period_ms /
+               static_cast<double>(_frames_per_step);
+    }
+
+    bool promotion_due(std::chrono::steady_clock::time_point const& now) const {
+        if (!active() || !_has_last_promotion) {
+            return true;
+        }
+        double const gap =
+            std::chrono::duration<double, std::milli>(now - _last_promotion)
+                .count();
+        return gap >= target_gap_ms();
+    }
+
+    // How long the caller may idle before the next frame is due, so the loop
+    // does not spin at thousands of redundant presents per second.
+    double ms_until_due(std::chrono::steady_clock::time_point const& now) const {
+        if (!active() || !_has_last_promotion) {
+            return 0.0;
+        }
+        double const gap =
+            std::chrono::duration<double, std::milli>(now - _last_promotion)
+                .count();
+        return std::max(0.0, target_gap_ms() - gap);
+    }
+
+private:
+    static constexpr double PERIOD_SMOOTHING = 0.2;
+    static constexpr double PACE_SAFETY = 0.9;
+
+    bool _enabled = false;
+    size_t _frames_per_step = 1;
+    double _step_period_ms = 0.0;
+    std::chrono::steady_clock::time_point _last_step;
+    std::chrono::steady_clock::time_point _last_promotion;
+    bool _has_last_step = false;
+    bool _has_last_promotion = false;
+};
+
+// Milliseconds elapsed since `start`, for the CPU-side loop metrics.
+static double elapsed_ms_since(
+    std::chrono::steady_clock::time_point const& start) {
+    return std::chrono::duration<double, std::milli>(
+               std::chrono::steady_clock::now() - start)
+        .count();
+}
 
 int main(int argc, char* argv[]) {
     // Must stay first: this only takes effect before the first CUDA context.
@@ -246,6 +545,10 @@ int main(int argc, char* argv[]) {
     Units units;
     int num_frames = 0;
     bool headless = false;
+    bool dlssg_enabled = false;
+    int dlssg_interpolated_frames = DEFAULT_DLSSG_INTERPOLATED_FRAMES;
+    PresentMode present_mode = PresentMode::Fifo;
+    bool pace_frames = false;
 
     if (!parse_args(argc,
                     argv,
@@ -255,7 +558,11 @@ int main(int argc, char* argv[]) {
                     up_axis,
                     units,
                     num_frames,
-                    headless)) {
+                    headless,
+                    dlssg_enabled,
+                    dlssg_interpolated_frames,
+                    present_mode,
+                    pace_frames)) {
         return 0; // Help was shown or parse error
     }
 
@@ -272,6 +579,19 @@ int main(int argc, char* argv[]) {
     std::cerr << "Units: "
               << (units == Units::Meters ? "meters" : "centimeters") << std::endl;
     std::cerr << "Mode: " << (headless ? "headless" : "windowed") << std::endl;
+    if (!headless) {
+        std::cerr << "Present mode: " << present_mode_name(present_mode)
+                  << std::endl;
+        std::cerr << "Frame pacing: " << (pace_frames ? "on" : "off")
+                  << std::endl;
+    }
+    std::cerr << "DLSS Frame Generation: ";
+    if (!dlssg_enabled) {
+        std::cerr << "off" << std::endl;
+    } else {
+        std::cerr << "requested, " << dlssg_interpolated_frames
+                  << " interpolated frame(s) (0 = renderer picks)" << std::endl;
+    }
 
     // =========================================================================
     // Initialize ovrtx
@@ -366,6 +686,15 @@ int main(int argc, char* argv[]) {
             }
             stage_attached = false;
         }
+        // After a detach failure, only renderer destruction is supported.
+        if (renderer) {
+            result = ovrtx_destroy_renderer(renderer);
+            if (check_and_print_error(result, "destroy_renderer")) {
+                result_code = 1;
+            } else {
+                renderer = nullptr;
+            }
+        }
         if (stage) {
             ovstage_api_status_t stage_result = ovstage_destroy_instance(stage);
             if (stage_result != OVSTAGE_OK) {
@@ -373,13 +702,6 @@ int main(int argc, char* argv[]) {
                 result_code = 1;
             }
             stage = nullptr;
-        }
-        if (renderer) {
-            result = ovrtx_destroy_renderer(renderer);
-            if (check_and_print_error(result, "destroy_renderer")) {
-                result_code = 1;
-            }
-            renderer = nullptr;
         }
         // Release the ovstage static loader (unloads ovstage.dll). Safe even if
         // ovstage_initialize failed or was never reached.
@@ -425,7 +747,19 @@ int main(int argc, char* argv[]) {
         commit_ovstage_ordinal(stage, stage_ordinal)) {
         return cleanup(1);
     }
-    if (create_validated_camera_query(stage, camera_prim_path, &camera_query)) {
+    if (create_validated_prim_query(stage, camera_prim_path, &camera_query)) {
+        return cleanup(1);
+    }
+
+    // Author the DLSS-G opinion before the first step so the renderer allocates
+    // interpolated frame slots from the very first frame it produces.
+    ++stage_ordinal;
+    if (author_dlssg_settings(stage,
+                              render_product_path,
+                              stage_ordinal,
+                              dlssg_enabled,
+                              dlssg_interpolated_frames) ||
+        commit_ovstage_ordinal(stage, stage_ordinal)) {
         return cleanup(1);
     }
 
@@ -481,9 +815,9 @@ int main(int argc, char* argv[]) {
 
     // Find color output (prefer HdrColor, fall back to LdrColor)
     OutputType output_type;
-    ovrtx_render_var_output_handle_t color_output_handle =
-        find_color_output(outputs, output_type);
-    if (color_output_handle == 0) {
+    std::vector<ovrtx_render_var_output_handle_t> color_outputs;
+    if (!collect_color_outputs(
+            outputs, render_product_path, color_outputs, &output_type)) {
         std::cerr << "No color output found (HdrColor or LdrColor)" << std::endl;
         ovrtx_destroy_results(renderer, step_result_handle);
         return cleanup(1);
@@ -498,7 +832,7 @@ int main(int argc, char* argv[]) {
 
     ovrtx_render_var_output_t rendered_output = {};
     result = ovrtx_map_render_var_output(renderer,
-                                       color_output_handle,
+                                       color_outputs.back(),
                                        &map_desc,
                                        ovrtx_timeout_infinite,
                                        &rendered_output);
@@ -595,15 +929,24 @@ int main(int argc, char* argv[]) {
         VulkanContextConfig vk_config;
         vk_config.window = headless ? nullptr : window;
         vk_config.initial_sampled_image_capacity = 16;
+        vk_config.present_mode = present_mode;
 
         VulkanContext vk(vk_config, cuda_uuid);
 
-        // Two shared images enable ping-pong: CUDA writes one while Vulkan
-        // samples the other, avoiding read/write hazards within a frame.
-        constexpr int SHARED_IMAGE_COUNT = 2;
+        if (!headless && vk.present_mode() != present_mode) {
+            std::cerr << "Present mode " << present_mode_name(present_mode)
+                      << " is not supported by this surface; using "
+                      << present_mode_name(vk.present_mode()) << std::endl;
+        }
+
+        // A ring of shared images lets CUDA keep copying while Vulkan samples
+        // one of them, and lets a whole step's worth of generated frames wait
+        // their turn instead of being shown back to back.
+        constexpr int SHARED_IMAGE_COUNT = CUDA_SHARED_IMAGE_COUNT;
         VkFormat vk_format = vulkan_format_for_output(output_type);
         CudaImageFormat cuda_format = cuda_format_for_output(output_type);
 
+        std::array<FrameSlot, SHARED_IMAGE_COUNT> slots;
         SampledImageHandle shared_images[SHARED_IMAGE_COUNT];
         for (int i = 0; i < SHARED_IMAGE_COUNT; ++i) {
             shared_images[i] = vk.create_sampled_image(
@@ -685,35 +1028,81 @@ int main(int argc, char* argv[]) {
         // Timeline semaphore synchronizes async CUDA producers with Vulkan
         // consumers without forcing CPU-side blocking.
         auto timeline_handle = vk.export_timeline_semaphore_handle();
-        cuda_import_timeline_semaphore(timeline_handle);
+        if (!cuda_import_timeline_semaphore(timeline_handle)) {
+            cuda_cleanup();
+            cleanup_window();
+            return cleanup(1);
+        }
 
         // CUDA events track copy completion and provide fence points back to
         // ovrtx.
         CUstream cuda_stream;
         cuStreamCreate(&cuda_stream, 0);
 
-        CUevent cuda_start_event, cuda_end_event, cuda_frame_done_event,
-            cuda_copy_done_event;
-        cuEventCreate(&cuda_start_event, CU_EVENT_DEFAULT);
-        cuEventCreate(&cuda_end_event, CU_EVENT_DEFAULT);
-        cuEventCreate(&cuda_frame_done_event, CU_EVENT_DISABLE_TIMING);
+        CUevent cuda_copy_done_event;
+        // Used by the priming and headless paths, which copy one frame at a
+        // time and release each mapping before starting the next.
         cuEventCreate(&cuda_copy_done_event, CU_EVENT_DISABLE_TIMING);
+        for (FrameSlot& slot : slots) {
+            cuEventCreate(&slot.copy_start, CU_EVENT_DEFAULT);
+            cuEventCreate(&slot.copy_done, CU_EVENT_DEFAULT);
+        }
 
-        // Double-buffer state: write_idx is CUDA's target, read_idx is Vulkan's
-        // source.
-        int write_idx = 0;
+        // Index of the slot Vulkan samples, and the queue of slots whose copy
+        // has landed and that are waiting to be shown, oldest first.
         int read_idx = 0;
+        std::vector<int> ready_queue;
+        ready_queue.reserve(SHARED_IMAGE_COUNT);
+        // `--num-frames` saves the buffer Vulkan last presented, so it must stop
+        // on a real rendered frame rather than a DLSS-G interpolated one.
+        bool read_holds_real_frame = true;
         uint64_t cuda_frame_counter = 0;
         uint64_t read_timeline_value =
             0; // timeline value for current read buffer
-        bool cuda_work_pending = false;
 
         // ovrtx step state
         ovrtx_step_result_handle_t current_step_result = 0;
-        ovrtx_render_var_output_map_handle_t current_map_handle = 0;
-        bool has_mapped_output = false;
+        PendingFrames pending;
+
+        // A CUDA interop helper failure leaves copies and ovrtx mappings in
+        // flight. Finish pending users before releasing mapped outputs or
+        // imported resources, and do not submit Vulkan work that waits on a
+        // signal that never happened.
+        auto fail_cuda_interop = [&]() {
+            cuStreamSynchronize(cuda_stream);
+            vkDeviceWaitIdle(vk.device());
+            for (FrameSlot& slot : slots) {
+                if (slot.mapped) {
+                    release_mapped_output(
+                        renderer, slot.map_handle, slot.copy_done);
+                    slot.mapped = false;
+                }
+            }
+            if (pending.step_result != 0) {
+                ovrtx_result_t const destroy_result =
+                    ovrtx_destroy_results(renderer, pending.step_result);
+                check_and_print_error(destroy_result, "destroy_results");
+                pending.step_result = 0;
+            }
+            if (current_step_result != 0) {
+                ovrtx_result_t const destroy_result =
+                    ovrtx_destroy_results(renderer, current_step_result);
+                check_and_print_error(destroy_result, "destroy_results");
+                current_step_result = 0;
+            }
+            cuEventDestroy(cuda_copy_done_event);
+            for (FrameSlot& slot : slots) {
+                cuEventDestroy(slot.copy_start);
+                cuEventDestroy(slot.copy_done);
+            }
+            cuStreamDestroy(cuda_stream);
+            cuda_cleanup();
+            cleanup_window();
+            return cleanup(1);
+        };
 
         ovrtx_accumulation_status_t accumulation_status{};
+        DlssgReport dlssg_report;
 
         // =====================================================================
         // Prime the first buffer so Vulkan has valid content before
@@ -737,6 +1126,7 @@ int main(int argc, char* argv[]) {
                                          ovrtx_timeout_infinite,
                                          &outputs);
             if (check_and_print_error(result, "fetch_results")) {
+                ovrtx_destroy_results(renderer, current_step_result);
                 cuda_cleanup();
                 cleanup_window();
                 return cleanup(1);
@@ -745,10 +1135,8 @@ int main(int argc, char* argv[]) {
             refresh_render_feedback(
                 window, accumulation_status, outputs, render_product_path);
 
-            // Find color output (same type as detected initially)
-            OutputType frame_output_type;
-            color_output_handle = find_color_output(outputs, frame_output_type);
-            if (color_output_handle == OVRTX_INVALID_HANDLE) {
+            if (!collect_color_outputs(
+                    outputs, render_product_path, color_outputs)) {
                 std::cerr << "ERROR: could not find output from "
                           << render_product_path << std::endl;
                 ovrtx_destroy_results(renderer, current_step_result);
@@ -757,63 +1145,44 @@ int main(int argc, char* argv[]) {
                 return cleanup(2);
             }
 
-            result = ovrtx_map_render_var_output(renderer,
-                                               color_output_handle,
-                                               &map_desc,
-                                               ovrtx_timeout_infinite,
-                                               &rendered_output);
-            if (check_and_print_error(result, "map_render_var_output")) {
+            // Prime with the real rendered frame, which is always the last one.
+            // Priming blocks on purpose: the loop needs valid content before it
+            // can present anything.
+            ovrtx_render_var_output_map_handle_t prime_map = 0;
+            if (copy_output_to_surface(renderer,
+                                       color_outputs.back(),
+                                       0,
+                                       cuda_format,
+                                       cuda_stream,
+                                       cuda_copy_done_event,
+                                       ovrtx_timeout_infinite,
+                                       &prime_map) !=
+                CopyOutputResult::Copied) {
                 ovrtx_destroy_results(renderer, current_step_result);
                 cuda_cleanup();
                 cleanup_window();
                 return cleanup(1);
             }
-
-            current_map_handle = rendered_output.map_handle;
-            has_mapped_output = true;
-
-            CUarray cuda_array =
-                reinterpret_cast<CUarray>(rendered_output.tensors[0].dl->data);
-            CUevent wait_event = reinterpret_cast<CUevent>(
-                rendered_output.cuda_sync.wait_event);
-            int out_width =
-                static_cast<int>(rendered_output.tensors[0].dl->shape[1]);
-            int out_height =
-                static_cast<int>(rendered_output.tensors[0].dl->shape[0]);
-
-            // ovrtx may signal a CUDA event when its output is ready; wait on
-            // that event in our stream before issuing the interop copy.
-            if (wait_event) {
-                cuda_wait_event(wait_event, cuda_stream);
-            }
-            cuda_copy_array_to_surface(
-                0, cuda_array, out_width, out_height, cuda_format, cuda_stream);
-            cuEventRecord(cuda_copy_done_event, cuda_stream);
             cuStreamSynchronize(cuda_stream);
-
-            // Return ownership of the mapped ovrtx output and tell ovrtx to
-            // defer any reuse until CUDA copy_done_event has completed.
-            ovrtx_cuda_sync_t copy_done_sync = {};
-            copy_done_sync.wait_event =
-                reinterpret_cast<uintptr_t>(cuda_copy_done_event);
-            result = ovrtx_unmap_render_var_output(
-                renderer, current_map_handle, copy_done_sync);
-            if (check_and_print_error(result, "unmap_render_var_output")) {
+            if (!release_mapped_output(
+                    renderer, prime_map, cuda_copy_done_event)) {
                 ovrtx_destroy_results(renderer, current_step_result);
                 cuda_cleanup();
                 cleanup_window();
                 return cleanup(1);
             }
+
             result = ovrtx_destroy_results(renderer, current_step_result);
             if (check_and_print_error(result, "destroy_results")) {
                 cuda_cleanup();
                 cleanup_window();
                 return cleanup(1);
             }
-            has_mapped_output = false;
+            current_step_result = 0;
 
             read_idx = 0;
-            write_idx = 1;
+            slots[0].state = FrameSlot::State::Showing;
+            slots[0].holds_real_frame = true;
         }
 
         int total_frames = 1;
@@ -823,6 +1192,9 @@ int main(int argc, char* argv[]) {
             // producer/consumer pipeline in automated environments.
             std::cerr << "Running headless render loop for " << num_frames
                       << " frames..." << std::endl;
+            // Headless has no presentation to overlap with, so it keeps the
+            // simple ping-pong: copy one frame, release it, move on.
+            int write_idx = 1;
             while (total_frames < num_frames) {
                 enqueue_result = ovrtx_step_with_stage(renderer,
                                                        render_products,
@@ -840,6 +1212,7 @@ int main(int argc, char* argv[]) {
                                              ovrtx_timeout_infinite,
                                              &outputs);
                 if (check_and_print_error(result, "fetch_results")) {
+                    ovrtx_destroy_results(renderer, current_step_result);
                     cuda_cleanup();
                     cleanup_window();
                     return cleanup(1);
@@ -848,9 +1221,8 @@ int main(int argc, char* argv[]) {
                 refresh_render_feedback(
                     nullptr, accumulation_status, outputs, render_product_path);
 
-                OutputType frame_output_type;
-                color_output_handle = find_color_output(outputs, frame_output_type);
-                if (color_output_handle == OVRTX_INVALID_HANDLE) {
+                if (!collect_color_outputs(
+                        outputs, render_product_path, color_outputs)) {
                     std::cerr << "ERROR: could not find output from "
                               << render_product_path << std::endl;
                     ovrtx_destroy_results(renderer, current_step_result);
@@ -858,65 +1230,52 @@ int main(int argc, char* argv[]) {
                     cleanup_window();
                     return cleanup(2);
                 }
+                report_dlssg_frame_count(dlssg_enabled,
+                                         dlssg_interpolated_frames,
+                                         color_outputs.size(),
+                                         dlssg_report);
 
-                result = ovrtx_map_render_var_output(renderer,
-                                                   color_output_handle,
-                                                   &map_desc,
-                                                   ovrtx_timeout_infinite,
-                                                   &rendered_output);
-                if (check_and_print_error(result, "map_render_var_output")) {
-                    ovrtx_destroy_results(renderer, current_step_result);
-                    cuda_cleanup();
-                    cleanup_window();
-                    return cleanup(1);
+                // Steps are drained whole, so a multi-frame step can push
+                // total_frames past num_frames. Exiting only on a step boundary
+                // also leaves read_idx on a real frame for the readback below.
+                for (ovrtx_render_var_output_handle_t color_output :
+                     color_outputs) {
+                    ovrtx_render_var_output_map_handle_t frame_map = 0;
+                    if (copy_output_to_surface(renderer,
+                                               color_output,
+                                               write_idx,
+                                               cuda_format,
+                                               cuda_stream,
+                                               cuda_copy_done_event,
+                                               ovrtx_timeout_infinite,
+                                               &frame_map) !=
+                        CopyOutputResult::Copied) {
+                        ovrtx_destroy_results(renderer, current_step_result);
+                        cuda_cleanup();
+                        cleanup_window();
+                        return cleanup(1);
+                    }
+                    cuStreamSynchronize(cuda_stream);
+                    if (!release_mapped_output(
+                            renderer, frame_map, cuda_copy_done_event)) {
+                        ovrtx_destroy_results(renderer, current_step_result);
+                        cuda_cleanup();
+                        cleanup_window();
+                        return cleanup(1);
+                    }
+
+                    read_idx = write_idx;
+                    write_idx = (write_idx + 1) % SHARED_IMAGE_COUNT;
+                    ++total_frames;
                 }
 
-                current_map_handle = rendered_output.map_handle;
-                has_mapped_output = true;
-
-                CUarray cuda_array = reinterpret_cast<CUarray>(
-                    rendered_output.tensors[0].dl->data);
-                CUevent wait_event = reinterpret_cast<CUevent>(
-                    rendered_output.cuda_sync.wait_event);
-                int out_width =
-                    static_cast<int>(rendered_output.tensors[0].dl->shape[1]);
-                int out_height =
-                    static_cast<int>(rendered_output.tensors[0].dl->shape[0]);
-
-                if (wait_event) {
-                    cuda_wait_event(wait_event, cuda_stream);
-                }
-                cuda_copy_array_to_surface(write_idx,
-                                           cuda_array,
-                                           out_width,
-                                           out_height,
-                                           cuda_format,
-                                           cuda_stream);
-                cuEventRecord(cuda_copy_done_event, cuda_stream);
-                cuStreamSynchronize(cuda_stream);
-
-                ovrtx_cuda_sync_t copy_done_sync = {};
-                copy_done_sync.wait_event =
-                    reinterpret_cast<uintptr_t>(cuda_copy_done_event);
-                result = ovrtx_unmap_render_var_output(
-                    renderer, current_map_handle, copy_done_sync);
-                if (check_and_print_error(result, "unmap_render_var_output")) {
-                    ovrtx_destroy_results(renderer, current_step_result);
-                    cuda_cleanup();
-                    cleanup_window();
-                    return cleanup(1);
-                }
                 result = ovrtx_destroy_results(renderer, current_step_result);
                 if (check_and_print_error(result, "destroy_results")) {
                     cuda_cleanup();
                     cleanup_window();
                     return cleanup(1);
                 }
-                has_mapped_output = false;
-
-                read_idx = write_idx;
-                write_idx = (write_idx + 1) % SHARED_IMAGE_COUNT;
-                ++total_frames;
+                current_step_result = 0;
             }
 
             VkImage read_image = vk.sampled_image(shared_images[read_idx]).image;
@@ -950,7 +1309,8 @@ int main(int argc, char* argv[]) {
         double accumulated_cuda_ms = 0.0;
         int frame_count = 0;
         int cuda_frame_count = 0;
-        int swaps_this_second = 0;
+        LoopMetrics metrics;
+        FramePacer pacer(pace_frames);
         bool defer_swapchain_recreate = false;
         auto last_print_time = std::chrono::steady_clock::now();
         auto last_step_time = std::chrono::steady_clock::now();
@@ -961,8 +1321,6 @@ int main(int argc, char* argv[]) {
         std::vector<double> all_cuda_times_ms;
 
         if (num_frames > 0) {
-            all_cpu_times_ms.reserve(num_frames);
-            all_vulkan_times_ms.reserve(num_frames);
             all_cuda_times_ms.reserve(num_frames);
         }
 
@@ -1042,23 +1400,56 @@ int main(int argc, char* argv[]) {
             // Non-blocking poll: once CUDA finishes writing the next frame,
             // swap roles so Vulkan presents fresh data while CUDA starts
             // writing the other image.
-            if (cuda_work_pending) {
-                CUresult event_status = cuEventQuery(cuda_frame_done_event);
-                if (event_status == CUDA_SUCCESS) {
-                    float cuda_elapsed_ms = 0.0f;
-                    cuEventElapsedTime(
-                        &cuda_elapsed_ms, cuda_start_event, cuda_end_event);
-                    accumulated_cuda_ms += cuda_elapsed_ms;
-                    cuda_frame_count++;
-                    if (num_frames > 0) {
-                        all_cuda_times_ms.push_back(cuda_elapsed_ms);
-                    }
-
-                    read_timeline_value = cuda_frame_counter;
-                    std::swap(read_idx, write_idx);
-                    cuda_work_pending = false;
-                    swaps_this_second++;
+            //
+            // Retire copies that have landed. Releasing the mapping here rather
+            // than inside the copy is what keeps the render wait out of the
+            // loop: ovrtx waits for the copy event on the CPU during unmap, and
+            // by now that event is already signaled.
+            for (int i = 0; i < SHARED_IMAGE_COUNT; ++i) {
+                FrameSlot& slot = slots[i];
+                if (slot.state != FrameSlot::State::Writing ||
+                    cuEventQuery(slot.copy_done) != CUDA_SUCCESS) {
+                    continue;
                 }
+                if (slot.mapped) {
+                    if (!release_mapped_output(
+                            renderer, slot.map_handle, slot.copy_done)) {
+                        cuda_cleanup();
+                        cleanup_window();
+                        return cleanup(1);
+                    }
+                    slot.mapped = false;
+                }
+                slot.state = FrameSlot::State::Ready;
+                ready_queue.push_back(i);
+
+                float cuda_elapsed_ms = 0.0f;
+                cuEventElapsedTime(
+                    &cuda_elapsed_ms, slot.copy_start, slot.copy_done);
+                accumulated_cuda_ms += cuda_elapsed_ms;
+                cuda_frame_count++;
+                if (num_frames > 0) {
+                    all_cuda_times_ms.push_back(cuda_elapsed_ms);
+                }
+            }
+
+            // Show the oldest ready frame once its scheduled slot arrives. A
+            // step's frames all become mappable at once, so without pacing they
+            // are shown back to back and the loop then idles until the next step
+            // lands, which reads as judder even though the counter looks healthy.
+            if (!ready_queue.empty() && pacer.promotion_due(frame_start)) {
+                int const next_idx = ready_queue.front();
+                ready_queue.erase(ready_queue.begin());
+
+                slots[read_idx].state = FrameSlot::State::Free;
+                read_idx = next_idx;
+                slots[read_idx].state = FrameSlot::State::Showing;
+                read_timeline_value = slots[read_idx].timeline_value;
+                read_holds_real_frame = slots[read_idx].holds_real_frame;
+
+                ++total_frames;
+                metrics.record_frame_promotion(frame_start);
+                pacer.on_promotion(frame_start);
             }
 
             // Camera edits are authored into ovstage so the next attached step
@@ -1087,151 +1478,204 @@ int main(int argc, char* argv[]) {
                 g_camera_dirty = false;
             }
 
-            // Keep at most one in-flight CUDA copy chain; this bounds latency
-            // and makes timeline bookkeeping deterministic.
-            if (!cuda_work_pending) {
-                cuEventRecord(cuda_start_event, cuda_stream);
-                bool pick_query_submitted = false;
-                std::optional<PickQueryNdc> pick_query =
-                    pending_pick_query_ndc(window, tex_width, tex_height);
-                if (pick_query) {
-                    ovrtx_pick_query_desc_t pick_desc = {};
-                    pick_desc.render_product_path = render_product_str;
-                    pick_desc.left_ndc = pick_query->left_ndc;
-                    pick_desc.top_ndc = pick_query->top_ndc;
-                    pick_desc.right_ndc = pick_query->right_ndc;
-                    pick_desc.bottom_ndc = pick_query->bottom_ndc;
-                    pick_desc.flags = 0;
-
-                    enqueue_result =
-                        ovrtx_enqueue_pick_query(renderer, &pick_desc);
-                    if (check_and_print_error(enqueue_result,
-                                              "enqueue_pick_query")) {
-                        cuda_cleanup();
-                        cleanup_window();
-                        return cleanup(1);
-                    }
-                    pick_query_submitted = true;
+            // Copy into any free ring slot. Production is no longer gated on
+            // presentation, so pacing can hold a frame back without also
+            // throttling the renderer.
+            int free_idx = -1;
+            for (int i = 0; i < SHARED_IMAGE_COUNT; ++i) {
+                if (slots[i].state == FrameSlot::State::Free) {
+                    free_idx = i;
+                    break;
                 }
+            }
+            if (free_idx >= 0) {
+                // Enqueue a step whenever none is in flight. Nothing below
+                // blocks, so a step whose frames are not ready yet simply falls
+                // through and the loop presents the previous frame again.
+                if (!pending.in_flight()) {
+                    std::optional<PickQueryNdc> pick_query =
+                        pending_pick_query_ndc(window, tex_width, tex_height);
+                    if (pick_query) {
+                        ovrtx_pick_query_desc_t pick_desc = {};
+                        pick_desc.render_product_path = render_product_str;
+                        pick_desc.left_ndc = pick_query->left_ndc;
+                        pick_desc.top_ndc = pick_query->top_ndc;
+                        pick_desc.right_ndc = pick_query->right_ndc;
+                        pick_desc.bottom_ndc = pick_query->bottom_ndc;
+                        pick_desc.flags = 0;
 
-                // Step ovrtx with real frame delta so simulation/render timing
-                // matches interactive frame pacing.
-                auto now = std::chrono::steady_clock::now();
-                double delta_time =
+                        enqueue_result =
+                            ovrtx_enqueue_pick_query(renderer, &pick_desc);
+                        if (check_and_print_error(enqueue_result,
+                                                  "enqueue_pick_query")) {
+                            cuda_cleanup();
+                            cleanup_window();
+                            return cleanup(1);
+                        }
+                        pending.pick_query_submitted = true;
+                    }
+
+                    // Step ovrtx with real frame delta so simulation/render
+                    // timing matches interactive frame pacing.
+                    auto now = std::chrono::steady_clock::now();
+                    double delta_time =
                         std::chrono::duration<double>(now - last_step_time).count();
-                last_step_time = now;
+                    last_step_time = now;
 
-                enqueue_result = ovrtx_step_with_stage(renderer,
-                                                       render_products,
-                                                       delta_time,
-                                                       stage_ordinal,
-                                                       &current_step_result);
-                if (check_and_print_error(enqueue_result, "step")) {
-                    cuda_cleanup();
-                    cleanup_window();
-                    return cleanup(1);
+                    enqueue_result = ovrtx_step_with_stage(renderer,
+                                                           render_products,
+                                                           delta_time,
+                                                           stage_ordinal,
+                                                           &pending.step_result);
+                    if (check_and_print_error(enqueue_result, "step")) {
+                        cuda_cleanup();
+                        cleanup_window();
+                        return cleanup(1);
+                    }
+                    pending.step_start = std::chrono::steady_clock::now();
+                    pacer.on_step(pending.step_start);
                 }
 
-                result = ovrtx_fetch_results(renderer,
-                                             current_step_result,
-                                             ovrtx_timeout_infinite,
-                                             &outputs);
-                if (check_and_print_error(result, "fetch_results")) {
-                    cuda_cleanup();
-                    cleanup_window();
-                    return cleanup(1);
-                }
+                // Poll for result metadata. The API does not promise the output
+                // frames are mappable once this returns, so it is only the
+                // first of two polled stages. In practice this renderer makes
+                // every frame of the step mappable by the time the fetch
+                // succeeds, which is why this is where the render wait is
+                // observed to land; the map poll below stays because that
+                // ordering is an implementation detail, not a guarantee.
+                if (pending.in_flight() && !pending.results_fetched) {
+                    result = ovrtx_fetch_results(renderer,
+                                                 pending.step_result,
+                                                 OVRTX_TIMEOUT_POLL,
+                                                 &outputs);
+                    if (result.status == OVRTX_API_SUCCESS) {
+                        metrics.step_ms += elapsed_ms_since(pending.step_start);
+                        ++metrics.steps;
 
-                refresh_render_feedback(
-                    window, accumulation_status, outputs, render_product_path);
+                        refresh_render_feedback(window,
+                                                accumulation_status,
+                                                outputs,
+                                                render_product_path);
 
-                if (pick_query_submitted) {
-                    ovrtx_render_var_output_handle_t pick_output_handle =
-                        find_render_var_output(outputs, OVRTX_RENDER_VAR_PICK_HIT);
-                    if (!process_pick_output(renderer,
-                                             &path_dictionary,
-                                             pick_output_handle,
-                                             selected_prim_path_ids)) {
-                        ovrtx_destroy_results(renderer, current_step_result);
+                        if (pending.pick_query_submitted) {
+                            pending.pick_output = find_render_var_output(
+                                outputs, OVRTX_RENDER_VAR_PICK_HIT);
+                        }
+
+                        if (!collect_color_outputs(outputs,
+                                                   render_product_path,
+                                                   pending.color_outputs)) {
+                            std::cerr << "ERROR: could not find output from "
+                                      << render_product_path << std::endl;
+                            ovrtx_destroy_results(renderer, pending.step_result);
+                            cuda_cleanup();
+                            cleanup_window();
+                            return cleanup(2);
+                        }
+                        pending.next = 0;
+                        pending.results_fetched = true;
+                        pacer.set_frames_per_step(pending.color_outputs.size());
+                        report_dlssg_frame_count(dlssg_enabled,
+                                                 dlssg_interpolated_frames,
+                                                 pending.color_outputs.size(),
+                                                 dlssg_report);
+                    } else if (result.status != OVRTX_API_TIMEOUT) {
+                        check_and_print_error(result, "fetch_results");
+                        ovrtx_destroy_results(renderer, pending.step_result);
                         cuda_cleanup();
                         cleanup_window();
                         return cleanup(1);
                     }
                 }
 
-                // Find color output (same type as detected initially)
-                OutputType frame_output_type;
-                color_output_handle =
-                    find_color_output(outputs, frame_output_type);
-
-                // [snippet:map-rendered-output-cuda-array]
-                result = ovrtx_map_render_var_output(renderer,
-                                                   color_output_handle,
-                                                   &map_desc,
-                                                   ovrtx_timeout_infinite,
-                                                   &rendered_output);
-                if (check_and_print_error(result, "map_render_var_output")) {
-                    ovrtx_destroy_results(renderer, current_step_result);
-                    cuda_cleanup();
-                    cleanup_window();
-                    return cleanup(1);
+                // Poll the pick hit on the same terms as the color output. It
+                // is mapped on the CPU, so a blocking map here would stall
+                // presentation for a whole readback; leaving the query pending
+                // instead lets the loop keep presenting and retry next
+                // iteration. The step stays in flight until it resolves, so no
+                // pick is dropped.
+                if (pending.results_fetched && pending.pick_query_submitted) {
+                    PickOutputResult const pick_result =
+                        process_pick_output(renderer,
+                                            &path_dictionary,
+                                            pending.pick_output,
+                                            OVRTX_TIMEOUT_POLL,
+                                            selected_prim_path_ids);
+                    if (pick_result == PickOutputResult::Failed) {
+                        ovrtx_destroy_results(renderer, pending.step_result);
+                        cuda_cleanup();
+                        cleanup_window();
+                        return cleanup(1);
+                    }
+                    if (pick_result == PickOutputResult::Read) {
+                        pending.pick_query_submitted = false;
+                        pending.pick_output = OVRTX_INVALID_HANDLE;
+                    }
                 }
 
-                current_map_handle = rendered_output.map_handle;
-                has_mapped_output = true;
-
-                CUarray cuda_array =
-                    reinterpret_cast<CUarray>(rendered_output.tensors[0].dl->data);
-                CUevent wait_event = reinterpret_cast<CUevent>(
-                    rendered_output.cuda_sync.wait_event);
-                int out_width =
-                    static_cast<int>(rendered_output.tensors[0].dl->shape[1]);
-                int out_height =
-                    static_cast<int>(rendered_output.tensors[0].dl->shape[0]);
-
-                // Ensure ovrtx has finished producing the mapped CUDA array
-                // before launching the copy into external Vulkan memory.
-                if (wait_event) {
-                    cuda_wait_event(wait_event, cuda_stream);
+                // Poll the map for the next unconsumed frame of this step. The
+                // renderer may still be producing it, in which case the loop
+                // presents the previous frame again rather than stalling.
+                bool copied_this_iteration = false;
+                if (pending.results_fetched && !pending.drained()) {
+                    size_t const frame_slot = pending.next;
+                    FrameSlot& target = slots[free_idx];
+                    auto map_copy_start = std::chrono::steady_clock::now();
+                    cuEventRecord(target.copy_start, cuda_stream);
+                    CopyOutputResult const copy_result = copy_output_to_surface(
+                        renderer,
+                        pending.color_outputs[pending.next],
+                        free_idx,
+                        cuda_format,
+                        cuda_stream,
+                        target.copy_done,
+                        OVRTX_TIMEOUT_POLL,
+                        &target.map_handle);
+                    if (copy_result == CopyOutputResult::Failed) {
+                        return fail_cuda_interop();
+                    }
+                    if (copy_result == CopyOutputResult::Copied) {
+                        metrics.record_map_copy(frame_slot,
+                                                elapsed_ms_since(map_copy_start));
+                        target.mapped = true;
+                        target.state = FrameSlot::State::Writing;
+                        // The real rendered frame is the last of a step; the
+                        // ones before it are interpolated.
+                        ++pending.next;
+                        target.holds_real_frame = pending.drained();
+                        copied_this_iteration = true;
+                    } else {
+                        ++metrics.map_polls;
+                    }
                 }
 
-                cuda_copy_array_to_surface(write_idx,
-                                           cuda_array,
-                                           out_width,
-                                           out_height,
-                                           cuda_format,
-                                           cuda_stream);
-                cuEventRecord(cuda_copy_done_event, cuda_stream);
-
-                // Hand map ownership back to ovrtx, gated by copy completion
-                // event.
-                ovrtx_cuda_sync_t copy_done_sync = {};
-                copy_done_sync.wait_event =
-                    reinterpret_cast<uintptr_t>(cuda_copy_done_event);
-                result = ovrtx_unmap_render_var_output(
-                    renderer, current_map_handle, copy_done_sync);
-                // [/snippet:map-rendered-output-cuda-array]
-                if (check_and_print_error(result, "unmap_render_var_output")) {
-                    ovrtx_destroy_results(renderer, current_step_result);
-                    cuda_cleanup();
-                    cleanup_window();
-                    return cleanup(1);
+                // Retire the step once every frame it produced has been copied
+                // out and any pick hit has been read. The mappings are already
+                // released, so this only frees the result metadata.
+                if (pending.retirable()) {
+                    result =
+                        ovrtx_destroy_results(renderer, pending.step_result);
+                    pending.step_result = 0;
+                    pending.results_fetched = false;
+                    if (check_and_print_error(result, "destroy_results")) {
+                        cuda_cleanup();
+                        cleanup_window();
+                        return cleanup(1);
+                    }
                 }
-                result = ovrtx_destroy_results(renderer, current_step_result);
-                if (check_and_print_error(result, "destroy_results")) {
-                    cuda_cleanup();
-                    cleanup_window();
-                    return cleanup(1);
-                }
-                has_mapped_output = false;
 
-                cuEventRecord(cuda_end_event, cuda_stream);
-                cuEventRecord(cuda_frame_done_event, cuda_stream);
-                cuda_frame_counter++;
-                // Signal timeline value N for buffer written this frame; Vulkan
-                // waits on this value before sampling that image.
-                cuda_signal_timeline(cuda_frame_counter, cuda_stream);
-                cuda_work_pending = true;
+                // copy_done was already recorded on the stream by
+                // copy_output_to_surface, right after the copy it fences.
+                if (copied_this_iteration) {
+                    cuda_frame_counter++;
+                    // Signal timeline value N for the buffer written this frame;
+                    // Vulkan waits on this value before sampling that image.
+                    slots[free_idx].timeline_value = cuda_frame_counter;
+                    if (!cuda_signal_timeline(cuda_frame_counter,
+                                              cuda_stream)) {
+                        return fail_cuda_interop();
+                    }
+                }
             }
 
             // Render uses read buffer only; barriers below transfer queue
@@ -1318,10 +1762,23 @@ int main(int argc, char* argv[]) {
                 all_cpu_times_ms.push_back(cpu_ms);
             }
             frame_count++;
-            total_frames++;
 
-            if (num_frames > 0 && total_frames >= num_frames) {
+            // total_frames counts frames that actually became visible, not loop
+            // iterations: now that the map is polled, the loop re-presents the
+            // same image many times while the next frame renders.
+            if (num_frames > 0 && total_frames >= num_frames &&
+                read_holds_real_frame) {
                 break;
+            }
+
+            // Idle until the next frame is due rather than re-presenting the
+            // same image as fast as the queue drains. Capped so window events
+            // and render progress are still polled promptly.
+            if (double const idle_ms =
+                    pacer.ms_until_due(std::chrono::steady_clock::now());
+                idle_ms > 0.0) {
+                std::this_thread::sleep_for(std::chrono::microseconds(
+                    static_cast<int64_t>(std::min(idle_ms, 2.0) * 1000.0)));
             }
 
             auto now = std::chrono::steady_clock::now();
@@ -1335,25 +1792,90 @@ int main(int argc, char* argv[]) {
                         ? accumulated_cuda_ms / cuda_frame_count
                         : 0.0;
 
+                double avg_step_ms =
+                    (metrics.steps > 0) ? metrics.step_ms / metrics.steps : 0.0;
+                double avg_map_copy_ms =
+                    (metrics.copies > 0)
+                        ? metrics.map_copy_ms / metrics.copies
+                        : 0.0;
+
                 std::cerr << "Avg (ms): CPU=" << avg_cpu_ms
+                          << "  Step=" << avg_step_ms
+                          << "  MapCopy=" << avg_map_copy_ms
                           << "  Vulkan=" << avg_vulkan_ms
                           << "  CUDA=" << avg_cuda_ms
-                          << "  FPS=" << (frame_count / elapsed_seconds)
+                          << " | Steps/s=" << (metrics.steps / elapsed_seconds)
+                          << "  Frames/s="
+                          << (metrics.promotions / elapsed_seconds)
+                          << "  Presents/s=" << (frame_count / elapsed_seconds)
                           << " | " << format_pt_accumulation_feedback(accumulation_status)
                           << std::endl;
+
+                // Spread of the gaps between visible frames. Judder shows up
+                // here as a wide min/max even when the mean looks healthy.
+                if (metrics.promotion_gaps_ms.size() > 1) {
+                    auto const [gap_min, gap_max] =
+                        std::minmax_element(metrics.promotion_gaps_ms.begin(),
+                                            metrics.promotion_gaps_ms.end());
+                    double const gap_mean =
+                        std::accumulate(metrics.promotion_gaps_ms.begin(),
+                                        metrics.promotion_gaps_ms.end(),
+                                        0.0) /
+                        metrics.promotion_gaps_ms.size();
+                    std::cerr << "  Frame gap (ms): min=" << *gap_min
+                              << "  mean=" << gap_mean
+                              << "  max=" << *gap_max
+                              << "  | map polls=" << metrics.map_polls
+                              << std::endl;
+                }
+
+                // With frame generation a step yields several frames; showing
+                // the per-slot map cost tells us whether they land together or
+                // one at a time.
+                if (metrics.map_copy_ms_by_slot.size() > 1) {
+                    std::cerr << "  MapCopy by frame-in-step (ms):";
+                    for (size_t slot = 0;
+                         slot < metrics.map_copy_ms_by_slot.size();
+                         ++slot) {
+                        int const n = metrics.frames_by_slot[slot];
+                        std::cerr << "  [" << slot << "]="
+                                  << ((n > 0)
+                                          ? metrics.map_copy_ms_by_slot[slot] / n
+                                          : 0.0);
+                    }
+                    std::cerr << std::endl;
+                }
 
                 accumulated_cpu_ms = 0.0;
                 accumulated_vulkan_ms = 0.0;
                 accumulated_cuda_ms = 0.0;
                 frame_count = 0;
                 cuda_frame_count = 0;
-                swaps_this_second = 0;
+                metrics.reset();
                 last_print_time = now;
             }
         }
 
         cuStreamSynchronize(cuda_stream);
         vk.wait_for_fence();
+
+        // Mappings outlive their step result, so any still held by the ring must
+        // be released explicitly. The stream is idle, so the unmap fence is
+        // already signaled and this does not block.
+        for (FrameSlot& slot : slots) {
+            if (slot.mapped) {
+                release_mapped_output(
+                    renderer, slot.map_handle, slot.copy_done);
+                slot.mapped = false;
+            }
+        }
+
+        // The loop can exit with frames of the last step still unconsumed.
+        if (pending.step_result != 0) {
+            result = ovrtx_destroy_results(renderer, pending.step_result);
+            pending.step_result = 0;
+            check_and_print_error(result, "destroy_results");
+        }
 
         // Print frame time statistics if --num-frames was specified
         if (num_frames > 0 && !headless) {
@@ -1368,13 +1890,8 @@ int main(int argc, char* argv[]) {
         if (num_frames > 0) {
             std::cerr << "Reading back frame from buffer " << read_idx
                       << "..." << std::endl;
-            std::vector<uint8_t> pixels =
-                cuda_read_surface_rgba8(read_idx,
-                                        tex_width,
-                                        tex_height,
-                                        (output_type == OutputType::HdrColor)
-                                            ? CudaImageFormat::Half4
-                                            : CudaImageFormat::UInt8_4);
+            std::vector<uint8_t> pixels = cuda_read_surface_rgba8(
+                read_idx, tex_width, tex_height, cuda_format);
             uint64_t const checksum = checksum_pixels(pixels);
             std::cerr << "Readback checksum: " << checksum << std::endl;
             if (pixels.empty() || checksum == 0) {
@@ -1401,10 +1918,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        cuEventDestroy(cuda_start_event);
-        cuEventDestroy(cuda_end_event);
-        cuEventDestroy(cuda_frame_done_event);
         cuEventDestroy(cuda_copy_done_event);
+        for (FrameSlot& slot : slots) {
+            cuEventDestroy(slot.copy_start);
+            cuEventDestroy(slot.copy_done);
+        }
         cuStreamDestroy(cuda_stream);
         cuda_cleanup();
     } catch (std::exception const& e) {
@@ -1618,16 +2136,17 @@ static bool commit_ovstage_ordinal(ovstage_instance_t* stage,
                            "advance_write_floor");
 }
 
-static bool create_validated_camera_query(ovstage_instance_t* stage,
-                                          std::string_view camera_prim_path,
-                                          ovstage_query_handle_t* out_query)
+// Resolve a single prim by its USD path into a reusable ovstage query handle.
+// Fails when the path does not match exactly one prim in the populated scene.
+static bool create_validated_prim_query(ovstage_instance_t* stage,
+                                        std::string_view prim_path,
+                                        ovstage_query_handle_t* out_query)
 {
-    ovx_string_t camera_path = {camera_prim_path.data(),
-                                camera_prim_path.size()};
+    ovx_string_t path = {prim_path.data(), prim_path.size()};
     ovstage_predicate_t predicate = {};
     predicate.attribute.string = literal_to_ovx_string("usd-path");
     predicate.op = OVSTAGE_FILTER_OP_IN;
-    predicate.values = &camera_path;
+    predicate.values = &path;
     predicate.value_count = 1;
 
     ovstage_filter_t filter = {};
@@ -1636,7 +2155,7 @@ static bool create_validated_camera_query(ovstage_instance_t* stage,
 
     ovstage_enqueue_result_t query_result =
         ovstage_query(stage, &filter, nullptr, 0, out_query);
-    if (wait_ovstage_op(stage, query_result, "query_camera_prim")) {
+    if (wait_ovstage_op(stage, query_result, "query_prim")) {
         if (*out_query != OVSTAGE_INVALID_QUERY_HANDLE) {
             wait_ovstage_op(stage, ovstage_release_query(stage, *out_query), "release_query");
             *out_query = OVSTAGE_INVALID_QUERY_HANDLE;
@@ -1650,12 +2169,12 @@ static bool create_validated_camera_query(ovstage_instance_t* stage,
     if (status != OVSTAGE_OK) {
         wait_ovstage_op(stage, ovstage_release_query(stage, *out_query), "release_query");
         *out_query = OVSTAGE_INVALID_QUERY_HANDLE;
-        return print_ovstage_error(stage, status, "fetch_camera_query_result");
+        return print_ovstage_error(stage, status, "fetch_query_result");
     }
 
     bool failed = false;
     if (fetched.total_prim_count != 1) {
-        std::cerr << "Camera prim '" << camera_prim_path
+        std::cerr << "Prim '" << prim_path
                   << "' was not found in the populated ovstage scene" << std::endl;
         failed = true;
     }
@@ -1713,6 +2232,86 @@ static bool write_camera_transform(ovstage_instance_t* stage,
         "write_camera_transform");
 }
 
+// [snippet:enable-dlssg]
+// DLSS Frame Generation is a per-RenderProduct render setting: two attributes on
+// the RenderProduct prim, read by the renderer from the runtime scene. Authoring
+// them through ovstage is therefore equivalent to declaring them in the USD file,
+// and does not require the RTX settings API schema to be applied to the prim.
+//
+// Both attributes are always written, including when frame generation is off, so
+// the command line stays authoritative over whatever the scene authored.
+static bool author_dlssg_settings(ovstage_instance_t* stage,
+                                  std::string_view render_product_path,
+                                  ovstage_ordinal_t ordinal,
+                                  bool enabled,
+                                  int interpolated_frames)
+{
+    ovstage_query_handle_t render_product_query = OVSTAGE_INVALID_QUERY_HANDLE;
+    if (create_validated_prim_query(
+            stage, render_product_path, &render_product_query)) {
+        return true;
+    }
+
+    uint8_t enabled_value = enabled ? 1 : 0;
+    int64_t shape[1] = {1};
+
+    DLTensor enabled_dl = {};
+    enabled_dl.data = &enabled_value;
+    enabled_dl.device.device_type = kDLCPU;
+    enabled_dl.device.device_id = 0;
+    enabled_dl.ndim = 1;
+    enabled_dl.shape = shape;
+    enabled_dl.dtype.code = kDLBool;
+    enabled_dl.dtype.bits = 8;
+    enabled_dl.dtype.lanes = 1;
+
+    // A count of 0 leaves the interpolated frame count up to the renderer; any
+    // other value is clamped to what the GPU supports.
+    int32_t frame_count_value = interpolated_frames;
+    DLTensor frame_count_dl = enabled_dl;
+    frame_count_dl.data = &frame_count_value;
+    frame_count_dl.dtype.code = kDLInt;
+    frame_count_dl.dtype.bits = 32;
+
+    ovstage_write_data_t enabled_write = {};
+    enabled_write.tensors = &enabled_dl;
+    enabled_write.tensor_count = 1;
+
+    ovstage_write_data_t frame_count_write = enabled_write;
+    frame_count_write.tensors = &frame_count_dl;
+
+    ovx_string_or_token_t enabled_attribute = {};
+    enabled_attribute.string =
+        literal_to_ovx_string("omni:rtx:dlss:frameGeneration");
+    ovx_string_or_token_t frame_count_attribute = {};
+    frame_count_attribute.string = literal_to_ovx_string(
+        "omni:rtx:dlss:frameGenerationInterpolatedFrameCount");
+
+    // |= rather than ||: the second write and the release must run even if an
+    // earlier step failed, so the query handle is never stranded.
+    bool failed = wait_ovstage_op(stage,
+                                  ovstage_write_attribute(stage,
+                                                          render_product_query,
+                                                          enabled_attribute,
+                                                          ordinal,
+                                                          enabled_write,
+                                                          OVSTAGE_PRIM_MODE_UPSERT),
+                                  "write_dlssg_frame_generation");
+    failed |= wait_ovstage_op(stage,
+                              ovstage_write_attribute(stage,
+                                                      render_product_query,
+                                                      frame_count_attribute,
+                                                      ordinal,
+                                                      frame_count_write,
+                                                      OVSTAGE_PRIM_MODE_UPSERT),
+                              "write_dlssg_interpolated_frame_count");
+    failed |= wait_ovstage_op(stage,
+                              ovstage_release_query(stage, render_product_query),
+                              "release_query");
+    return failed;
+}
+// [/snippet:enable-dlssg]
+
 static auto find_accumulation_status(
     ovrtx_render_product_set_outputs_t const& outputs,
     std::string_view render_product_path) -> std::optional<ovrtx_accumulation_status_t> {
@@ -1721,12 +2320,15 @@ static auto find_accumulation_status(
         if (product_output.output_frame_count == 0) {
             continue;
         }
-        std::string_view const path(product_output.render_product_path.ptr,
-                                    product_output.render_product_path.length);
-        if (path != render_product_path) {
+        if (!ovx_string_equals(product_output.render_product_path,
+                               render_product_path)) {
             continue;
         }
-        return product_output.output_frames[0].accumulation_status;
+        // The real rendered frame is always last; DLSS-G interpolated frames
+        // carry no accumulation status of their own.
+        return product_output
+            .output_frames[product_output.output_frame_count - 1]
+            .accumulation_status;
     }
     return std::nullopt;
 }
@@ -1781,6 +2383,21 @@ static void print_usage(char const* program_name) {
            "without GLFW" << std::endl;
     std::cerr << "  --camera, -c <path>       Orbit camera prim (default: "
               << DEFAULT_CAMERA_PRIM_PATH << ")" << std::endl;
+    std::cerr
+        << "  --dlssg                   Enable DLSS Frame Generation (default: "
+           "off)" << std::endl;
+    std::cerr
+        << "  --present-mode <mode>     fifo | mailbox | immediate "
+           "(default: fifo)" << std::endl
+        << "                            fifo waits for vsync; mailbox and "
+           "immediate do not" << std::endl
+        << "  --pace                    Space generated frames evenly instead "
+           "of in bursts" << std::endl
+        << "  --dlssg-frames <N>        Interpolated frames per rendered frame, "
+           "implies --dlssg" << std::endl;
+    std::cerr
+        << "                            (default: renderer picks, capped by the "
+           "GPU)" << std::endl;
     std::cerr << "  --help, -h                Show this help message" << std::endl;
 }
 
@@ -1792,7 +2409,11 @@ static bool parse_args(int argc,
                        UpAxis& up_axis,
                        Units& units,
                        int& num_frames,
-                       bool& headless) {
+                       bool& headless,
+                       bool& dlssg_enabled,
+                       int& dlssg_interpolated_frames,
+                       PresentMode& present_mode,
+                       bool& pace_frames) {
     // Set defaults
     usd_file = DEFAULT_USD_FILE_URL;
     render_product = DEFAULT_RENDER_PRODUCT_PATH;
@@ -1801,6 +2422,10 @@ static bool parse_args(int argc,
     units = DEFAULT_SCENE_UNITS;
     num_frames = 0;
     headless = false;
+    dlssg_enabled = false;
+    dlssg_interpolated_frames = DEFAULT_DLSSG_INTERPOLATED_FRAMES;
+    present_mode = PresentMode::Fifo;
+    pace_frames = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -1873,6 +2498,34 @@ static bool parse_args(int argc,
             }
         } else if (arg == "--headless" || arg == "--no-window") {
             headless = true;
+        } else if (arg == "--dlssg") {
+            dlssg_enabled = true;
+        } else if (arg == "--dlssg-frames") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument" << std::endl;
+                return false;
+            }
+            dlssg_interpolated_frames = std::stoi(argv[++i]);
+            if (dlssg_interpolated_frames < 1) {
+                std::cerr << "Error: --dlssg-frames must be a positive integer"
+                          << std::endl;
+                return false;
+            }
+            dlssg_enabled = true;
+        } else if (arg == "--pace") {
+            pace_frames = true;
+        } else if (arg == "--present-mode") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument" << std::endl;
+                return false;
+            }
+            std::string val = argv[++i];
+            if (!parse_present_mode(val, present_mode)) {
+                std::cerr << "Error: invalid present mode '" << val
+                          << "', must be fifo, mailbox or immediate"
+                          << std::endl;
+                return false;
+            }
         } else {
             std::cerr << "Error: unknown option '" << arg << "'" << std::endl;
             print_usage(argv[0]);
@@ -1880,6 +2533,19 @@ static bool parse_args(int argc,
         }
     }
 
+    return true;
+}
+
+static bool parse_present_mode(std::string_view value, PresentMode& mode) {
+    if (value == "fifo") {
+        mode = PresentMode::Fifo;
+    } else if (value == "mailbox") {
+        mode = PresentMode::Mailbox;
+    } else if (value == "immediate") {
+        mode = PresentMode::Immediate;
+    } else {
+        return false;
+    }
     return true;
 }
 
@@ -1942,8 +2608,11 @@ static void print_frame_time_stats(int total_frames,
         return {min_val, max_val, mean};
     };
 
-    std::cerr << std::endl << "=== Frame Time Statistics (" << total_frames
-              << " frames) ===" << std::endl;
+    // The CPU and Vulkan samples are per loop iteration, which is no longer one
+    // per visible frame: the loop re-presents the current image while the next
+    // one renders. total_frames counts the frames that actually became visible.
+    std::cerr << std::endl << "=== Loop Time Statistics (" << total_frames
+              << " frames shown) ===" << std::endl;
 
     auto [cpu_min, cpu_max, cpu_mean] = compute_stats(cpu_times_ms);
     std::cerr << "CPU:    min=" << cpu_min << " ms  max=" << cpu_max
@@ -2205,24 +2874,27 @@ static auto find_render_var_output(ovrtx_render_product_set_outputs_t const& out
     return 0;
 }
 
-static bool process_pick_output(ovrtx_renderer_t* renderer,
-                                path_dictionary_instance_t* path_dictionary,
-                                ovrtx_render_var_output_handle_t pick_output_handle,
-                                std::vector<ovx_primpath_t>& selected_prim_path_ids) {
-    std::optional<PickedPrims> picked_prims =
-        read_picked_prims(renderer, path_dictionary, pick_output_handle);
-    if (!picked_prims) {
-        return false;
+static PickOutputResult process_pick_output(
+    ovrtx_renderer_t* renderer,
+    path_dictionary_instance_t* path_dictionary,
+    ovrtx_render_var_output_handle_t pick_output_handle,
+    ovrtx_timeout_t map_timeout,
+    std::vector<ovx_primpath_t>& selected_prim_path_ids) {
+    PickedPrims picked_prims;
+    PickOutputResult const result = read_picked_prims(
+        renderer, path_dictionary, pick_output_handle, map_timeout, picked_prims);
+    if (result != PickOutputResult::Read) {
+        return result;
     }
 
-    print_picked_prims(picked_prims->paths);
+    print_picked_prims(picked_prims.paths);
     if (!update_selection_outline(
-            renderer, selected_prim_path_ids, picked_prims->path_ids)) {
-        return false;
+            renderer, selected_prim_path_ids, picked_prims.path_ids)) {
+        return PickOutputResult::Failed;
     }
 
-    selected_prim_path_ids = picked_prims->path_ids;
-    return true;
+    selected_prim_path_ids = picked_prims.path_ids;
+    return PickOutputResult::Read;
 }
 
 static bool configure_selection_style(ovrtx_renderer_t* renderer) {
@@ -2260,14 +2932,16 @@ static bool write_selection_outline_group(ovrtx_renderer_t* renderer,
     return !check_and_print_error(result, "set_selection_outline_group");
 }
 
-static auto read_picked_prims(ovrtx_renderer_t* renderer,
-                              path_dictionary_instance_t* path_dictionary,
-                              ovrtx_render_var_output_handle_t pick_output_handle)
-    -> std::optional<PickedPrims> {
+static PickOutputResult read_picked_prims(
+    ovrtx_renderer_t* renderer,
+    path_dictionary_instance_t* path_dictionary,
+    ovrtx_render_var_output_handle_t pick_output_handle,
+    ovrtx_timeout_t map_timeout,
+    PickedPrims& picked_prims) {
     if (pick_output_handle == OVRTX_INVALID_HANDLE) {
         std::cerr << "ERROR: pick query produced no "
                   << OVRTX_RENDER_VAR_PICK_HIT << " output\n";
-        return std::nullopt;
+        return PickOutputResult::Failed;
     }
 
     ovrtx_map_output_description_t map_desc = {};
@@ -2277,13 +2951,16 @@ static auto read_picked_prims(ovrtx_renderer_t* renderer,
     ovrtx_result_t result = ovrtx_map_render_var_output(renderer,
                                                         pick_output_handle,
                                                         &map_desc,
-                                                        ovrtx_timeout_infinite,
+                                                        map_timeout,
                                                         &pick_output);
+    if (result.status == OVRTX_API_TIMEOUT) {
+        return PickOutputResult::NotReady;
+    }
     if (check_and_print_error(result, "map_pick_output")) {
-        return std::nullopt;
+        return PickOutputResult::Failed;
     }
 
-    std::optional<PickedPrims> picked_prims = PickedPrims{};
+    bool parsed = true;
     DLTensor const* prim_path_tensor =
         find_render_var_tensor(pick_output, "primPath");
     DLTensor const* magic_param = find_render_var_param(pick_output, "magic");
@@ -2304,7 +2981,7 @@ static auto read_picked_prims(ovrtx_renderer_t* renderer,
         std::cerr << "ERROR: unexpected pick hit schema"
                   << " magic=0x" << std::hex << magic << std::dec
                   << " version=" << version << "\n";
-        picked_prims = std::nullopt;
+        parsed = false;
     } else if (hit_count == 0) {
         // Miss (sky/background): primPath column is length 0 and data may be null.
         picked_prims = PickedPrims{};
@@ -2322,7 +2999,7 @@ static auto read_picked_prims(ovrtx_renderer_t* renderer,
                   << " data="
                   << (prim_path_tensor && prim_path_tensor->data ? "set" : "null")
                   << "\n";
-        picked_prims = std::nullopt;
+        parsed = false;
     } else {
         auto const* prim_paths = reinterpret_cast<ovx_primpath_t const*>(
             reinterpret_cast<uint8_t const*>(prim_path_tensor->data) +
@@ -2331,16 +3008,16 @@ static auto read_picked_prims(ovrtx_renderer_t* renderer,
             if (prim_paths[i] == 0) {
                 continue;
             }
-            if (std::find(picked_prims->path_ids.begin(),
-                          picked_prims->path_ids.end(),
-                          prim_paths[i]) != picked_prims->path_ids.end()) {
+            if (std::find(picked_prims.path_ids.begin(),
+                          picked_prims.path_ids.end(),
+                          prim_paths[i]) != picked_prims.path_ids.end()) {
                 continue;
             }
             std::string path =
                 resolve_primpath(path_dictionary, prim_paths[i]);
             if (!path.empty()) {
-                picked_prims->path_ids.push_back(prim_paths[i]);
-                picked_prims->paths.push_back(path);
+                picked_prims.path_ids.push_back(prim_paths[i]);
+                picked_prims.paths.push_back(path);
             }
         }
     }
@@ -2349,10 +3026,10 @@ static auto read_picked_prims(ovrtx_renderer_t* renderer,
     result = ovrtx_unmap_render_var_output(
         renderer, pick_output.map_handle, no_sync);
     if (check_and_print_error(result, "unmap_pick_output")) {
-        return std::nullopt;
+        return PickOutputResult::Failed;
     }
 
-    return picked_prims;
+    return parsed ? PickOutputResult::Read : PickOutputResult::Failed;
 }
 
 static auto resolve_primpath(path_dictionary_instance_t* path_dictionary,
@@ -2436,20 +3113,31 @@ static auto find_render_var_param(ovrtx_render_var_output_t const& output,
     return nullptr;
 }
 
-// Search for color output in ovrtx results, preferring HdrColor over LdrColor
-// Returns the output handle and sets the output_type
-static auto find_color_output(ovrtx_render_product_set_outputs_t const& outputs,
-                              OutputType& output_type)
-    -> ovrtx_render_var_output_handle_t {
-    ovrtx_render_var_output_handle_t hdr_handle = 0;
-    ovrtx_render_var_output_handle_t ldr_handle = 0;
+// Collect the color output of every frame the render product produced, in
+// presentation order. A step normally produces a single frame; with DLSS Frame
+// Generation on it produces the interpolated frames first and the real rendered
+// frame last.
+static bool collect_color_outputs(
+    ovrtx_render_product_set_outputs_t const& outputs,
+    std::string_view render_product_path,
+    std::vector<ovrtx_render_var_output_handle_t>& color_outputs,
+    OutputType* detected_type) {
+    color_outputs.clear();
 
     for (size_t i = 0; i < outputs.output_count; ++i) {
         ovrtx_render_product_output_t const& product_output =
             outputs.outputs[i];
+        if (!ovx_string_equals(product_output.render_product_path,
+                               render_product_path)) {
+            continue;
+        }
+
         for (size_t f = 0; f < product_output.output_frame_count; ++f) {
             ovrtx_render_product_frame_output_t const& frame =
                 product_output.output_frames[f];
+            ovrtx_render_var_output_handle_t hdr_handle = 0;
+            ovrtx_render_var_output_handle_t ldr_handle = 0;
+
             for (size_t v = 0; v < frame.render_var_count; ++v) {
                 ovrtx_render_product_render_var_output_t const& var =
                     frame.output_render_vars[v];
@@ -2463,17 +3151,151 @@ static auto find_color_output(ovrtx_render_product_set_outputs_t const& outputs,
                     ldr_handle = var.output_handle;
                 }
             }
+
+            // Prefer HdrColor, fall back to LdrColor
+            if (hdr_handle != 0) {
+                if (detected_type) {
+                    *detected_type = OutputType::HdrColor;
+                }
+                color_outputs.push_back(hdr_handle);
+            } else if (ldr_handle != 0) {
+                if (detected_type) {
+                    *detected_type = OutputType::LdrColor;
+                }
+                color_outputs.push_back(ldr_handle);
+            }
         }
     }
 
-    // Prefer HdrColor, fall back to LdrColor
-    if (hdr_handle != 0) {
-        output_type = OutputType::HdrColor;
-        return hdr_handle;
-    } else if (ldr_handle != 0) {
-        output_type = OutputType::LdrColor;
-        return ldr_handle;
+    return !color_outputs.empty();
+}
+
+// [snippet:map-rendered-output-cuda-array]
+// Map one ovrtx color output as a CUDA array and copy it into the CUDA-imported
+// Vulkan image at `image_index`. The copy is stream-ordered: `copy_done_event`
+// is recorded on completion and handed back to ovrtx as the unmap fence, so the
+// renderer defers reuse of the output until the copy has landed.
+//
+// A step result can be fetched while its output frames are still being
+// produced, so `map_timeout` of 0 turns the map into a non-blocking poll that
+// reports CopyOutputResult::NotReady and lets an interactive loop keep
+// presenting the previous frame instead of stalling.
+//
+// On success the mapping is handed back through `out_map_handle` instead of
+// being released here. Unmapping waits for `copy_done_event` on the CPU, so
+// unmapping immediately would just move the render wait from the map into the
+// unmap. Call release_mapped_output() once cuEventQuery reports the copy done.
+static CopyOutputResult copy_output_to_surface(
+    ovrtx_renderer_t* renderer,
+    ovrtx_render_var_output_handle_t color_output,
+    int image_index,
+    CudaImageFormat cuda_format,
+    CUstream cuda_stream,
+    CUevent copy_done_event,
+    ovrtx_timeout_t map_timeout,
+    ovrtx_render_var_output_map_handle_t* out_map_handle) {
+    ovrtx_map_output_description_t map_desc = {};
+    map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY;
+    map_desc.sync_stream = 0;
+
+    ovrtx_render_var_output_t rendered_output = {};
+    ovrtx_result_t result = ovrtx_map_render_var_output(renderer,
+                                                        color_output,
+                                                        &map_desc,
+                                                        map_timeout,
+                                                        &rendered_output);
+    if (result.status == OVRTX_API_TIMEOUT) {
+        return CopyOutputResult::NotReady;
+    }
+    if (check_and_print_error(result, "map_render_var_output")) {
+        return CopyOutputResult::Failed;
     }
 
-    return 0; // Not found
+    if (rendered_output.num_tensors == 0) {
+        std::cerr << "color render variable produced no tensors" << std::endl;
+        ovrtx_unmap_render_var_output(
+            renderer, rendered_output.map_handle, ovrtx_cuda_sync_t{});
+        return CopyOutputResult::Failed;
+    }
+
+    DLTensor const& dl = *rendered_output.tensors[0].dl;
+    CUarray cuda_array = reinterpret_cast<CUarray>(dl.data);
+    CUevent wait_event =
+        reinterpret_cast<CUevent>(rendered_output.cuda_sync.wait_event);
+
+    // Ensure ovrtx has finished producing the mapped CUDA array before launching
+    // the copy into external Vulkan memory.
+    if (wait_event) {
+        cuda_wait_event(wait_event, cuda_stream);
+    }
+
+    if (!cuda_copy_array_to_surface(image_index,
+                                    cuda_array,
+                                    static_cast<int>(dl.shape[1]),
+                                    static_cast<int>(dl.shape[0]),
+                                    cuda_format,
+                                    cuda_stream)) {
+        // No copy was queued, so the mapping can be released without a fence.
+        ovrtx_unmap_render_var_output(
+            renderer, rendered_output.map_handle, ovrtx_cuda_sync_t{});
+        return CopyOutputResult::Failed;
+    }
+    cuEventRecord(copy_done_event, cuda_stream);
+
+    *out_map_handle = rendered_output.map_handle;
+    return CopyOutputResult::Copied;
+}
+
+// Release a mapping produced by copy_output_to_surface. `copy_done_event` is
+// passed as the unmap fence so ovrtx does not reuse the output before the copy
+// has landed; a zero-copy CUDA-array mapping owns no tensor buffers, so ovrtx
+// waits for that event on the CPU inside this call. Call it only once
+// cuEventQuery(copy_done_event) reports CUDA_SUCCESS to keep that wait free.
+static bool release_mapped_output(
+    ovrtx_renderer_t* renderer,
+    ovrtx_render_var_output_map_handle_t map_handle,
+    CUevent copy_done_event) {
+    ovrtx_cuda_sync_t copy_done_sync = {};
+    copy_done_sync.wait_event = reinterpret_cast<uintptr_t>(copy_done_event);
+    ovrtx_result_t const result = ovrtx_unmap_render_var_output(
+        renderer, map_handle, copy_done_sync);
+    return !check_and_print_error(result, "unmap_render_var_output");
+}
+// [/snippet:map-rendered-output-cuda-array]
+
+static void report_dlssg_frame_count(bool dlssg_enabled,
+                                     int requested_interpolated_frames,
+                                     size_t produced_frames,
+                                     DlssgReport& report) {
+    if (!dlssg_enabled || report.reported) {
+        return;
+    }
+
+    ++report.steps_observed;
+    bool const engaged = produced_frames > 1;
+    if (!engaged && report.steps_observed < DLSSG_WARMUP_STEPS) {
+        return;
+    }
+    report.reported = true;
+
+    if (!engaged) {
+        std::cerr << "DLSS Frame Generation did not engage after "
+                  << report.steps_observed
+                  << " steps. It requires an Ada or newer GPU driving the "
+                     "display, the RealTimePathTracing render mode, "
+                     "LdrColor/HdrColor as the only render outputs, and a "
+                     "render resolution of at least 126 pixels per side."
+                  << std::endl;
+        return;
+    }
+
+    int const interpolated = static_cast<int>(produced_frames) - 1;
+    std::cerr << "DLSS Frame Generation engaged: " << interpolated
+              << " interpolated frame(s) per rendered frame";
+    if (requested_interpolated_frames > 0 &&
+        requested_interpolated_frames != interpolated) {
+        std::cerr << " (" << requested_interpolated_frames
+                  << " requested; the GPU caps the count)";
+    }
+    std::cerr << std::endl;
 }

@@ -52,6 +52,12 @@ cmake --build build
 ./build/ovrtx-interop
 ```
 
+For non-interactive validation without a GLFW window or Vulkan swapchain:
+
+```bash
+./build/ovrtx-interop --headless --num-frames 100
+```
+
 ## Windows
 
 ### Prerequisites
@@ -79,6 +85,12 @@ cmake --build build --config Release
 .\build\Release\ovrtx-interop.exe
 ```
 
+For non-interactive validation without a GLFW window or Vulkan swapchain:
+
+```pwsh
+.\build\Release\ovrtx-interop.exe --headless --num-frames 100
+```
+
 The example is configured to load the robot scene from Omniverse. Running the default configuration requires internet access to download this remote S3 scene asset:
 
 | Setting | Value |
@@ -94,6 +106,45 @@ The example is configured to load the robot scene from Omniverse. Running the de
 - **Left-click** — Pick the prim under the cursor and print its path
 - **Left-click and drag** — Marquee-select prims and print their paths
 - **Mouse wheel** — Dolly camera in/out
+
+### DLSS Frame Generation
+
+Frame generation is off by default and is enabled with `--dlssg`. Use `--dlssg-frames <N>` to ask for a specific number of interpolated frames per rendered frame; it implies `--dlssg`, and the renderer clamps the count to what the GPU supports (1 on Ada, 3 on Blackwell). Omitting it lets the renderer pick.
+
+```pwsh
+.\build\Release\ovrtx-interop.exe --dlssg-frames 2
+```
+
+The sample authors the two DLSS-G render settings on the RenderProduct prim through ovstage at startup, and writes them on every run — including `false` when the flag is absent — so the command line always wins over whatever the scene file authored.
+
+With frame generation active, one `ovrtx_step_with_stage()` returns several output frames: the interpolated frames first and the real rendered frame last. The sample shows them in that order, and only steps again once the previous step's frames have all been copied out.
+
+The renderer silently declines frame generation when it cannot run, in which case a step keeps returning a single frame and the sample prints a warning. It requires:
+
+- An Ada or newer GPU that is driving the display
+- The `RealTimePathTracing` render mode (not `PathTracing`)
+- `LdrColor` or `HdrColor` as the only render outputs
+- A render resolution of at least 126 pixels per side
+
+### Presentation and frame pacing
+
+All `N + 1` frames of a step become available at nearly the same moment, so showing them as soon as they arrive puts them on screen back to back and then leaves a gap until the next step lands. The frame counter doubles, but the motion reads as judder. Two flags control this:
+
+- `--present-mode {fifo,mailbox,immediate}` selects the swapchain present mode, defaulting to `fifo`. `fifo` waits for vsync, which caps presentation at the display refresh and hides frame-generation throughput; use `immediate` to measure the real rate. Modes the surface does not support fall back to `fifo`, which is the only one Vulkan guarantees.
+- `--pace` spreads the frames of a step evenly instead of showing them in a burst. It targets the observed step period divided by the frames per step, and only engages when a step actually produces more than one frame.
+
+The per-second log separates three rates that frame generation makes diverge. `Steps/s` counts renders, `Frames/s` counts frames that became visible, and `Presents/s` counts main-loop iterations — the loop re-presents the current image while the next frame renders, so it is much higher than either. `Frame gap` reports the spread between visible frames, which is what pacing improves:
+
+```text
+# --dlssg-frames 1 --present-mode immediate, L40 (Ada), 1 interpolated frame per render
+Steps/s=22.0  Frames/s=45.0  Presents/s=291
+Frame gap (ms): min=3.13   mean=22.3  max=41.5    # unpaced: frames arrive in pairs
+Frame gap (ms): min=20.1   mean=22.3  max=25.0    # --pace: evenly spread
+```
+
+Pacing costs no throughput here — `Steps/s` and `Frames/s` are the same either way, because the ring lets copies and the next step proceed while an earlier frame is held back for its slot.
+
+Note the latency direction: frame generation adds a frame of latency and this sample has no Reflex to claw any of it back, so both flags trade responsiveness for smoothness.
 
 # Licensing
 

@@ -1,0 +1,11 @@
+#usda 1.0
+# [snippet:doc-camera-rolling-shutter]
+def Camera "Camera" (
+    prepend apiSchemas = ["OmniRtxRollingShutterAPI"]
+)
+{
+    double2 omni:rtx:rollingShutter:lineExposure = (1, 32)
+    double2 omni:rtx:rollingShutter:lineOffset = (40, 1000000)
+    token omni:rtx:rollingShutter:scanOrder = "topToBottom"
+}
+# [/snippet:doc-camera-rolling-shutter]

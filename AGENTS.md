@@ -54,6 +54,11 @@ use [`update-0-4-to-0-5`](skills/update-0-4-to-0-5/SKILL.md). It covers the 0.5
 RenderVar/DLPack/API migrations, sensor asset changes, and the paired ovstage
 0.1 to 0.2 data-contract changes that can affect an attached application.
 
+For existing Python or C/C++ applications moving from ovrtx 0.5.x to 0.6.x,
+use [`update-0-5-to-0-6`](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-5-to-0-6/SKILL.md) for logging,
+animation, OVStage 0.3 source/data contracts, sensor outputs, and SPG scripts.
+Renderer-setting migrations are outside that skill's scope.
+
 ## Start Here
 
 - Read `README.md` for top-level product context and quick starts.
@@ -179,6 +184,7 @@ When a request maps to a known ovrtx workflow, go directly to the relevant skill
 - 0.3 to 0.4 (+ ovstage 0.1) migration for C codebases -> `skills/update-0_3-0_4-c/SKILL.md`
 - 0.3 to 0.4 (+ ovstage 0.1) migration for Python codebases -> `skills/update-0_3-0_4-python/SKILL.md`
 - 0.4 to 0.5 migration for Python and C/C++ codebases -> `skills/update-0-4-to-0-5/SKILL.md`
+- 0.5 to 0.6 source/data migration for Python and C/C++ codebases -> [update-0-5-to-0-6](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-5-to-0-6/SKILL.md)
 
 If multiple skills seem relevant, start with `skills/application-flow/SKILL.md`, then layer in specialized skills.
 

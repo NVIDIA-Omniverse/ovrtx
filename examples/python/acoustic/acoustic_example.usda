@@ -1,0 +1,116 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    # [snippet:configure-acoustic-sensor]
+    # The sensor fires along its local -Z. This transform maps that onto world
+    # +X, where the wall stands, and puts the sensor 0.5 m up, level with the
+    # wall's center. It is authored as a matrix rather than as translate/rotate
+    # ops so it matches the layout the runtime "omni:xform" attribute expects.
+    def OmniAcoustic "Acoustic" (
+        prepend apiSchemas = ["OmniSensorGenericAcousticWpmAPI"]
+    )
+    {
+        double2 omni:sensor:frameRate = (10, 1)
+
+        # Ray tracing: a wide ultrasonic lobe pointing along sensor -Z.
+        float omni:sensor:WpmAcoustic:azSpanDeg = 90
+        float omni:sensor:WpmAcoustic:elSpanDeg = 60
+        uint omni:sensor:WpmAcoustic:raysPerDeg = 3
+        uint omni:sensor:WpmAcoustic:traceTreeDepth = 2
+
+        matrix4d xformOp:transform = ( (0, -1, 0, 0), (0, 0, 1, 0), (-1, 0, 0, 0), (0, 0, 0.5, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+    # [/snippet:configure-acoustic-sensor]
+
+    def Mesh "GroundPlane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, 0), (50, 50, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Asphalt>
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-50, -50, 0), (50, -50, 0), (50, 50, 0), (-50, 50, 0)]
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.05)]
+    }
+
+    # A concrete wall facing the sensor. The cube is scaled to 0.1 along X from
+    # size = 2, so its near face sits 0.1 m in front of the authored center:
+    # the reflecting surface stands at exactly 3.0 m.
+    def Cube "ConcreteWall" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 2
+        color3f[] primvars:displayColor = [(0.45, 0.43, 0.39)]
+        rel material:binding = </World/Materials/Concrete>
+        double3 xformOp:scale = (0.1, 1.5, 0.75)
+        double3 xformOp:translate = (3.1, 0, 0.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def DistantLight "DistantLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float intensity = 2500
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    # [snippet:configure-acoustic-output]
+    # The acoustic model publishes one composite RenderVar, "SignalWays". It
+    # carries every per-sample channel plus the frame header as parameters, so
+    # the product requests a single var rather than one per channel.
+    def "Render"
+    {
+        def "Products"
+        {
+            def RenderProduct "AcousticProduct"
+            {
+                rel camera = </World/Acoustic>
+                rel orderedVars = [<../../Vars/SignalWays>]
+            }
+        }
+
+        def "Vars"
+        {
+            def RenderVar "SignalWays"
+            {
+                uniform string sourceName = "SignalWays"
+            }
+        }
+    }
+    # [/snippet:configure-acoustic-output]
+
+    # [snippet:configure-nonvisual-materials]
+    def Xform "Materials"
+    {
+        # These materials intentionally omit visual shaders. The sensor return
+        # behavior comes from the nonvisual attributes on the bound Material.
+        def Material "Asphalt"
+        {
+            token omni:simready:nonvisual:base = "asphalt"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+        }
+
+        def Material "Concrete"
+        {
+            token omni:simready:nonvisual:base = "concrete"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+        }
+    }
+    # [/snippet:configure-nonvisual-materials]
+}

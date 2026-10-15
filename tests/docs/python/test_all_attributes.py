@@ -186,15 +186,15 @@ SUPPORTED_ATTRIBUTE_CASES = [
     _numeric_case("int64", "int64", np.int64, -6100000000),
     _numeric_case("int64[]", "int64Array", np.int64, [-6200000000, 6300000000], is_array=True),
     _numeric_case("int[]", "intArray", np.int32, [-64, 65], is_array=True),
-    _numeric_case("matrix2d", "matrix2d", np.float64, _flat((1, 2), (3, 4)), (4,)),
-    _numeric_case("matrix2d[]", "matrix2dArray", np.float64, [_flat((1, 2), (3, 4)), _flat((5, 6), (7, 8))], (4,), True),
-    _numeric_case("matrix3d", "matrix3d", np.float64, _flat((1, 2, 3), (4, 5, 6), (7, 8, 9)), (9,)),
+    _numeric_case("matrix2d", "matrix2d", np.float64, _flat((1, 2), (3, 4)), (2, 2)),
+    _numeric_case("matrix2d[]", "matrix2dArray", np.float64, [_flat((1, 2), (3, 4)), _flat((5, 6), (7, 8))], (2, 2), True),
+    _numeric_case("matrix3d", "matrix3d", np.float64, _flat((1, 2, 3), (4, 5, 6), (7, 8, 9)), (3, 3)),
     _numeric_case(
         "matrix3d[]",
         "matrix3dArray",
         np.float64,
         [_flat((1, 2, 3), (4, 5, 6), (7, 8, 9)), _flat((10, 11, 12), (13, 14, 15), (16, 17, 18))],
-        (9,),
+        (3, 3),
         True,
     ),
     _numeric_case(
@@ -202,7 +202,7 @@ SUPPORTED_ATTRIBUTE_CASES = [
         "matrix4d",
         np.float64,
         _flat((1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12), (13, 14, 15, 16)),
-        (16,),
+        (4, 4),
     ),
     _numeric_case(
         "matrix4d[]",
@@ -212,7 +212,7 @@ SUPPORTED_ATTRIBUTE_CASES = [
             _flat((1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12), (13, 14, 15, 16)),
             _flat((17, 18, 19, 20), (21, 22, 23, 24), (25, 26, 27, 28), (29, 30, 31, 32)),
         ],
-        (16,),
+        (4, 4),
         True,
     ),
     _numeric_case("normal3d", "normal3d", np.float64, (66.1, 66.2, 66.3), (3,)),
@@ -736,13 +736,13 @@ def test_raw_attribute_read_write_snippets(stage):
                     matrix4d_values = np.from_dlpack(group.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-matrix4d]
-                assert matrix4d_values.shape == (1, 16)
+                assert matrix4d_values.shape == (1, 4, 4)
 
                 ordinal += 1
                 matrix4d_updated = np.array(
                     [[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]],
                     dtype=np.float64,
-                )
+                ).reshape(1, 4, 4)
                 # [snippet:doc-write-usd-matrix4d]
                 stage.write_attribute(
                     query,

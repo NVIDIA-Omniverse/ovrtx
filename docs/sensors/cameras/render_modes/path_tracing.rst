@@ -39,51 +39,26 @@ Path Tracing
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:samplesPerPixel``
-
-       Maximum number of samples to accumulate per pixel. When this count is reached, rendering stops until a scene or setting change is detected. Set to 0 to remove this limit.
-     - ``uint``
-     - ``512``
-   * - ``omni:rtx:pt:samplesPerIteration``
-
-       Number of samples per pixel, per iteration. Multiple iterations can be run per launch to reduce kernel launch overhead.
-     - ``int``
-     - ``1``
-   * - ``omni:rtx:pt:adaptiveSampling:enabled``
-
-       When enabled, noise values are computed for each pixel, and upon reaching the threshold level the pixel is no longer sampled.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:limits:maxBounces``
-
-       Maximum number of ray bounces for any ray type. Higher values give more accurate results, but worse performance.
-     - ``uint``
-     - ``4``
-   * - ``omni:rtx:pt:limits:extraSpecularAndTransmissiveBounces``
-
-       Additional number of specular and transmission ray bounces beyond ``maxBounces``.
-     - ``uint``
-     - ``2``
-   * - ``omni:rtx:pt:maxVolumeBounces``
-
-       Maximum number of ray bounces for SSS.
-     - ``uint``
-     - ``15``
-   * - ``omni:rtx:pt:limits:maxFogBounces``
-
-       Maximum number of bounces for volume scattering within a fog/sky volume.
-     - ``uint``
-     - ``2``
-   * - ``omni:rtx:pt:fractionalCutoutOpacity``
-
-       If disabled, material opacity is considered binary: values greater than or equal to 0.5 are considered opaque, while values less than 0.5 are considered transparent.
-     - ``bool``
-     - ``true``
+   * - USD declaration
+     - Description
+   * - ``uint omni:rtx:pt:samplesPerPixel = 512``
+     - Maximum number of samples to accumulate per pixel. When this count is reached, rendering stops until a scene or setting change is detected. Set to 0 to remove this limit.
+   * - ``int omni:rtx:pt:samplesPerIteration = 1``
+     - Number of samples per pixel, per iteration. Multiple iterations can be run per launch to reduce kernel launch overhead.
+   * - ``bool omni:rtx:pt:adaptiveSampling:enabled = false``
+     - When enabled, noise values are computed for each pixel, and upon reaching the threshold level the pixel is no longer sampled.
+   * - ``uint omni:rtx:pt:limits:maxBounces = 4``
+     - Maximum number of ray bounces for any ray type. Higher values give more accurate results, but worse performance.
+   * - ``uint omni:rtx:pt:limits:extraSpecularAndTransmissiveBounces = 2``
+     - Maximum number of ray bounces for specular and transmission.
+   * - ``uint omni:rtx:pt:maxVolumeBounces = 15``
+     - Maximum number of ray bounces for SSS.
+   * - ``uint omni:rtx:pt:limits:maxFogBounces = 2``
+     - Maximum number of bounces for volume scattering within a fog/sky volume.
+   * - ``bool omni:rtx:pt:fractionalCutoutOpacity = true``
+     - If disabled, material opacity is considered binary: values greater than or equal to 0.5 are considered opaque, while values less than 0.5 are considered transparent.
 
 Denoising
 ~~~~~~~~~
@@ -92,27 +67,18 @@ Denoising
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:denoising:enabled``
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:denoising:optix:temporal``
-     - ``bool``
-     - ``false``
-   * - ``omni:rtx:pt:denoising:blendFactor``
-
-       Blend factor indicating how much to blend the denoised image with the original. 0 shows only the denoised image, 1.0 shows no denoising.
-     - ``float``
-     - ``0.0``
-   * - ``omni:rtx:pt:denoising:optix:denoiseAOVs``
-
-       If enabled, the OptiX Denoiser also denoises additional render variables alongside the color output.
-     - ``bool``
-     - ``true``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:pt:denoising:enabled = true``
+     - Runs the selected denoiser on the image.
+   * - ``bool omni:rtx:pt:denoising:optix:temporal = false``
+     - Uses motion information to reduce frame-to-frame flickering artifacts in the denoiser.
+   * - ``float omni:rtx:pt:denoising:blendFactor = 0.0``
+     - Blend factor indicating how much to blend the denoised image with the original. 0 shows only the denoised image, 1.0 shows no denoising.
+   * - ``bool omni:rtx:pt:denoising:optix:denoiseAOVs = true``
+     - If enabled, the OptiX Denoiser also denoises additional render variables alongside the color output.
 
 Sampling and Caching
 ~~~~~~~~~~~~~~~~~~~~
@@ -121,31 +87,18 @@ Sampling and Caching
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:radianceCache:enabled``
-
-       Enables caching path-tracing results for improved performance at the cost of some accuracy.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:lightCache:enabled``
-
-       Enables the many-light sampling algorithm, which can improve performance in scenes with many lights.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:ris:meshLights``
-
-       Enables direct illumination sampling of geometry with emissive materials.
-     - ``bool``
-     - ``false``
-   * - ``omni:rtx:pathtracing:rayguide:cached:enabled``
-
-       Enables caching lighting results for improving surface ray sampling directions.
-     - ``bool``
-     - ``false``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:pt:radianceCache:enabled = true``
+     - Enables caching path-tracing results for improved performance at the cost of some accuracy.
+   * - ``bool omni:rtx:pt:lightCache:enabled = true``
+     - Enables the many-light sampling algorithm, which can improve performance in scenes with many lights.
+   * - ``bool omni:rtx:pt:ris:meshLights = false``
+     - Enables direct illumination sampling of geometry with emissive materials.
+   * - ``bool omni:rtx:pathtracing:rayguide:cached:enabled = false``
+     - Enables caching lighting results for improving surface ray sampling directions.
 
 Firefly Filter
 ~~~~~~~~~~~~~~
@@ -154,65 +107,43 @@ Firefly Filter
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:fireflyFilter:enabled``
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSample``
-
-       Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
-     - ``float``
-     - ``3200.0``
-   * - ``omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse``
-
-       Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
-     - ``float``
-     - ``3200.0``
-   * - ``omni:rtx:pt:fireflyFilter:maxPerEmissiveUnexposedIntensity``
-
-       Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
-     - ``float``
-     - ``3200.0``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:pt:fireflyFilter:enabled = true``
+     - Enables the firefly filter.
+   * - ``float omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSample = 3200.0``
+     - Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
+   * - ``float omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse = 3200.0``
+     - Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
+   * - ``float omni:rtx:pt:fireflyFilter:maxPerEmissiveUnexposedIntensity = 3200.0``
+     - Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
 
 Spectral Rendering
 ~~~~~~~~~~~~~~~~~~
+
+See :doc:`spectral_rendering` for startup configuration, physical illuminants,
+and RGB-versus-spectral comparisons.
 
 .. rst-class:: compact-table
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pathtracing:spectral:enabled``
-     - ``bool``
-     - ``false``
-   * - ``omni:rtx:pathtracing:spectral:wavelengthMin``
-
-       Minimum simulated wavelength in nanometers.
-     - ``float``
-     - ``10.0``
-   * - ``omni:rtx:pathtracing:spectral:wavelengthMax``
-
-       Maximum simulated wavelength in nanometers.
-     - ``float``
-     - ``10000.0``
-   * - ``omni:rtx:renderingColorSpace``
-
-       Color space input is converted from and to spectral.
-     - ``string``
-     - ``"lin_rec709_scene"``
-   * - ``omni:rtx:pathtracing:spectral:responseCurve``
-
-       Response curve to convert spectral to CIE XYZ.
-     - ``uint``
-     - ``0``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:pathtracing:spectral:enabled = false``
+     - Enables spectral rendering.
+   * - ``float omni:rtx:pathtracing:spectral:wavelengthMin = 10.0``
+     - Minimum simulated wavelength in nanometers.
+   * - ``float omni:rtx:pathtracing:spectral:wavelengthMax = 10000.0``
+     - Maximum simulated wavelength in nanometers.
+   * - ``string omni:rtx:renderingColorSpace = "lin_rec709_scene"``
+     - Color space input is converted from and to spectral.
+   * - ``uint omni:rtx:pathtracing:spectral:responseCurve = 0``
+     - Response curve to convert spectral to CIE XYZ.
 
 Non-Uniform Volumes
 ~~~~~~~~~~~~~~~~~~~
@@ -221,34 +152,20 @@ Non-Uniform Volumes
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:ptvol:enabled``
-     - ``bool``
-     - ``false``
-   * - ``omni:rtx:pt:volumes:transmittanceMethod``
-
-       Choose between ``biasedRayMarching`` or ``ratioTracking``. Biased ray marching is the ideal option in all cases.
-     - ``token``
-     - ``"biasedRayMarching"``
-   * - ``omni:rtx:pt:volumes:tracking:maxScatteringSteps``
-
-       Maximum delta tracking steps between bounces. Increase for highly scattering volumes like clouds.
-     - ``int``
-     - ``1024``
-   * - ``omni:rtx:pt:volumes:tracking:maxShadowSteps``
-
-       Maximum ratio tracking delta steps for shadow rays. Increase for highly scattering volumes like clouds.
-     - ``int``
-     - ``32``
-   * - ``omni:rtx:pt:limits:maxVolumeBounces``
-
-       Maximum number of bounces in non-uniform volumes.
-     - ``uint``
-     - ``2``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:pt:ptvol:enabled = false``
+     - Enables path-traced non-uniform volumes.
+   * - ``token omni:rtx:pt:volumes:transmittanceMethod = "biasedRayMarching"``
+     - Choose between ``biasedRayMarching`` or ``ratioTracking``. Biased ray marching is the ideal option in all cases.
+   * - ``int omni:rtx:pt:volumes:tracking:maxScatteringSteps = 1024``
+     - Maximum delta tracking steps between bounces. Increase for highly scattering volumes like clouds.
+   * - ``int omni:rtx:pt:volumes:tracking:maxShadowSteps = 32``
+     - Maximum ratio tracking delta steps for shadow rays. Increase for highly scattering volumes like clouds.
+   * - ``uint omni:rtx:pt:limits:maxVolumeBounces = 2``
+     - Maximum number of bounces in non-uniform volumes.
 
 Multi-GPU
 ~~~~~~~~~
@@ -257,39 +174,22 @@ Multi-GPU
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:multigpu:enabled``
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:mgpu:autoLoadBalancing:enabled``
-
-       Automatically balance path-tracing work across GPUs in a multi-GPU configuration.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:mgpu:compressRadiance``
-
-       Enables lossy compression of per-pixel output radiance values.
-     - ``bool``
-     - ``false``
-   * - ``omni:rtx:pt:mgpu:compressAlbedo``
-
-       Enables lossy compression of per-pixel output albedo values (needed by OptiX denoiser).
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:pt:mgpu:compressNormals``
-
-       Enables lossy compression of per-pixel output normal values (needed by OptiX denoiser).
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:multiThreading:enabled``
-
-       Enabling multi-threading improves UI responsiveness.
-     - ``bool``
-     - ``true``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:pt:multigpu:enabled = true``
+     - Enables rendering across multiple GPUs when available.
+   * - ``bool omni:rtx:pt:mgpu:autoLoadBalancing:enabled = true``
+     - Automatically balance path-tracing work across GPUs in a multi-GPU configuration.
+   * - ``bool omni:rtx:pt:mgpu:compressRadiance = false``
+     - Enables lossy compression of per-pixel output radiance values.
+   * - ``bool omni:rtx:pt:mgpu:compressAlbedo = true``
+     - Enables lossy compression of per-pixel output albedo values (needed by OptiX denoiser).
+   * - ``bool omni:rtx:pt:mgpu:compressNormals = true``
+     - Enables lossy compression of per-pixel output normal values (needed by OptiX denoiser).
+   * - ``bool omni:rtx:multiThreading:enabled = true``
+     - Enabling multi-threading improves UI responsiveness.
 
 Global Volumetric Effects
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -298,26 +198,16 @@ Global Volumetric Effects
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:ptvol:raySky``
-
-       Enables an additional medium of Rayleigh-scattering particles to simulate a physically based sky.
-     - ``bool``
-     - ``false``
-   * - ``omni:rtx:pt:ptvol:raySkyScale``
-
-       Scales the size of the Rayleigh sky.
-     - ``float``
-     - ``1.0``
-   * - ``omni:rtx:pt:ptvol:raySkyDomelight``
-
-       If a domelight is rendered for the sky color, the Rayleigh atmosphere is applied to the foreground while the background sky color is left unaffected.
-     - ``bool``
-     - ``false``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:pt:ptvol:raySky = false``
+     - Enables an additional medium of Rayleigh-scattering particles to simulate a physically based sky.
+   * - ``float omni:rtx:pt:ptvol:raySkyScale = 1.0``
+     - Scales the size of the Rayleigh sky.
+   * - ``bool omni:rtx:pt:ptvol:raySkyDomelight = false``
+     - If a domelight is rendered for the sky color, the Rayleigh atmosphere is applied to the foreground while the background sky color is left unaffected.
 
 Anti-Aliasing
 ~~~~~~~~~~~~~
@@ -326,18 +216,11 @@ Anti-Aliasing
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:pt:pixelFilter:filter``
-
-       Sampling pattern used for anti-aliasing. Select from ``box``, ``triangle``, ``gaussian``, and ``uniform``.
-     - ``token``
-     - ``"triangle"``
-   * - ``omni:rtx:pt:pixelFilter:radius``
-
-       Sampling footprint radius, in pixels, when generating samples with the selected anti-aliasing pattern.
-     - ``float``
-     - ``1.0``
+   * - USD declaration
+     - Description
+   * - ``token omni:rtx:pt:pixelFilter:filter = "triangle"``
+     - Sampling pattern used for anti-aliasing. Select from ``box``, ``triangle``, and ``gaussian``. ``uniform`` is deprecated and is rendered as ``box``.
+   * - ``float omni:rtx:pt:pixelFilter:radius = 1.0``
+     - Sampling footprint radius, in pixels, when generating samples with the selected anti-aliasing pattern.

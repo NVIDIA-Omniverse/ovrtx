@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = Path("/tmp/ovrtx-skills")
 
 SNIPPET_START_RE = re.compile(r"\[\s*snippet:(?P<name>[A-Za-z0-9_.:-]+)\s*\]")

@@ -25,68 +25,21 @@ declare more than one input.
 
 **Fan out.** One node's output feeds a published AOV and a second node at the same time.
 
-.. graphviz::
+.. image:: ../../img/spg/split-join-fan-out.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      "LdrColor" [fillcolor="#4c566a" fontcolor="white"]
-      "Out1" [fillcolor="#4c566a" fontcolor="white"]
-      "Out2" [fillcolor="#4c566a" fontcolor="white"]
-      "a" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "b" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "LdrColor" -> "a"
-      "a" -> "Out1"
-      "a" -> "b"
-      "b" -> "Out2"
-   }
+   :alt: LdrColor feeds node a. Node a writes Out1 and also feeds node b, which writes Out2.
 
 **Fan in.** One node takes two inputs, here an upstream node's output and an AOV directly.
 
-.. graphviz::
+.. image:: ../../img/spg/split-join-fan-in.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      "LdrColor" [fillcolor="#4c566a" fontcolor="white"]
-      "Out" [fillcolor="#4c566a" fontcolor="white"]
-      "a" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "n" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "LdrColor" -> "a"
-      "a" -> "n"
-      "LdrColor" -> "n"
-      "n" -> "Out"
-   }
+   :alt: LdrColor feeds node a and node n. Node n also reads the output of node a, and writes Out.
 
 **Diamond.** A split that rejoins, so ``d`` runs only after both branches have.
 
-.. graphviz::
+.. image:: ../../img/spg/split-join-diamond.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      "LdrColor" [fillcolor="#4c566a" fontcolor="white"]
-      "Out" [fillcolor="#4c566a" fontcolor="white"]
-      "a" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "b" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "c" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "d" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "LdrColor" -> "a"
-      "a" -> "b"
-      "a" -> "c"
-      "b" -> "d"
-      "c" -> "d"
-      "d" -> "Out"
-   }
+   :alt: LdrColor feeds node a. Node a feeds nodes b and c, both feed node d, and node d writes Out.
 
 How It Works
 ------------

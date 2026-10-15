@@ -1,0 +1,37 @@
+#usda 1.0
+# [snippet:doc-camera-scene-partitions]
+def Xform "World"
+{
+    def Camera "CameraLeft"
+    {
+        custom token omni:scenePartition = "left"
+    }
+
+    def Camera "CameraRight"
+    {
+        custom token omni:scenePartition = "right"
+    }
+
+    def Xform "EnvironmentLeft"
+    {
+        token primvars:omni:scenePartition = "left" (
+            interpolation = "constant"
+        )
+
+        def Cube "Geometry"
+        {
+        }
+    }
+
+    def Xform "EnvironmentRight"
+    {
+        token primvars:omni:scenePartition = "right" (
+            interpolation = "constant"
+        )
+
+        def Cube "Geometry"
+        {
+        }
+    }
+}
+# [/snippet:doc-camera-scene-partitions]

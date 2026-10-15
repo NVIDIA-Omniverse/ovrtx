@@ -87,6 +87,17 @@ extern "C"
      */
     void ovrtx_get_version(uint32_t* out_major, uint32_t* out_minor, uint32_t* out_patch);
 
+    /**
+     * Get the complete build identity embedded in the loaded OVRTX loader binary that exports this API.
+     *
+     * This function is safe before ovrtx_initialize(). The returned pointer and all strings it references are immutable
+     * and remain valid while the OVRTX loader library remains loaded. Callers should use struct_size to interpret future
+     * append-only extensions safely.
+     *
+     * @return Build information for the loaded OVRTX loader library.
+     */
+    const ovrtx_build_info_t* ovrtx_get_build_info(void);
+
     /** @} */ // end of ovrtx_version
 
     /** @defgroup ovrtx_creation Creation and destruction operations
@@ -257,7 +268,31 @@ extern "C"
     ovrtx_result_t ovrtx_create_renderer(const ovrtx_config_t* config, ovrtx_renderer_t** out_renderer);
 
     /**
+     * Read back the configuration entries supplied when a renderer was created.
+     *
+     * The returned config contains the explicit entries accepted by
+     * ovrtx_create_renderer(), in their original order. It does not add omitted
+     * defaults or expose internal settings derived from those entries.
+     *
+     * The entry array and any string or blob payloads are owned by @p renderer
+     * and remain valid until ovrtx_destroy_renderer() is called. The caller must
+     * not free or modify them. The caller owns only the outer @ref ovrtx_config_t
+     * value written to @p out_config.
+     *
+     * @param renderer Renderer instance from ovrtx_create_renderer().
+     * @param[out] out_config Borrowed view of the renderer's explicit config.
+     * @return
+     * - **OVRTX_API_SUCCESS** if the config was returned successfully,
+     * - **OVRTX_API_ERROR** if either argument is null or the OVRTX system is unavailable.
+     */
+    ovrtx_result_t ovrtx_get_config(const ovrtx_renderer_t* renderer, ovrtx_config_t* out_config);
+
+    /**
      * Destroy a renderer instance.
+     *
+     * If destruction of a valid renderer fails, the caller retains ownership
+     * of the renderer. Do not use it for any other operation; retry
+     * ovrtx_destroy_renderer() to finish cleanup.
      * @param renderer Renderer instance to destroy
      * @return
      * - **OVRTX_API_SUCCESS** if the renderer was destroyed successfully,
@@ -270,22 +305,35 @@ extern "C"
      * attached, the renderer renders the scene held by that ovstage instead of
      * one it builds itself.
      *
-     * Must be matched by ovrtx_detach_ovstage() before either the renderer or
-     * the stage is destroyed. To switch stages, detach the current stage before
-     * attaching another.
+     * A successful attach retains the stage until ovrtx_detach_ovstage() or
+     * renderer destruction. The caller may destroy its stage handle after
+     * attach; that invalidates only the caller's handle and does not detach the
+     * renderer. To switch stages, detach the current stage before attaching
+     * another.
      * At most one ovrtx renderer may be attached to an ovstage instance at a
      * time. The stage may be attached to another renderer after it is detached.
      *
      * Use ovrtx_update_from_stage() after ovstage population work and
      * ovrtx_step_with_stage() to render a committed stage state.
      *
+     * Attaching rebuilds the renderer's internal render state on the calling
+     * thread, so wait for previously enqueued operations with ovrtx_wait_op()
+     * before calling it. Note that an ovrtx_wait_op() timeout does not cancel
+     * an operation: it keeps running, so a timed-out wait does not make it safe
+     * to attach or detach.
+     *
+     * OVRTX validates the ovstage runtime version during attachment. An
+     * incompatible version returns OVRTX_API_ERROR without attaching; the
+     * error diagnostic reports the expected and supplied versions.
+     *
      * @param renderer Renderer instance from ovrtx_create_renderer().
-     * @param stage ovstage instance to attach. Must be initialized.
+     * @param stage ovstage instance to attach. Must be initialized and remain
+     *              valid for the duration of this call.
      * @return
      * - **OVRTX_API_SUCCESS** if the renderer was attached successfully,
      * - **OVRTX_API_ERROR** if the renderer is already attached, the stage is
      *   already attached to another ovrtx renderer, the stage is invalid, or
-     *   the attach failed.
+     *   the attach failed. On failure the renderer is left unchanged.
      */
     ovrtx_result_t ovrtx_attach_ovstage(ovrtx_renderer_t* renderer,
                                          ovstage_instance_t* stage);
@@ -299,10 +347,16 @@ extern "C"
      * After a successful detach, the renderer may attach the same or a different
      * initialized stage.
      *
+     * This tears down internal render state, so the in-flight operation rules
+     * described on ovrtx_attach_ovstage() apply here too. On failure teardown
+     * may be partial; do not use the renderer except to destroy it. The renderer
+     * retains any stage state still needed for safe destruction, so the caller
+     * may release its own stage handle before or after destroying the renderer.
+     *
      * @param renderer Renderer instance previously passed to ovrtx_attach_ovstage().
      * @return
      * - **OVRTX_API_SUCCESS** if the renderer was detached successfully,
-     * - **OVRTX_API_ERROR** if the renderer is not currently attached, or the
+     * - **OVRTX_API_ERROR** if the renderer is not currently attached or the
      *   detach failed.
      */
     ovrtx_result_t ovrtx_detach_ovstage(ovrtx_renderer_t* renderer);
@@ -422,7 +476,10 @@ extern "C"
      * Enqueue an asynchronous operation to remove a previously added USD reference from the runtime stage.
      * All prims added to the stage during the add operation will be removed.
      * @param instance Renderer instance
-     * @param add_usd_handle Handle obtained from ovrtx_add_usd_reference_from_file() or ovrtx_add_usd_reference_from_string()
+     * @param add_usd_handle Handle obtained from ovrtx_add_usd_reference_from_file() or
+     *                       ovrtx_add_usd_reference_from_string(). @ref OVRTX_INVALID_HANDLE is
+     *                       rejected immediately with @ref OVRTX_API_ERROR, an invalid operation
+     *                       index, and details from @ref ovrtx_get_last_error().
      * @return
      * - **OVRTX_API_SUCCESS** if the usd file was removed successfully,
      * - **OVRTX_API_ERROR** if the usd file removal failed.
@@ -434,8 +491,11 @@ extern "C"
     /**
      * Enqueue an asynchronous operation to clone the subtree under the source path to
      * one or more target paths in the runtime stage representation.
-     * The source path must exist in the stage.
-     * The target paths must not already exist in the stage.
+     * The source path must exist in the stage and the target paths must not already
+     * exist in it. Both are checked before anything is cloned, so a rejected batch
+     * creates nothing, and the per-operation error string names the missing source or
+     * the targets that already exist, e.g.
+     * `ovrtx_clone_usd: target prim already exists at '/Tile3'`.
      * Relationship targets, path values, and USD attribute connections that
      * point inside the source subtree are rebased to each target subtree. External
      * paths are copied unchanged.
@@ -444,8 +504,10 @@ extern "C"
      * @param target_paths Array of target paths to clone to
      * @param num_target_paths Number of target paths to clone to
      * @return
-     * - **OVRTX_API_SUCCESS** if the path was cloned successfully,
-     * - **OVRTX_API_ERROR** if the path cloning failed.
+     * - **OVRTX_API_SUCCESS** if the operation was enqueued successfully,
+     * - **OVRTX_API_ERROR** if the operation was not enqueued successfully. A missing
+     *   source or an already-existing target fails the operation itself; observe it
+     *   through @ref ovrtx_wait_op and @ref ovrtx_get_last_op_error.
      */
     OVRTX_DEPRECATED("Use ovstage_clone(instance, source_path, target_paths, num_target_paths, ordinal) on the attached ovstage instance, then advance the write floor and render via ovrtx_update_from_stage / ovrtx_step_with_stage.")
     ovrtx_enqueue_result_t ovrtx_clone_usd(ovrtx_renderer_t* instance,
@@ -455,6 +517,12 @@ extern "C"
 
     /**
      * Enqueue an asynchronous operation to reset the runtime stage representation to an empty stage.
+     *
+     * A successful reset invalidates all previously returned @ref ovrtx_usd_handle_t
+     * reference handles. Their values stored by the caller are not cleared and
+     * must not be reused. In asynchronous mode, @ref OVRTX_API_SUCCESS only
+     * confirms enqueue; use @ref ovrtx_wait_op to observe execution completion.
+     *
      * @param instance Renderer instance
      * @return
      * - **OVRTX_API_SUCCESS** if the stage was reset successfully,
@@ -490,7 +558,9 @@ extern "C"
      *                    This binding defines the layout of the input data, both in terms
      *                    of attribute data encoding as well as the layout of prims. The binding
      *                    can be generated in place or a persistent handle can be provided to manually
-     *                    manage the lifetime.
+     *                    manage the lifetime. A @ref ovrtx_binding_desc_or_handle_t::binding_handle
+     *                    equal to @ref OVRTX_INVALID_HANDLE selects the inline
+     *                    @ref ovrtx_binding_desc_or_handle_t::binding_desc and is valid.
      * @param data_array Source data to write. Based on the input_access this source is used during the execution of the write operation,
      *                    not during the enqueue. So it is important that the data source remains valid
      *                    until the write operation has completed.
@@ -520,7 +590,9 @@ extern "C"
      * @param binding_handle_or_desc Handle or description of the binding to use to determine
      *                    the layout of the data to write. The binding
      *                    can be generated in place or a persistent handle can be provided to manually
-     *                    manage the lifetime.
+     *                    manage the lifetime. A @ref ovrtx_binding_desc_or_handle_t::binding_handle
+     *                    equal to @ref OVRTX_INVALID_HANDLE selects the inline
+     *                    @ref ovrtx_binding_desc_or_handle_t::binding_desc and is valid.
      * @param mapping_desc Description of the mapping to use
      * @param out_attribute_mapping [out] Handle to the attribute mapping
      * @return
@@ -543,7 +615,10 @@ extern "C"
      * The data written by the user must be ready when the unmap operation is called for CPU data and when
      * the cuda synchronization event is signaled for GPU data.
      * @param instance Renderer instance
-     * @param map_handle Handle to the attribute mapping to unmap
+     * @param map_handle Handle to the attribute mapping to unmap.
+     *                   @ref OVRTX_INVALID_HANDLE is rejected immediately with
+     *                   @ref OVRTX_API_ERROR, an invalid operation index, and details
+     *                   from @ref ovrtx_get_last_error().
      * @param cuda_sync optional cuda synchronization to wait for before the mapped memory is accessed during the
      *                   application of the written data to the stage representation.
      * @return
@@ -574,8 +649,19 @@ extern "C"
 
     /**
      * Enqueue an asynchronous operation to destroy a persistent attribute binding.
+     *
+     * Successful destruction invalidates the binding handle. Copies stored by
+     * the caller are not cleared and must not be reused. In asynchronous mode,
+     * @ref OVRTX_API_SUCCESS only confirms enqueue; use @ref ovrtx_wait_op to
+     * observe execution completion and @ref ovrtx_get_last_op_error for errors.
+     *
      * @param instance Renderer instance
-     * @param binding_handle Handle to the attribute binding to destroy
+     * @param binding_handle Handle to the attribute binding to destroy. In asynchronous mode,
+     *                       @ref OVRTX_INVALID_HANDLE is enqueued and reported as an operation
+     *                       execution error by @ref ovrtx_wait_op(); retrieve details with
+     *                       @ref ovrtx_get_last_op_error(). In synchronous mode it returns
+     *                       @ref OVRTX_API_ERROR with details from @ref ovrtx_get_last_error();
+     *                       the returned operation index remains valid.
      * @return
      * - **OVRTX_API_SUCCESS** if the attribute binding was destroyed successfully,
      * - **OVRTX_API_ERROR** if the attribute binding destruction failed.
@@ -608,7 +694,10 @@ extern "C"
      * The read sees the stage as-if all prior stream-ordered operations have completed.
      *
      * @param instance Renderer instance
-     * @param binding_handle_or_desc Binding identifying prims and attribute to read
+     * @param binding_handle_or_desc Binding identifying prims and attribute to read. A
+     *                               @ref ovrtx_binding_desc_or_handle_t::binding_handle equal
+     *                               to @ref OVRTX_INVALID_HANDLE selects the inline
+     *                               @ref ovrtx_binding_desc_or_handle_t::binding_desc and is valid.
      * @param read_dest Optional destination tensor for scalar reads (NULL = allocate internally).
      *                  Must be NULL for array attributes. GPU tensors (kDLCUDA) are supported.
      * @param[out] out_read_handle Handle to the read result for use with @ref ovrtx_fetch_read_result()
@@ -628,18 +717,20 @@ extern "C"
      * This operation is synchronous and will block until the read completes or the timeout
      * is reached. Passing 0 as the timeout makes it a non-blocking poll.
      *
-     * For scalar attributes the result contains a single tensor of shape [prim_count].
-     * For array attributes the result contains one tensor per prim with variable length.
-     * Multi-component C attribute tensors encode component count in @c DLTensor::dtype.lanes:
-     * for example, a point3f[] array with 10 points is shape [10] with lanes=3, and
-     * a 4x4 double matrix attribute for N prims is shape [N] with lanes=16.
+     * For fixed-size attributes the result contains one tensor with leading shape [prim_count].
+     * For array attributes it contains one tensor per prim with variable length.
+     * Result tensors use scalar lanes and type-aware trailing dimensions: a point3f[]
+     * array with 10 points is shape [10,3], and a matrix-typed 4x4 double attribute
+     * for N prims is shape [N,4,4]. An untyped 16-component tuple is [N,16].
      * When a destination tensor was provided to @ref ovrtx_read_attribute(), buffer_count is 0.
      *
      * All pointers in the output are valid until @ref ovrtx_release_read_result() is called
      * with the same read handle.
      *
      * @param instance Renderer instance
-     * @param read_handle Handle obtained from @ref ovrtx_read_attribute()
+     * @param read_handle Handle obtained from @ref ovrtx_read_attribute().
+     *                    @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                    and details from @ref ovrtx_get_last_error().
      * @param timeout Timeout for the operation
      * @param[out] out_read_output Read data
      * @return
@@ -662,7 +753,9 @@ extern "C"
      * become invalid.
      *
      * @param instance Renderer instance
-     * @param read_handle Handle from @ref ovrtx_read_attribute()
+     * @param read_handle Handle from @ref ovrtx_read_attribute().
+     *                    @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                    and details from @ref ovrtx_get_last_error().
      * @param before_destroy_cuda_sync Optional CUDA synchronization to wait for before
      *                                  freeing GPU resources (zero-initialized = no sync)
      * @return
@@ -713,7 +806,9 @@ extern "C"
      * All pointers in the result are valid until @ref ovrtx_release_query_results() is called.
      *
      * @param instance Renderer instance
-     * @param query_handle Handle obtained from @ref ovrtx_query_prims()
+     * @param query_handle Handle obtained from @ref ovrtx_query_prims().
+     *                     @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                     and details from @ref ovrtx_get_last_error().
      * @param timeout Timeout for the operation
      * @param[out] out_result Query result containing prim groups
      * @return
@@ -737,7 +832,9 @@ extern "C"
      * become invalid.
      *
      * @param instance Renderer instance
-     * @param query_handle Handle obtained from @ref ovrtx_query_prims()
+     * @param query_handle Handle obtained from @ref ovrtx_query_prims().
+     *                     @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                     and details from @ref ovrtx_get_last_error().
      * @return
      * - **OVRTX_API_SUCCESS** if the results were released successfully,
      * - **OVRTX_API_ERROR** if the release failed.
@@ -830,7 +927,12 @@ extern "C"
      * named CPU tensors (``primPath``, ``objectType``, ``geometryInstanceId``, ``worldPositionM``,
      * ``worldNormal``) and ``uint32`` params (``magic`` = @ref OVRTX_PICK_HIT_MAGIC, ``version`` =
      * @ref OVRTX_PICK_HIT_VERSION, ``hitCount``). The ``primPath`` column stores @ref ovx_primpath_t
-     * ids; resolve strings via @ref ovrtx_get_path_dictionary() if needed. The query rectangle is
+     * ids and is populated independently of the query flags; resolve strings via
+     * @ref ovrtx_get_path_dictionary() if needed. For a one-pixel-equivalent pick,
+     * @ref OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO requests tracked metadata for the first hit. Without that flag,
+     * ``objectType``, ``geometryInstanceId``, ``worldPositionM``, and ``worldNormal`` remain zero-filled.
+     * Multi-pixel picks leave those tracked metadata tensors zero-filled even when the flag is set.
+     * The query rectangle is
      * specified in normalized RenderProduct coordinates using [0, 1] top-left-origin NDC. It uses the same
      * convention as the old pixel API: right/bottom mark the edge just past the last included pixel. For
      * example, pixel (x, y) on a width x height RenderProduct is [x / width, y / height, (x + 1) / width,
@@ -967,7 +1069,9 @@ extern "C"
      * be mapped to retrieve the actual output data.
      * All strings and pointers inside the result are valid until the result is destroyed by ovrtx_destroy_results().
      * @param instance Renderer instance
-     * @param result_handle Handle to the step result to query
+     * @param result_handle Handle to the step result to query.
+     *                      @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                      and details from @ref ovrtx_get_last_error().
      * @param timeout Timeout for the operation.
      *                Passing 0 will make the operation non-blocking and return immediately with the current status of the operation.
      * @param out_render_product_set_outputs [out] Render product set outputs
@@ -1006,7 +1110,9 @@ extern "C"
      * - Params (@ref ovrtx_render_var_output_t::params) are always CPU-resident DLPack tensors;
      *   their shape encodes scalar vs. array (e.g. `{1}` for scalar, `{N}` for array).
      * @param instance Renderer instance
-     * @param output_handle Handle to the output to map
+     * @param output_handle Handle to the output to map.
+     *                      @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                      and details from @ref ovrtx_get_last_error().
      * @param map_output_desc Description of the output to map
      * @param timeout Timeout for the operation.
      *                Passing 0 will make the operation non-blocking and return immediately with the current status of the operation.
@@ -1029,7 +1135,9 @@ extern "C"
      * this lifetime is independent of ovrtx_destroy_results().
      * It is safe to call unmap on a map_handle that was produced from a step result that has been destroyed by destroy_results.
      * @param instance Renderer instance.
-     * @param map_handle Handle to the map to unmap.
+     * @param map_handle Handle to the map to unmap. @ref OVRTX_INVALID_HANDLE is rejected
+     *                   with @ref OVRTX_API_ERROR and details from
+     *                   @ref ovrtx_get_last_error().
      * @param before_destroy_cuda_sync CUDA synchronization to wait for before the mapped memory is destroyed.
      * @return
      * - **OVRTX_API_SUCCESS** if the output was unmapped successfully,
@@ -1043,7 +1151,9 @@ extern "C"
      * Releases all resources associated with the result of a sensor simulation step, with the exception of resources provided by calls to
      * ovrtx_map_render_var_output(). Those are only released through ovrtx_unmap_render_var_output().
      * @param instance Renderer instance
-     * @param result_handle Handle to the step result to destroy
+     * @param result_handle Handle to the step result to destroy.
+     *                      @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                      and details from @ref ovrtx_get_last_error().
      * @return
      * - **OVRTX_API_SUCCESS** if the step result was destroyed successfully,
      * - **OVRTX_API_ERROR** if the step result destruction failed.
@@ -1069,7 +1179,8 @@ extern "C"
      * transient thread-local data and are invalidated by the next call to ovrtx_wait_op() on the
      * same thread. Consume/copy them before the next wait call.
      * @param instance Renderer instance
-     * @param op_id Non-zero operation id to wait for. @ref OVRTX_INVALID_HANDLE is not waitable
+     * @param op_id Non-zero operation id to wait for. @ref OVRTX_INVALID_HANDLE is rejected
+     *              with @ref OVRTX_API_ERROR and details from @ref ovrtx_get_last_error().
      * @param time_out Timeout for the operation
      * @param out_wait_result [out] Wait result information (error op ids and lowest pending op id)
      * @return
@@ -1102,7 +1213,9 @@ extern "C"
      * - The set of counters varies by operation type
      *
      * @param instance Renderer instance
-     * @param op_id Operation ID to query (from ovrtx_enqueue_result_t.op_index)
+     * @param op_id Operation ID to query (from ovrtx_enqueue_result_t.op_index).
+     *              @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *              and details from @ref ovrtx_get_last_error().
      * @param out_status [out] Status information for the operation
      * @return OVRTX_API_SUCCESS if status was retrieved successfully,
      *         OVRTX_API_ERROR if op_id is invalid or query failed
@@ -1161,112 +1274,11 @@ extern "C"
     /**
      * Returns the error string for the provided operation id from the last call to ovrtx_wait_op
      * on the calling thread. The string is valid until the next call to ovrtx_wait_op on the same
-     * thread.
+     * thread. This is a lookup-only identifier: @ref OVRTX_INVALID_HANDLE and any operation id
+     * not present in the last wait result return an empty string rather than an API error.
      * @param op_id Operation id to get the error string for
      */
     ovx_string_t ovrtx_get_last_op_error(ovrtx_op_id_t op_id);
-
-    /*--------------------------------------------------*/
-    /* Logging callback */
-    /*--------------------------------------------------*/
-
-    /**
-     * Set a process-global callback that receives every carb log message produced
-     * by ovrtx (and by any plugin or framework code loaded under it).
-     *
-     * The callback is shared across the whole ovrtx process, not per-renderer:
-     * its lifetime is tied to ovrtx_initialize / ovrtx_shutdown, not to any
-     * particular renderer instance. As a result the callback receives messages
-     * emitted before the first ovrtx_create_renderer (framework startup, plugin
-     * loading, the OVRTX logging banner) as well as messages emitted during and
-     * after ovrtx_destroy_renderer (e.g. asset eviction during teardown).
-     *
-     * Only one callback can be active at a time; calling this function replaces
-     * the previous callback. Pass NULL as @p callback to disable delivery.
-     *
-     * Calling this function before ovrtx_initialize or after ovrtx_shutdown
-     * returns OVRTX_API_ERROR with a descriptive error string accessible via
-     * ovrtx_get_last_error().
-     *
-     * The callback does NOT carry per-renderer attribution. ovrtx may add a v2
-     * callback type with (renderer, op_id) once per-op TLS plumbing exists.
-     *
-     * Thread safety: The callback may be invoked from any thread. The
-     * implementation guarantees that callbacks are serialized for the process
-     * (no concurrent invocations).
-     *
-     * Channel filter syntax
-     * ---------------------
-     * @p channel_filter is a comma-separated list of `<channel_prefix>=<level>`
-     * entries (RUST_LOG-style). The channel prefix is matched against carb's
-     * dotted source name; longest matching prefix wins. Per-channel rules
-     * override @p severity for matched channels. Channels not matched by any
-     * rule use @p severity as their threshold. The empty / NULL filter is
-     * equivalent to "every channel uses @p severity".
-     *
-     * Accepted level names (case-insensitive):
-     *     "verbose" (alias "debug"), "info", "warn" (alias "warning"),
-     *     "error", "fatal".
-     *
-     * Whitespace around tokens and trailing commas are tolerated; empty entries
-     * are skipped. Malformed entries (missing `=`, unknown level name, empty
-     * channel name) cause this function to return OVRTX_API_ERROR with a
-     * descriptive ovrtx_get_last_error() string and leave the previously
-     * installed callback state unchanged.
-     *
-     * Examples:
-     *   - `""`                                     no rules; every channel uses @p severity
-     *   - `"omni.usd=error"`                       omni.usd* uses error+, everything else uses @p severity
-     *   - `"carb=warn,carb.tasking=verbose"`       carb.tasking uses verbose+, other carb.* uses warn+,
-     *                                              everything else uses @p severity
-     *
-     * @param severity Default severity threshold applied to channels not
-     *                 matched by an explicit rule in @p channel_filter. Use
-     *                 OVRTX_LOG_INFO to receive INFO and above by default;
-     *                 OVRTX_LOG_ERROR to filter out everything but errors by
-     *                 default. Note that ovrtx_log_severity_t does not expose
-     *                 carb's lower verbose / debug levels: those are dropped
-     *                 by the default and can only be received by an explicit
-     *                 per-channel rule like "carb.tasking=verbose" in @p
-     *                 channel_filter.
-     * @param channel_filter Optional comma-separated `<channel>=<level>` list.
-     *                       Pass NULL to apply @p severity uniformly.
-     * @param callback Callback function to receive log messages, or NULL to disable
-     * @param user_data User-provided context passed to each callback invocation
-     * @return OVRTX_API_SUCCESS if callback was set successfully,
-     *         OVRTX_API_ERROR if the system is not initialized or the filter
-     *         string failed to parse
-     */
-    ovrtx_result_t ovrtx_set_log_callback(ovrtx_log_severity_t severity,
-        const ovx_string_t* channel_filter,
-        ovrtx_log_callback_t callback,
-        void* user_data);
-
-    /**
-     * Flush all pending log messages through the global callback.
-     *
-     * This operation blocks until all log messages generated up to this point
-     * have been delivered through the log callback. This is useful when you
-     * need to ensure all logs have been processed before proceeding (e.g.,
-     * after an operation completes or fails, or before tearing the system
-     * down).
-     *
-     * If no log callback is set, this function returns immediately with success.
-     *
-     * Calling this function before ovrtx_initialize or after ovrtx_shutdown
-     * returns OVRTX_API_ERROR.
-     *
-     * Note: This only flushes messages generated before this call. Messages
-     * generated concurrently or after this call may not be included.
-     *
-     * @param timeout Maximum time to wait for flush to complete
-     * @return OVRTX_API_SUCCESS if all pending logs were flushed,
-     *         OVRTX_API_TIMEOUT if flush did not complete within timeout,
-     *         OVRTX_API_ERROR if flush failed (system not initialized)
-     */
-    ovrtx_result_t ovrtx_flush_log(ovrtx_timeout_t timeout);
-
-    /*--------------------------------------------------*/
 
     /** @} */ // end of ovrtx_error
 

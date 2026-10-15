@@ -211,7 +211,7 @@ Operation Status Types
 Logging Types
 ^^^^^^^^^^^^^
 
-.. doxygengroup:: ovrtx_log_types
+.. doxygengroup:: ovx_log_types
    :project: ovrtx
    :content-only:
 

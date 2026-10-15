@@ -753,7 +753,16 @@ protected:
 
     static void docs_destroy_suite_renderer(ovrtx_renderer_t** renderer) {
         if (renderer && *renderer) {
-            ovrtx_destroy_renderer(*renderer);
+            const ovrtx_result_t result = ovrtx_destroy_renderer(*renderer);
+            if (result.status != OVRTX_API_SUCCESS) {
+                const ovx_string_t err = ovrtx_get_last_error();
+                ADD_FAILURE() << "ovrtx_destroy_renderer failed: "
+                              << (err.ptr ? std::string(err.ptr, err.length) : std::string());
+                return;
+            }
+            if (*renderer == detach_failed_renderer_) {
+                detach_failed_renderer_ = nullptr;
+            }
             *renderer = nullptr;
         }
     }
@@ -761,6 +770,11 @@ protected:
     // Attach a fresh ovstage instance to `renderer` for this test. Named after
     // the test (ovrtx.docs.<Suite>.<Test>) so ovstage logs stay traceable.
     void docs_attach_stage(ovrtx_renderer_t* renderer) {
+        if (detach_failed_renderer_ != nullptr) {
+            ASSERT_NE(renderer, detach_failed_renderer_)
+                << "a previous ovrtx_detach_ovstage failed, so this renderer is partially "
+                   "torn down and cannot take another stage";
+        }
         const ::testing::TestInfo* info =
             ::testing::UnitTest::GetInstance()->current_test_info();
         stage_name_ = std::string("ovrtx.docs.")
@@ -775,8 +789,13 @@ protected:
 
     void docs_detach_stage() {
         if (stage_) {
-            ovrtx_detach_ovstage(renderer_);
-            ovstage_destroy_instance(stage_);
+            if (ovrtx_detach_ovstage(renderer_).status != OVRTX_API_SUCCESS) {
+                ADD_FAILURE() << "ovrtx_detach_ovstage failed; the renderer may be partially "
+                                 "torn down and must only be destroyed";
+                detach_failed_renderer_ = renderer_;
+            }
+            EXPECT_EQ(ovstage_destroy_instance(stage_), OVSTAGE_OK)
+                << format_ovstage_last_error();
             stage_ = nullptr;
             renderer_ = nullptr;
         }
@@ -822,6 +841,9 @@ protected:
     ovrtx_renderer_t*    renderer_ = nullptr;
     ovstage_instance_t*  stage_    = nullptr;
     std::string          stage_name_;
+    // Set in docs_detach_stage on failure; cleared when that renderer is destroyed. Keyed
+    // on the renderer pointer so other suites' renderers are unaffected.
+    inline static ovrtx_renderer_t* detach_failed_renderer_ = nullptr;
 };
 
 // Boilerplate wiring for a derived doc-test suite: per-suite renderer, per-test

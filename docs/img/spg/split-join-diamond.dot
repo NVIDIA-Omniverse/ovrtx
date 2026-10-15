@@ -1,0 +1,18 @@
+digraph {
+   rankdir=LR
+   bgcolor="transparent"
+   node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
+   edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
+   "LdrColor" [fillcolor="#4c566a" fontcolor="white"]
+   "Out" [fillcolor="#4c566a" fontcolor="white"]
+   "a" [fillcolor="#76b900" fontcolor="#1b1b1b"]
+   "b" [fillcolor="#76b900" fontcolor="#1b1b1b"]
+   "c" [fillcolor="#76b900" fontcolor="#1b1b1b"]
+   "d" [fillcolor="#76b900" fontcolor="#1b1b1b"]
+   "LdrColor" -> "a"
+   "a" -> "b"
+   "a" -> "c"
+   "b" -> "d"
+   "c" -> "d"
+   "d" -> "Out"
+}

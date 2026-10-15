@@ -93,6 +93,8 @@ def _pick_hits(renderer, ordinal, left_ndc, top_ndc, right_ndc, bottom_ndc):
         top_ndc=top_ndc,
         right_ndc=right_ndc,
         bottom_ndc=bottom_ndc,
+        # Request tracked surface metadata for one-pixel-equivalent click queries.
+        flags=ovrtx.OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO,
     )
     products = renderer.step(
         render_products={"/Render/Camera"},
@@ -101,6 +103,10 @@ def _pick_hits(renderer, ordinal, left_ndc, top_ndc, right_ndc, bottom_ndc):
     )
     # [/snippet:doc-enqueue-pick-query-python]
 
+    return _read_pick_hits(renderer, products)
+
+
+def _read_pick_hits(renderer, products):
     product = products["/Render/Camera"]
     frame = product.frames[0]
     pick_var = frame.render_vars[ovrtx.OVRTX_RENDER_VAR_PICK_HIT]
@@ -201,14 +207,60 @@ def test_pick_center_pixel(picking_renderer):
     assert picked_paths == {"/World/CenterCube"}
 
 
+def test_pick_center_pixel_includes_surface_info(picking_renderer):
+    renderer, stage = picking_renderer
+    ordinal = _load_scene(renderer, stage)
+
+    renderer.enqueue_pick_query(
+        render_product_path="/Render/Camera",
+        left_ndc=CENTER_LEFT_NDC,
+        top_ndc=CENTER_TOP_NDC,
+        right_ndc=CENTER_RIGHT_NDC,
+        bottom_ndc=CENTER_BOTTOM_NDC,
+        flags=ovrtx.OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO,
+    )
+    products = renderer.step(
+        render_products={"/Render/Camera"},
+        delta_time=1.0 / 60.0,
+        ordinal=ordinal,
+    )
+
+    hits = _read_pick_hits(renderer, products)
+    assert len(hits) == 1
+    assert renderer.resolve_prim_path_id(hits[0]["prim_path"]) == "/World/CenterCube"
+    # The camera is at Z=220 looking down -Z. CenterCube spans Z=[-12, 12], and the stage uses
+    # 0.01 metres per unit, so the selected center pixel hits its front face near (0, 0, 0.12) m with a +Z normal.
+    assert hits[0]["object_type"] != 0
+    assert hits[0]["geometry_instance_id"] != 0
+    assert np.allclose(hits[0]["world_position"], (0.0, 0.0, 0.12), atol=0.02)
+    assert np.allclose(hits[0]["world_normal"], (0.0, 0.0, 1.0), atol=0.01)
+
+
 def test_marquee_picks_multiple_prims(picking_renderer):
     renderer, stage = picking_renderer
     ordinal = _load_scene(renderer, stage)
 
-    picked_paths = _pick_paths(renderer, ordinal, 0.0, 0.0, MARQUEE_RIGHT_NDC, 1.0)
+    renderer.enqueue_pick_query(
+        render_product_path="/Render/Camera",
+        left_ndc=0.0,
+        top_ndc=0.0,
+        right_ndc=MARQUEE_RIGHT_NDC,
+        bottom_ndc=1.0,
+        flags=ovrtx.OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO,
+    )
+    products = renderer.step(
+        render_products={"/Render/Camera"},
+        delta_time=1.0 / 60.0,
+        ordinal=ordinal,
+    )
+
+    hits = _read_pick_hits(renderer, products)
+    picked_paths = _resolve_picked_paths(renderer, hits)
     assert "/World/LeftCube" in picked_paths
     assert "/World/CenterCube" in picked_paths
     assert "/World/RightCube" not in picked_paths
+    assert all(np.array_equal(hit["world_position"], (0.0, 0.0, 0.0)) for hit in hits)
+    assert all(np.array_equal(hit["world_normal"], (0.0, 0.0, 0.0)) for hit in hits)
 
 
 def test_pickable_false_excludes_prim(picking_renderer):

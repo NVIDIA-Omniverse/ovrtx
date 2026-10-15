@@ -27,11 +27,21 @@ Version and Constants
 
 .. autodata:: ovrtx.OVRTX_LIBRARY_PATH_HINT
 
+.. autofunction:: ovrtx.get_build_info
+
+.. autoclass:: ovrtx.BuildInfo
+   :members:
+
 .. autodata:: ovrtx.OVRTX_RENDER_VAR_PICK_HIT
 
-.. autodata:: ovrtx.OVRTX_PICK_FLAG_GIZMO
+.. py:data:: ovrtx.OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO
+   :type: int
+   :value: 2
 
-.. autodata:: ovrtx.OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO
+   Requests tracked metadata for the first hit of a one-pixel-equivalent pick.
+   Without this flag, or for a multi-pixel pick, ``objectType``,
+   ``geometryInstanceId``, ``worldPositionM``, and ``worldNormal`` are
+   zero-filled.
 
 .. autodata:: ovrtx.OVRTX_PICK_HIT_MAGIC
 
@@ -54,6 +64,8 @@ paths automatically before OpenUSD loads. If ``ovstage.Stage`` (or
 ``ovstage.library_version()``) runs first, call ``ovrtx.register_schema_paths()``
 before it. The registration call loads only the ovrtx shared loader; the ovrtx
 runtime remains deferred until renderer initialization.
+
+See :doc:`../core/usd_plugin_paths` for complete, tested workflows.
 
 .. autofunction:: ovrtx.register_schema_paths
 

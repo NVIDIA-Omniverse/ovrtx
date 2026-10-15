@@ -111,3 +111,15 @@ When `omni:rtx:rendermode = "PathTracing"` is set on the RenderProduct, the refe
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+
+## Gaussian splats example
+
+> **Source:** `examples/python/gaussian-splats/main.py` snippet `gaussian-render-python`
+>
+> **Source:** `examples/c/gaussian-splats/main.cpp` snippet `gaussian-c-step-renderer`
+>
+> The supplied procedural Gaussian scene renders its first frame without a
+> warmup loop. Python's `--steps` can select a later frame. Measure other scenes
+> separately before choosing a warmup count; extra frames are not required just
+> because a scene contains Gaussian splats.

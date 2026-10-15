@@ -1,0 +1,124 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "World"
+    upAxis = "Y"
+    metersPerUnit = 1
+)
+
+def Xform "World"
+{
+    # [snippet:overlay-rig]
+    # The camera sits on a rig, so its local transform (where it is mounted) and its world
+    # transform (where it is in the scene) differ. The launch script reports both.
+    def Xform "Rig"
+    {
+        double3 xformOp:translate = (0, 1.5, 6)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        def Camera "Camera"
+        {
+            float2 clippingRange = (0.1, 1000)
+            float focalLength = 24
+            float horizontalAperture = 20.955
+            float verticalAperture = 20.955
+            double3 xformOp:translate = (0.4, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+    # [/snippet:overlay-rig]
+
+    # Three markers the overlay must find, each in a colour of its own so the host can tell
+    # which one a crosshair landed on.
+    def Scope "Markers"
+    {
+        def Sphere "Red"
+        {
+            color3f[] primvars:displayColor = [(1, 0.1, 0.1)] ( interpolation = "constant" )
+            double radius = 0.25
+            double3 xformOp:translate = (-1.5, 1.2, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Sphere "Green"
+        {
+            color3f[] primvars:displayColor = [(0.1, 1, 0.1)] ( interpolation = "constant" )
+            double radius = 0.25
+            double3 xformOp:translate = (0.6, 2.4, -1)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Sphere "Blue"
+        {
+            color3f[] primvars:displayColor = [(0.1, 0.1, 1)] ( interpolation = "constant" )
+            double radius = 0.25
+            double3 xformOp:translate = (1.8, 0.8, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+
+    # [snippet:overlay-settings]
+    # A prim of the scene's own that the launch script reads by path. The renderer does not
+    # need it, so the host has to ask for it to be published: refer to main.py.
+    def Scope "Overlay"
+    {
+        custom rel markers = [
+            </World/Markers/Red>,
+            </World/Markers/Green>,
+            </World/Markers/Blue>,
+        ]
+        custom float crosshairSize = 8
+    }
+    # [/snippet:overlay-settings]
+
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 1000
+    }
+
+    def DistantLight "KeyLight"
+    {
+        float inputs:intensity = 3000
+        double3 xformOp:rotateXYZ = (-45, 30, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+}
+
+# [snippet:overlay-render-graph]
+def Scope "Render"
+{
+    def RenderProduct "OverlayDemo"
+    {
+        uniform int2 resolution = (512, 512)
+        rel camera = </World/Rig/Camera>
+        rel orderedVars = [ <LdrColor>, <Overlay> ]
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+            opaque omni:rtx:aov
+        }
+
+        def RenderVar "Overlay"
+        {
+            uniform string sourceName = "Overlay"
+            opaque omni:rtx:aov.connect = <../MarkerOverlay.outputs:Overlay>
+        }
+
+        def Shader "MarkerOverlay" (
+            references = @MarkerOverlayKernel.usda@
+        )
+        {
+            opaque inputs:Image.connect = <../LdrColor.omni:rtx:aov>
+        }
+    }
+}
+# [/snippet:overlay-render-graph]

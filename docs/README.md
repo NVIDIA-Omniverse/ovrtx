@@ -60,12 +60,12 @@ You can also point `make.bat` at another executable by setting `%DOXYGEN%`.
 `make.bat` picks its Sphinx in this order:
 
 1. `%SPHINXBUILD%` if you've set it explicitly.
-2. `..\repo.bat` (NVIDIA-internal builds) — routes `uv` through it.
-3. `uv` on `PATH`.
-4. A bare `sphinx-build` on `PATH` (only useful if you've installed Sphinx
+2. `uv` on `PATH`.
+3. A bare `sphinx-build` on `PATH` (only useful if you've installed Sphinx
    yourself).
 
-Options 2 and 3 both provision the toolchain from `requirements.txt`.
+Option 2 provisions the toolchain from `requirements.txt`.
+
 
 If you'd rather drive Sphinx directly:
 

@@ -89,7 +89,7 @@ Python exposes both:
 |-------|-------|----------------------------------------|
 | `RenderProductSetOutputs.simulation_start_time` | step result | `T` — the step clock base |
 | `RenderProductSetOutputs.simulation_end_time` | step result | `T + dt` |
-| `FrameOutput.start_time` / `end_time` | per frame | sensor capture inside `[T, T + dt]` |
+| `FrameOutput.start_time` / `end_time` | per frame | capture or split interval; an accumulated capture can start before `T` |
 
 A default viewport camera captures instantaneously at the *end* of the step window, so its `FrameOutput.start_time` is `T + dt`, not `T`. That is expected, not a clock bug — assert `products.simulation_start_time` when checking the clock base.
 
@@ -108,6 +108,26 @@ A default viewport camera captures instantaneously at the *end* of the step wind
 ### Render loop
 
 > **Source:** `tests/docs/python/test_camera_sensors.py` snippet `doc-step-and-map-camera-outputs`
+
+### Sensors with different capture rates
+
+> **Source:** `examples/python/multi-rate-sensors/main.py` snippets `doc-multi-rate-step`, `doc-multi-rate-partial-outputs`, and `doc-multi-rate-read-outputs`
+>
+> **Source (C):** `tests/docs/c/test_sensor_configuration.cpp` snippets `doc-multi-rate-step-c` and `doc-multi-rate-partial-outputs-c`
+
+Keep all active sensor RenderProducts in every step, including steps with no
+completed output. Omitting a product discards its accumulated rendering history.
+Apply `OmniSensorAPI` to scheduled cameras and author `omni:sensor:frameRate`
+as rational Hz. For compatibility with the pinned ovrtx 0.5 package, set the
+camera's `omni:sensor:Core:partialOutputs` through ovstage: its camera USD schemas
+do not declare this attribute, so an extra USD opinion alone is not populated.
+`LdrColor` has no public completion flag and can repeat the last
+completed image during an intermediate rolling-shutter split.
+
+The runnable example and `tests/docs/python/test_multi_rate_sensors.py` validate
+40/20 Hz lidars and 10/20 Hz cameras on a 40 Hz simulation clock, both output
+policies, and accumulated scan history. The example records from the first step
+without warmup. See `docs/sensors/multi_rate.rst` for the timing and metadata distinctions.
 
 ### Reset simulation time
 
@@ -150,7 +170,7 @@ RenderProductSetOutputs
   .simulation_start_time / .simulation_end_time   # step window [t, t+dt]
   -> ProductOutput (one per render product path)
     -> FrameOutput (one per frame produced during the step)
-      .start_time / .end_time                     # sensor capture inside the window
+      .start_time / .end_time                     # capture interval; can start before the step
       -> RenderVarOutput (one per full RenderVar prim path: /Render/Camera/LdrColor, /Render/Camera/HdrColor, etc.)
 ```
 
@@ -158,7 +178,7 @@ RenderProductSetOutputs
 
 - The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure; later runs should be faster once the shader cache is populated.
 - In C, you must call `ovrtx_destroy_results()` after processing to free resources. ovrtx will warn if results are leaked.
-- `delta_time` controls sensor simulation timing. A camera without motion blur produces one frame per step regardless of delta.
+- `delta_time` controls sensor simulation timing. A camera without an authored positive sensor frame rate is auto-triggered; a scheduled camera follows its own capture rate.
 - The render product paths must match actual RenderProduct prims in the USD stage.
 - In Python, `RenderProductSetOutputs` auto-destroys on garbage collection. Step result metadata is released when `products` falls out of scope; live render-var mappings and their DLPack views are unaffected (they have their own independent lifetime).
 
@@ -179,3 +199,20 @@ See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and 
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+### Simulated camera with an interactive observer
+
+> **Source:** `examples/c/sensor-observer/main.cpp` snippets `doc-observer-output-policy-c`, `doc-observer-step-c`, and `doc-observer-copy-outputs-c`
+>
+> **Source (Python):** `tests/docs/python/test_sensor_observer.py` snippets `doc-observer-output-policy-python`, `doc-observer-simulation-step-python`, and `doc-observer-view-step-python`
+
+Use an ordinary camera without a scheduled frame rate or long exposure for the
+observer. Publish its camera transform at a new ordinal, then step both products
+with zero delta time. Update scene motion only on positive simulation steps.
+Retain the last completed sensor image between captures; do not remove its
+RenderProduct from view-only steps. Start with a positive step, since a zero-time
+step exactly at an instantaneous sensor's initial startTime can trigger it.
+The C example runs simulation and inspection at 30 Hz and renders the observer
+continuously at the rate permitted by display presentation and rendering
+performance, including without camera input and while simulation is paused.
+It provides an interactive Vulkan window and a headless cadence check.

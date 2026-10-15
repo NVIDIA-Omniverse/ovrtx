@@ -13,12 +13,6 @@ assert SPEC.loader is not None
 sys.modules["inline_skill_snippets"] = inline_skill_snippets
 SPEC.loader.exec_module(inline_skill_snippets)
 
-VALIDATOR_PATH = REPO_ROOT / "tools" / "ci" / "validate_skills.py"
-VALIDATOR_SPEC = importlib.util.spec_from_file_location("validate_skills", VALIDATOR_PATH)
-validate_skills = importlib.util.module_from_spec(VALIDATOR_SPEC)
-assert VALIDATOR_SPEC.loader is not None
-VALIDATOR_SPEC.loader.exec_module(validate_skills)
-
 
 class InlineSkillSnippetsTest(unittest.TestCase):
     def setUp(self):
@@ -26,11 +20,8 @@ class InlineSkillSnippetsTest(unittest.TestCase):
         self.repo_root = Path(self.temp_dir.name)
         self.skills_dir = self.repo_root / "skills"
         self.output_dir = self.repo_root / "out-skills"
-        self.validator_repo_root = validate_skills.REPO_ROOT
-        validate_skills.REPO_ROOT = self.repo_root
 
     def tearDown(self):
-        validate_skills.REPO_ROOT = self.validator_repo_root
         self.temp_dir.cleanup()
 
     def write(self, relative_path, content):
@@ -136,8 +127,8 @@ renderer.step()
                 allow_missing=False,
             )
 
-    def test_malformed_source_reference_fails_inliner_and_validator(self):
-        skill_file = self.write(
+    def test_malformed_source_reference_fails(self):
+        self.write(
             "skills/sample/SKILL.md",
             "> **Source:** `tests/docs/python/test_sample.py` `doc-missing-keyword`\n",
         )
@@ -153,21 +144,6 @@ renderer.step()
                 in_place=False,
                 allow_missing=False,
             )
-
-        errors = validate_skills.validate_source_references(skill_file, skill_file.read_text(), {})
-        self.assertEqual(1, len(errors))
-        self.assertIn("malformed snippet reference", errors[0])
-
-    def test_validator_ignores_reference_examples_in_fences(self):
-        skill_file = self.write(
-            "skills/sample/SKILL.md",
-            "```markdown\n"
-            "> **Invented source:** `tests/docs/python/test_sample.py` snippet `doc-example`\n"
-            "```\n",
-        )
-
-        errors = validate_skills.validate_source_references(skill_file, skill_file.read_text(), {})
-        self.assertEqual([], errors)
 
     def test_missing_reference_fails_by_default(self):
         self.write(
@@ -204,6 +180,12 @@ renderer.step()
             transformed,
         )
         self.assertEqual(1, stats.unresolved_references)
+
+    def test_default_repo_root_is_repository_root(self):
+        self.assertEqual(REPO_ROOT, inline_skill_snippets.REPO_ROOT)
+        args = inline_skill_snippets.parse_args([])
+        self.assertEqual(REPO_ROOT, args.repo_root)
+        self.assertTrue((args.repo_root / "skills").is_dir())
 
     def test_repository_skill_references_resolve(self):
         with tempfile.TemporaryDirectory() as output_dir:

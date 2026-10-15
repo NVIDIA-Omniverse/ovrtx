@@ -31,11 +31,11 @@ your buffers.
 
 On Linux, a CUDA stream wait that is outstanding while the renderer submits
 Vulkan work on the same device disturbs how that Vulkan work is scheduled. The
-renderer's GPU workload develops scheduling bubbles: leading it to potentially 
+renderer's GPU workload develops scheduling bubbles: leading it to potentially
 occupying significantly more wall-clock time than its isolated cost.
 The effect is a property of the concurrency, not of any particular ovrtx call.
-Using the API correctly still triggers it — passing your consumer stream as 
-``sync_stream`` is the intended pattern and is affected the same way as any 
+Using the API correctly still triggers it — passing your consumer stream as
+``sync_stream`` is the intended pattern and is affected the same way as any
 other stream-ordered wait.
 
 Recommended Workaround

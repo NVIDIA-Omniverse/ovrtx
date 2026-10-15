@@ -4,6 +4,247 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-10-13
+
+### Added
+
+- Added experimental support for [DLSS 5 Neural Rendering](https://nvidia-omniverse.github.io/ovrtx/sensors/cameras/render_modes/dlss_nr.html) on Windows only. Note that DLSS 5 requires unsupported driver
+  615.64+
+- The location where ovrtx writes its runtime caches now defaults to `$XDG_CACHE_HOME` or `$HOME/.cache` on Linux, and 
+  `%LOCALAPPDATA%` on Windows. This location can also be configured. See [Cache
+  Locations](https://nvidia-omniverse.github.io/ovrtx/core/renderer_configuration.html#cache-locations).
+- Path Tracing mode now supports [spectral rendering](https://nvidia-omniverse.github.io/ovrtx/sensors/cameras/render_modes/spectral_rendering.html). Spectral path tracing startup configuration through Python 
+  [`RendererConfig.enable_spectral_rendering`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.RendererConfig.enable_spectral_rendering) and C [`OVRTX_CONFIG_ENABLE_SPECTRAL_RENDERING`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_config_bool_t.OVRTX_CONFIG_ENABLE_SPECTRAL_RENDERING).
+- Path Tracing mode now supports [Light Path Expressions (LPEs)](https://nvidia-omniverse.github.io/ovrtx/sensors/cameras/light_path_expressions.html). LPEs enable creating custom outputs that select specific
+  paths from the light transport integral, for debugging and compositing applications.
+- Setting `omni:rtx:scene:useSimulationTime` on a render product makes its temporal
+  effects, such as auto exposure, follow that sensor's own render time, based on the [`delta_time`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.step) passed to the step. 
+  Off by default.
+- Add Python [`RendererConfig.enable_crash_reporter`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.RendererConfig.enable_crash_reporter) and C [`OVRTX_CONFIG_ENABLE_CRASH_REPORTER`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_config_bool_t.OVRTX_CONFIG_ENABLE_CRASH_REPORTER) /
+  [`ovrtx_config_entry_enable_crash_reporter()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_config_entry_enable_crash_reporter). A host application that owns crash handling sets it to false
+  on the first renderer so ovrtx installs no crash handlers and uploads no dumps. Enabled when omitted.
+- [`OVRTX_SEMANTIC_MATRIX`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_attribute_semantic_t.OVRTX_SEMANTIC_MATRIX) / Python [`Semantic.MATRIX`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Semantic.MATRIX) represents generic 2x2, 3x3, or 4x4 double matrices
+  independently of transform semantics.
+- Add [C](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_config_entry_enable_mdl_displacement) and [Python](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.RendererConfig.enable_mdl_displacement) renderer configuration for MDL material displacement. Displacement is disabled when the
+  option is omitted.
+- Add public [`RendererConfig.enable_minimal`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.RendererConfig.enable_minimal), [`enable_realtimepathtracing`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.RendererConfig.enable_realtimepathtracing), and [`enable_pathtracing`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.RendererConfig.enable_pathtracing) options
+  with corresponding C keys and helpers to choose the available modes when the first ovrtx renderer instance is created, 
+  reducing GPU memory use and startup work.
+- Add [C](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_get_config) and [Python readback](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.config) for the explicit configuration used to create a renderer.
+- Complete build identity is now embedded in ovrtx binaries and packages, logged at renderer startup, and
+  attached to crash reports. Native callers can query it with [`ovrtx_get_build_info()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_get_build_info); after renderer
+  initialization, Python callers can use [`ovrtx.get_build_info()`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.get_build_info) or [`Renderer.build_info`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.build_info).
+- Radar [`PointCloud`](https://nvidia-omniverse.github.io/ovrtx/sensors/pointclouds.html) outputs now expose the CPU-resident scan metadata params [`sensorID`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), [`scanIdx`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters),
+  [`cycleCnt`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), [`maxRangeM`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), [`minVelMps`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), [`maxVelMps`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), [`minAzRad`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), [`maxAzRad`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), [`minElRad`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters), and [`maxElRad`](https://nvidia-omniverse.github.io/ovrtx/sensors/radar.html#radar-pointcloud-parameters).
+- Each render product's outputs now signal readiness as soon as that render product finishes, instead of
+  waiting for the whole step. Render products with the same start time keep the order in which the caller
+  added them.
+- A render product can now hold several sensor render variables with the same source name and different
+  channel lists.
+- SPG Lua launch scripts can read current-frame prim attributes and transforms through read-only tables for
+  render products, cameras, render variables, or arbitrary paths.
+- SPG accepts USD `uchar[]` value inputs.
+- New documentation and tested examples: Gaussian splats; USD plugin paths and schema registration; spectral
+  rendering; cameras (lens calibration, rolling shutter, scene partitions, and USD camera attributes); light
+  path expressions; light controls; pick query flags; multi-rate sensors and observer cameras; acoustic
+  sensors; hardware and driver requirements; RTX Minimal anti-aliasing and DLSS; decals; G-buffer debug views;
+  reading simulation timestamps from step results; and C API handle lifetime, invalid-handle behavior, and
+  log-callback context lifetime. SPG diagrams in the published documentation now display as images.
+- Expanded camera sensor SPG processing with photon estimation, HDR noise, YCbCr/MJPEG encoding, CFA-to-MIPI
+  conversion, and embedded-line generation and splicing.
+
+### Changed
+
+- **Breaking (C and Python):** compatibility attribute reads now return scalar-lane tensors with explicit
+  component dimensions, such as `[N,3]` for vectors and `[N,4,4]` for 4x4 matrices, instead of `[N]` with 3 or
+  16 lanes. This also applies to array value tensors. Update raw tensor shape, stride, and byte-count handling
+  to include every dimension. Generic 16-component tuples remain `[N,16]`; MATRIX semantics identify square
+  matrices. Returned attribute maps use the same scalar-lane component axes: scalars `[N]`, tuples `[N,C]`,
+  and square MATRIX values `[N,S,S]` for S=2,3,4. Update raw dtype, rank, and row-stride checks as well.
+  Binding creation dtypes and canonical write inputs retain their multi-lane layout; unmap ownership and
+  synchronization are unchanged. Rendered output tensors keep their existing layout.
+- **Breaking:** Animation time is now permanently the accumulated simulation clock built from [`ovrtx_step`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_step) /
+  [`ovrtx_step_with_stage`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_step_with_stage) deltas, for every stage. Anything driven by animation time (MDL
+  `state::animation_time()`, video texture frame selection, animated NuRec volumes and Gaussian splats)
+  advances with the step delta.
+- **Breaking:** lidar point-cloud [`ChannelId`](https://nvidia-omniverse.github.io/ovrtx/sensors/pointclouds.html#lidar-point-cloud) now reports the channel IDs authored in the sensor profile.
+  Default profiles report 1 to N instead of 0 to N-1, and sparse channel numbering is supported.
+- **Breaking:** acoustic sensors now publish one composite [`SignalWays`](https://nvidia-omniverse.github.io/ovrtx/sensors/acoustic.html#configure-signalways-output) output, matching lidar and radar point
+  clouds. Previously each channel was a separate untyped output.
+- **Breaking:** the camera sensor attribute `omni:sensor:core:colorFilterArrayMaximalValue` is now `float`
+  instead of `int`. Re-author assets that set it as `int`.
+- **Breaking (C):** logging APIs now live in [`<ovrtx/ovrtx_logging.h>`](https://nvidia-omniverse.github.io/ovrtx/c_api/practical_patterns.html#logging-callback) and use [`ovx_log_severity_t`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#logging-types) /
+  [`OVX_LOG_*`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#logging-types) and [`ovx_log_callback_t`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#logging-types). Callbacks receive an [`ovx_log_message_t`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#logging-types) containing message text,
+  nanosecond timestamps, channel, and source metadata instead of separate severity, timestamp, and text
+  arguments. Update callback signatures and recompile.
+- Auto exposure, temporal anti-aliasing, and DLSS now advance by the simulation step time instead of
+  wall-clock time, so brightness adaptation is repeatable across runs and machines.
+- The Gaussian splat skip-tonemapping option now works in path tracing and RTX Minimal as well as real-time
+  path tracing, using `omni:rtx:gaussian:skipTonemapping:enabled`.
+- Default physical illuminant resampling to the existing 1 nm mode instead of 5 nm, preserving finer spectral
+  features without changing interpolation or buffer layout.
+- ovrtx 0.6 attached mode requires ovstage 0.3.x. [`ovrtx_attach_ovstage()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_attach_ovstage) now rejects incompatible ovstage
+  versions before attaching. OVStage 0.3 defaults to `NONDECREASING` ordinal admission: mutations older than
+  retained changes can be rejected even if they clear write floors; equal ordinals remain allowed. See
+  [OVStage integration](https://nvidia-omniverse.github.io/ovrtx/core/ovstage_integration.html#ovstage-ordinal-admission)
+  for migration guidance.
+- Installed wheels now report their complete distribution version, including the build number, through
+  [`ovrtx.__version__`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.__version__); source checkouts continue to report the semantic version, and the native
+  [`ovrtx_get_version()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_get_version) / [`Renderer.version`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.version) compatibility contract is unchanged.
+- On Windows, the loader opens the ovrtx runtime library with a restricted DLL search (the library's own
+  directory, the package dependency directories, and System32) instead of the inherited `PATH`, so an
+  unrelated DLL on the host's `PATH` can no longer replace a packaged dependency.
+- The Linux ARM64 package is smaller: debug symbols are stripped from bundled third-party libraries.
+- Sensor model revisions now count from `0` within each schema version. Use a supported integer revision,
+  including `"0"`, or `"latest"` in `omni:sensor:modelVersion`; malformed, unsupported, and runtime-changing
+  requests remain rejected.
+- Section planes no longer remove lights. New `omni:rtx:scene:sectionPlane:preserveSectionedLighting`
+  preserves shadows, bounce light, and reflections from clipped geometry when enabled; it defaults to false.
+- Identical streamed texture mip data now shares GPU allocations, reducing memory use and duplicate uploads
+  even when textures use different file paths.
+- Reduced RTX Minimal GPU memory use by reusing eligible color-output buffers and avoiding redundant full-size
+  intermediate images.
+- The supported number of lights is raised from 8,192 to more than 16 million.
+
+### Deprecated
+
+- The `uniform` anti-aliasing sample pattern is deprecated and now renders as `box`.
+- The old Gaussian splat skip-tonemapping attribute is deprecated. Use
+  `omni:rtx:gaussian:skipTonemapping:enabled`; the previous name remains supported.
+- The section-plane `sectionLight` option is deprecated and ignored. Use
+  `omni:rtx:scene:sectionPlane:preserveSectionedLighting` to preserve lighting from clipped geometry.
+
+### Fixed
+
+- Renderer initialization failures (GPU Foundation, CUDA runtime, UJITSO, Hydra engine, static plugin
+  registration) now fail [`ovrtx_create_renderer()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_create_renderer) / [`Renderer()`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer) with an error instead of terminating the
+  host process.
+- Python [`Semantic.MATRIX`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Semantic.MATRIX) writes accept NumPy 2x2, 3x3, and 4x4 double matrices. Persistent bindings accept
+  matching scalar-lane NumPy input and preserve an explicit float64 dtype with 4, 9, or 16 components; their
+  mapped Python views expose the corresponding square shape. A binding without an explicit component count
+  defaults to 4x4, and transform semantics remain 4x4. Mismatched matrix sizes and scalar types are rejected.
+- [`Depth`](https://nvidia-omniverse.github.io/ovrtx/sensors/cameras/outputs.html) D32 outputs support direct CUDA array mapping on Vulkan and DX12 without intermediate textures or
+  pixel copies. Linear CUDA-buffer mappings use the existing device-to-device copy path. Device-depth values
+  and explicit CPU mappings are preserved.
+- Prevent the startup GPU diagnostic subprocess from opening a console window in Windows GUI applications.
+- ovrtx now links a private, hidden-visibility copy of ImGui into the runtime library instead of depending on
+  a shared `libimgui.so` / `imgui.dll`, and the package no longer ships
+  `bin/plugins/renderer.imgui/libimgui.so` / `imgui.dll`. A host process that loads its own ImGui under the
+  same name no longer shares one copy with ovrtx: previously, whichever loaded first was used by both, so the
+  host could fail with undefined ImGui symbols or ovrtx could run against an ImGui with a different ABI.
+- Failed internal assertions inside the ovrtx shared library no longer open a modal dialog on Windows. A
+  failed check in a headless process (CI, embedded hosts) previously blocked on the dialog until the process
+  was killed. An attached debugger still breaks on the assertion.
+- [`step()`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.step) no longer hangs when progressive geometry loading reaches its memory or instance budget.
+- Fixed hangs when two or more renderers run in the same process, on the first step with an attached stage and
+  while waiting on geometry streaming status.
+- An idle renderer no longer exhausts rendering resources shared with other renderers in the same process.
+- Multiple renderers in the same process using camera or depth-sensor processing no longer interfere with each
+  other.
+- Fixed GPU memory growth when render products without a viewport share a camera and resolution.
+- Fixed GPU memory growth when render products using DLSS are repeatedly created and destroyed.
+- [`ovrtx_attach_ovstage()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_attach_ovstage) now retains its own stage handle, so destroying the caller's handle while the
+  renderer remains attached is safe. The documentation now states that [`ovrtx_attach_ovstage()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_attach_ovstage) and
+  [`ovrtx_detach_ovstage()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_detach_ovstage) rebuild renderer state on the calling thread, so previously enqueued operations
+  must be waited for with [`ovrtx_wait_op()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_wait_op) first. An [`ovrtx_wait_op()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_wait_op) timeout does not cancel an operation,
+  so a timed-out wait is not sufficient. After a detach failure, do not use the renderer except to destroy it.
+- [`ovrtx_reset()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_reset) now discards all accumulated rendering history, as documented. Previously the path tracer's
+  radiance cache, the Flow simulation and the frame number that sampling sequences depend on survived it, so a
+  renderer rendered differently after a reset than a newly created one.
+- On multi-GPU systems, a render product added after [`ovrtx_reset()`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_reset) now renders on the GPU a new renderer
+  would choose, instead of the next GPU in the automatic assignment.
+- A REPLICATE-attached renderer now drops a prim's type, applied-schema and ancestor-type tags when the stage
+  deletes `usd-prim-type`, `usd-schemas` or `usd-ancestor-types`, as a BORROW-attached renderer does.
+  Previously a prim that a live USD edit left typeless kept its old type and ancestor types under REPLICATE
+  only.
+- `path_dictionary_create_paths_from_tokens()` now constructs absolute paths, matching ovstage and returning
+  the same handle as the equivalent absolute string path within the same dictionary. Zero-component paths now
+  resolve to `/`. Previously, component paths omitted the leading `/` and could identify a different prim.
+- The deprecated [`ovrtx_clone_usd`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_clone_usd) / [`Renderer.clone_usd`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.clone_usd) now reject a missing source and any already-existing
+  target path before mutating the stage, and the per-operation error names the offending path(s), e.g.
+  `ovrtx_clone_usd: target prim already exists at '/Tile3'`. Previously the operation reported success while
+  cloning over the existing prim, or created empty prims when the source did not exist.
+- An attached renderer no longer returns frames for render products that have been removed from the stage.
+- CUDA-backed `UsdGeomPoints` buffers now resize correctly after an ovstage stage is attached.
+- Cloned geometry is shared during initial streaming, so scenes with many cloned environments no longer use
+  excess GPU memory.
+- Fixed intermittent heap corruption and crashes in the shader cache.
+- The package now includes all required USD schema plugins.
+- [`OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO) now returns tracked metadata in pick results.
+- Python: a rejected [`step()`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.step), for example one with an invalid render product path, no longer re-raises its
+  error on the next valid step or reset, and no longer reports leaked step outputs.
+- Python: renderer teardown at interpreter exit no longer prints a false cleanup warning.
+- Lidar: scan start time and pose are kept across simulation steps.
+- Lidar: solid-state beams with Gaussian or uniform ray types return points.
+- Lidar: rotary scans are no longer empty at certain frame rates.
+- Lidar: hit normals are transformed into the output frame.
+- Lidar: motion-compensated points from moving sensors line up with the scene geometry.
+- Lidar: completed scans report scan-level pose and timestamps.
+- Lidar: point-cloud outputs report the correct scan timestamp and compaction type.
+- Changing parameters on a running sensor no longer resets its scan or frame counter, and reconfiguring or
+  removing sensors while frames are in flight no longer crashes.
+- Fixed a heap overflow when RTX sensor materials use paint variants.
+- [`DistanceToCamera`](https://nvidia-omniverse.github.io/ovrtx/sensors/cameras/outputs.html) is now correct for lat-long, fisheye and other non-pinhole cameras.
+- Instanced meshes no longer disappear in multi-rate rendering with motion BVH enabled.
+- Gaussian splats now render in RTX Minimal on GPUs without inline ray tracing.
+- Fixed Gaussian splat white-strip artifacts with tiled cameras, depth-of-field artifacts when tone mapping is
+  skipped, and incorrect rendering of particle fields with array attributes, spherical-harmonic data or empty
+  positions.
+- Reduced shadow flicker on Gaussian splats lit by several lights.
+- Cylinder lights with IES profiles now reach their target photometric power.
+- Fixed artifacts on the back faces of area lights in RTX Minimal.
+- Path tracing handles transmissive objects consistently when a path reaches its bounce limit.
+- Corrected fast-refraction shadow brightness with spectral rendering.
+- Path tracing [`PtPreDenoisedResult`](https://nvidia-omniverse.github.io/ovrtx/sensors/cameras/outputs.html) output is no longer denoised, and Multi-Matte outputs now produce correct
+  geometry and material masks.
+- Stable-ID outputs now include all IDs, including geometry that loads after the first frames.
+- Curves whose widths start empty and are filled in later now render at the correct width.
+- Fixed decal shadows crashing the shader compiler on some drivers.
+- Fixed possible heap corruption in the material system on Linux ARM64.
+- Cloning a subtree that contains scene-graph instances whose prototype has an intermediate prim between the
+  instance root and its geometry (for example a link-level `instanceable` group above the meshes) now keeps
+  the cloned instance proxies attached to their rebased hierarchy parent. They were attached to their literal
+  path parent, which is not a prim in that layout, so they kept the source's world transform and every clone
+  rendered on top of the source ([`ovrtx_clone_usd`](https://nvidia-omniverse.github.io/ovrtx/c_api/index.html#c.ovrtx_clone_usd) / [`Renderer.clone_usd`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.Renderer.clone_usd), and `ovstage_clone` with an
+  attached stage). A clone whose destination parent is not a prim now hangs under the nearest existing
+  ancestor, as population does for an instance proxy whose intermediate ancestors are not populated, instead
+  of being left unparented.
+- Matrix-array writes preserve outer slices, including byte strides that are not a whole matrix size, and
+  reject noncompact component axes explicitly.
+- A renderer created without an explicit [`motion_bvh`](https://nvidia-omniverse.github.io/ovrtx/python_api/index.html#ovrtx.RendererConfig.motion_bvh) option now restores the process defaults instead of
+  inheriting a previous renderer's Motion BVH override.
+- Linux ovrtx runtime and rendering plugins now hide internal symbols, reducing symbol collisions with
+  libraries loaded by the host application.
+- Linux OpenGL interop now falls back safely to device EGL when GLX is unavailable or fails, including
+  headless systems, and preserves shared EGL displays while other contexts still use them.
+- Rotary lidar partial captures retain their requested interval when crossing a scan boundary.
+- Instant solid-state lidar samples the requested endpoint time and pose instead of treating the flash as a
+  swept interval.
+- Idealized lidar multi-return outputs now report each return's [`EchoId`](https://nvidia-omniverse.github.io/ovrtx/sensors/pointclouds.html#lidar-point-cloud) instead of zero for every return.
+- Fixed invalid factor-8 tiled subsampling schedules in WPM lidar.
+- Lidar atmospheric and solar settings apply consistently across frames, and live sun-direction or irradiance
+  changes take effect without changing the aerosol model.
+- Invalid lidar and radar sensor parameters now produce error diagnostics.
+- Fixed OpenPBR material loading at startup when shader inputs have both a connection and an authored fallback
+  value.
+- Fixed shadow-terminator artifacts on hard surfaces in RTX Minimal.
+- Corrected spectral texture sampling for cameras with custom spectral responsivity, and improved spectral
+  subsurface-scattering compatibility with RGB rendering.
+- Fixed random-sampling seed collisions and repeated material sampling dimensions that could introduce
+  correlations in path-traced and subsurface-scattering images.
+- Animated Gaussian splat bounds now update on the GPU so moving splats remain correctly bounded.
+- A syntax error in an SPG Lua script now fails only its node instead of terminating the process.
+
+### Security
+
+- **Breaking:** SPG Lua scripts now run under enforced limits: 1 million instructions per load or launch, 64
+  KB of log output per call, and 10 MB of memory. `pcall`, `xpcall` and the string pattern functions are no
+  longer available. A node whose script exceeds a limit stops until its SPG setup changes.
+- Package contents are scanned for embedded credentials before the archive and the wheel are assembled, and
+  the finished archive and wheel are scanned again before they are uploaded. On Linux, ELF `.comment` entries
+  that embed a URL, a build path or a source-control reference (toolchain-identification strings inherited
+  from prebuilt third-party components) are blanked before packaging.
+
 ## [0.5.1] - 2026-10-05
 
 ### Changed
@@ -52,27 +293,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   destination now return that destination directly.
 - **Breaking:** Renderer tensor inputs now require the standard `__dlpack__`
   protocol; raw `DLTensor` structures are no longer accepted.
-- CMake model #2 now pairs `ovrtx::ovrtx` with the new ovstage shared loader
-  behind `ovstage::ovstage`, so both runtimes remain deferred until API
-  initialization. The C minimal example builds and checks both loader models.
 - **Breaking:** Public OVRTX packages now use Vulkan exclusively on Windows. The
   Python `RendererConfig.use_vulkan` field and the C
   `OVRTX_CONFIG_USE_VULKAN` / `ovrtx_config_entry_use_vulkan()` API have
   been removed. Recompile C applications against the 0.5 headers and remove
   backend selection; pre-0.5 binaries that pass the retired key receive a clear
   `OVRTX_API_ERROR`.
-- `ovrtx_set_reset_xform_stack()` now declares its payload as `{kDLBool, 8, 1}` instead of `{kDLUInt, 8, 1}`, matching the documented USD `bool` mapping. The bytes on the wire are unchanged (one byte per prim) and the helper still writes only to prims that already carry the attribute.
 - **Breaking:** `omni:sensor:modelVersion` now inherits `"latest"` from `OmniSensorAPI`. Legacy dotted values such as `"0.0.0"` are invalid; migrate authored assets to `"latest"` or a supported positive integer revision such as `"1"`.
 - **Breaking:** Python `ManagedDLTensor` can no longer be constructed directly.
 - **Breaking:** Previously, ovrtx identified `RenderVar`s by their `sourceName`. `RenderVar`s are now identified by their full path. For example, `frame.render_vars["/Render/Product/LdrColor"]`.
+- **Breaking:** The absolute specular and transmission bounce limits have been replaced by attributes that specify additional bounces beyond `maxBounces`:
+  - RTPT: `omni:rtx:rtpt:maxSpecularAndTransmissionBounces` was replaced by `omni:rtx:rtpt:extraSpecularAndTransmissiveBounces`. Legacy authored data is converted using `extraSpecularAndTransmissiveBounces = max(maxSpecularAndTransmissionBounces - maxBounces, 0)`.
+  - PathTracing: `omni:rtx:pt:limits:maxGlossyBounces` was replaced by `omni:rtx:pt:limits:extraSpecularAndTransmissiveBounces`. Legacy authored data is converted using `extraSpecularAndTransmissiveBounces = max(maxGlossyBounces - maxBounces, 0)`.
+- CMake model #2 now pairs `ovrtx::ovrtx` with the new ovstage shared loader
+  behind `ovstage::ovstage`, so both runtimes remain deferred until API
+  initialization. The C minimal example builds and checks both loader models.
+- `ovrtx_set_reset_xform_stack()` now declares its payload as `{kDLBool, 8, 1}` instead of `{kDLUInt, 8, 1}`, matching the documented USD `bool` mapping. The bytes on the wire are unchanged (one byte per prim) and the helper still writes only to prims that already carry the attribute.
 - Python `ManagedDLTensor.numpy()` now raises `RuntimeError` for non-CPU tensors to guard against trying to use a GPU pointer on the CPU.
 - `ovrtx_register_schema_paths()` now registers ovrtx's schema families with ovstage, so an attached ovstage resolves them when it populates. Call it before ovstage's first populate.
 - MDL SDK updated to 2026.0.1. This also fixes a crash observed when cold-loading some materials on ARM.
 - The `DepthSD` AOV is deprecated. Use `DistanceToImagePlaneSD` or `DistanceToCameraSD` instead.
 - `ovrtx` and `ovstage` now automatically apply relevant RTX schemata to `Camera` and `RenderProduct` prims, meaning applications do not need to apply these manually in order to set render settings.
-- **Breaking:** The absolute specular and transmission bounce limits have been replaced by attributes that specify additional bounces beyond `maxBounces`:
-  - RTPT: `omni:rtx:rtpt:maxSpecularAndTransmissionBounces` was replaced by `omni:rtx:rtpt:extraSpecularAndTransmissiveBounces`. Legacy authored data is converted using `extraSpecularAndTransmissiveBounces = max(maxSpecularAndTransmissionBounces - maxBounces, 0)`.
-  - PT: `omni:rtx:pt:limits:maxGlossyBounces` was replaced by `omni:rtx:pt:limits:extraSpecularAndTransmissiveBounces`. Legacy authored data is converted using `extraSpecularAndTransmissiveBounces = max(maxGlossyBounces - maxBounces, 0)`.
 - Updated the `UsdPreviewSurface` implementation to match the [OpenUSD 25.11 specification](https://openusd.org/25.11/spec_usdpreviewsurface.html#preview-surface). In particular, this adds the `opacityMode` attribute.
 - Enabled native selection outlines by default. Applications can assign and style selection groups at runtime or disable the global outline pass when creating the renderer.
 - Enabled multiple dome lights by default and bounded path-tracing cost by sampling at most eight dome lights per sample when scenes contain larger dome-light sets.
@@ -149,8 +390,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Summary
 
-ovrtx 0.4.1 adds rendering configuration controls and includes rendering,
-sensor, GPU interoperability, and stability improvements.
+- ovrtx 0.4.1 adds rendering configuration controls and includes rendering,
+  sensor, GPU interoperability, and stability improvements.
 
 ### Highlights
 
@@ -187,59 +428,57 @@ sensor, GPU interoperability, and stability improvements.
 
 ## [0.4.0] - 2026-07-17
 
-# ovrtx 0.4.0 Release Notes
+### Summary
 
-## Summary
+- ovrtx 0.4 introduces integration with the new [ovstage](https://github.com/nvidia-omniverse/ovstage) 0.1 library. Applications can attach an externally owned ovstage instance and render its scene data.
 
-ovrtx 0.4 introduces integration with the new [ovstage](https://github.com/nvidia-omniverse/ovstage) 0.1 library. Applications can attach an externally owned ovstage instance and render its scene data.
+- Existing ovrtx APIs for loading USD and reading or writing stage attributes remain available for compatibility but are deprecated and will be removed in a future release.
 
-Existing ovrtx APIs for loading USD and reading or writing stage attributes remain available for compatibility but are deprecated and will be removed in a future release.
+- This release also includes breaking C API changes, improved DLSS Ray Reconstruction quality under motion, and numerous rendering, sensor, and stability fixes.
 
-This release also includes breaking C API changes, improved DLSS Ray Reconstruction quality under motion, and numerous rendering, sensor, and stability fixes.
+### Highlights
 
-## Highlights
+- **ovstage integration**
 
-### ovstage integration
+- New C APIs support attached-stage workflows:
 
-New C APIs support attached-stage workflows:
+  - `ovrtx_attach_ovstage()` and `ovrtx_detach_ovstage()`
+  - `ovrtx_step_with_stage()`
+  - `ovrtx_update_from_stage()`
 
-- `ovrtx_attach_ovstage()` and `ovrtx_detach_ovstage()`
-- `ovrtx_step_with_stage()`
-- `ovrtx_update_from_stage()`
+- While attached, ovrtx stage-building, write, and map APIs return `OVRTX_API_ERROR`. Read-only `ovrtx_query_prims()` remains available.
 
-While attached, ovrtx stage-building, write, and map APIs return `OVRTX_API_ERROR`. Read-only `ovrtx_query_prims()` remains available.
+- **Motion BVH configuration**
 
-### Motion BVH configuration
+- `OVRTX_CONFIG_MOTION_BVH` replaces the former Boolean option:
 
-`OVRTX_CONFIG_MOTION_BVH` replaces the former Boolean option:
+  - `Disable` — off and now the default
+  - `Enable` — enabled when the renderer is created
+  - `Auto` — enabled when required by sensors or motion-sensitive cameras
 
-- `Disable` — off and now the default
-- `Enable` — enabled when the renderer is created
-- `Auto` — enabled when required by sensors or motion-sensitive cameras
+- Applications that relied on implicit auto-detection must explicitly select `Auto`.
 
-Applications that relied on implicit auto-detection must explicitly select `Auto`.
+- **Schema registration**
 
-### Schema registration
+- Automatic registration in `PXR_PLUGINPATH_NAME` is now disabled by default. Register schemas by setting `OVRTX_PXR_SCHEMA_AUTO_REGISTER` or calling `ovrtx_register_schema_paths()` before OpenUSD initializes.
 
-Automatic registration in `PXR_PLUGINPATH_NAME` is now disabled by default. Register schemas by setting `OVRTX_PXR_SCHEMA_AUTO_REGISTER` or calling `ovrtx_register_schema_paths()` before OpenUSD initializes.
+- Standalone applications using `ovrtx_initialize()` or `ovrtx_create_renderer()` continue to register paths automatically. `OVRTX_SKIP_SCHEMA_AUTO_REGISTER` has been removed.
 
-Standalone applications using `ovrtx_initialize()` or `ovrtx_create_renderer()` continue to register paths automatically. `OVRTX_SKIP_SCHEMA_AUTO_REGISTER` has been removed.
+- `ovrtx_get_usd_plugin_path_count()` and `ovrtx_get_usd_plugin_paths()` enumerate ovrtx's USD schema/plugin directories without mutating any environment variable (the Python `ovrtx.usd_plugin_paths()` forwards an explicit root via the config struct rather than the env). Enumeration and registration share one first-call-wins effective-root pin: whichever runs first pins the root, and the other warns and acts on the pinned root on mismatch, in either order.
 
-`ovrtx_get_usd_plugin_path_count()` and `ovrtx_get_usd_plugin_paths()` enumerate ovrtx's USD schema/plugin directories without mutating any environment variable (the Python `ovrtx.usd_plugin_paths()` forwards an explicit root via the config struct rather than the env). Enumeration and registration share one first-call-wins effective-root pin: whichever runs first pins the root, and the other warns and acts on the pinned root on mismatch, in either order.
+- **Other additions**
 
-### Other additions
+  - NDC-based picking, pickability controls, and configurable selection outlines
+  - Geometry streaming configuration
+  - Rolling-shutter, RenderVar channel, physical-camera responsivity, and light-shaping schemas
+  - Render Output Compression, LPE labels for AOVs, and multiple dome lights
+  - Gaussian splats and scene partitioning in RTX Minimal
+  - SPG output fanout, multiple descriptor sets, structured buffers, and large array inputs
+  - Updated DLSS Ray Reconstruction with better quality under motion
 
-- NDC-based picking, pickability controls, and configurable selection outlines
-- Geometry streaming configuration
-- Rolling-shutter, RenderVar channel, physical-camera responsivity, and light-shaping schemas
-- Render Output Compression, LPE labels for AOVs, and multiple dome lights
-- Gaussian splats and scene partitioning in RTX Minimal
-- SPG output fanout, multiple descriptor sets, structured buffers, and large array inputs
-- Updated DLSS Ray Reconstruction with better quality under motion
+### Breaking Changes
 
-## Breaking Changes
-
-All C consumers must be recompiled.
+- All C consumers must be recompiled.
 
 - `ovrtx_release_read_result()` now accepts the original `ovrtx_read_handle_t`.
 - `ovrtx_read_map_handle_t` and `ovrtx_read_output_t::map_handle` were removed.
@@ -248,7 +487,7 @@ All C consumers must be recompiled.
 - `ovx_string_t::str` and `::len` became `::ptr` and `::length`.
 - RT1 `DirectLightingSampled` and `DirectLightingLtc` modes were removed.
 
-## Notable Fixes
+### Notable Fixes
 
 - Corrected HDR color, illuminance, motion-vector, and dome-light AOV behavior
 - Fixed rect, sphere, distant, and dome-light rendering issues
@@ -259,7 +498,7 @@ All C consumers must be recompiled.
 - Added DLPack v1.2-compliant row-major strides
 - Enabled SPG by default
 
-## Known Issues
+### Known Issues
 
 - Known driver scheduling interaction on Linux: CUDA stream synchronization concurrent with the renderer's Vulkan work reduces throughput. Set `CUDA_DEVICE_MAX_CONNECTIONS=1` before the first CUDA context is created. Windows is unaffected. Refer to the "CUDA and Vulkan Scheduling on Linux" documentation page.
 - Multi-GPU viewport picking is limited to GPU 0; set RenderProduct `deviceIds = [0]`.
@@ -268,16 +507,17 @@ All C consumers must be recompiled.
 - ovstage 0.1 does not support USD-active reads.
 - The material-editor C example has not yet been migrated to ovstage or validated.
 
-## Upgrading from ovrtx 0.3.x
+### Upgrading
 
-1. Recompile C consumers and update read-result, picking, string, and SPG APIs.
-2. Enable schema registration explicitly if your application depends on it.
-3. Select Motion BVH `Auto` if you relied on the former implicit behavior.
-4. Migrate deprecated scene, attribute, query, and USD population APIs to ovstage.
-5. Commit at least one ovstage write before calling `ovrtx_step_with_stage()`.
-6. Replace removed RT1 direct-lighting modes.
+- From ovrtx 0.3.x:
+  1. Recompile C consumers and update read-result, picking, string, and SPG APIs.
+  2. Enable schema registration explicitly if your application depends on it.
+  3. Select Motion BVH `Auto` if you relied on the former implicit behavior.
+  4. Migrate deprecated scene, attribute, query, and USD population APIs to ovstage.
+  5. Commit at least one ovstage write before calling `ovrtx_step_with_stage()`.
+  6. Replace removed RT1 direct-lighting modes.
 
-The repository includes agent-assisted `update-0_3-0_4-c` and `update-0_3-0_4-python` migration skills.
+- The repository includes agent-assisted `update-0_3-0_4-c` and `update-0_3-0_4-python` migration skills.
 
 
 ## [0.3.0] - 2026-05-15
@@ -402,3 +642,12 @@ The repository includes agent-assisted `update-0_3-0_4-c` and `update-0_3-0_4-py
 
 - ovrtx cannot be used in a process that also links OpenUSD that is not v25.11, non-monolithic and Python-enabled, linked against oneTBB. In particular, this means ovrtx cannot be used together with `usd-core` in the same process. This limitation will be lifted in a future version.
 - ovrtx currently supports camera sensors only. Other types of sensors will be supported in the next minor release.
+
+[0.6.0]: https://github.com/NVIDIA-Omniverse/ovrtx/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/NVIDIA-Omniverse/ovrtx/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/NVIDIA-Omniverse/ovrtx/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/NVIDIA-Omniverse/ovrtx/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/NVIDIA-Omniverse/ovrtx/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/NVIDIA-Omniverse/ovrtx/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/NVIDIA-Omniverse/ovrtx/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/NVIDIA-Omniverse/ovrtx/releases/tag/v0.1.0

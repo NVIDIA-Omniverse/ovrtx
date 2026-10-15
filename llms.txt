@@ -61,7 +61,7 @@ For C validation:
 cd examples/c/minimal
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/minimal
+./build/static/minimal
 ```
 
 Success means `out.png` exists and matches the documented minimal reference image.

@@ -53,7 +53,7 @@ Build and Run
 
       .. code-block:: bash
 
-         ./build/minimal
+         ./build/static/minimal
 
    .. tab-item:: Windows
 
@@ -78,7 +78,7 @@ Build and Run
 
       .. code-block:: pwsh
 
-         .\build\Release\minimal.exe
+         .\build\static\Release\minimal.exe
 
 Licensing
 ---------

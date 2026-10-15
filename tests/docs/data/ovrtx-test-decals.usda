@@ -1,0 +1,148 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    subLayers = [@./ovrtx-test-base.usda@]
+    upAxis = "Y"
+)
+
+over "Render"
+{
+    over "Camera"
+    {
+        token omni:rtx:rendermode = "PathTracing"
+        int2 resolution = (768, 768)
+    }
+}
+
+over "World"
+{
+    over "logo"
+    {
+        over "logo"
+        {
+            over "logo" (
+                prepend apiSchemas = ["OmniCoordSysAPI:RedRTXA", "OmniCoordSysAPI:RedRTXB", "OmniCoordSysAPI:RedRTXC", "OmniCoordSysAPI:SilverLogoA", "OmniCoordSysAPI:SilverLogoB", "OmniCoordSysAPI:SilverLogoC"]
+            )
+            {
+                rel coordSys:RedRTXA:binding = </World/RedRTXA>
+                rel coordSys:RedRTXB:binding = </World/RedRTXB>
+                rel coordSys:RedRTXC:binding = </World/RedRTXC>
+                rel coordSys:SilverLogoA:binding = </World/SilverLogoA>
+                rel coordSys:SilverLogoB:binding = </World/SilverLogoB>
+                rel coordSys:SilverLogoC:binding = </World/SilverLogoC>
+            }
+        }
+    }
+
+    over "Looks"
+    {
+        def Material "RedMaterial"
+        {
+            token outputs:mdl:surface.connect = </World/Looks/RedMaterial/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniSurface.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniSurface"
+                color3f inputs:diffuse_reflection_color = (0.65, 0.012, 0.008)
+                float inputs:specular_reflection_roughness = 0.65
+                bool inputs:enable_opacity = true
+                asset inputs:geometry_opacity_image = @./decal-rtx-mask.png@
+                int inputs:geometry_opacity_image_alpha_mode = 1
+                token outputs:out (renderType = "material")
+            }
+        }
+
+        def Material "SilverMaterial"
+        {
+            token outputs:mdl:surface.connect = </World/Looks/SilverMaterial/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniSurface.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniSurface"
+                # [snippet:doc-decal-silver-mask-usda]
+                color3f inputs:diffuse_reflection_color = (0.95, 0.95, 0.95)
+                float inputs:metalness = 1
+                float inputs:specular_reflection_roughness = 0.55
+                bool inputs:enable_opacity = true
+                asset inputs:geometry_opacity_image = @./decal-nvidia-mask.png@
+                # Read the mask's red channel, not a missing alpha channel.
+                int inputs:geometry_opacity_image_alpha_mode = 1
+                # [/snippet:doc-decal-silver-mask-usda]
+                token outputs:out (renderType = "material")
+            }
+        }
+    }
+
+    def OmniDecal "RedRTXA" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
+        rel material:binding = </World/Looks/RedMaterial>
+        token omni:decal:faceMode = "frontAndBack"
+        int omni:decal:priority = 0
+        token omni:projector:space = "object"
+        token omni:projector:type = "planar"
+        # Planar projection uses local X/Y; aim local Z along world Y.
+        double3 xformOp:translate = (3, 4, -10)
+        float3 xformOp:rotateXYZ = (-90, 0, 0)
+        # Double the projected width/height; leave the clipping depth unchanged.
+        float3 xformOp:scale = (16, 16, 12)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def OmniDecal "RedRTXB" (
+        prepend inherits = </World/RedRTXA>
+    )
+    {
+        double3 xformOp:translate = (-9.6, 4, 2)
+        float3 xformOp:rotateXYZ = (-90, -70, 0)
+        float3 xformOp:scale = (13, 13, 12)
+    }
+
+    def OmniDecal "RedRTXC" (
+        prepend inherits = </World/RedRTXA>
+    )
+    {
+        # Follow the lower-right curve and overlap the right-hand NVIDIA logo.
+        double3 xformOp:translate = (7, 4, 6)
+        float3 xformOp:rotateXYZ = (-90, 40, 0)
+        float3 xformOp:scale = (13, 13, 12)
+    }
+
+    def OmniDecal "SilverLogoA" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
+        rel material:binding = </World/Looks/SilverMaterial>
+        token omni:decal:faceMode = "frontAndBack"
+        int omni:decal:priority = 10
+        token omni:projector:space = "object"
+        token omni:projector:type = "planar"
+        # Overlap the upper RTX wordmark; priority 10 places silver over red (0).
+        double3 xformOp:translate = (-3, 4, -8)
+        float3 xformOp:rotateXYZ = (-90, 0, 0)
+        float3 xformOp:scale = (10.6, 10.6, 12)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def OmniDecal "SilverLogoB" (
+        prepend inherits = </World/SilverLogoA>
+    )
+    {
+        double3 xformOp:translate = (9.8, 4, 1)
+        float3 xformOp:scale = (10.6, 10.6, 12)
+    }
+
+    def OmniDecal "SilverLogoC" (
+        prepend inherits = </World/SilverLogoA>
+    )
+    {
+        double3 xformOp:translate = (-4, 4, 9)
+        float3 xformOp:scale = (10.6, 10.6, 12)
+    }
+}

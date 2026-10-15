@@ -109,21 +109,82 @@ immediately without applying scene-data changes.
 The update applies committed population changes while retaining shared
 attribute storage. Python performs this update automatically before stepping.
 
+Two Clocks: USD Time and the Simulation Clock
+---------------------------------------------
+
+An attached application drives two independent clocks, and ovrtx infers neither
+of them from the other:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Clock
+     - Driven by
+   * - **USD time**, the position on the stage's timeline
+     - ``ovstage_population_apply_usd_time``, which resamples time-sampled
+       attributes into the attached scene data
+   * - **Simulation clock**, the accumulated sensor/simulation time
+     - the ``delta_time`` argument of :c:func:`ovrtx_step_with_stage`;
+       :c:func:`ovrtx_reset` sets it to the time it is given
+
+Under ovrtx, **animation time is the simulation clock**. Everything that
+animates from animation time -- MDL ``state::animation_time()``, video texture
+frame selection, animated NuRec volumes and Gaussian splats -- advances with the
+``ovrtx_step`` delta, not with the applied USD time. Applying a USD time never
+changes animation time.
+
+An application that wants animation playback must therefore advance both clocks
+together. Derive them from a single time source: pass the absolute time to
+``ovstage_population_apply_usd_time`` and the delta since the previous frame to
+:c:func:`ovrtx_step_with_stage`. Advancing one without the other desynchronizes
+materials from geometry: time-sampled geometry would move while materials stay
+still, or the reverse.
+
+Because ovrtx never reads the timeline position back out of the attached scene
+data, the renderer's own notion of USD time stays at zero while attached. That is
+by design -- ``ovstage_population_apply_usd_time`` resamples time-sampled
+attributes into the scene data, so the renderer consumes already-evaluated values
+and has no reason to re-evaluate them at a timeline position. Three consequences:
+
+* Time-sampled render settings must be reached through population. Values that
+  would only resolve by sampling USD at the current timeline position are not
+  evaluated.
+* Timestamp fallbacks that substitute USD time when simulation time is
+  unavailable (some sensor and camera-ISP paths) read zero. Pass a real
+  ``delta_time`` so simulation time is authoritative.
+* Animation time never follows the timeline, as described above.
+
+.. _ovstage-ordinal-admission:
+
 Ordinals and Write-Floor Gates
 -------------------------------
 
-ovstage uses **ordinals** (monotonically increasing ``uint64_t`` values) to
+ovstage uses **ordinals** (application-supplied ``uint64_t`` values) to
 version writes. Every ``write_attribute``, ``clone``, and related mutation
-carries an ordinal. ovstage 0.1 retains the latest committed snapshot only; an
+carries an ordinal. ovstage retains the latest committed snapshot only; an
 ordinal passed to rendering is a publication gate, not a historical snapshot
 selector.
 
 A **write-floor gate** is a per-attribute lower bound that rejects writes at or
 below the floor with ``OVSTAGE_ERROR_WRITE_FLOOR_VIOLATION``
-(returned through ``wait_op``). Key properties:
+(reported by enqueue or operation completion, depending on the operation).
+Key properties:
 
-- Admission is per-attribute, not a global watermark. A clone is blocked only
-  by a floor on an attribute it would touch, not by unrelated seals.
+- For data-plane writes, map commits, clones, and deletes, clearing the floor is
+  necessary but does not guarantee admission. The
+  ``STRICTLY_INCREASING`` policy also rejects ordinals older than or equal to
+  retained committed changes on affected cells (prim path and canonical
+  attribute) and prim lifecycle. Disjoint cells may share an ordinal.
+- ``NONDECREASING`` permits equality with retained changes while rejecting older
+  ordinals. Both history policies check applicable prim-lifecycle history and
+  the ``usd-path`` lifecycle floor. ``FLOOR_ONLY`` skips retained-history
+  admission and that additional lifecycle check. All policies still enforce
+  the operation's write floors and preserve type and create-only checks.
+- Cloning commits copied cells at the clone ordinal. Under the strict policy,
+  a subsequent customization of a copied cell needs a newer ordinal, even before
+  sealing. Reusing the same unsealed ordinal requires an admission policy that
+  allows equality.
 - :c:func:`ovrtx_update_from_stage` uses the per-attribute write floor to skip
   attributes that have not changed since the last pull at the same ordinal,
   making incremental updates cheap.
@@ -131,8 +192,26 @@ below the floor with ``OVSTAGE_ERROR_WRITE_FLOOR_VIOLATION``
   should go through ovstage. The renderer attribute-write entry points remain
   available for compatibility but are deprecated in 0.4.
 
-The ordinal model and write-floor API are owned by ovstage. Consult the ovstage
-documentation for the full API reference.
+Enqueue success does not guarantee that a mutation will pass admission during
+execution. Wait for successful mutation completion, then advance the write floor
+and wait for that publication before updating or rendering through ovrtx.
+
+Select the policy through ovstage's process configuration before creating
+instances; it remains fixed until all initialization and instance references
+have been released. With ``FLOOR_ONLY``, an older-ordinal mutation that executes
+later can replace newer state. Ordinal ranges do not provide historical payload
+snapshots. Consult the documentation shipped with the installed ovstage version
+for its supported configuration settings.
+
+The ordinal model, admission policy, and write-floor API are owned by ovstage.
+See its `write contract
+<https://github.com/NVIDIA-Omniverse/ovstage/blob/main/docs/scene/writing_attributes.rst>`_
+and `asynchronous submit/observe model
+<https://github.com/NVIDIA-Omniverse/ovstage/blob/main/docs/concepts/async_model.rst>`_
+for the authoritative contracts.
+
+For population update sequencing, see the `ovstage population documentation
+<https://github.com/NVIDIA-Omniverse/ovstage/blob/main/docs/scene/population.rst>`_.
 
 Path Dictionary Notes
 ---------------------
@@ -147,6 +226,14 @@ through the public accessor supplied by its owner:
   dictionary; do not free it or assume dictionaries are shared across
   instances.
 
+Both dictionaries construct absolute paths with
+``path_dictionary_create_paths_from_tokens``. See the shared contract for
+``path_dictionary_vtable_t::create_paths_from_tokens`` in
+``<ovx/path_dictionary/path_dictionary_vtable.h>`` for component and root semantics.
+
+``ovrtx_get_path_dictionary`` continues to return the renderer's own dictionary
+when an OVStage instance is attached.
+
 Path-list handles returned by ovstage result structs are **borrows** valid only
 for the lifetime of the producing operation. Call
 ``path_dictionary_add_path_list_reference`` before releasing the producer when
@@ -156,11 +243,34 @@ the list must remain usable, then pair it with
 Detaching From ovstage
 -----------------------
 
+After a successful attach, ovrtx retains its own ovstage handle. The application
+may destroy the handle it passed to :c:func:`ovrtx_attach_ovstage`; this
+invalidates the application's handle but leaves the attached renderer and shared
+stage state alive.
+
 Call :c:func:`ovrtx_detach_ovstage` to return the renderer to standalone mode.
 Detach resets the renderer's stage, dropping all prims and attributes sourced
-from the attached ovstage. After detach, the
-renderer can attach the same or a different ovstage, or use the deprecated
-standalone scene APIs for compatibility.
+from the attached ovstage, then releases ovrtx's retained handle. Destroying the
+renderer performs the same attached-stage cleanup. After detach, the renderer
+can attach the same or a different ovstage, or use the deprecated standalone
+scene APIs for compatibility.
+
+Attaching and Detaching Around In-Flight Operations
+---------------------------------------------------
+
+Both :c:func:`ovrtx_attach_ovstage` and :c:func:`ovrtx_detach_ovstage` rebuild
+the renderer's internal state on the calling thread, so wait for previously
+enqueued operations with :c:func:`ovrtx_wait_op` before calling either one.
+Neither call waits on your behalf, and rebuilding that state underneath a
+running operation can crash or hang the renderer. Note that an
+:c:func:`ovrtx_wait_op` timeout does not cancel the operation it was waiting
+on: the operation keeps running, so a timed-out wait does not make it safe to
+attach or detach.
+
+When detach fails, teardown may be partial. Do not use the renderer again except
+to destroy it. The application may release its own ovstage handle before or
+after destroying the renderer because ovrtx retains any shared stage state still
+needed for safe renderer destruction.
 
 Related Docs
 ------------

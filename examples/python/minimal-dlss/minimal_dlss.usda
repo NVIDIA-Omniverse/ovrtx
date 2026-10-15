@@ -1,0 +1,44 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+# Reuse the scene without importing its viewport RenderProducts.
+def Xform "World" (
+    prepend references = @../semantic-segmentation/ovrtx-robot-lineup.usda@</World>
+)
+{
+}
+
+# [snippet:doc-minimal-dlss-render-product]
+def Scope "Render"
+{
+    def RenderProduct "Camera" (
+        prepend apiSchemas = ["OmniRtxSettingsMinimalAPI_1"]
+    )
+    {
+        rel camera = </World/Camera>
+        int2 resolution = (1280, 720)
+        rel orderedVars = [<LdrColor>]
+        token omni:rtx:rendermode = "MinimalRendering"
+        int omni:rtx:minimal:mode = 2
+
+        # Enable super resolution; use 2 for ray reconstruction or 0 to disable DLSS.
+        int omni:rtx:minimal:dlss:mode = 1
+        # Use "rtxaa" for native-resolution DLAA instead of upscaling.
+        token omni:rtx:minimal:dlss:execMode = "quality"
+
+        # Keep small robots visible inside the warehouse.
+        bool omni:rtx:minimal:castShadows = false
+
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+}
+# [/snippet:doc-minimal-dlss-render-product]

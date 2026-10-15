@@ -57,6 +57,10 @@ USDA_FILES = [
     "spg-previous-frame/MotionKernel.slang.usda",
     "spg-previous-frame/motion_scene.usda",
     "spg-previous-frame/motion_scene_slang.usda",
+    "spg-scene-query/MarkerOverlayKernel.usda",
+    "spg-scene-query/MarkerOverlayKernel.slang.usda",
+    "spg-scene-query/overlay_scene.usda",
+    "spg-scene-query/overlay_scene_slang.usda",
 ]
 
 # scene file, render product path, prims that must compose, expected (shader, subIdentifier).
@@ -94,6 +98,30 @@ SCENES = [
         "/Render/CornellBox",
         ["/World/Camera", "/Render/CornellBox/LdrColor", "/Render/CornellBox/Cornell"],
         [("RaygenCornellBoxPipeline", "rayGenCornellBoxPipeline")],
+    ),
+    (
+        "spg-scene-query/overlay_scene.usda",
+        "/Render/OverlayDemo",
+        [
+            "/World/Rig/Camera",
+            "/World/Overlay",
+            "/World/Markers/Red",
+            "/Render/OverlayDemo/LdrColor",
+            "/Render/OverlayDemo/Overlay",
+        ],
+        [("MarkerOverlay", "markerOverlay")],
+    ),
+    (
+        "spg-scene-query/overlay_scene_slang.usda",
+        "/Render/OverlayDemo",
+        [
+            "/World/Rig/Camera",
+            "/World/Overlay",
+            "/World/Markers/Red",
+            "/Render/OverlayDemo/LdrColor",
+            "/Render/OverlayDemo/Overlay",
+        ],
+        [("MarkerOverlay", "markerOverlay")],
     ),
     (
         "spg-grayscale/grayscale_scene.usda",

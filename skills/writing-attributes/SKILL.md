@@ -51,7 +51,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 1. Identify the target language, prim paths, attribute name, value kind, data shape, memory target, and sync/async requirement.
 2. Read the matching source snippet and copy its lifecycle pattern rather than inventing equivalent calls.
 3. Validate dtype, shape, semantic, and ownership rules before proposing or editing code.
-4. Wait for the ovstage write, then advance the write floor before rendering its ordinal; preserve C compatibility lifetimes when maintaining C code.
+4. Choose an explicit ordinal satisfying the configured ovstage admission policy and applicable floors. Under the `STRICTLY_INCREASING` policy, rewriting a cell needs a newer ordinal than its retained committed changes even before sealing; disjoint cells may share an ordinal. Wait for the ovstage write to succeed, then advance and wait for the write floor before rendering its ordinal; preserve C compatibility lifetimes when maintaining C code. See the [admission-policy summary](../../docs/core/ovstage_integration.rst#ordinals-and-write-floor-gates).
 5. When changing code, run the narrow docs test or example that owns the snippet whenever practical.
 
 ## Output Format
@@ -98,7 +98,7 @@ Scalar values can use NumPy arrays directly. For vectors and matrices, wrap NumP
 
 ### C — lane-based attributes
 
-The C API uses `DLDataType::lanes` for multi-component attribute reads and writes. The shape counts logical attribute elements; the lane count holds the vector or matrix component count:
+The C API accepts `DLDataType::lanes` for multi-component writes; shape-based scalar-lane writes are also accepted. Raw reads return scalar lanes with trailing component dimensions. This table describes canonical write input:
 
 | USD type | C DLTensor shape | C `DLDataType` |
 |---|---|---|
@@ -110,7 +110,7 @@ The C API uses `DLDataType::lanes` for multi-component attribute reads and write
 
 > **Source:** `tests/docs/c/test_attribute_shapes.cpp` snippets `doc-shape-scalar-int32-c`, `doc-shape-float3-array-c`, `doc-shape-mat4-array-c`.
 
-For a C `point3f[]` attribute with 10 points, write or read one tensor with `shape=[10]` and `dtype={kDLFloat, 32, 3}`. Rendered output/AOV tensors are not attribute tensors; in C they use channel-last shapes such as `[height, width, channels]` with `dtype.lanes=1`.
+For a C `point3f[]` attribute with 10 points, write one tensor with `shape=[10]`, `dtype={kDLFloat, 32, 3}` or `shape=[10,3]`, `dtype={kDLFloat,32,1}`; the read tensor is `[10,3]` with scalar lanes. A shape-based `[N,4,4]` float64 write to a new generic attribute records a matrix role, allowing a `[N,4,4]` read. Rendered output/AOV tensors are separate and use channel-last shapes such as `[height, width, channels]`.
 
 ## USD Type Lookup
 
@@ -228,7 +228,7 @@ Ovstage C write payload (`ovstage_write_data_t`):
 
 Semantics (Python: `ovstage.AttributeSemantic`; C ovstage: `ovstage_attribute_semantic_t`; C ovrtx compat: `ovrtx_attribute_semantic_t`):
 - `AttributeSemantic.NONE` / `OVSTAGE_SEMANTIC_NONE` / `OVRTX_SEMANTIC_NONE` -- generic data.
-- `AttributeSemantic.MATRIX` / `OVSTAGE_SEMANTIC_MATRIX` / `OVRTX_SEMANTIC_XFORM_MAT4x4` -- matrix data.
+- `AttributeSemantic.MATRIX` / `OVSTAGE_SEMANTIC_MATRIX` / `OVRTX_SEMANTIC_MATRIX` -- generic matrix data; `OVRTX_SEMANTIC_XFORM_MAT4x4` additionally requests transform conversion.
 - `OVRTX_SEMANTIC_XFORM_POS3d_ROT4f_SCALE3f` -- decomposed transform (C ovrtx compat only).
 - `OVRTX_SEMANTIC_XFORM_POS3d_ROT3x3f` -- decomposed transform (C ovrtx compat only).
 - `AttributeSemantic.RELATIONSHIP_PATH_ID` / `OVSTAGE_SEMANTIC_RELATIONSHIP_PATH_ID` -- interned relationship path IDs (write `is_array=true`).

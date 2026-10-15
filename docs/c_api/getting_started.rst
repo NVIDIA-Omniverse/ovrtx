@@ -203,51 +203,12 @@ contract.
 In an ovstage-attached application, the call also registers ovrtx's families with ovstage,
 so they resolve as ovstage populates. Call it before ovstage's first populate.
 
-External OpenUSD runtimes:
-""""""""""""""""""""""""""
+External OpenUSD runtimes
+"""""""""""""""""""""""""
 
-If the same process **also** uses OpenUSD outside ovrtx — for example a ``usd-core``
-Python distribution, a Kit host, or any OpenUSD build that reads the upstream
-``PXR_PLUGINPATH_NAME`` env var — choose one of the following integration models:
+See :doc:`../core/usd_plugin_paths` for tested enumeration, registration order,
+and conflicting schema families.
 
-* :c:func:`ovrtx_register_schema_paths` (and the implicit registration done by
-  :c:func:`ovrtx_initialize` / :c:func:`ovrtx_create_renderer`) always writes to the
-  ovrtx-namespaced ``OV_PXR_PLUGINPATH_2511`` key. When
-  ``OVRTX_PXR_SCHEMA_AUTO_REGISTER=1`` is set, it also publishes the same schema paths
-  to upstream ``PXR_PLUGINPATH_NAME``.
-* To select or filter the external runtime's paths yourself, leave the opt-in unset,
-  obtain ovrtx's plugin directories via
-  :c:func:`ovrtx_get_usd_plugin_paths`, drop any entries that collide with the external
-  runtime's own built-in schemas, and append the remaining directories to
-  ``PXR_PLUGINPATH_NAME``.
-* **Timing is critical.** OpenUSD's plug registry is populated once during static
-  initialization / the first schema lookup. Setting ``PXR_PLUGINPATH_NAME`` *after* the
-  external OpenUSD runtime has already opened its first stage has no retroactive effect
-  on schema discovery — the paths must be in place **before** the first stage is opened
-  on that runtime.
-
-.. code-block:: c
-
-   // Enumerate ovrtx's schema plugin directories (no env-var mutation).
-   size_t count = ovrtx_get_usd_plugin_path_count(NULL);
-   ovx_string_t* paths = (ovx_string_t*)calloc(count, sizeof(ovx_string_t));
-   if (count == 0 || paths != NULL)
-   {
-       ovrtx_get_usd_plugin_paths(NULL, paths, count);
-
-       // Append the desired subset to PXR_PLUGINPATH_NAME BEFORE any external OpenUSD
-       // opens its first stage. Filter out directories that collide with the external
-       // runtime's built-in schemas as appropriate.
-       //   ... integrator-owned append logic ...
-
-       // Only after the append is done, hand control to the external OpenUSD runtime.
-       //   external_openusd_open_stage(...);
-   }
-
-   free(paths);
-
-The strings returned by :c:func:`ovrtx_get_usd_plugin_paths` are owned by ovrtx and
-valid for the lifetime of the process; the caller must not free them.
 
 Minimal Example
 ---------------

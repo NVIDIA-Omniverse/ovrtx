@@ -138,8 +138,8 @@ TEST_F(AttributeReadTest, ReadArrayAttribute) {
     // Array attributes are variable-length per prim. Read semantics are the
     // same as for scalars — enqueue, wait, fetch — but the DLTensor's shape
     // reflects the per-prim element count; for `points` (float3 array) the
-    // dtype.lanes carries the tuple width and the leading shape dim carries
-    // the element (point) count.
+    // the leading shape dim carries the element count and the trailing
+    // dimension carries the point width.
     ovstage_ordinal_range_t range{};
     range.has_start_ordinal = false;
     range.end_ordinal = 1;
@@ -161,10 +161,11 @@ TEST_F(AttributeReadTest, ReadArrayAttribute) {
     // ovrtx-test-base-geometry.usda authors 4 float3 points on the Plane.
     ASSERT_EQ(t.dtype.code, kDLFloat);
     ASSERT_EQ(t.dtype.bits, 32u);
-    ASSERT_EQ(t.dtype.lanes, 3u);
-    ASSERT_EQ(t.ndim, 1);
+    ASSERT_EQ(t.dtype.lanes, 1u);
+    ASSERT_EQ(t.ndim, 2);
     ASSERT_EQ(t.shape[0], 4);
-    int64_t element_count = t.shape[0] * t.dtype.lanes;
+    ASSERT_EQ(t.shape[1], 3);
+    int64_t element_count = t.shape[0] * t.shape[1];
 
     ovstage_release_group(stage_, &group);
     ovstage_release_read(stage_, read_handle);

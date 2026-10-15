@@ -1,0 +1,41 @@
+#usda 1.0
+
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+# [snippet:doc-ghost-lights]
+def Xform "World"
+{
+    def RectLight "Softbox"
+    {
+        # Keep illuminating the scene, but hide the source from camera rays.
+        bool visibleInPrimaryRay = false
+
+        # Suppress the source in specular and glossy interactions.
+        float ghostFactor = 0.5
+    }
+
+    def Sphere "Subject"
+    {
+        # Per-object ghosting overrides the light and RenderProduct values.
+        float primvars:omni:rtx:ghostFactor = 1
+    }
+}
+
+def "Render"
+{
+    def RenderProduct "Camera" (
+        prepend apiSchemas = ["OmniRtxSettingsCommonAPI_1"]
+    )
+    {
+        token omni:rtx:lights:visibilityOverride = "perLight"
+        float omni:rtx:lights:reflectionVisibleRoughnessThreshold = 0.15
+        float omni:rtx:lights:refractionVisibleRoughnessThreshold = 0.8
+    }
+}
+# [/snippet:doc-ghost-lights]

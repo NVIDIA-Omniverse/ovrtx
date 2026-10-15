@@ -11,9 +11,8 @@
 #define OVRTX_TYPES_H
 
 #define OVRTX_VERSION_MAJOR 0
-#define OVRTX_VERSION_MINOR 5
-#define OVRTX_VERSION_PATCH 1
-
+#define OVRTX_VERSION_MINOR 6
+#define OVRTX_VERSION_PATCH 0
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -32,6 +31,23 @@ extern "C"
      */
 
     typedef struct ovrtx_renderer_t ovrtx_renderer_t;
+
+    /**
+     * Immutable build identity for the loaded OVRTX loader binary that exports this API.
+     *
+     * Future versions may append fields; callers should use struct_size before reading appended fields. String views
+     * remain valid while the OVRTX loader library remains loaded, and their lengths exclude the null terminator. Use
+     * @ref ovrtx_get_version() for the semantic version.
+     */
+    typedef struct ovrtx_build_info_t
+    {
+        uint32_t struct_size;
+        uint32_t build_number;
+        ovx_string_t build_string;
+        ovx_string_t git_branch;
+        ovx_string_t git_hash;
+        ovx_string_t build_location;
+    } ovrtx_build_info_t;
 
     /** @} */ // end of ovrtx_core_types
 
@@ -58,9 +74,21 @@ extern "C"
 
     /**
     * Sentinel value representing an invalid/null ovrtx handle.
-    * Valid handles non-zero, so 0 is reserved to indicate "no handle" or "invalid handle".
-    * Zero initialization of structures containing handles is valid API usage to indicate
-    * that no valid handle is provided.
+    *
+    * Valid handles are non-zero, so 0 is reserved to indicate "no handle" or
+    * "invalid handle". Zero-initializing output handles and structures containing
+    * handles is valid API usage.
+    *
+    * A non-zero value does not guarantee that a handle is still valid. Callers
+    * must track handle lifetime and stop using handles after their resources
+    * are released or invalidated. Destroying a resource or resetting a stage
+    * does not clear handle values stored by the caller. For asynchronous
+    * operations, distinguish successful enqueue from successful execution.
+    *
+    * OVRTX_INVALID_HANDLE is not universally an error when passed to an API:
+    * required live-handle parameters reject it, while discriminated inputs may use
+    * it to select an inline description instead. Each API parameter documents its
+    * specific behavior.
     */
     #define OVRTX_INVALID_HANDLE 0
 
@@ -148,8 +176,6 @@ extern "C"
      * renderer's Vulkan work; correct API use still triggers it. Windows is not affected. This
      * applies to every @c ovrtx_cuda_sync_t and @c sync_stream field in the API. Refer to the
      * "CUDA and Vulkan Scheduling on Linux" page in the ovrtx documentation for more details.
-
-
      */
     typedef struct
     {
@@ -227,6 +253,7 @@ extern "C"
         OVRTX_SEMANTIC_TOKEN_ID = 6, /**< Raw token identifier (kDLUInt, 64, 1). Returned by query for token-valued attributes. Resolve to a string via the path dictionary. */
         OVRTX_SEMANTIC_PATH_ID = 7, /**< Raw path identifier (kDLUInt, 64, 1). Returned by query for path-valued attributes. Resolve to a string via the path dictionary. */
         OVRTX_SEMANTIC_TAG = 8, /**< Name-only attribute with no value or storage. Returned by query for tag attributes. No data should be read. */
+        OVRTX_SEMANTIC_MATRIX = 9, /**< Generic matrix-valued attribute (not a transform conversion). Float64 2x2, 3x3, and 4x4 values retain the Fabric matrix role and read with square trailing dimensions. */
     }ovrtx_attribute_semantic_t;
 
     /*
@@ -375,7 +402,11 @@ extern "C"
         ovx_string_t doc; /**< Human-readable description */
     } ovrtx_render_var_param_t;
 
-    /** Mapped attribute that can be written to until unmapped. */
+    /** Mapped attribute that can be written to until unmapped.
+     * Scalar lanes and compact strides match returned read tensors: scalars
+     * [N], tuples [N,C], and semantic square matrices [N,S,S] (S=2,3,4).
+     * Descriptor metadata is borrowed and must not be modified.
+     */
     typedef struct
     {
         ovrtx_map_handle_t map_handle; /**< Map handle for unmap operation */
@@ -478,10 +509,12 @@ extern "C"
 
     /** Attribute read output retrieved via @ref ovrtx_fetch_read_result().
      *
-     * For scalar attributes @ref ovrtx_read_output_t::buffer_count is 1 and the single tensor
-     * has shape [prim_count]. For array attributes @ref ovrtx_read_output_t::buffer_count equals
+     * For fixed-size attributes @ref ovrtx_read_output_t::buffer_count is 1 and the single tensor
+     * has leading shape [prim_count]. For array attributes @ref ovrtx_read_output_t::buffer_count equals
      * @ref ovrtx_read_output_t::prim_count with one tensor per prim of variable length.
-     * Multi-component C attribute tensors encode component count in @c DLTensor::dtype.lanes.
+     * Returned tensors have @c DLTensor::dtype.lanes == 1. Multi-component values add a
+     * trailing component dimension; matrix-typed values add two square dimensions instead
+     * (for example, matrix4d uses [prim_count, 4, 4]). All strides are explicit and compact.
      *
      * When a user-provided destination tensor was passed to @ref ovrtx_read_attribute(),
      * buffer_count is 0 (the data was written directly into the caller's tensor).
@@ -527,7 +560,8 @@ extern "C"
     /** Path-tracing accumulation status for a rendered frame. */
     typedef struct
     {
-        uint32_t progression; /**< PT sample accumulation progress since the last reset, increments each time an output is renderered to */
+        /** PathTracing sample accumulation progress since the last reset; increments each time an output is rendered. */
+        uint32_t progression;
         bool converged;         /**< True when a stop criterion was reached (ex: omni:rtx:pt:samplesPerPixel) */
     } ovrtx_accumulation_status_t;
 
@@ -580,6 +614,10 @@ extern "C"
      */
 
 #define OVRTX_PICK_FLAG_GIZMO (1u << 0)
+    /** Include tracked metadata for a one-pixel-equivalent pick. When available, the first hit's
+     *  @c objectType, @c geometryInstanceId, @c worldPositionM, and @c worldNormal tensors are populated.
+     *  Without this flag, those tensors are present but zero-filled. Multi-pixel picks do not provide tracked
+     *  metadata and leave those tensors zero-filled even when this flag is set. */
 #define OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO (1u << 1)
 
     /** Pick rectangle in normalized RenderProduct coordinates. Values use [0, 1] top-left-origin NDC:
@@ -596,7 +634,8 @@ extern "C"
         float top_ndc;
         float right_ndc;
         float bottom_ndc;
-        uint32_t flags;
+        uint32_t flags; /**< Optional pick flags. Use @ref OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO to request tracked
+                         *   metadata for a one-pixel-equivalent pick. */
     } ovrtx_pick_query_desc_t;
 
     /**
@@ -783,44 +822,6 @@ extern "C"
 
     /** @} */ // end of ovrtx_op_status_types
 
-    /** @defgroup ovrtx_log_types Logging types
-     *  @{
-     */
-
-    /**
-     * Log severity levels for operation messages.
-     */
-    typedef enum ovrtx_log_severity_t
-    {
-        OVRTX_LOG_INFO = -1,     /**< Informational message */
-        OVRTX_LOG_WARNING = 0,  /**< Warning (operation continues) */
-        OVRTX_LOG_ERROR = 1,    /**< Error (operation may have failed) */
-        OVRTX_LOG_FATAL = 2,    /**< Fatal error (operation may have failed) */
-    } ovrtx_log_severity_t;
-
-    /**
-     * Callback function type for receiving log messages.
-     *
-     * The callback is process-global (see ovrtx_set_log_callback) and may be
-     * invoked from any thread. The implementation serializes invocations so
-     * the callback body itself does not need its own mutex, but it must still
-     * be thread-safe with respect to whatever data it touches outside.
-     *
-     * The message string is only valid for the duration of the callback.
-     * If the message needs to be retained, copy it before returning.
-     *
-     * @param severity Severity level of the message
-     * @param timestamp Wall-clock time in seconds since the epoch
-     * @param message Log message text (valid only during callback)
-     * @param user_data User-provided context from ovrtx_set_log_callback
-     */
-    typedef void (*ovrtx_log_callback_t)(ovrtx_log_severity_t severity,
-                                         double timestamp,
-                                         ovx_string_t message,
-                                         void* user_data);
-
-    /** @} */ // end of ovrtx_log_types
-
     /** @defgroup ovrtx_config_types Configuration types
      *  @{
      */
@@ -889,6 +890,46 @@ extern "C"
         /** If true, suppresses runtime deprecation warnings emitted by legacy OVRTX APIs.
          * Compile-time deprecation diagnostics are unaffected. Create_renderer. */
         OVRTX_CONFIG_SUPPRESS_DEPRECATION_WARNINGS,
+        /** Controls whether Minimal rendering is available. Pass to ovrtx_create_renderer(), not ovrtx_initialize().
+         *  The first ovrtx renderer instance initializes shared graphics resources: true enables this rendering
+         *  mode, false disables it, and omission leaves availability unchanged. All three modes are enabled by default.
+         *  Additional ovrtx renderer instances inherit this availability; conflicting explicit values fail creation.
+         *  To reset availability, create an instance with OVRTX_CONFIG_KEEP_SYSTEM_ALIVE=false and omit all
+         *  OVRTX_CONFIG_ENABLE_* entries. This clears retention left by earlier keep-alive instances. Then destroy
+         *  every ovrtx renderer instance, including this temporary instance, before creating one with different modes.
+         *  Do not create another keep-alive instance during teardown. At least one rendering mode must remain enabled.
+         *  A RenderProduct requesting a disabled mode logs a warning and uses the first enabled mode in RT2, PathTracing,
+         *  then Minimal order. For example, an RT2 request uses Minimal when only Minimal is enabled. */
+        OVRTX_CONFIG_ENABLE_MINIMAL,
+        /** Controls whether real-time path tracing (RT2) is available. Pass to ovrtx_create_renderer().
+         *  Same creation-time, shared graphics resource, and omission rules as OVRTX_CONFIG_ENABLE_MINIMAL. */
+        OVRTX_CONFIG_ENABLE_REALTIMEPATHTRACING,
+        /** Controls whether PathTracing is available. Pass to ovrtx_create_renderer().
+         *  Same creation-time, shared graphics resource, and omission rules as OVRTX_CONFIG_ENABLE_MINIMAL. */
+        OVRTX_CONFIG_ENABLE_PATHTRACING,
+        /** If true, enables MDL material displacement. Pass to ovrtx_create_renderer().
+         *  When not specified, defaults to false. */
+        OVRTX_CONFIG_ENABLE_MDL_DISPLACEMENT,
+        /** Enables Spectral PathTracing shaders, materials, and sampled physical illuminants.
+         *  Pass to ovrtx_create_renderer().
+         *  Set before the first renderer is created. Defaults to false; omission on later instances inherits
+         *  the process choice. Conflicting explicit values fail, even after all instances are destroyed,
+         *  because the material backend persists. Use a new process to change this option.
+         *  Also author omni:rtx:pathtracing:spectral:enabled=true on each PathTracing RenderProduct.
+         *  Use separate processes for RGB and spectral comparisons; mixed transport in one scene is unsupported. */
+        OVRTX_CONFIG_ENABLE_SPECTRAL_RENDERING,
+        /** If false, OVRTX does not start its crash reporter, so a host that owns crash handling keeps it.
+         *  Pass to ovrtx_create_renderer(). Defaults to true. The first renderer in the process decides;
+         *  omission on later instances inherits that choice, and a conflicting explicit value fails, even after
+         *  all instances are destroyed. Use a new process to change this option. */
+        OVRTX_CONFIG_ENABLE_CRASH_REPORTER,
+        /** Select the platform's global cache root for ${omni_cache} and OVRTX's writable caches.
+         * Omission defaults to true. False disables the platform root unless the other call supplies true.
+         * An ovrtx.portable file beside the executable or OVRTX binaries selects the application directory instead.
+         * A valid OVRTX_CONFIG_CACHE_ROOT_PATH takes precedence over both.
+         * Configure this option during the first initialization or renderer creation in the process.
+         * Changing the cache root within the same process is unsupported, including after ovrtx_shutdown(). */
+        OVRTX_CONFIG_ENABLE_GLOBAL_CACHE_ROOT,
         OVRTX_CONFIG_BOOL_COUNT
     } ovrtx_config_bool_t;
 
@@ -911,7 +952,14 @@ extern "C"
         /** Allow all soft-deprecated sensor versions, but only while pinned to a specific framework release:
          * "<major>.<minor>.<patch>". (e.g. "0.4.0"). Any other value (or unset) allows none. */
         OVRTX_CONFIG_SENSORS_ALLOWED_DEPRECATION_BASE = 5,
-        OVRTX_CONFIG_STRING_COUNT = 6
+        /** Override the process-wide ${omni_cache} token with a nonempty path that resolves to an absolute root.
+         * Takes precedence over the platform default and an ovrtx.portable marker beside the executable
+         * or OVRTX binaries.
+         * System-level; paths supplied to init and create_renderer must match.
+         * Supply this path during the first initialization or renderer creation in the process.
+         * Changing it within the same process is unsupported, including after ovrtx_shutdown(). */
+        OVRTX_CONFIG_CACHE_ROOT_PATH = 6,
+        OVRTX_CONFIG_STRING_COUNT = 7
     } ovrtx_config_string_t;
 
     /** Int64 config keys. Value type: int64_t. Used at create_renderer. */

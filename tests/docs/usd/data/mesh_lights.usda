@@ -1,0 +1,58 @@
+#usda 1.0
+
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto. Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+def Xform "World"
+{
+    # [snippet:doc-mesh-light]
+    def Mesh "Emitter" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)]
+        rel material:binding = </World/Looks/Emitter>
+    }
+
+    def Scope "Looks"
+    {
+        def Material "Emitter"
+        {
+            token outputs:mdl:surface.connect = </World/Looks/Emitter/Shader.outputs:out>
+
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniEmissive.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniEmissive"
+                color3f inputs:emissive_color = (1, 1, 1)
+                float inputs:emission_intensity = 200
+                token outputs:out (
+                    renderType = "material"
+                )
+            }
+        }
+    }
+    # [/snippet:doc-mesh-light]
+}
+
+# [snippet:doc-enable-mesh-light-sampling]
+def "Render"
+{
+    def RenderProduct "Camera" (
+        prepend apiSchemas = ["OmniRtxSettingsPtAdvancedAPI_1"]
+    )
+    {
+        # Author the setting for each render mode that may use this product.
+        bool omni:rtx:pt:ris:meshLights = true
+        bool omni:rtx:rtpt:ris:meshLights = true
+    }
+}
+# [/snippet:doc-enable-mesh-light-sampling]

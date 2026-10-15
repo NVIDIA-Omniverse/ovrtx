@@ -16,46 +16,71 @@ Decals
 Overview
 --------
 
-Decals project MDL materials onto mesh geometry without modifying the geometry itself, as if they were stickers. A decal defines a volumetric bounding region (a clipbox) and a projector. At render time, the decal overlays its material on the surface material of bound mesh geometry that intersects the clipbox.
+Decals project materials onto mesh geometry without changing the geometry, like stickers. An ``OmniDecal`` prim defines a bounded volume (the clipbox), a projector, and the material to overlay. Bound mesh surfaces receive the decal where they intersect that volume.
 
-Use decals to add labels, dirt, wear, or markings without requiring separate geometry or UV mapping changes. Multiple decals can overlap the same surface and are composited in priority order. Up to six decals can be active at any surface point.
+Use decals for labels, dirt, wear, and markings that should remain independent of the receiver's geometry and UV layout. Overlapping decals are composited by priority; at most six contribute at one surface point.
 
 .. note::
 
-   Decals differ from :doc:`UV projectors <projectors>`. UV projectors generate or replace a primitive's UV texture coordinates. Decals project a separate MDL material onto a mesh at render time and overlay its existing material.
+   Decals differ from :doc:`UV projectors <projectors>`. UV projectors provide texture coordinates to a primitive's material. A decal overlays a separate material on bound geometry.
 
-.. figure:: ../img/decals.avif
+.. figure:: ../img/example-decals.avif
    :align: center
    :width: 100%
-   :alt: Two bottles with multiple overlapping decorative decals layered on their surfaces
+   :alt: Red RTX lettering and silver NVIDIA logos projected onto a curved green logo
 
-   *Several decals layered on the front of two objects.*
+   *Silver NVIDIA logos overlap red RTX lettering on the curved receiver.
+   Cutouts reveal lower-priority decals or the original green material.*
 
 Creating a Decal
 ----------------
 
-Define an ``OmniDecal`` prim to create a decal. Its ``extent`` attribute defines the local-space clipbox, and ``material:binding`` selects the MDL material to overlay. The material prim must contain an authored MDL shader network to produce a visible result.
+Define an ``OmniDecal`` prim, set its local-space ``extent``, and bind a material. ``OmniDecal`` and ``OmniCoordSysAPI`` do not have typed usd-core Python bindings, so Python authoring uses generic prim, attribute, metadata, and relationship APIs.
 
-This example creates a planar decal and binds a placeholder ``/World/Looks/DecalMaterial`` material. Replace the placeholder with an authored MDL shader network to produce a visible decal:
+The following equivalent snippets create a planar decal and bind a placeholder material. Add an MDL shader network to that material for a visible result.
 
-.. literalinclude:: ../../tests/docs/usd/data/decal.usda
-   :language: usda
-   :start-after: # [snippet:doc-create-decal]
-   :end-before: # [/snippet:doc-create-decal]
+.. tab-set::
 
-The decal's transform and ``extent`` position and size the clipbox. The ``OmniDecal`` schema inherits ``OmniProjectorAPI``, so projector attributes control how the decal computes UV coordinates within that region.
+   .. tab-item:: USDA
+
+      .. literalinclude:: ../../tests/docs/usd/data/decal.usda
+         :language: usda
+         :start-after: # [snippet:doc-create-decal]
+         :end-before: # [/snippet:doc-create-decal]
+
+   .. tab-item:: usd-core Python
+
+      .. literalinclude:: ../../tests/docs/usd/test_usd_python_examples.py
+         :language: python
+         :start-after: # [snippet:doc-create-decal-python]
+         :end-before: # [/snippet:doc-create-decal-python]
+
+The decal's transform and ``extent`` position and size the clipbox. The
+``OmniDecal`` schema automatically applies ``OmniProjectorAPI``, whose
+attributes control how the decal computes UV coordinates within that region.
 
 Binding a Decal to a Prim
 -------------------------
 
-Apply the multiple-apply ``OmniCoordSysAPI`` to receiving geometry and bind that instance to the decal prim. This extended example adds a Cube, applies ``OmniCoordSysAPI:Decal``, and targets ``/World/Decal`` through the corresponding ``coordSys:Decal:binding`` relationship:
+Apply a named ``OmniCoordSysAPI`` instance to receiving geometry and target the decal through the matching ``coordSys:<instance>:binding`` relationship. The instance name connects the applied schema to its relationship.
 
-.. literalinclude:: ../../tests/docs/usd/data/decal_binding.usda
-   :language: usda
-   :start-after: # [snippet:doc-bind-decal]
-   :end-before: # [/snippet:doc-bind-decal]
+.. tab-set::
 
-The ``Decal`` instance name identifies this binding. Use a unique ``OmniCoordSysAPI`` instance for each additional decal bound to the same prim. You can bind one decal to multiple prims, or apply the binding to a parent prim to affect mesh descendants.
+   .. tab-item:: USDA
+
+      .. literalinclude:: ../../tests/docs/usd/data/decal_binding.usda
+         :language: usda
+         :start-after: # [snippet:doc-bind-decal]
+         :end-before: # [/snippet:doc-bind-decal]
+
+   .. tab-item:: usd-core Python
+
+      .. literalinclude:: ../../tests/docs/usd/test_usd_python_examples.py
+         :language: python
+         :start-after: # [snippet:doc-bind-decal-python]
+         :end-before: # [/snippet:doc-bind-decal-python]
+
+Use a unique instance name for each additional decal. A decal can target multiple receivers, and a binding authored on a parent applies to mesh descendants unless a descendant blocks or replaces it.
 
 OmniDecal Attributes
 --------------------
@@ -64,31 +89,23 @@ OmniDecal Attributes
 
 .. rst-class:: compact-table
 
-.. list-table::
-   :header-rows: 1
+.. csv-table::
+   :header: "Declaration and default", "Behavior"
+   :widths: 42, 58
 
-   * - Attribute
-     - Meaning
-   * - ``omni:decal:enabled``
-     - Enables or disables the decal. A disabled decal has no effect, equivalent
-       to setting the prim's visibility to ``invisible``.
-   * - ``extent``
-     - Defines the decal's local-space clipbox as minimum and maximum points. A
-       surface point must be inside this box to receive the decal.
-   * - ``omni:decal:faceMode``
-     - Selects which side of a mesh receives the decal. Refer to
-       :ref:`Face Modes <decal_face_modes>`.
-   * - ``omni:decal:priority``
-     - Sets composition order when decals overlap. Higher values render above
-       lower values. Negative values are valid.
-   * - ``omni:decal:outputSpace``
-     - Selects the output UV set: 0 for ``st``, 1 for ``st1``, 2 for ``st2``,
-       or 3 for ``st3``.
+   "``float3[] extent``", "Local-space minimum and maximum corners of the clipbox. This attribute has no schema default and must be authored."
+   "``bool omni:decal:enabled = true``", "Enables or disables the decal."
+   "``token omni:decal:faceMode = ""front""``", "Selects receiving faces; see :ref:`decal_face_modes`."
+   "``int omni:decal:outputSpace = 0``", "Selects ``st``, ``st1``, ``st2``, or ``st3`` for values 0 through 3."
+   "``int omni:decal:priority = 0``", "Orders overlapping decals. Higher values are composited over lower values; negative values are valid."
 
-Inherited Projector Attributes
-------------------------------
+Projector Attributes
+--------------------
 
-``OmniDecal`` inherits the attributes of ``OmniProjectorAPI``. These attributes control how UV coordinates are computed inside the clipbox. Refer to :ref:`OmniProjectorAPI Attributes <projector_attributes>` and :ref:`Projector Types <projector_types>`.
+``OmniDecal`` automatically applies ``OmniProjectorAPI``. Its attributes
+control how UV coordinates are computed inside the clipbox. Refer to
+:ref:`OmniProjectorAPI Attributes <projector_attributes>` and :ref:`Projector
+Types <projector_types>`.
 
 .. _decal_face_modes:
 
@@ -99,27 +116,54 @@ Face Modes
 
 .. rst-class:: compact-table
 
-.. list-table::
-   :header-rows: 1
+.. csv-table::
+   :header: "Value", "Effect"
+   :widths: 25, 75
 
-   * - Value
-     - Effect
-   * - ``front``
-     - Applies the decal only to the front side of the mesh. This is the
-       default.
-   * - ``back``
-     - Applies the decal only to the back side of the mesh.
-   * - ``frontAndBack``
-     - Applies the decal to both sides of the mesh.
+   "``front``", "Applies to front-facing surfaces. This is the default."
+   "``back``", "Applies to back-facing surfaces."
+   "``frontAndBack``", "Applies to both sides."
 
-Mesh normals and the camera ray direction determine the front and back sides.
+Front and back are classified by whether the rendering ray enters or exits the
+receiver surface. Projector direction does not currently affect this
+classification.
+
+Ordering Overlapping Decals
+----------------------------
+
+Use ``omni:decal:priority`` to choose which decal appears on top where their
+projected masks overlap. Higher values cover lower values. A cutout in the
+top decal reveals the next lower decal, or the receiver's original material
+if no lower decal applies. Assign distinct priorities when ordering matters;
+do not rely on binding relationship order to break ties.
+
+These Path Tracing renders use the same geometry, masks, and decal transforms.
+Only the red decals' priority changes. Silver covers red at priority 10 versus
+0; red covers silver when raised to 20. The masks' black areas remain cut out
+in either order.
+
+.. tab-set::
+
+   .. tab-item:: Silver above red
+
+      .. figure:: ../img/example-decals.avif
+         :alt: Silver NVIDIA decals cover the upper red R and lower-right red X with silver priority 10 and red priority 0
+
+         *Default: silver 10, red 0.*
+
+   .. tab-item:: Red above silver
+
+      .. figure:: ../img/example-decals-red-on-top.avif
+         :alt: Upper red R and lower-right red X cover the silver NVIDIA decals after red priority is raised to 20
+
+         *Reordered: red 20, silver 10. Placement and size are unchanged.*
 
 Limitations
 -----------
 
 - A maximum of six decals can be active at any surface point. If more than six overlap, only the six with the highest priority values are rendered.
-- Real-Time Path-Tracing and Path Tracing support decals. Minimal rendering does not.
-- Decals support cutout opacity only; transparency is not supported.
-- Decals cannot cast shadows, including when an opaque decal overlays a transparent object.
+- Real-Time Path-Tracing and Path Tracing support decals. The Minimal renderer does not.
+- Cutout opacity is supported. Transmissive decal materials are not supported.
+- In path-traced modes, decal cutouts contribute to shadow visibility.
 
-For information about assigning an MDL material to a decal, refer to :doc:`material_binding`.
+For complete runnable workflows, see :doc:`../examples/python_decals` and :doc:`../examples/c_decals`. For material assignment, see :doc:`material_binding`.

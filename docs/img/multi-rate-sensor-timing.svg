@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="900" viewBox="0 0 1180 900" role="img" aria-labelledby="title desc">
+<title id="title">Multi-rate sensors: simulation steps, capture periods, and output delivery</title>
+<desc id="desc">Eight 25 millisecond simulation steps cover 200 milliseconds. A 40 Hz lidar completes eight scans, while a 20 Hz lidar completes four scans spanning two steps each. With partial outputs disabled, the 20 Hz lidar returns a full scan on even steps. With partial outputs enabled, it returns the first and second scan portions on successive steps. Capture timing is unchanged.</desc>
+<style>
+text { font-family: Arial, sans-serif; fill: #202b38; font-size: 16px; }
+.title { font-size: 28px; font-weight: 700; }
+.heading { font-size: 21px; font-weight: 700; }
+.bold { font-weight: 700; }
+.small { font-size: 14px; fill: #526171; }
+.mono { font-family: monospace; font-size: 15px; }
+.panel { fill: #f7f9fb; stroke: #cdd5de; }
+.full { fill: #d8edb7; stroke: #5d852e; }
+.partial { fill: #cce7f6; stroke: #397b9f; }
+.empty { fill: #fff; stroke: #8893a3; stroke-dasharray: 5 4; }
+.axis { stroke: #647486; stroke-width: 1.5; }
+.grid { stroke: #cdd5de; stroke-dasharray: 4 4; }
+</style>
+<rect width="1180" height="900" fill="#fff"/>
+<text x="30" y="42" class="title">Multi-rate sensors: one clock, independent capture rates</text>
+<text x="30" y="72">All sensors are requested on every step. Their configured rates determine capture timing.</text>
+<rect x="24" y="94" width="1132" height="366" rx="6" class="panel"/>
+<text x="44" y="128" class="heading">1  Simulation steps and capture periods</text>
+<text x="44" y="158" class="small">Example: scans start at 0 ms; each scan spans one capture period.</text>
+
+<line x1="300" y1="194" x2="300" y2="430" class="grid"/>
+<text x="300" y="190" class="small" text-anchor="middle">0</text>
+<line x1="400" y1="194" x2="400" y2="430" class="grid"/>
+<text x="400" y="190" class="small" text-anchor="middle">25</text>
+<line x1="500" y1="194" x2="500" y2="430" class="grid"/>
+<text x="500" y="190" class="small" text-anchor="middle">50</text>
+<line x1="600" y1="194" x2="600" y2="430" class="grid"/>
+<text x="600" y="190" class="small" text-anchor="middle">75</text>
+<line x1="700" y1="194" x2="700" y2="430" class="grid"/>
+<text x="700" y="190" class="small" text-anchor="middle">100</text>
+<line x1="800" y1="194" x2="800" y2="430" class="grid"/>
+<text x="800" y="190" class="small" text-anchor="middle">125</text>
+<line x1="900" y1="194" x2="900" y2="430" class="grid"/>
+<text x="900" y="190" class="small" text-anchor="middle">150</text>
+<line x1="1000" y1="194" x2="1000" y2="430" class="grid"/>
+<text x="1000" y="190" class="small" text-anchor="middle">175</text>
+<line x1="1100" y1="194" x2="1100" y2="430" class="grid"/>
+<text x="1100" y="190" class="small" text-anchor="middle">200</text>
+<text x="44" y="190" class="bold" text-anchor="start">Simulation time (ms)</text>
+<text x="44" y="246" class="bold" text-anchor="start">Simulation steps</text>
+<text x="44" y="270" class="mono" text-anchor="start">delta_time = 25 ms</text>
+<rect x="304" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="350" y="254" class="" text-anchor="middle">Step 1</text>
+<rect x="404" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="450" y="254" class="" text-anchor="middle">Step 2</text>
+<rect x="504" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="550" y="254" class="" text-anchor="middle">Step 3</text>
+<rect x="604" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="650" y="254" class="" text-anchor="middle">Step 4</text>
+<rect x="704" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="750" y="254" class="" text-anchor="middle">Step 5</text>
+<rect x="804" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="850" y="254" class="" text-anchor="middle">Step 6</text>
+<rect x="904" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="950" y="254" class="" text-anchor="middle">Step 7</text>
+<rect x="1004" y="220" width="92" height="58" rx="6" class="empty"/>
+<text x="1050" y="254" class="" text-anchor="middle">Step 8</text>
+<text x="44" y="320" class="bold" text-anchor="start">40 Hz lidar</text>
+<text x="44" y="343" class="small" text-anchor="start">25 ms / scan</text>
+<rect x="304" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="350" y="329" class="" text-anchor="middle">Scan 1</text>
+<rect x="404" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="450" y="329" class="" text-anchor="middle">Scan 2</text>
+<rect x="504" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="550" y="329" class="" text-anchor="middle">Scan 3</text>
+<rect x="604" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="650" y="329" class="" text-anchor="middle">Scan 4</text>
+<rect x="704" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="750" y="329" class="" text-anchor="middle">Scan 5</text>
+<rect x="804" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="850" y="329" class="" text-anchor="middle">Scan 6</text>
+<rect x="904" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="950" y="329" class="" text-anchor="middle">Scan 7</text>
+<rect x="1004" y="300" width="92" height="48" rx="6" class="full"/>
+<text x="1050" y="329" class="" text-anchor="middle">Scan 8</text>
+<text x="44" y="395" class="bold" text-anchor="start">20 Hz lidar</text>
+<text x="44" y="418" class="small" text-anchor="start">50 ms / scan</text>
+<rect x="304" y="374" width="192" height="48" rx="6" class="partial"/>
+<text x="400" y="404" class="" text-anchor="middle">Scan 1</text>
+<rect x="504" y="374" width="192" height="48" rx="6" class="partial"/>
+<text x="600" y="404" class="" text-anchor="middle">Scan 2</text>
+<rect x="704" y="374" width="192" height="48" rx="6" class="partial"/>
+<text x="800" y="404" class="" text-anchor="middle">Scan 3</text>
+<rect x="904" y="374" width="192" height="48" rx="6" class="partial"/>
+<text x="1000" y="404" class="" text-anchor="middle">Scan 4</text>
+<rect x="24" y="480" width="1132" height="320" rx="6" class="panel"/>
+<text x="44" y="514" class="heading">2  What the 20 Hz lidar returns at each step's end</text>
+<text x="44" y="544" class="small">The same four scans above; only the delivery policy changes.</text>
+
+<text x="350" y="579" class="small" text-anchor="middle">25 ms</text>
+<text x="450" y="579" class="small" text-anchor="middle">50 ms</text>
+<text x="550" y="579" class="small" text-anchor="middle">75 ms</text>
+<text x="650" y="579" class="small" text-anchor="middle">100 ms</text>
+<text x="750" y="579" class="small" text-anchor="middle">125 ms</text>
+<text x="850" y="579" class="small" text-anchor="middle">150 ms</text>
+<text x="950" y="579" class="small" text-anchor="middle">175 ms</text>
+<text x="1050" y="579" class="small" text-anchor="middle">200 ms</text>
+<text x="44" y="615" class="bold" text-anchor="start">Completed scans only</text>
+<text x="44" y="641" class="mono" text-anchor="start">partialOutputs = false</text>
+<text x="44" y="710" class="bold" text-anchor="start">Scan portions each step</text>
+<text x="44" y="736" class="mono" text-anchor="start">partialOutputs = true</text>
+<rect x="304" y="593" width="92" height="66" rx="6" class="empty"/>
+<text x="350" y="619" class="small" text-anchor="middle">No output</text>
+<rect x="304" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="350" y="712" class="small" text-anchor="middle">1st half</text>
+<text x="350" y="734" class="small" text-anchor="middle">Scan 1</text>
+<rect x="404" y="593" width="92" height="66" rx="6" class="full"/>
+<text x="450" y="619" class="small" text-anchor="middle">Full scan</text>
+<text x="450" y="641" class="small" text-anchor="middle">Scan 1</text>
+<rect x="404" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="450" y="712" class="small" text-anchor="middle">2nd half</text>
+<text x="450" y="734" class="small" text-anchor="middle">Scan 1</text>
+<rect x="504" y="593" width="92" height="66" rx="6" class="empty"/>
+<text x="550" y="619" class="small" text-anchor="middle">No output</text>
+<rect x="504" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="550" y="712" class="small" text-anchor="middle">1st half</text>
+<text x="550" y="734" class="small" text-anchor="middle">Scan 2</text>
+<rect x="604" y="593" width="92" height="66" rx="6" class="full"/>
+<text x="650" y="619" class="small" text-anchor="middle">Full scan</text>
+<text x="650" y="641" class="small" text-anchor="middle">Scan 2</text>
+<rect x="604" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="650" y="712" class="small" text-anchor="middle">2nd half</text>
+<text x="650" y="734" class="small" text-anchor="middle">Scan 2</text>
+<rect x="704" y="593" width="92" height="66" rx="6" class="empty"/>
+<text x="750" y="619" class="small" text-anchor="middle">No output</text>
+<rect x="704" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="750" y="712" class="small" text-anchor="middle">1st half</text>
+<text x="750" y="734" class="small" text-anchor="middle">Scan 3</text>
+<rect x="804" y="593" width="92" height="66" rx="6" class="full"/>
+<text x="850" y="619" class="small" text-anchor="middle">Full scan</text>
+<text x="850" y="641" class="small" text-anchor="middle">Scan 3</text>
+<rect x="804" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="850" y="712" class="small" text-anchor="middle">2nd half</text>
+<text x="850" y="734" class="small" text-anchor="middle">Scan 3</text>
+<rect x="904" y="593" width="92" height="66" rx="6" class="empty"/>
+<text x="950" y="619" class="small" text-anchor="middle">No output</text>
+<rect x="904" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="950" y="712" class="small" text-anchor="middle">1st half</text>
+<text x="950" y="734" class="small" text-anchor="middle">Scan 4</text>
+<rect x="1004" y="593" width="92" height="66" rx="6" class="full"/>
+<text x="1050" y="619" class="small" text-anchor="middle">Full scan</text>
+<text x="1050" y="641" class="small" text-anchor="middle">Scan 4</text>
+<rect x="1004" y="686" width="92" height="66" rx="6" class="partial"/>
+<text x="1050" y="712" class="small" text-anchor="middle">2nd half</text>
+<text x="1050" y="734" class="small" text-anchor="middle">Scan 4</text>
+<text x="44" y="780" class="small" text-anchor="start">Partial lidar outputs are successive scan portions, not an accumulated full scan.</text>
+<text x="30" y="835" class="" text-anchor="start">The 40 Hz lidar completes a scan every step under either policy.</text>
+<text x="30" y="864" class="small" text-anchor="start">Camera intermediate outputs depend on the RenderVar; display color can repeat the last completed image.</text>
+</svg>

@@ -2,6 +2,22 @@
 
 This directory contains example projects demonstrating various features of ovrtx.
 
+Camera feature examples:
+
+- [`python/camera-lens-calibration`](python/camera-lens-calibration/) compares OpenCV pinhole, OpenCV fisheye, and omni-directional stereo cameras.
+- [`python/camera-rolling-shutter`](python/camera-rolling-shutter/) compares global and rolling shutters.
+- [`python/multi-rate-sensors`](python/multi-rate-sensors/) keeps two lidars and two cameras active at different capture rates and compares partial-output policies.
+- [`c/sensor-observer`](c/sensor-observer/) combines a 30 Hz sensor camera with an interactive observer that can move while simulation is paused.
+- [`python/camera-scene-partitions`](python/camera-scene-partitions/) renders isolated environments from one stage.
+- [`python/debug-views`](python/debug-views/) renders every RT2 G-buffer debug view and logs them together to Rerun.
+- [`python/minimal-dlss`](python/minimal-dlss/) and [`c/minimal-dlss`](c/minimal-dlss/) render Minimal mode with optional DLSS-SR, DLSS-RR, or native-resolution DLAA.
+
+Light feature examples:
+
+- [`python/spectral-rendering`](python/spectral-rendering/) and [`c/spectral-rendering`](c/spectral-rendering/) compare physical illuminants in RGB and spectral PathTracing.
+
+- [`python/projector-light-calibration`](python/projector-light-calibration/) generates an OpenCV-calibrated projector direction texture and renders it.
+
 ## Example Projects
 
 
@@ -140,6 +156,40 @@ This directory contains example projects demonstrating various features of ovrtx
   </tr>
   <tr>
     <td align="center" width="50%">
+      <b>Light Path Expressions</b>
+      <br>
+      <blockquote>
+        <img src="../docs/img/light-path-expressions.avif" alt="Beauty and four Light Path Expression outputs" width="100%">
+        <p align="left"><em>“Create a compact ovrtx example that composes an existing scene with reflection, transmission, and caustics LPE RenderVars, renders them with HdrColor, and records sRGB uint8 images.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/lpes/">Python →</a></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="../docs/img/example-decals.avif" alt="Red RTX lettering and silver NVIDIA logos overlapping on a curved green logo" width="100%">
+      <br>
+      <b>Decals</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Create a minimal example that loads USD-authored decals through a runtime stage, renders them, and saves the color output.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="c/decals/">C →</a>, <a href="python/decals/">Python →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="../docs/img/light-projector-direction-texture.avif" alt="Pinhole and OpenCV-calibrated projector-light output" width="100%">
+      <br>
+      <b>Projector Light Calibration</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Generate an OpenEXR projector direction texture from an OpenCV camera matrix and distortion vector, then render the calibrated projection.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/projector-light-calibration/">Python →</a></sub>
+    </td>
+    <td></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
       <img src="../img/example-spg-grayscale.png" alt="SPG Grayscale Example" width="100%">
       <br>
       <b>SPG: Grayscale</b>
@@ -237,5 +287,28 @@ This directory contains example projects demonstrating various features of ovrtx
       </blockquote>
       <sub>Build &amp; run in: <a href="python/spg-previous-frame/">Python →</a></sub>
     </td>
+    <td align="center" width="50%">
+      <b>USD Plugin Paths</b>
+      <br>
+      <blockquote>
+        <p align="left">Register ovrtx schemas with external OpenUSD and verify a fallback value in Python. Use C/C++ to enumerate schema directories and publish paths for the bundled USD runtime.</p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/usd-plugin-paths/">Python →</a> | <a href="c/usd-plugin-paths/">C/C++ →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="../docs/img/spectral-banner.avif" alt="Spectral PathTracing under white, sodium, and mercury illumination" width="100%">
+      <br>
+      <b>Spectral Rendering</b>
+      <br>
+      <p align="left">Compare physical illuminants in RGB and spectral PathTracing, then compare Canon EOS 5D and Sony α7 IV camera responses with the CIE 1931 observer.</p>
+      <sub>Build &amp; run in: <a href="c/spectral-rendering/">C →</a>, <a href="python/spectral-rendering/">Python →</a></sub>
+    </td>
   </tr>
 </table>
+
+## Gaussian Splats
+
+- [Python](python/gaussian-splats/): runnable scene and validation.
+- [C/C++](c/gaussian-splats/): equivalent runtime workflow.

@@ -76,3 +76,31 @@ html[data-theme="dark"] .example-prompt {
     font-style: normal;
     font-weight: 400;
 }
+
+/* Keep camera previews visible as long AOV and format names wrap. */
+.aov-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.aov-table td, .aov-table th {
+    overflow-wrap: anywhere;
+}
+.aov-table code, .aov-table .pre {
+    white-space: normal;
+}
+.aov-table img {
+    display: block;
+}
+
+/* Join each AOV's metadata and full-width description into one visual group. */
+.aov-table .aov-info > td {
+    border-bottom-width: 0;
+}
+.aov-table .aov-description > td {
+    border-top-width: 0;
+    padding-top: 0;
+    padding-bottom: 0.8rem;
+}
+.aov-table .aov-description p:last-child {
+    margin-bottom: 0;
+}

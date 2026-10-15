@@ -79,6 +79,8 @@ Create a renderer with default settings:
 Or with configuration:
 
 > **Source:** `tests/docs/python/test_support_api.py` snippet `doc-renderer-config`
+>
+> **Source (rolling shutter):** `tests/docs/python/test_support_api.py` snippet `doc-create-rolling-shutter-renderer`
 
 Cleanup is automatic -- the renderer is destroyed when it goes out of scope.
 
@@ -107,6 +109,8 @@ With configuration entries:
 
 > **Source:** `tests/docs/c/test_support_api.cpp` snippet `doc-version-and-config-c`
 >
+> **Source (rolling shutter):** `tests/docs/c/test_support_api.cpp` snippet `doc-create-rolling-shutter-renderer-c`
+>
 > To add config entries, populate `config.entries` and `config.entry_count` before calling `ovrtx_create_renderer`. See the `ovrtx_config_entry_*` helpers in `ovrtx_config.h`.
 
 Cleanup is manual -- you must call `ovrtx_destroy_renderer()`:
@@ -130,9 +134,10 @@ Config helpers in C (`ovrtx_config.h`):
 - `ovrtx_config_entry_binary_package_root_path(ovx_string_t)`
 - `ovrtx_config_entry_enable_profiling(bool)`
 - `ovrtx_config_entry_read_gpu_transforms(bool)`
+- `ovrtx_config_entry_motion_bvh(ovrtx_motion_bvh_t)` -- select disabled, enabled, or automatic motion-BVH creation; Python `RendererConfig(motion_bvh=ovrtx.MotionBvh.*)`
 - `ovrtx_config_entry_keep_system_alive(bool)` -- keep shared GPU resources alive after the last renderer is destroyed, so a subsequent `ovrtx_create_renderer` reuses them
 - `ovrtx_config_entry_active_cuda_gpus(ovx_string_t)` -- comma-separated CUDA-visible device indices (e.g., `"0,1,2"`), after `CUDA_VISIBLE_DEVICES` filtering/remapping, to select which GPUs the renderer may use
-- `ovrtx_config_entry_sensors_allowed_deprecation_base(ovx_string_t)` -- allow all soft-deprecated sensor versions while pinned to the exact OVRTX `"<major>.<minor>.<patch>"` version (e.g. `"0.5.0"`); any non-matching value (or unset) allows none
+- `ovrtx_config_entry_sensors_allowed_deprecation_base(ovx_string_t)` -- allow all soft-deprecated sensor versions while pinned to the exact ovrtx `"<major>.<minor>.<patch>"` version (e.g. `"0.5.0"`); any non-matching value (or unset) allows none
 - `ovrtx_config_entry_datastore_cache(ovx_string_t)` -- configure the UJITSO datastore cache with a `grpcdns://`, `grpcdns_notls://`, or `local://` value; Python `RendererConfig(datastore_cache=...)`
 - `ovrtx_config_entry_enable_geometry_streaming(bool)` -- opt in to geometry streaming, which is disabled by default when omitted; Python `RendererConfig(enable_geometry_streaming=...)`
 - `ovrtx_config_entry_texture_streaming_mode(ovrtx_texture_streaming_mode_t)` -- select disabled, synchronous, or asynchronous texture streaming (asynchronous by default); Python `RendererConfig(texture_streaming_mode=ovrtx.TextureStreamingMode.*)`

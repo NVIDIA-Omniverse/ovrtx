@@ -32,16 +32,19 @@ evolve across releases. This is what it does not do today.
 - A ray-generation node cannot use a ``.spv`` binary.
 - No node is given geometry. There are no vertex or index buffers and no material data; a
   ray-generation node gets hit distance and surface identity from a trace and nothing more.
-- A launch script cannot read the scene. A prim's attributes, a camera's transform and how a
-  render product is laid out are all unreachable from it; a node is given what its ports carry
-  and its authored value-inputs, and nothing else.
-- A product bound to more than one camera is rendered in tiles, one camera per tile, and a node
-  reading that image sees all of them at once with nothing to tell it the layout.
+- A launch script reads the scene as the renderer has it. Custom attributes are there only when
+  the load names their prim, and a ``string`` attribute published that way reads as a number, so
+  custom text is authored as a ``token``. Refer to :doc:`../do/scene_queries`.
+- A launch script cannot write the scene. Prim tables are read-only.
+- A product bound to more than one camera is rendered in tiles, one camera per tile. The layout
+  comes from ``rtx.product.tiling``; nothing in the image itself says which tile a pixel is in.
 - A node cannot reach the CPU mid-frame. No pixel data is readable from the launch script, and
   the GPU code cannot call back to the host.
 - A node cannot reach other frames, beyond what a stateful output or a previous-frame read
   carries.
 - A launch script cannot reach the filesystem or the OS; its sandbox has neither.
+- A launch script cannot catch errors or use the string pattern functions. Refer to
+  :ref:`the sandbox <spg-lua-sandbox>`.
 - A shader output can be bound to one RenderVar at a time.
 - A node cannot read an AOV and publish under that same name within one RenderProduct.
 - A previous-frame read reaches at most 8 frames back.

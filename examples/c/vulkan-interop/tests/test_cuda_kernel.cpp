@@ -150,3 +150,37 @@ TEST_F(CudaKernelTest, MemoryAllocationWorks) {
         cuMemFree(ptr);
     }
 }
+
+TEST(CudaContextLifetime, BorrowedContextSurvivesCleanup) {
+    ASSERT_EQ(cuInit(0), CUDA_SUCCESS);
+    CUdevice device;
+    ASSERT_EQ(cuDeviceGet(&device, 0), CUDA_SUCCESS);
+    CUcontext owned_context = nullptr;
+#if CUDA_VERSION >= 13000
+    ASSERT_EQ(cuCtxCreate(&owned_context, nullptr, 0, device), CUDA_SUCCESS);
+#else
+    ASSERT_EQ(cuCtxCreate(&owned_context, 0, device), CUDA_SUCCESS);
+#endif
+    CUuuid uuid{};
+    EXPECT_TRUE(cuda_init(0, &uuid));
+    cuda_cleanup();
+    CUcontext current = nullptr;
+    EXPECT_EQ(cuCtxGetCurrent(&current), CUDA_SUCCESS);
+    EXPECT_EQ(current, owned_context);
+    EXPECT_EQ(cuCtxDestroy(owned_context), CUDA_SUCCESS);
+}
+
+TEST(CudaContextLifetime, StandaloneCleanupRestoresPreviousContext) {
+    ASSERT_EQ(cuInit(0), CUDA_SUCCESS);
+    CUcontext previous = nullptr;
+    ASSERT_EQ(cuCtxGetCurrent(&previous), CUDA_SUCCESS);
+    CUuuid uuid{};
+    ASSERT_TRUE(cuda_init_standalone(0, &uuid));
+    cuda_cleanup();
+    CUcontext current = nullptr;
+    EXPECT_EQ(cuCtxGetCurrent(&current), CUDA_SUCCESS);
+    EXPECT_EQ(current, previous);
+    EXPECT_TRUE(cuda_read_surface_rgba8(-1, 1, 1, CudaImageFormat::UInt8_4).empty());
+    EXPECT_FALSE(cuda_signal_timeline(1, nullptr));
+    EXPECT_FALSE(cuda_copy_array_to_surface(-1, nullptr, 1, 1, CudaImageFormat::UInt8_4, nullptr));
+}

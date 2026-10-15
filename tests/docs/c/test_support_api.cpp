@@ -24,6 +24,22 @@ protected:
     DOCS_OVSTAGE_TEST_SUITE(SupportApiTest)
 };
 
+TEST_F(SupportApiTest, RollingShutterMotionBvhConfig) {
+    // [snippet:doc-create-rolling-shutter-renderer-c]
+    ovrtx_config_entry_t entries[] = {
+        ovrtx_config_entry_motion_bvh(OVRTX_MOTION_BVH_AUTO),
+    };
+    ovrtx_config_t config = {entries, 1};
+
+    ovrtx_renderer_t* rolling_shutter_renderer = nullptr;
+    ovrtx_result_t result = ovrtx_create_renderer(&config, &rolling_shutter_renderer);
+    ASSERT_API_SUCCESS(result.status);
+    // [/snippet:doc-create-rolling-shutter-renderer-c]
+
+    ASSERT_NE(rolling_shutter_renderer, nullptr);
+    ovrtx_destroy_renderer(rolling_shutter_renderer);
+}
+
 TEST_F(SupportApiTest, VersionAndConfigConstruction) {
     // [snippet:doc-version-and-config-c]
     uint32_t major = 0;
@@ -31,8 +47,9 @@ TEST_F(SupportApiTest, VersionAndConfigConstruction) {
     uint32_t patch = 0;
     ovrtx_get_version(&major, &minor, &patch);
 
+    std::string log_level = "info";
     ovrtx_config_entry_t entries[] = {
-        ovrtx_config_entry_log_level(ovx_str("info")),
+        ovrtx_config_entry_log_level({ log_level.data(), log_level.size() }),
         ovrtx_config_entry_sync_mode(true),
     };
     ovrtx_config_t config{entries, 2};
@@ -41,8 +58,33 @@ TEST_F(SupportApiTest, VersionAndConfigConstruction) {
     ovrtx_result_t create_result = ovrtx_create_renderer(&config, &configured_renderer);
     ASSERT_API_SUCCESS(create_result.status);
     ASSERT_NE(configured_renderer, nullptr);
-    ovrtx_destroy_renderer(configured_renderer);
     // [/snippet:doc-version-and-config-c]
+
+    // The renderer owns the readback storage; changing the caller's entries
+    // after creation cannot change the captured config.
+    log_level[0] = 'X';
+    entries[1].value.bool_value = false;
+
+    ovrtx_config_t captured_config{};
+    const ovrtx_result_t get_result = ovrtx_get_config(configured_renderer, &captured_config);
+    EXPECT_API_SUCCESS(get_result.status);
+    if (get_result.status == OVRTX_API_SUCCESS)
+    {
+        EXPECT_EQ(captured_config.entry_count, 2u);
+        if (captured_config.entry_count == 2u)
+        {
+            EXPECT_EQ(captured_config.entries[0].key_type, OVRTX_CONFIG_KEY_TYPE_STRING);
+            EXPECT_EQ(captured_config.entries[0].key.string_key, OVRTX_CONFIG_LOG_LEVEL);
+            EXPECT_EQ(std::string(captured_config.entries[0].value.string_value.ptr,
+                                  captured_config.entries[0].value.string_value.length),
+                      "info");
+            EXPECT_EQ(captured_config.entries[1].key_type, OVRTX_CONFIG_KEY_TYPE_BOOL);
+            EXPECT_EQ(captured_config.entries[1].key.bool_key, OVRTX_CONFIG_SYNC_MODE);
+            EXPECT_TRUE(captured_config.entries[1].value.bool_value);
+        }
+    }
+
+    ovrtx_destroy_renderer(configured_renderer);
 
     EXPECT_TRUE(major != 0u || minor != 0u || patch != 0u);
     EXPECT_EQ(config.entry_count, 2u);

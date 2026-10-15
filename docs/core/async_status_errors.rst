@@ -16,6 +16,12 @@ offers blocking convenience methods plus ``*_async`` variants. C enqueue
 functions return operation ids that must be waited before fetching results or
 assuming side effects are visible.
 
+In attached mode, wait for scene mutations through ovstage's operation APIs.
+Accepted enqueues can still fail ordinal admission during execution. Check
+mutation completion, then advance and wait for the ovstage write floor before
+rendering that ordinal. Ordering async operations does not bypass the configured
+admission policy; see :ref:`ovstage-ordinal-admission`.
+
 Python Operations
 -----------------
 

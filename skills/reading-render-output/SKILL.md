@@ -93,6 +93,10 @@ After reading/processing, unmap to release the mapped buffer.
 >
 > **Source (save-to-PNG example):** `examples/python/projectors/main.py` snippet `projectors-save-png`
 
+### Record Path Tracing LPE outputs with Rerun
+
+> **Source:** `examples/python/lpes/main.py` snippet `doc-read-lpe-outputs`
+
 ### Map to CUDA for GPU processing
 
 > **Source:** `tests/docs/python/test_camera_sensors.py` snippet `doc-map-render-output-cuda`

@@ -27,7 +27,7 @@ In this documentation you will find getting started guides for Python and C, API
    Starting with **ovrtx 0.4**, the renderer can attach to **ovstage** — an
    optional NVIDIA library that manages the runtime scene, ordinal-keyed writes,
    and change detection. Renderer-owned scene APIs remain available for
-   standalone compatibility in 0.4, but are deprecated as scene ownership
+   standalone compatibility, but have been deprecated since 0.4 as scene ownership
    transitions entirely to ovstage in a future release. Refer to
    :doc:`core/ovstage_integration` for the attach-mode reference.
 
@@ -71,6 +71,7 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    core/renderer_configuration
    core/async_status_errors
    core/cuda_vulkan_scheduling
+   core/usd_plugin_paths
    core/ovstage_integration
 
 .. toctree::
@@ -79,6 +80,7 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    :caption: Sensors
 
    sensors/configuration
+   sensors/multi_rate
    sensors/sensor_outputs
    sensors/cameras
    sensors/nonvisual
@@ -109,11 +111,35 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
 
 .. toctree::
    :maxdepth: 2
+   :caption: Geometry
+
+   geometry/gaussian_splats
+
+.. toctree::
+   :maxdepth: 2
    :caption: Materials
 
    materials/material_binding
    materials/projectors
    materials/decals
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Lights
+
+   lights/index
+   lights/common_attributes
+   lights/physical_lighting
+   lights/shaping_and_ies
+   lights/light_linking
+   lights/ghost_lights
+   lights/distant_light
+   lights/sphere_light
+   lights/rect_light
+   lights/disk_light
+   lights/cylinder_light
+   lights/dome_light
+   lights/mesh_lights
 
 .. toctree::
    :maxdepth: 2

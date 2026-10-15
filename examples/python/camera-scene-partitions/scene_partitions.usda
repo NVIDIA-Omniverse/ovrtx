@@ -1,0 +1,124 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+# [snippet:doc-example-camera-scene-partitions]
+def Xform "World"
+{
+    def Xform "Left" (
+        prepend references = @../../../tests/docs/data/cube.usd@
+    )
+    {
+        token primvars:omni:scenePartition = "left" (interpolation = "constant")
+        double3 xformOp:translate = (-115, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        over "Cube"
+        {
+            color3f[] primvars:displayColor = [(0.9, 0.12, 0.025)]
+        }
+    }
+
+    def Xform "Right" (
+        prepend references = @../../../tests/docs/data/torus.usd@
+    )
+    {
+        token primvars:omni:scenePartition = "right" (interpolation = "constant")
+        double3 xformOp:translate = (115, 75, 0)
+        float3 xformOp:rotateXYZ = (90, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+        over "Torus"
+        {
+            color3f[] primvars:displayColor = [(0.025, 0.3, 0.85)]
+        }
+    }
+
+    def Xform "Ground" (
+        prepend references = @../../../tests/docs/data/ground.usd@
+    )
+    {
+        double3 xformOp:scale = (20, 1, 20)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+    }
+
+    def DomeLight "Environment"
+    {
+        float inputs:intensity = 1000
+        asset inputs:texture:file = @../../../tests/docs/data/studio.exr@
+        token inputs:texture:format = "latlong"
+    }
+
+    def Camera "LeftCamera"
+    {
+        custom token omni:scenePartition = "left"
+        float focalLength = 38
+        float2 clippingRange = (1, 100000)
+        double3 xformOp:translate = (0, 230, 850)
+        float3 xformOp:rotateXYZ = (-12, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Camera "RightCamera"
+    {
+        custom token omni:scenePartition = "right"
+        float focalLength = 38
+        float2 clippingRange = (1, 100000)
+        double3 xformOp:translate = (0, 230, 850)
+        float3 xformOp:rotateXYZ = (-12, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Camera "BothCamera"
+    {
+        float focalLength = 38
+        float2 clippingRange = (1, 100000)
+        double3 xformOp:translate = (0, 230, 850)
+        float3 xformOp:rotateXYZ = (-12, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+}
+
+# [/snippet:doc-example-camera-scene-partitions]
+
+def Scope "Render"
+{
+    # Allow the camera without a partition selector to see both objects.
+    def RenderSettings "OmniverseGlobalRenderSettings"
+    {
+        bool omni:rtx:scenePartitioning:showAllPartitionsByDefault = true
+    }
+
+    def RenderVar "LdrColor"
+    {
+        string sourceName = "LdrColor"
+    }
+
+    def RenderProduct "Left"
+    {
+        rel camera = </World/LeftCamera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (640, 480)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:scenePartitioning:excludeBackgroundDomeLightInPartition = false
+    }
+
+    def RenderProduct "Right"
+    {
+        rel camera = </World/RightCamera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (640, 480)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:scenePartitioning:excludeBackgroundDomeLightInPartition = false
+    }
+
+    def RenderProduct "Both"
+    {
+        rel camera = </World/BothCamera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (640, 480)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:scenePartitioning:excludeBackgroundDomeLightInPartition = false
+    }
+}

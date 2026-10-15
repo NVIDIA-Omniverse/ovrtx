@@ -88,9 +88,8 @@ OmniProjectorAPI Attributes
        *Object* applies the projection in the local space of the primitive;
        *World* applies it in world space; *Texture* takes UV coordinates from
        the texture space selected by ``omni:projector:inputSpace`` (up to four
-       spaces; this mode is not yet functional). *Object meters* and *World
-       meters* account for scene units, so the texture repeats instead of
-       stretching when a primitive is scaled up.
+       spaces). *Object meters* and *World meters* account for scene units,
+       so the texture repeats instead of stretching when a primitive is scaled up.
    * - ``omni:projector:inputSpace``
      - Selects the texture space to read when ``omni:projector:space`` is set
        to *Texture* (up to four spaces).

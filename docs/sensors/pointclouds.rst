@@ -177,19 +177,19 @@ Produced by the radar sensor model.
       type:    "PointCloud"
 
       tensors (device reported by each DLTensor; Nmax is the per-frame allocation bound):
-        "Coordinates"      -- [3, Nmax]  float32   (range, azimuth, elevation -- or x, y, z per coordsType)
-        "RCS"              -- [Nmax]     float32   (radar cross section)
-        "RadialVelocityMs" -- [Nmax]     float32   (radial velocity, m/s -- negative for approaching)
-        "TimeOffsetNs"     -- [Nmax]     int32     (per-detection time offset from frame start)
-        "Flags"            -- [Nmax]     uint8     (auto-enabled)
+        "Coordinates"      -- [3, Nmax]  float32   (coordinates per detection; spherical or cartesian per coordsType)
+        "RCS"              -- [Nmax]     float32   (radar cross section per detection)
+        "RadialVelocityMs" -- [Nmax]     float32   (signed radial velocity per detection)
+        "TimeOffsetNs"     -- [Nmax]     int32     (per-detection time offset from scan start)
+        "Flags"            -- [Nmax]     uint8     (status / validity flags; auto-enabled)
         "Counts"           -- [1]        int32     (number of delivered detections this frame; auto-enabled)
 
       params (always CPU):
         "frameId"                  -- uint64
         "timestampNs"              -- uint64
         "modality"                 -- uint32
-        "coordsType"               -- uint32
-        "frameOfReference"         -- uint16
+        "frameOfReference"         -- uint16     (sensor | world | custom)
+        "coordsType"               -- uint32     (cartesian | spherical)
         "modelToAppTransform"      -- float32 [4, 4]
         "frameStartTimeStampNs"    -- uint64
         "frameStartPosM"           -- float32 [3]
@@ -198,5 +198,15 @@ Produced by the radar sensor model.
         "frameEndPosM"             -- float32 [3]
         "frameEndOrientation"      -- float32 [4]
         "maxPoints"                -- uint32     (maximum detection allocation; use Counts for the delivered per-frame range)
+        "sensorID"                 -- uint8
+        "scanIdx"                  -- uint8
+        "cycleCnt"                 -- uint64
+        "maxRangeM"                -- float32
+        "minVelMps"                -- float32
+        "maxVelMps"                -- float32
+        "minAzRad"                 -- float32
+        "maxAzRad"                 -- float32
+        "minElRad"                 -- float32
+        "maxElRad"                 -- float32
 
-Field-by-field meaning is in :doc:`radar`.
+Field-by-field meaning, units, and visualization patterns are in :doc:`radar`.

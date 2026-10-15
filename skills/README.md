@@ -195,6 +195,10 @@ For existing ovrtx 0.4 projects, use `skills/update-0-4-to-0-5/SKILL.md` to migr
 the public OVRTX 0.5 API and authored-USD changes, including the OVStage 0.2
 data-contract changes that affect attached applications.
 
+For existing ovrtx 0.5 projects, use [update-0-5-to-0-6](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-5-to-0-6/SKILL.md) for
+logging, animation clocks, OVStage 0.3 source/data contracts, sensor outputs,
+and SPG Lua migration. Renderer-setting migrations are outside its scope.
+
 ## Adding a New Skill
 
 1. **Write docs tests first.** Add focused tests under `tests/docs/python` for Python APIs, `tests/docs/c` for C APIs, or `tests/docs/usd` for pure USDA constructs. Wrap every illustrative section in `doc-*` snippet markers.

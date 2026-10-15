@@ -1,0 +1,24 @@
+digraph {
+   rankdir=LR
+   bgcolor="transparent"
+   compound=true
+   node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
+   edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
+   subgraph "cluster_A" {
+      label="product A" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
+      color="#9aa0a6" style=dashed
+      "A:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
+      "A:Out" [fillcolor="#4c566a" fontcolor="white" label="Out"]
+      "A:a" [fillcolor="#76b900" fontcolor="#1b1b1b" label="a"]
+      "A:LdrColor" -> "A:a"
+      "A:a" -> "A:Out"
+   }
+   subgraph "cluster_B" {
+      label="product B" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
+      color="#9aa0a6" style=dashed
+      "B:b" [fillcolor="#76b900" fontcolor="#1b1b1b" label="b"]
+      "B:OutB" [fillcolor="#4c566a" fontcolor="white" label="OutB"]
+      "B:b" -> "B:OutB"
+   }
+   "A:Out" -> "B:b"
+}

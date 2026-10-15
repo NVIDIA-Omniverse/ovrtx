@@ -10,7 +10,7 @@
 - Mapping OVRTX output as CUDA arrays
 - Copying into Vulkan-exported images imported by CUDA
 - Synchronizing CUDA and Vulkan with an external timeline semaphore
-- Presenting with async double-buffering (ping-pong images)
+- Presenting from a ring of shared images, with optional frame pacing
 
 This sample intentionally keeps OVRTX integration in `src/main.cpp` (no wrapper class).
 
@@ -77,12 +77,14 @@ Linux:
 
 ```bash
 ./build/ovrtx-interop
+./build/ovrtx-interop --headless --num-frames 100
 ```
 
 Windows:
 
 ```pwsh
 .\build\Release\ovrtx-interop.exe
+.\build\Release\ovrtx-interop.exe --headless --num-frames 100
 ```
 
 ## Command Line Interface (Matches `main.cpp`)
@@ -98,8 +100,48 @@ Options:
   --up-axis, -a <Y|Z>           Scene up axis (default: Z)
   --units <meters|centimeters>  Scene units (default: meters)
   --num-frames, -n <N>          Render N frames, save out.png, and exit
+  --headless, --no-window       Run the interop path without GLFW
+  --camera, -c <path>           Orbit camera prim (default: /World/Camera)
+  --present-mode <mode>         fifo | mailbox | immediate (default: fifo)
+  --pace                        Space generated frames evenly (default: off)
+  --dlssg                       Enable DLSS Frame Generation (default: off)
+  --dlssg-frames <N>            Interpolated frames per rendered frame,
+                                implies --dlssg (default: renderer picks)
   --help, -h                    Show help
 ```
+
+## Presentation and Frame Pacing
+
+- `--present-mode` selects the swapchain present mode. `fifo` is the default and
+  the only mode the Vulkan spec guarantees, so the other two fall back to it when
+  `vkGetPhysicalDeviceSurfacePresentModesKHR` does not report them. Both creation
+  sites go through `VulkanContext::_select_present_mode()` so they cannot
+  disagree, and `VulkanContext::present_mode()` reports what was accepted.
+- `fifo` caps presentation at the display refresh, which hides frame-generation
+  throughput. `immediate` is the mode to use for benchmarking. On a virtual or
+  remote display with no client attached, `fifo` *and* `mailbox` can both pin to
+  a very low rate because `vkAcquireNextImageKHR` waits on the display.
+- `--pace` spreads frame promotions instead of showing a whole step's frames back
+  to back. `FramePacer` targets the observed step period divided by the frames
+  per step, deliberately undershooting by a safety factor: promoting a frame is
+  what frees a ring slot, so a target slower than the renderer's real output rate
+  would throttle production and inflate the very period being measured.
+- Pacing only engages when a step yields more than one frame; there is nothing to
+  spread out otherwise.
+
+## Metrics
+
+The per-second line separates measurements that frame generation makes diverge:
+
+- `Steps/s` counts `ovrtx_step_with_stage` calls; `Frames/s` counts frames that
+  actually became visible. With DLSS-G, `Frames/s` is `(N + 1) x Steps/s`.
+- `Presents/s` counts loop iterations. Because the map is polled, the loop
+  re-presents the current image while the next frame renders, so this is much
+  higher than `Frames/s` and is not a smoothness measure.
+- `Step` is enqueue to `ovrtx_fetch_results` success. `MapCopy` is the map plus
+  the copy submission, which is cheap now that the unmap is deferred.
+- `Frame gap` is the spread between visible frames. Judder shows up here as a
+  wide min/max even when the mean looks healthy; pacing is what tightens it.
 
 ## Runtime Flow (Current Implementation)
 
@@ -108,46 +150,88 @@ Initialization:
 1. `cuda_apply_scheduling_workaround()` as the first statement of `main()`, before anything can create a CUDA context
 2. `ovrtx_initialize` -> `ovrtx_create_renderer`
 3. Create an ovstage instance, attach it to OVRTX, populate USD with `ovstage_population_open_usd_from_file`, and advance the write floor
-4. Configure CUDA-visible device 0 in ovrtx, then call `cuda_init(0, &cuda_uuid)` to validate the OVRTX context and obtain its MIG-aware UUID with `cuDeviceGetUuid_v2`
-5. Run one `ovrtx_step_with_stage` to detect output type and dimensions
-6. Create Vulkan context using CUDA UUID for device matching
-7. Create two exportable sampled images (`SHARED_IMAGE_COUNT = 2`)
-8. Export Vulkan image memory and import into CUDA as surface-backed arrays
-9. Export Vulkan timeline semaphore and import into CUDA
-10. Prime first frame into buffer 0
+4. Author the DLSS-G settings on the RenderProduct prim (`author_dlssg_settings`), unconditionally, so the CLI overrides the scene's opinion
+5. Configure CUDA-visible device 0 in ovrtx, then call `cuda_init(0, &cuda_uuid)` to validate the OVRTX context and obtain its MIG-aware UUID with `cuDeviceGetUuid_v2`
+6. Run one `ovrtx_step_with_stage` to detect output type and dimensions
+7. Create Vulkan context using CUDA UUID for device matching
+8. Create the ring of exportable sampled images (`CUDA_SHARED_IMAGE_COUNT = 4`)
+9. Export Vulkan image memory and import into CUDA as surface-backed arrays
+10. Export Vulkan timeline semaphore and import into CUDA
+11. Prime first frame into buffer 0
 
-Main loop:
+Main loop. Nothing in it blocks on the renderer: both ovrtx waits are polled with
+a zero timeout, so an iteration that finds nothing ready just re-presents the
+current image.
 
 1. Poll window/events and acquire swapchain image
-2. If prior CUDA work is done (`cuEventQuery(cuda_frame_done_event)`):
-   - update `read_timeline_value`
-   - swap `read_idx` and `write_idx`
-3. If camera moved, write transform to ovstage with `ovstage_write_attribute` and advance the write floor
-4. If no CUDA work pending:
-   - enqueue pending `ovrtx_enqueue_pick_query` before stepping, if the user clicked or dragged in the viewport
-   - `ovrtx_step_with_stage` -> `ovrtx_fetch_results` -> `ovrtx_map_render_var_output`
-   - if a pick query was submitted, map `OVRTX_RENDER_VAR_PICK_HIT` on CPU, print resolved prim paths, and update selection outline groups
-   - wait on `rendered_output.cuda_sync.wait_event` (if provided)
-   - copy OVRTX `CUarray` -> CUDA-imported Vulkan image at `write_idx`
-   - signal external timeline semaphore from CUDA
-   - unmap with `ovrtx_unmap_render_var_output` using `copy_done_event`
-   - destroy results via `ovrtx_destroy_results`
-5. Vulkan draws fullscreen triangle sampling image `read_idx`, plus the marquee overlay line strip while dragging
-6. Submit/present with Vulkan waiting on `read_timeline_value`
+2. Retire ring slots whose copy has landed (`cuEventQuery(slot.copy_done)`):
+   release the ovrtx mapping with `release_mapped_output` and move the slot from
+   `Writing` to `Ready`, appending it to `ready_queue`
+3. If a frame is ready and `FramePacer` says it is due, show the oldest one: free
+   the previously shown slot, adopt the new `read_idx`, and take that slot's
+   `timeline_value` and `holds_real_frame`
+4. If camera moved, write transform to ovstage with `ovstage_write_attribute` and advance the write floor
+5. If any ring slot is `Free`:
+   - if no step is in flight, enqueue one:
+     - enqueue pending `ovrtx_enqueue_pick_query` before stepping, if the user clicked or dragged in the viewport
+     - `ovrtx_step_with_stage`
+   - poll `ovrtx_fetch_results` with timeout 0. On success:
+     - if a pick query was submitted, resolve and keep the
+       `OVRTX_RENDER_VAR_PICK_HIT` handle; the map itself is polled separately
+     - `collect_color_outputs` gathers one color handle per output frame, in presentation order
+   - if a pick query is still outstanding, poll its CPU map with timeout 0. On
+     success, print resolved prim paths and update selection outline groups; on
+     `OVRTX_API_TIMEOUT` leave the query pending and retry next iteration
+   - poll `copy_output_to_surface` with timeout 0 for the next unconsumed frame:
+     map, wait on `cuda_sync.wait_event` (if provided), copy OVRTX `CUarray` ->
+     CUDA-imported Vulkan image at the free slot. The mapping is **not** released
+     here; it is handed back for step 2
+   - signal external timeline semaphore from CUDA and record `slot.copy_done`
+   - destroy the step result once every frame it produced has been copied out
+     and any pick hit has been read (`PendingFrames::retirable()`)
+6. Vulkan draws fullscreen triangle sampling image `read_idx`, plus the marquee overlay line strip while dragging
+7. Submit/present with Vulkan waiting on `read_timeline_value`
+8. Sleep until the next frame is due, so pacing does not busy-spin on redundant
+   presents
+
+## Frame Queue and DLSS Frame Generation
+
+- One `ovrtx_step_with_stage` normally produces one output frame. With DLSS Frame Generation enabled it produces `N + 1`: the interpolated frames first, the real rendered frame last.
+- All `N + 1` frames of a step become mappable at essentially the same time, not progressively. Measured on L40 with `N = 1`, `MapCopy by frame-in-step` is ~0.25 ms for both the interpolated and the real frame, and `map polls` stays at 0 — by the time `ovrtx_fetch_results` succeeds, every frame of the step is already mappable. This is why pacing is needed to spread them out, and why the ring has to be able to hold a whole step.
+- Consequently the renderer wait lives in the polled `ovrtx_fetch_results`, not in the map. The map poll is kept anyway because it costs nothing and the ordering is a renderer implementation detail, not a documented guarantee.
+- `PendingFrames` holds the step result plus one color output handle per frame, and tracks `results_fetched` because a step result is fetched before its frames are mappable. The next step is only enqueued once the queue is drained, and `ovrtx_destroy_results` runs only after the last frame of a step has been copied out.
+- Priming uses the last (real) frame of its step, and so does `find_accumulation_status`, since interpolated frames carry no accumulation status.
+- `--num-frames` must save a real frame to `out.png`. Each ring slot records `holds_real_frame` (set from `pending.drained()` at copy time), the shown slot's value becomes `read_holds_real_frame`, and the loop exits only once the shown buffer holds a real frame. Headless drains all frames of a step in one iteration, so it always exits on a step boundary. Both count frames that became visible, so either can overshoot `--num-frames` by up to `N`.
+- The two settings are authored with `ovstage_write_attribute` + `OVSTAGE_PRIM_MODE_UPSERT` on the RenderProduct prim, not through a renderer config entry. No USD API schema needs to be applied first; both the sensor scheduling layer and Hydra read them from the runtime scene by attribute name.
+  - `bool omni:rtx:dlss:frameGeneration`
+  - `int omni:rtx:dlss:frameGenerationInterpolatedFrameCount` (0 means "renderer picks")
+- Frame generation is declined silently in several situations, so `report_dlssg_frame_count` warns once if no step produced extra frames within `DLSSG_WARMUP_STEPS`. The warmup exists because DLSS-G interpolates between two rendered frames and legitimately produces a single frame right after a history reset.
 
 ## OVRTX Integration Contract
 
 The core OVRTX frame lifecycle used by this sample:
 
 1. `ovrtx_step_with_stage(...)` enqueues a frame from the current committed ovstage ordinal
-2. `ovrtx_fetch_results(...)` waits for completion
-3. `ovrtx_map_render_var_output(...)` maps output as CUDA array (`OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY`)
+2. `ovrtx_fetch_results(...)` returns result metadata. This does **not** mean the
+   output frames are ready to map. Timeout 0 makes it a poll returning
+   `OVRTX_API_TIMEOUT`
+3. `ovrtx_map_render_var_output(...)` maps output as CUDA array (`OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY`). Timeout 0 makes it a poll
 4. Consume `rendered_output.tensors[0].dl->data` as `CUarray`
 5. If `rendered_output.cuda_sync.wait_event != 0`, wait on it in CUDA stream
-6. After copy/compute, call `ovrtx_unmap_render_var_output(...)` and pass completion event
-7. Call `ovrtx_destroy_results(...)`
+6. After the copy has actually landed, call `ovrtx_unmap_render_var_output(...)`
+   and pass the completion event. For a zero-copy CUDA-array mapping this call
+   waits for that event on the CPU, so call it only once `cuEventQuery` reports
+   the event complete
+7. Call `ovrtx_destroy_results(...)`. This is independent of the mappings and may
+   run before them
 
 Do not skip unmap/destroy; the sample treats these as required per-frame cleanup.
+Deferring the unmap means shutdown has to release any mapping the ring still
+holds, which the sample does after `cuStreamSynchronize`.
+
+Check the result of CUDA timeline import, image copy, and timeline signaling.
+On failure, drain pending work, release mapped outputs and results, and exit
+with a nonzero status before submitting Vulkan work that depends on the failed operation.
 
 CUDA device identity is based on process-visible ordinals after `CUDA_VISIBLE_DEVICES` filtering. The configured ovrtx GPU, RenderProduct `deviceIds`, and mapped DLPack `device_id` use that same ordinal namespace. Vulkan device selection compares `cuDeviceGetUuid_v2` with `VkPhysicalDeviceIDProperties::deviceUUID`; never use PCI identity, `cudaDeviceProp::uuid`, or legacy `cuDeviceGetUuid` to distinguish MIG instances.
 
@@ -169,13 +253,31 @@ Format mapping used in this sample:
 
 - OVRTX -> CUDA: per-frame CUDA wait event from mapped output (`cuda_sync.wait_event`)
 - CUDA -> Vulkan: external timeline semaphore; CUDA signals monotonically increasing value
-- CPU side: frame completion is polled by `cuEventQuery(cuda_frame_done_event)` to avoid blocking
-- Double buffering:
-  - CUDA writes `write_idx`
-  - Vulkan samples `read_idx`
-  - indices swap only after CUDA frame is complete
+- CPU side: nothing in the windowed loop waits on the renderer.
+  `ovrtx_fetch_results` and `ovrtx_map_render_var_output` are polled with
+  timeout 0 for the color output *and* for the pick hit, and copy completion is
+  polled with `cuEventQuery(slot.copy_done)`. The startup prime and the headless
+  loop still use `ovrtx_timeout_infinite`; neither presents interactively
+- Ring buffering (`CUDA_SHARED_IMAGE_COUNT` slots, states `Free` / `Writing` /
+  `Ready` / `Showing`):
+  - CUDA writes into any `Free` slot
+  - Vulkan samples the `Showing` slot
+  - a slot becomes `Ready` only after its copy event completes, and the slot
+    being shown is freed when a newer frame replaces it
+- **Each slot owns its own `copy_start` / `copy_done` events.** Several copies are
+  in flight at once, so a shared completion event would be unsafe and a shared
+  timing pair could not attribute a duration to one frame. The single shared
+  `cuda_copy_done_event` remains only for the priming and headless paths, which
+  copy one frame at a time and release each mapping before starting the next.
+- **The unmap is deferred on purpose.** For a zero-copy CUDA-array mapping,
+  `ovrtx_unmap_render_var_output` waits for its fence event on the CPU, and that
+  event is stream-ordered behind the renderer's own production. Unmapping right
+  after queueing the copy relocates the render wait into the unmap instead of
+  removing it, so the mapping is held until `cuEventQuery` reports the copy done.
+  Mapping lifetime is independent of `ovrtx_destroy_results()`, which is what
+  makes this legal.
 - Known driver scheduling interaction on Linux: the OVRTX -> CUDA stream wait above disturbs Vulkan scheduling and stalls the renderer's GPU work. Workaround is `CUDA_DEVICE_MAX_CONNECTIONS=1` in the environment before the first CUDA context is created. `cuda_apply_scheduling_workaround()` (`src/cuda/cuda_kernel.cpp`, snippet `cuda-device-max-connections`) does this from the first statement of `main()`, so the call site must stay first; it defers to a value already in the environment, which is the no-rebuild opt-out. See `docs/core/cuda_vulkan_scheduling.rst`. Windows is unaffected, where the function is a no-op.
-- The interaction needs **both** an outstanding stream wait and concurrent renderer Vulkan submission. An outstanding wait alone is not enough: if the loop blocks on the copy before enqueueing more renderer work, the renderer sits idle and nothing is disturbed. This is why only the headless loop reproduces it (`Runtime Flow`), while the windowed loop, which gates the next step on the previous copy, shows no difference from the workaround.
+- The interaction needs **both** an outstanding stream wait and concurrent renderer Vulkan submission. An outstanding wait alone is not enough: if the loop blocks on the copy before enqueueing more renderer work, the renderer sits idle and nothing is disturbed. The headless loop, which copies one frame at a time, is what reproduces it (`Runtime Flow`). The windowed loop used to be exempt by construction because it gated the next step on the previous copy; now that it polls and keeps a step in flight while copies are still outstanding, it satisfies both conditions too, so the workaround is expected to matter for both loops.
 
 ## Camera and Scene Updates
 
@@ -190,6 +292,7 @@ Format mapping used in this sample:
 - Left drag enqueues an NDC marquee pick query using the drag rectangle and draws the bounds through `overlay.vert` / `overlay.frag`.
 - Any scene used with picking must restrict the picked RenderProduct to CUDA-visible GPU 0 with `uint[] deviceIds = [0]`.
 - Pick results are returned as `OVRTX_RENDER_VAR_PICK_HIT`, mapped on CPU, and resolved to string prim paths with `ovrtx_get_path_dictionary` plus `path_dictionary_get_tokens_from_paths`.
+- That map is polled with timeout 0 like the color one and returns `PickOutputResult::{Read, NotReady, Failed}`. A CPU map is a readback, so blocking on it would stall presentation for exactly the reason the color path no longer does. `NotReady` leaves `pick_query_submitted` set and the step in flight, so the pick is retried on later iterations instead of being dropped, and `retirable()` holds `ovrtx_destroy_results` back until the pick has been read.
 - Picking remains active while attached to ovstage and prints resolved prim paths.
 - Selection outlines are enabled at renderer creation with `ovrtx_config_entry_selection_outline_enabled(true)` and `ovrtx_config_entry_selection_fill_mode(OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR)`.
 - Group `1` is styled once at startup with `ovrtx_set_selection_group_styles()` (custom outline color plus translucent fill).

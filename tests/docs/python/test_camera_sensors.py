@@ -19,7 +19,6 @@ import ovstage
 
 SCENE_PATH = str((Path(__file__).parent / "../../../tests/data/simple_camera.usda").resolve())
 LDR_COLOR_PATH = "/Render/Camera/LdrColor"
-HDR_COLOR_PATH = "/Render/Camera/HdrColor"
 
 USDA = f"""#usda 1.0
 (
@@ -63,21 +62,26 @@ def test_step_and_map_camera_outputs(renderer, stage, output_dir):
         ordinal=ordinal,
     )
 
-    for product_name, product in products.items():
-        for frame in product.frames:
-            # LdrColor: uint8 sRGB image
-            var = frame.render_vars[LDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
-            ldr_pixels = np.from_dlpack(var)  # shape: (H, W, 4), dtype: uint8
-            assert ldr_pixels.shape == (1080, 1920, 4)
-            assert ldr_pixels.dtype == np.uint8
-            Image.fromarray(ldr_pixels).save(output_dir / "test_camera_sensors.LdrColor.png")
+    for frame in products["/Render/Camera"].frames:
+        # RenderVar outputs are keyed by their full prim paths.
+        ldr_var = frame.render_vars["/Render/Camera/LdrColor"]
+        hdr_var = frame.render_vars["/Render/Camera/HdrColor"]
 
-            # HdrColor: float16 linear image
-            var = frame.render_vars[HDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
-            hdr_pixels = np.from_dlpack(var)  # shape: (H, W, 4), dtype: float16
-            assert hdr_pixels.shape == (1080, 1920, 4)
-            assert hdr_pixels.dtype == np.float16
+        # LdrColor: uint8 sRGB image
+        var = ldr_var.map(device=ovrtx.Device.CPU)
+        ldr_pixels = np.from_dlpack(var)  # shape: (H, W, 4), dtype: uint8
+        assert ldr_pixels.shape == (1080, 1920, 4)
+        assert ldr_pixels.dtype == np.uint8
+        Image.fromarray(ldr_pixels).save(output_dir / "test_camera_sensors.LdrColor.png")
+
+        # HdrColor: float16 linear image
+        var = hdr_var.map(device=ovrtx.Device.CPU)
+        hdr_pixels = np.from_dlpack(var)  # shape: (H, W, 4), dtype: float16
+        assert hdr_pixels.shape == (1080, 1920, 4)
+        assert hdr_pixels.dtype == np.float16
     # [/snippet:doc-step-and-map-camera-outputs]
+
+    assert products["/Render/Camera"].frames
 
 
 def test_step_async_returns_operation(renderer, stage):

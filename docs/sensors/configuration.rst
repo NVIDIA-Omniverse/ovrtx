@@ -133,8 +133,10 @@ variables, resolution, stepping, device pinning, or result handling:
          :end-before: # [/snippet:doc-multi-render-product-shared-vars-python]
          :dedent:
 
-When stepping the renderer, pass all the independent RenderProduct paths you want
-output for:
+When stepping the renderer, pass every active RenderProduct path, including
+sensors that have no completed output this step. See :doc:`multi_rate` for
+different sensor rates and partial outputs. The following example steps two
+independent products:
 
 .. tab-set::
 

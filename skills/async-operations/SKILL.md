@@ -171,11 +171,20 @@ C wait result fields:
 
 When ovrtx is attached to ovstage, the write side of the async model moves to
 ovstage's ordinal-keyed submit/observe: ovstage enqueues return an ``op_index``
-immediately, and ordinal sealing (``ovstage_advance_write_floor``) is what makes
-writes observable. ovrtx observes the sealed state by passing the same ordinal
+immediately. Enqueue acceptance does not guarantee successful admission or
+publication. Wait for each mutation to complete successfully, then advance and
+wait for the write floor (``ovstage_advance_write_floor``) before rendering.
+For data-plane mutations, the ``STRICTLY_INCREASING`` admission policy
+requires a newer ordinal for repeated changes to an affected cell or prim
+lifecycle, even before sealing;
+disjoint cells may share an ordinal. Other policies change retained-history
+admission but still enforce the operation's write floors. ovrtx observes the
+sealed state by passing the same ordinal
 to ``ovrtx_step_with_stage(..., ordinal)`` and
-``ovrtx_update_from_stage(ordinal)``. See ovstage
-``skills/cpu-ahead-gpu-async/SKILL.md`` for the authoritative async model.
+``ovrtx_update_from_stage(ordinal)``. See the
+[admission-policy summary](../../docs/core/ovstage_integration.rst#ordinals-and-write-floor-gates)
+and ovstage's authoritative
+[asynchronous submit/observe model](https://github.com/NVIDIA-Omniverse/ovstage/blob/main/docs/concepts/async_model.rst).
 
 See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and `skills/update-0_3-0_4-python/SKILL.md`.
 

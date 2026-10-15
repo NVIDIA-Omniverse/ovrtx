@@ -1,0 +1,27 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+(
+    defaultPrim = "MarkerOverlayKernel"
+)
+
+# The Slang implementation of the marker overlay node. Identical to MarkerOverlayKernel.usda
+# except for the source asset: the file extension selects the backend. The ports are the same,
+# so a scene swaps one for the other and changes nothing else.
+def Shader "MarkerOverlayKernel"
+{
+    uniform token info:implementationSource = "sourceAsset"
+    uniform asset info:spg:sourceAsset = @MarkerOverlayKernel.slang@
+    uniform token info:spg:sourceAsset:subIdentifier = "markerOverlay"
+
+    opaque inputs:Image
+    token inputs:settings = "/World/Overlay"
+    opaque outputs:Overlay
+}

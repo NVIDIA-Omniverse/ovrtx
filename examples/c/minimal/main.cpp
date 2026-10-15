@@ -163,16 +163,17 @@ int main() {
                 result_code = 1;
             }
         }
+        // After a detach failure, only renderer destruction is supported.
+        if (renderer) {
+            result = ovrtx_destroy_renderer(renderer);
+            if (check_and_print_error(result, "destroy_renderer")) {
+                result_code = 1;
+            }
+        }
         if (stage) {
             ovstage_api_status_t stage_result = ovstage_destroy_instance(stage);
             if (stage_result != OVSTAGE_OK) {
                 print_ovstage_error(stage, stage_result, "destroy_instance");
-                result_code = 1;
-            }
-        }
-        if (renderer) {
-            result = ovrtx_destroy_renderer(renderer);
-            if (check_and_print_error(result, "destroy_renderer")) {
                 result_code = 1;
             }
         }

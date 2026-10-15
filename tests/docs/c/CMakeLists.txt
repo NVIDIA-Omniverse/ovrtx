@@ -90,7 +90,9 @@ add_executable(ovrtx_docs_tests
     test_error_handling.cpp
     test_logging.cpp
     test_semantic_labels.cpp
+    test_usd_plugin_paths.cpp
     test_support_api.cpp
+    test_renderer_configuration.cpp
     test_all_attributes.cpp
     test_transform_helpers.cpp
     test_picking_selection.cpp

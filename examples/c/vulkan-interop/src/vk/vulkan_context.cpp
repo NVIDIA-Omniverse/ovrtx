@@ -46,6 +46,7 @@ VulkanContext::VulkanContext(VulkanContextConfig const& config, CUuuid const& cu
     _headless = (_window == nullptr);
     _initial_sampled_image_capacity = config.initial_sampled_image_capacity;
     _debug_callback = config.debug_callback;
+    _requested_present_mode = config.present_mode;
     
     // Initialize volk (loads global Vulkan functions)
     if (volkInitialize() != VK_SUCCESS) {
@@ -289,7 +290,7 @@ auto VulkanContext::recreate_swapchain() -> void {
     create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.preTransform = capabilities.currentTransform;
     create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    create_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    create_info.presentMode = _select_present_mode();
     create_info.clipped = VK_TRUE;
     create_info.oldSwapchain = old_swapchain;
     
@@ -821,6 +822,48 @@ auto VulkanContext::_create_device() -> void {
     vkGetDeviceQueue(_device, _graphics_queue_family, 0, &_graphics_queue);
 }
 
+auto present_mode_name(PresentMode mode) -> std::string_view {
+    switch (mode) {
+    case PresentMode::Mailbox:
+        return "mailbox";
+    case PresentMode::Immediate:
+        return "immediate";
+    case PresentMode::Fifo:
+    default:
+        return "fifo";
+    }
+}
+
+auto VulkanContext::_select_present_mode() -> VkPresentModeKHR {
+    // FIFO is the only mode the spec requires every surface to support, so it
+    // is both the default and the fallback.
+    _present_mode = PresentMode::Fifo;
+    if (_requested_present_mode == PresentMode::Fifo) {
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    uint32_t mode_count = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(
+        _physical_device, _surface, &mode_count, nullptr);
+    std::vector<VkPresentModeKHR> modes(mode_count);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(
+        _physical_device, _surface, &mode_count, modes.data());
+
+    VkPresentModeKHR const wanted =
+        (_requested_present_mode == PresentMode::Mailbox)
+            ? VK_PRESENT_MODE_MAILBOX_KHR
+            : VK_PRESENT_MODE_IMMEDIATE_KHR;
+
+    for (VkPresentModeKHR mode : modes) {
+        if (mode == wanted) {
+            _present_mode = _requested_present_mode;
+            return wanted;
+        }
+    }
+
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
 auto VulkanContext::_create_swapchain(int width, int height) -> void {
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_physical_device, _surface, &capabilities);
@@ -862,7 +905,7 @@ auto VulkanContext::_create_swapchain(int width, int height) -> void {
     create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     create_info.preTransform = capabilities.currentTransform;
     create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    create_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    create_info.presentMode = _select_present_mode();
     create_info.clipped = VK_TRUE;
     
     VK_CHECK(vkCreateSwapchainKHR(_device, &create_info, nullptr, &_swapchain));

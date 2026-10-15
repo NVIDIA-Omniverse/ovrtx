@@ -11,11 +11,10 @@
 // Round-trip tests for the ovstage C-API DLTensor tensor-layout convention.
 // Mirrors tests/docs/python/test_attribute_shapes.py.
 //
-// The C API uses DLTensor lanes for multi-component attribute data: an
-// N-element array of float3 values is shape=[N] with dtype.lanes=3, and an
-// N-prim array of 4x4 matrices is shape=[N] with dtype.lanes=16. Rendered
-// outputs/AOVs are the exception: image tensors use channel-last shapes such
-// as [height, width, channels] with dtype.lanes=1.
+// Write tensors may use DLTensor lanes for multi-component attribute data.
+// Raw reads expose scalar lanes with trailing component dimensions: float3
+// arrays read as [N,3], and matrix4d values as [N,4,4]. Rendered outputs/AOVs
+// use their separate channel-last image layout.
 
 #include <gtest/gtest.h>
 #include "helpers.h"
@@ -133,9 +132,10 @@ TEST_F(AttributeShapesTest, Float3ArraySingleElement) {
               OVSTAGE_OK);
 
     DLTensor const& t = group.data.tensors[0];
-    EXPECT_EQ(t.ndim, 1);
+    EXPECT_EQ(t.ndim, 2);
     EXPECT_EQ(t.shape[0], 1);
-    EXPECT_EQ(t.dtype.lanes, 3u);
+    EXPECT_EQ(t.shape[1], 3);
+    EXPECT_EQ(t.dtype.lanes, 1u);
     float const* data = static_cast<float const*>(t.data);
     EXPECT_FLOAT_EQ(data[0], 1.0f);
     EXPECT_FLOAT_EQ(data[1], 2.0f);
@@ -185,7 +185,7 @@ TEST_F(AttributeShapesTest, Float3Array) {
     docs_wait_ovstage_no_errors(stage_, wq.op_index);
     docs_ovstage_advance_write_floor(stage_, 2);
 
-    // Read back — expect ndim=1, shape=[4], dtype.lanes=3.
+    // Read back — expect shape=[4,3] and scalar lanes.
     ovstage_ordinal_range_t range{};
     range.end_ordinal = 2;
     ovstage_read_handle_t read_handle = OVSTAGE_INVALID_READ_HANDLE;
@@ -199,9 +199,10 @@ TEST_F(AttributeShapesTest, Float3Array) {
               OVSTAGE_OK);
 
     DLTensor const& t = group.data.tensors[0];
-    EXPECT_EQ(t.ndim, 1);
+    EXPECT_EQ(t.ndim, 2);
     EXPECT_EQ(t.shape[0], 4);
-    EXPECT_EQ(t.dtype.lanes, 3u);
+    EXPECT_EQ(t.shape[1], 3);
+    EXPECT_EQ(t.dtype.lanes, 1u);
 
     ovstage_release_group(stage_, &group);
     ovstage_release_read(stage_, read_handle);
@@ -252,7 +253,7 @@ TEST_F(AttributeShapesTest, Mat4Array) {
     docs_wait_ovstage_no_errors(stage_, wq.op_index);
     docs_ovstage_advance_write_floor(stage_, 2);
 
-    // Read back — expect ndim=1, shape=[1], dtype.lanes=16.
+    // Read back — expect shape=[1,4,4] and scalar lanes.
     ovstage_ordinal_range_t range{};
     range.end_ordinal = 2;
     ovstage_read_handle_t read_handle = OVSTAGE_INVALID_READ_HANDLE;
@@ -266,9 +267,11 @@ TEST_F(AttributeShapesTest, Mat4Array) {
               OVSTAGE_OK);
 
     DLTensor const& t = group.data.tensors[0];
-    EXPECT_EQ(t.ndim, 1);
+    EXPECT_EQ(t.ndim, 3);
     EXPECT_EQ(t.shape[0], 1);
-    EXPECT_EQ(t.dtype.lanes, 16u);
+    EXPECT_EQ(t.shape[1], 4);
+    EXPECT_EQ(t.shape[2], 4);
+    EXPECT_EQ(t.dtype.lanes, 1u);
 
     double const* data = static_cast<double const*>(t.data);
     // Row 3 (last row) holds the translation under USD's row-vector convention.

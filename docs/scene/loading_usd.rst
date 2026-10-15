@@ -48,9 +48,14 @@ Opening a Root Layer
          :end-before: // [/snippet:load-usd-and-wait]
          :dedent:
 
-Python population assigns an ordinal; advance the ovstage write floor before
-rendering that ordinal. C compatibility open calls are asynchronous and must be
-waited before using the loaded stage.
+Supply Python population with an explicit application-owned ordinal above the
+applicable floors. Wait for population completion, then advance and wait for the
+ovstage write floor before rendering that ordinal; see
+:doc:`/core/ovstage_integration`. Refer to the authoritative `ovstage population
+documentation
+<https://github.com/NVIDIA-Omniverse/ovstage/blob/main/docs/scene/population.rst>`_
+for population-domain admission limits. C compatibility open calls are
+asynchronous and must be waited before using the loaded stage.
 
 Inline Composition
 ------------------

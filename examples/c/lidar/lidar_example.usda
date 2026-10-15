@@ -97,9 +97,6 @@ def Xform "World"
             token omni:simready:nonvisual:base = "asphalt"
             token omni:simready:nonvisual:coating = "none"
             token[] omni:simready:nonvisual:attributes = ["none"]
-            custom string inputs:nonvisual:base = "asphalt"
-            custom string inputs:nonvisual:coating = "none"
-            custom string inputs:nonvisual:attributes = "none"
         }
 
         def Material "Concrete"
@@ -107,9 +104,6 @@ def Xform "World"
             token omni:simready:nonvisual:base = "concrete"
             token omni:simready:nonvisual:coating = "none"
             token[] omni:simready:nonvisual:attributes = ["none"]
-            custom string inputs:nonvisual:base = "concrete"
-            custom string inputs:nonvisual:coating = "none"
-            custom string inputs:nonvisual:attributes = "none"
         }
     }
 }

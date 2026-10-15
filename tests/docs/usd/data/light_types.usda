@@ -1,0 +1,75 @@
+#usda 1.0
+
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+def Xform "World"
+{
+    # [snippet:doc-common-light-attributes]
+    def SphereLight "KeyLight"
+    {
+        color3f inputs:color = (1, 0.85, 0.7)
+        float inputs:colorTemperature = 4500
+        float inputs:diffuse = 1
+        bool inputs:enableColorTemperature = true
+        float inputs:exposure = 2
+        float inputs:intensity = 1000
+        bool inputs:normalize = false
+        float inputs:specular = 1
+    }
+    # [/snippet:doc-common-light-attributes]
+
+    # [snippet:doc-distant-light]
+    def DistantLight "Sun"
+    {
+        float inputs:angle = 0.53
+        float inputs:intensity = 50000
+        bool inputs:normalize = true
+    }
+    # [/snippet:doc-distant-light]
+
+    # [snippet:doc-sphere-light]
+    def SphereLight "Bulb"
+    {
+        float inputs:radius = 0.05
+        bool treatAsPoint = false
+    }
+    # [/snippet:doc-sphere-light]
+
+    # [snippet:doc-rect-light]
+    def RectLight "Panel"
+    {
+        float inputs:height = 0.6
+        float inputs:width = 1.2
+    }
+    # [/snippet:doc-rect-light]
+
+    # [snippet:doc-disk-light]
+    def DiskLight "Downlight"
+    {
+        float inputs:radius = 0.25
+    }
+    # [/snippet:doc-disk-light]
+
+    # [snippet:doc-cylinder-light]
+    def CylinderLight "Tube"
+    {
+        float inputs:length = 1.2
+        float inputs:radius = 0.025
+        bool treatAsLine = false
+    }
+    # [/snippet:doc-cylinder-light]
+
+    # [snippet:doc-dome-light]
+    def DomeLight "Environment"
+    {
+        asset inputs:texture:file = @../../data/studio.exr@
+        token inputs:texture:format = "latlong"
+    }
+    # [/snippet:doc-dome-light]
+}

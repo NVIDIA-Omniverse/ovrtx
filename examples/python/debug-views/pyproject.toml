@@ -1,0 +1,24 @@
+[project]
+name = "debug-views"
+version = "0.1.0"
+description = "Render RT2 G-buffer debug views and log them together to Rerun"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "numpy==2.2.6",
+    "ovrtx==0.6.0.1791947691",
+    "ovstage==0.3.0.1791986420",
+    "pillow==12.1.1",
+    "rerun-sdk==0.29.0",
+]
+
+[tool.uv]
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+

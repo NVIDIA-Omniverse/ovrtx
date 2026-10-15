@@ -28,9 +28,16 @@ extern "C"
                                                        size_t num_strings,
                                                        ovx_token_t* out_tokens);
 
-        /* Intern prim paths described as concatenated token arrays. Output
+        /** Intern prim paths described as concatenated token arrays. Output
            handles are dict-lifetime. Equal token sequences yield equal output
-           paths. The input tokens must have been minted from this dictionary. */
+           paths. The input tokens must have been minted from this dictionary.
+
+           Each token names a path component without a separator. Paths are
+           absolute: tokens for `World` and `Box` produce `/World/Box`, with the
+           same handle as `create_paths_from_strings` for that absolute path
+           in this dictionary.
+           A path with zero tokens represents `/`. Supply a non-null
+           `tokens_per_path` array even when every path has zero tokens. */
         ovx_api_result_t (*create_paths_from_tokens)(path_dictionary_context_t* instance,
                                                      const ovx_token_t* tokens_per_path,
                                                      const size_t* num_tokens_per_path,

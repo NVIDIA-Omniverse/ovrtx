@@ -1,0 +1,344 @@
+#usda 1.0
+(
+    customLayerData = {
+        dictionary cameraSettings = {
+            dictionary Front = {
+                double3 position = (50000, 0, 0)
+                double radius = 500
+            }
+            dictionary Perspective = {
+                double3 position = (3.4130333366736694, -9.166151244327946, 3.647279242186782)
+                double3 target = (-4.666825164772725, 5.566928700091902, 1.6643306516719256)
+            }
+            dictionary Right = {
+                double3 position = (0, -50000, 0)
+                double radius = 500
+            }
+            dictionary Top = {
+                double3 position = (0, 0, 50000)
+                double radius = 500
+            }
+            string boundCamera = "/World/Camera"
+        }
+        dictionary omni_layer = {
+            string authoring_layer = "./ovrtx-robot-lineup.usda"
+            dictionary locked = {
+            }
+            dictionary muteness = {
+            }
+        }
+        dictionary renderSettings = {
+        }
+    }
+    defaultPrim = "World"
+    endTimeCode = 100
+    metersPerUnit = 1
+    startTimeCode = 0
+    timeCodesPerSecond = 60
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def "warehouse" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Environments/Simple_Warehouse/warehouse.usd@
+    )
+    {
+    }
+
+    def "GR1T2_fourier_hand_6dof" (
+        delete payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/FourierIntelligence/GR-1/GR1T2_fourier_hand_6dof/GR3T2_fourier_hand_6dof.usd@
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/FourierIntelligence/GR-1/GR1T2_fourier_hand_6dof/GR1T2_fourier_hand_6dof.usd@
+    )
+    {
+        quatd xformOp:orient = (0.8526401643540923, 0, 0, -0.5224985647159488)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-7.400000110268593, 1.9000000283122063, 0.9253882595669647)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+
+    def Camera "Camera" (
+        prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+        hide_in_stage_window = false
+        no_delete = false
+    )
+    {
+        float4[] clippingPlanes = []
+        float2 clippingRange = (1, 10000000)
+        float exposure = 0
+        float exposure:fStop = 5
+        float exposure:iso = 100
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        float focalLength = 40
+        float focusDistance = 400
+        float fStop = 0
+        float horizontalAperture = 20.955
+        float horizontalApertureOffset = 0
+        bool omni:kit:cameraLock = 1
+        custom vector3d omni:kit:centerOfInterest = (0, 0, -14.689268931561076)
+        custom float omni:rtx:autoExposure:adaptationSpeed = 3.5
+        custom bool omni:rtx:autoExposure:enabled = 0
+        custom bool omni:rtx:autoExposure:histogramClamping:enabled = 1
+        custom float omni:rtx:autoExposure:histogramClamping:maxLuminance = 100000
+        custom float omni:rtx:autoExposure:histogramClamping:minLuminance = 50
+        custom token omni:rtx:autoExposure:histogramFilter = "median"
+        custom float omni:rtx:autoExposure:whitePointScale = 10
+        token projection = "perspective"
+        uniform token purpose = "default"
+        double shutter:close = 0
+        double shutter:open = 0
+        uniform token stereoRole = "mono"
+        float verticalAperture = 15.2908
+        float verticalApertureOffset = 0
+        token visibility = "inherited"
+        float3 xformOp:rotateYXZ = (89.22138, -180, 178.63612)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-6.747290447338486, -8.739438096157297, 1.0727920064412346)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+
+    def "spot" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/BostonDynamics/spot/spot.usd@
+    )
+    {
+        quatd xformOp:orient = (0.8910065241883679, 0, 0, 0.45399049973954675)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-6.800000101327896, 4.500000067055225, 0.6864133012869036)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+
+    def "forklift_c" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/IsaacSim/ForkliftC/forklift_c.usd@
+    )
+    {
+        quatd xformOp:orient = (0.4646441375204056, 0, 0, -0.8854975016723189)
+        double3 xformOp:scale = (0.01, 0.01, 0.01)
+        double3 xformOp:translate = (-2.4040811777911264, 10.886376955008448, 1.3322676295501884e-15)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "Looks"
+        {
+            over "M_Forklift_C01_Blue"
+            {
+                over "Shader"
+                {
+                    color3f inputs:diffuse_tint = (0.5675676, 0.024105191, 0.024105191)
+                }
+            }
+        }
+    }
+
+    def "forklift_b" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/IsaacSim/ForkliftB/forklift_b.usd@
+    )
+    {
+        float3 xformOp:rotateXYZ = (0, 0, 6.6992216)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3.9417495865725183, 13.478114876257587, -8.881784197001252e-16)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def "carter_v1" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Carter/carter_v1.usd@
+    )
+    {
+        quatd xformOp:orient = (0.9383206006309662, 0, 0, 0.34576646805545325)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-5.127357233584355, 2.8000000417232513, 0.24999999999999953)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+
+    def "jetbot" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Jetbot/jetbot.usd@
+    )
+    {
+        float3 xformOp:rotateXYZ = (0, 0, -35.98492)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-6.189119470112797, 2.1570095317217772, 0.04000000000000001)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def "kaya" (
+        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Kaya/kaya.usd@
+    )
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 25.698814613470546)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-5.808854128566658, 2.7305753976314144, -2.578492974691926e-14)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+}
+
+def "Render" (
+    hide_in_stage_window = true
+    no_delete = true
+)
+{
+    def "OmniverseKit"
+    {
+        def "HydraTextures" (
+            hide_in_stage_window = true
+            no_delete = true
+        )
+        {
+            def RenderProduct "omni_kit_widget_viewport_ViewportTexture_0" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </World/Camera>
+                token omni:rtx:ambientOcclusion:denoiserMode = "none"
+                token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
+                token omni:rtx:background:source:type = "domeLight"
+                bool omni:rtx:debug:view:pixelDebug:enableFixedTextPos = 1
+                token omni:rtx:directLighting:sampledLighting:denoisingTechnique = "None"
+                bool omni:rtx:dlss:frameGeneration = 1
+                float3 omni:rtx:domeLight:rotationAxis = (0, 1, 0)
+                bool omni:rtx:indirectDiffuse:denoiser:enabled = 0
+                bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
+                bool omni:rtx:post:registeredCompositing:invertToneMap = 1
+                bool omni:rtx:pt:adaptiveSampling:filterError = 0
+                uint omni:rtx:pt:adaptiveSampling:fixedSppIterations = 2
+                uint omni:rtx:pt:maxSamplesPerLaunch = 2073600
+                uint omni:rtx:pt:mgpu:maxPixelsPerRegionExponent = 12
+                bool omni:rtx:reflections:denoiser:enabled = 0
+                token omni:rtx:rendermode = "RealTimePathTracing"
+                color3f omni:rtx:rt:ambientLight:color = (0.1, 0.1, 0.1)
+                bool omni:rtx:rt:demoire = 0
+                bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
+                int omni:rtx:rt:sss:samples = 1
+                uint omni:rtx:rtpt:maxVolumeBounces = 15
+                float omni:rtx:rtpt:modulatingRoughnessThreshold = 0.08
+                bool omni:rtx:scene:hydra:mdlMaterialWarmup = 1
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (1716, 839)
+            }
+        }
+    }
+
+    def RenderSettings "OmniverseGlobalRenderSettings" (
+        prepend apiSchemas = ["OmniRtxSettingsGlobalRtAdvancedAPI_1", "OmniRtxSettingsGlobalPtAdvancedAPI_1"]
+        no_delete = true
+    )
+    {
+        rel products = </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>
+    }
+
+    def "Vars"
+    {
+        def RenderVar "LdrColor" (
+            hide_in_stage_window = true
+            no_delete = true
+        )
+        {
+            uniform string sourceName = "LdrColor"
+            uniform token sourceType = "raw"
+        }
+    }
+}
+
+over "OmniverseKit_Persp" (
+    prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float exposure:fStop = 5
+    float exposure:responsivity = 1.1026709
+    float exposure:time = 0.02
+    float focalLength = 18.147562
+    float focusDistance = 400
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -16.919806238981778)
+    float3 xformOp:rotateXYZ = (83.269646, 4.9298598e-14, 28.741074)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (3.4130333366736694, -9.166151244327946, 3.647279242186782)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Front" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (90, -1.2722219e-14, 90)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (50000, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Right" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (90, -1.41245e-30, 1.2722219e-14)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, -50000, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Top" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (-1.2722219e-14, -7.016709e-15, -90)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, 0, 50000)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}

@@ -1,0 +1,14 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-plugin-physical-light]
+def "World"
+{
+    def RectLight "Light" (
+        prepend apiSchemas = ["PhysicalLightIlluminantAPI"]
+    )
+    {
+    }
+}
+# [/snippet:doc-plugin-physical-light]

@@ -27,6 +27,8 @@ Lookup, not teaching. Every surface a node touches, stated once and in full.
      - Every function, dtype and wrapper on the ``cuda`` table, and what each one produces.
    * - :doc:`lua_slang`
      - Every function, binder and layout control on the ``slang`` table.
+   * - :doc:`lua_rtx`
+     - The ``rtx`` table: the product the node sits under, prim tables, and the scene queries.
    * - :doc:`usd`
      - What a shader definition, a RenderVar and a RenderProduct may declare.
    * - :doc:`builtin_catalogue`
@@ -40,6 +42,7 @@ Lookup, not teaching. Every surface a node touches, stated once and in full.
    lua_contract
    lua_cuda
    lua_slang
+   lua_rtx
    usd
    builtin_catalogue
    glossary

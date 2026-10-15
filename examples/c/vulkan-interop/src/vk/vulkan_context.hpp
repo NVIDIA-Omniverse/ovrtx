@@ -25,6 +25,7 @@
 #endif
 
 #define GLFW_INCLUDE_VULKAN
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #include "command_buffer.hpp"
@@ -66,12 +67,30 @@ enum class DebugSeverity {
 // Debug callback function type
 using DebugCallback = std::function<void(DebugSeverity severity, std::string_view message)>;
 
+// Requested swapchain presentation behavior. Only Fifo is guaranteed by the
+// Vulkan spec; the others are used when the surface reports support and fall
+// back to Fifo when it does not.
+//
+// Fifo blocks the presentation engine to the display refresh, which caps how
+// fast frames can be shown. That cap hides throughput work such as DLSS Frame
+// Generation, so Mailbox (tear-free, drops stale frames) and Immediate
+// (uncapped, may tear) exist to measure and display the real frame rate.
+enum class PresentMode {
+    Fifo,
+    Mailbox,
+    Immediate
+};
+
 // Configuration for VulkanContext
 struct VulkanContextConfig {
     GLFWwindow* window = nullptr;  // nullptr = headless mode
     uint32_t initial_sampled_image_capacity = 1024;
     DebugCallback debug_callback = nullptr;  // nullptr = no debug messenger
+    PresentMode present_mode = PresentMode::Fifo;
 };
+
+// Human-readable name for a present mode, for logging and CLI parsing.
+auto present_mode_name(PresentMode mode) -> std::string_view;
 
 class VulkanContext {
 public:
@@ -152,6 +171,9 @@ public:
     auto swapchain_image(uint32_t index) const -> VkImage;
     auto swapchain_extent() const -> VkExtent2D { return _swapchain_extent; }
     auto swapchain_format() const -> VkFormat { return _swapchain_format; }
+    // The mode the surface actually accepted, which may differ from the
+    // requested one when the surface does not support it.
+    auto present_mode() const -> PresentMode { return _present_mode; }
     auto device() const -> VkDevice { return _device; }
     auto graphics_queue() const -> VkQueue { return _graphics_queue; }
     auto is_headless() const -> bool { return _headless; }
@@ -169,6 +191,10 @@ private:
     auto _find_queue_family() -> void;
     auto _create_device() -> void;
     auto _create_swapchain(int width, int height) -> void;
+    // Resolve the requested present mode against surface support, caching the
+    // result in _present_mode. Both swapchain creation paths call this so they
+    // cannot disagree.
+    auto _select_present_mode() -> VkPresentModeKHR;
     auto _create_timeline_semaphore() -> void;
     auto _create_descriptor_set_layout() -> void;
     auto _create_command_pool() -> void;
@@ -199,6 +225,8 @@ private:
     std::vector<VkImageView> _swapchain_image_views;
     VkFormat _swapchain_format = VK_FORMAT_UNDEFINED;
     VkExtent2D _swapchain_extent = {};
+    PresentMode _requested_present_mode = PresentMode::Fifo;
+    PresentMode _present_mode = PresentMode::Fifo;
     
     // Shader objects
     ankerl::unordered_dense::map<uint64_t, Shader> _shaders;
@@ -241,4 +269,3 @@ private:
     // Helper to grow descriptor pool when needed
     auto _grow_descriptor_pool_if_needed() -> void;
 };
-

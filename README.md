@@ -11,7 +11,7 @@
 
 **ovrtx** is best suited for developers looking to build applications, tools or workflows that need real-time, physically accurate camera, lidar, radar, and other sensor simulation for [Physical AI](https://www.nvidia.com/en-us/glossary/generative-physical-ai/), targeting robotics learning, synthetic data generation, and industrial and design workflows.
 
-Starting with **ovrtx** version **0.4**, ovrtx integrates with the NVIDIA Omniverse [**ovstage**](https://github.com/NVIDIA-Omniverse/ovstage) library. **ovstage** supports loading of USD data to a runtime representation, manages the runtime scene data, ordinal-keyed simulation steps, and change detection. Renderer-owned scene data loading and management APIs remain available in 0.4 for compatibility, but are deprecated. Scene ownership will transition entirely to ovstage in a future release.
+**ovrtx** integrates with the NVIDIA Omniverse [**ovstage**](https://github.com/NVIDIA-Omniverse/ovstage) library. **ovstage** supports loading of USD data to a runtime representation, manages the runtime scene data, ordinal-keyed simulation steps, and change detection. See [Packaging and Dependencies](#packaging-and-dependencies) for how the two libraries relate.
 
 > [!NOTE]
 > ovrtx is currently **pre-release** software.
@@ -36,9 +36,19 @@ Sources live under [`examples/`](examples/) and are the source of truth for the 
 ovrtx is distributed as a C package (.zip file) available in the Releases page in this repo, and as Python wheels available via pypi.org.
 These packages include a number of pre-packaged dependencies.
 
+The C package contains `ovrtx-build-info.json` at its root, and the wheel contains the same file under its `ovrtx/`
+package directory. This schema-versioned file is passive diagnostic metadata for offline inspection: it records the
+package build's version, build number, Git branch/hash, and build location. Deployment does not use it as an executable
+identity check. `ovrtx_get_build_info()` and, after creating a `Renderer`, `ovrtx.get_build_info()` report the identity
+of the OVRTX loader library that exports the API. The C query is safe before `ovrtx_initialize()`; the Python query
+intentionally stays inside the `Renderer`-managed native-library lifecycle. Normal packages build the loader and runtime
+together. If an application deliberately selects a different runtime with `binary_package_root_path`, runtime startup
+logs and crash metadata report that runtime's identity.
+
 In addition to these pre-packaged dependencies, two other dependencies are noted here:
-1. starting with version 0.4 of ovrtx, a dependency on the NVIDIA [ovstage](https://github.com/NVIDIA-Omniverse/ovstage) library is introduced. 
-    * While this dependency is currently optional, it will be required in the next release. To enable a smooth migration from the ovstage-like APIs included in ovrtx 0.3, the ovrtx 0.4 release continues including those APIs, marked with a deprecated tag. To ease the migration to ovstage, you can take advantage of the agent-friendly migration skills [for C](skills/update-0_3-0_4-c/SKILL.md) and [for Python](skills/update-0_3-0_4-python/SKILL.md).
+1. ovrtx uses the NVIDIA [ovstage](https://github.com/NVIDIA-Omniverse/ovstage) library, introduced in ovrtx 0.4, to own the runtime scene.
+    * ovstage is optional only for standalone compatibility mode. The renderer-owned scene APIs that mode uses have been deprecated since ovrtx 0.4, and scene ownership will transition entirely to ovstage in a future release.
+    * To ease the migration to ovstage, you can take advantage of the agent-friendly migration skills for ovrtx 0.3 to 0.4 [for C](skills/update-0_3-0_4-c/SKILL.md) and [for Python](skills/update-0_3-0_4-python/SKILL.md), and for [ovrtx 0.4 to 0.5](skills/update-0-4-to-0-5/SKILL.md).
 2. on Windows, ovrtx depends on [Microsoft's VC runtime redistributable libraries](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170), with a minimum version of 14.38 (as included in Visual Studio 2022 17.8). 
     * These libraries can be installed by an end user (using the linked Microsoft resources) or can be included by an application. 
     * The use of this version of the MSVC runtime libraries makes our binaries compatible with the vcruntime140.dll pre-packaged in Python distributions for Windows as old as Python 3.11. Older Python versions include older vcruntime140.dll, and are therefore not guaranteed to work.
@@ -49,7 +59,7 @@ In addition to these pre-packaged dependencies, two other dependencies are noted
     - The ovrtx library has a C11-compatible interface. It can be loaded dynamically or by statically linking to the `ovrtx-static` loader library, which requires linking to the C++ stdlib.
     - The example code requires a C++17 compiler and CMake 3.16+ (`find_package(ovrtx)` fails on older versions); building the whole example set through the top-level `examples/c/CMakeLists.txt` needs 3.18. The examples use cmake to fetch the prebuilt ovrtx and ovstage packages from their GitHub.com release pages.
 - **Python**:
-    - Python 3.10–3.13 versions are supported
+    - Python 3.10–3.13 versions are supported. On Windows, use Python 3.11 or newer (see the VC runtime note under [Packaging and Dependencies](#packaging-and-dependencies)).
     - The examples use [uv](https://docs.astral.sh/uv/) to resolve the `ovrtx` wheel.
 - CUDA-capable environment for GPU-resident data paths; CPU payload paths are also part of the API surface.
 - DLPack-compatible tensor data for CPU/GPU interchange.
@@ -86,11 +96,11 @@ uv add ovrtx ovstage
 pip install ovrtx ovstage
 ```
 
-ovstage is optional when maintaining standalone compatibility code. The renderer-owned scene APIs used by that mode are deprecated in ovrtx 0.4.
+ovstage is optional only when maintaining standalone compatibility code, which uses the deprecated renderer-owned scene APIs. See [Packaging and Dependencies](#packaging-and-dependencies).
 
-All the examples in this repository contain pyproject.toml files that are tested with uv. Python 3.10-3.13 are supported.
+All the examples in this repository contain pyproject.toml files that are tested with uv. See [System requirements](#system-requirements) for supported Python versions.
 
-If installation fails, first verify that you are using Python 3.10-3.13 and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
+If installation fails, first verify that you are using a [supported Python version](#system-requirements) and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
 
 To get started with the repository examples, first clone this repository and run the minimal example with uv:
 
@@ -133,14 +143,14 @@ On Windows:
 ```
 cmake -B build
 cmake --build build --config Release
-.\build\Release\minimal.exe
+.\build\static\Release\minimal.exe
 ```
 
 On Linux:
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/minimal
+./build/static/minimal
 ```
 
 See the [C minimal example documentation](examples/c/minimal/README.md) for more information on environment setup and prerequisites.
@@ -167,14 +177,14 @@ These binaries are provided for the supported platforms:
  * Linux aarch64
 
 The libraries require a compatible NVIDIA RTX-capable GPU with a compatible NVIDIA driver on the system to be able to initialize correctly.
-Supported driver versions are listed in [Driver requirements](docs/driver_requirements.rst).
+Supported hardware and driver versions are listed in [Hardware & Driver Requirements](https://nvidia-omniverse.github.io/ovrtx/driver_requirements.html).
 
 
 ## Testing
 
 Tests live under `tests/docs/` in three independent suites: Python, C, and USD validation.
 
-> **ovrtx 0.4 compatibility:** Stage-owning Python documentation tests request an attached ovstage fixture, with focused compatibility coverage for deprecated renderer wrappers. C documentation tests remain on deprecated standalone renderer stage APIs. USD validation tests do not exercise either stage-ownership model.
+> **Stage ownership in tests:** Stage-owning Python documentation tests request an attached ovstage fixture, with focused compatibility coverage for deprecated renderer wrappers. C documentation tests remain on deprecated standalone renderer stage APIs. USD validation tests do not exercise either stage-ownership model.
 
 ### Python tests (GPU required)
 
@@ -190,6 +200,12 @@ uv run pytest test_base.py::test_bind_material -v
 ```
 
 ### C tests (GPU required)
+
+**Pinned SDK build limitation:** The standard `ovrtx_docs_tests` target does
+not currently compile with the fallback ovrtx package pinned in
+`examples/c/cmake/ovrtx.cmake`. The existing `test_support_api.cpp` requires
+`ovrtx_get_config()`, which that SDK does not provide. See the [C documentation test build notes](tests/docs/c/README.md)
+for the affected commands, validation scope, and SDK selection instructions.
 
 ```bash
 cd tests/docs/c
@@ -208,7 +224,22 @@ ctest -R BaseTest.RenderLdrColor --output-on-failure
 
 ### USD validation tests (no GPU required)
 
+These tests use the schema descriptors from an extracted OVRTX SDK. Set
+`OVRTX_DOCS_USD_PLUGIN_ROOT` to its `bin/usd_plugins` directory before running
+pytest; the source checkout does not contain those descriptors.
+
+Linux:
+
 ```bash
+export OVRTX_DOCS_USD_PLUGIN_ROOT="/absolute/path/to/ovrtx-sdk/bin/usd_plugins"
+cd tests/docs/usd
+uv run pytest -v
+```
+
+Windows (PowerShell):
+
+```powershell
+$env:OVRTX_DOCS_USD_PLUGIN_ROOT = "C:\path\to\ovrtx-sdk\bin\usd_plugins"
 cd tests/docs/usd
 uv run pytest -v
 ```
@@ -223,30 +254,9 @@ Documentation is published at https://nvidia-omniverse.github.io/ovrtx
 * [C getting started](https://nvidia-omniverse.github.io/ovrtx/c_api/getting_started.html)
 * [Examples](examples/README.md)
 
-Full build instructions, prerequisites, and platform-specific notes are in [docs/README.md](docs/README.md).
-
 ### Building the Documentation
 
-**Prerequisites:** [uv](https://docs.astral.sh/uv/) and [Doxygen](https://www.doxygen.nl/) (see [docs/README.md](docs/README.md) for Windows installation and project-local download options).
-
-**Linux:**
-```bash
-cd docs
-make html
-```
-
-**Windows:**
-```bat
-cd docs
-make.bat html
-```
-
-Then serve the output locally:
-```bash
-uv run python -m http.server 8000 -d _build/html
-```
-
-Then open http://localhost:8000/ in a browser.
+The documentation build requires [uv](https://docs.astral.sh/uv/) and [Doxygen](https://www.doxygen.nl/). From the `docs` directory, run `make html` on Linux or `make.bat html` on Windows. See [docs/README.md](docs/README.md) for prerequisites, platform-specific notes, and how to preview the output locally.
 
 ---
 

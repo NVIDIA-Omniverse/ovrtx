@@ -25,142 +25,27 @@ A node under one product can read an AOV published by another. Dashed boxes are 
 
 **A cross-product edge.** ``B`` reads an AOV that ``A`` published.
 
-.. graphviz::
+.. image:: ../../img/spg/products-cross-product-edge.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      compound=true
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      subgraph "cluster_A" {
-         label="product A" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "A:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-         "A:Out" [fillcolor="#4c566a" fontcolor="white" label="Out"]
-         "A:a" [fillcolor="#76b900" fontcolor="#1b1b1b" label="a"]
-         "A:LdrColor" -> "A:a"
-         "A:a" -> "A:Out"
-      }
-      subgraph "cluster_B" {
-         label="product B" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "B:b" [fillcolor="#76b900" fontcolor="#1b1b1b" label="b"]
-         "B:OutB" [fillcolor="#4c566a" fontcolor="white" label="OutB"]
-         "B:b" -> "B:OutB"
-      }
-      "A:Out" -> "B:b"
-   }
+   :alt: In product A, LdrColor feeds node a, which writes Out. Node b in product B reads Out and writes OutB.
 
 **A chain of three.** Each product's result feeds the next, so SPG orders all three.
 
-.. graphviz::
+.. image:: ../../img/spg/products-chain-of-three.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      compound=true
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      subgraph "cluster_A" {
-         label="product A" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "A:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-         "A:M1" [fillcolor="#4c566a" fontcolor="white" label="M1"]
-         "A:a" [fillcolor="#76b900" fontcolor="#1b1b1b" label="a"]
-         "A:LdrColor" -> "A:a"
-         "A:a" -> "A:M1"
-      }
-      subgraph "cluster_B" {
-         label="product B" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "B:b" [fillcolor="#76b900" fontcolor="#1b1b1b" label="b"]
-         "B:M2" [fillcolor="#4c566a" fontcolor="white" label="M2"]
-         "B:b" -> "B:M2"
-      }
-      subgraph "cluster_C" {
-         label="product C" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "C:c" [fillcolor="#76b900" fontcolor="#1b1b1b" label="c"]
-         "C:Out" [fillcolor="#4c566a" fontcolor="white" label="Out"]
-         "C:c" -> "C:Out"
-      }
-      "A:M1" -> "B:b"
-      "B:M2" -> "C:c"
-   }
+   :alt: Node a in product A writes M1. Node b in product B reads M1 and writes M2. Node c in product C reads M2 and writes Out.
 
 **Two products into one node.** ``g`` runs after both producers, wherever they live.
 
-.. graphviz::
+.. image:: ../../img/spg/products-two-into-one.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      compound=true
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      subgraph "cluster_A" {
-         label="product A" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "A:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-         "A:M1" [fillcolor="#4c566a" fontcolor="white" label="M1"]
-         "A:a" [fillcolor="#76b900" fontcolor="#1b1b1b" label="a"]
-         "A:LdrColor" -> "A:a"
-         "A:a" -> "A:M1"
-      }
-      subgraph "cluster_B" {
-         label="product B" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "B:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-         "B:M2" [fillcolor="#4c566a" fontcolor="white" label="M2"]
-         "B:b" [fillcolor="#76b900" fontcolor="#1b1b1b" label="b"]
-         "B:LdrColor" -> "B:b"
-         "B:b" -> "B:M2"
-      }
-      subgraph "cluster_C" {
-         label="product C" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "C:g" [fillcolor="#76b900" fontcolor="#1b1b1b" label="g"]
-         "C:Out" [fillcolor="#4c566a" fontcolor="white" label="Out"]
-         "C:g" -> "C:Out"
-      }
-      "A:M1" -> "C:g"
-      "B:M2" -> "C:g"
-   }
+   :alt: Node a in product A writes M1 and node b in product B writes M2. Node g in product C reads both and writes Out.
 
 **Independent products.** No edge crosses, so nothing orders one against the other.
 
-.. graphviz::
+.. image:: ../../img/spg/products-independent.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      compound=true
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      subgraph "cluster_A" {
-         label="product A" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "A:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-         "A:OutA" [fillcolor="#4c566a" fontcolor="white" label="OutA"]
-         "A:a" [fillcolor="#76b900" fontcolor="#1b1b1b" label="a"]
-         "A:LdrColor" -> "A:a"
-         "A:a" -> "A:OutA"
-      }
-      subgraph "cluster_B" {
-         label="product B" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "B:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-         "B:OutB" [fillcolor="#4c566a" fontcolor="white" label="OutB"]
-         "B:b" [fillcolor="#76b900" fontcolor="#1b1b1b" label="b"]
-         "B:LdrColor" -> "B:b"
-         "B:b" -> "B:OutB"
-      }
-   }
+   :alt: In product A, LdrColor feeds node a, which writes OutA. In product B, LdrColor feeds node b, which writes OutB. No edge connects the two products.
 
 A graph is authored under a RenderProduct, and a scene may carry several. Each has its own
 camera and its own :doc:`orderedVars <aovs>`, the list of AOVs it produces.

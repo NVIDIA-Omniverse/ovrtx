@@ -49,6 +49,7 @@ PACKAGE-DEPS.yaml
 # Crash dumps and logs
 **/*.dmp.zip.toml
 **/*.dmp.zip
+**/*.nvcudmp
 **/crash*.txt
 
 /CMakeSettings.json

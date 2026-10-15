@@ -1,0 +1,37 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# Local stand-in for the Minimal DLSS example scene. The shipped example
+# references ovrtx-robot-lineup.usda, whose remote payloads do not load in
+# GitHub CI, so the docs tests render this scene instead. It keeps the shipped
+# RenderProduct and swaps /World for the local test base geometry.
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+    subLayers = [@../../../examples/python/minimal-dlss/minimal_dlss.usda@]
+)
+
+# An explicit reference list replaces the robot lineup reference authored in
+# the sublayer, so no remote payload is composed.
+over "World" (
+    references = @./ovrtx-test-base-no-light.usda@</World>
+)
+{
+    over "Camera"
+    {
+        float focalLength = 28
+    }
+}
+
+over "Render"
+{
+    over "Camera"
+    {
+        # The test base has no lights; ambient illumination keeps the texture
+        # and silhouette comparison visible.
+        color3f omni:rtx:sceneDb:ambientLightColor = (1, 1, 1)
+        float omni:rtx:sceneDb:ambientLightIntensity = 1
+    }
+}

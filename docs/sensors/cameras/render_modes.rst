@@ -55,4 +55,6 @@ Refer to :doc:`outputs` for the available outputs per render mode.
 
    render_modes/real_time_path_tracing
    render_modes/path_tracing
+   render_modes/spectral_rendering
+   render_modes/dlss_nr
    render_modes/minimal

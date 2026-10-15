@@ -17,6 +17,19 @@ import ovstage
 TEST_BASE_PATH = str((Path(__file__).parent / "../data/ovrtx-test-base.usda").resolve())
 
 
+def test_rolling_shutter_renderer_config():
+    """Create a renderer with automatic motion-BVH support for rolling shutter."""
+    # [snippet:doc-create-rolling-shutter-renderer]
+    config = ovrtx.RendererConfig(motion_bvh=ovrtx.MotionBvh.AUTO)
+    renderer = ovrtx.Renderer(config)
+    # [/snippet:doc-create-rolling-shutter-renderer]
+
+    try:
+        assert renderer.config.motion_bvh is ovrtx.MotionBvh.AUTO
+    finally:
+        renderer.destroy()
+
+
 def test_dl_data_type_from_str():
     """Construct DLPack dtype descriptors from string aliases."""
     # [snippet:doc-dldata-type-from-str]
@@ -66,7 +79,7 @@ def test_renderer_config_version_and_async_stage(output_dir):
         sync_mode=True,
         log_file_path=str(output_dir / "config-test.log"),
         log_level="info",
-        sensors_allowed_deprecation_base="0.5.0",
+        sensors_allowed_deprecation_base="0.6.0",
         aftermath_mode=ovrtx.AftermathMode.AUTO,
     )
     renderer = ovrtx.Renderer(config=config)
@@ -74,9 +87,15 @@ def test_renderer_config_version_and_async_stage(output_dir):
     assert renderer.config.sync_mode is True
     assert renderer.config.log_level == "info"
     assert renderer.config.log_file_path == str(output_dir / "config-test.log")
-    assert renderer.config.sensors_allowed_deprecation_base == "0.5.0"
+    assert renderer.config.sensors_allowed_deprecation_base == "0.6.0"
     assert renderer.config.aftermath_mode is ovrtx.AftermathMode.AUTO
     # [/snippet:doc-renderer-config]
+
+    config.log_level = "error"
+    returned_config = renderer.config
+    returned_config.sync_mode = False
+    assert renderer.config.log_level == "info"
+    assert renderer.config.sync_mode is True
 
     stage = ovstage.Stage("ovrtx.docs.support-api")
     renderer.attach_ovstage(stage)

@@ -22,22 +22,9 @@ The Shape
 
 Two nodes in a row, with the image passing between them never published:
 
-.. graphviz::
+.. image:: ../../img/spg/chaining-two-nodes.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      "LdrColor" [fillcolor="#4c566a" fontcolor="white"]
-      "Out" [fillcolor="#4c566a" fontcolor="white"]
-      "a" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "b" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-      "LdrColor" -> "a"
-      "a" -> "b"
-      "b" -> "Out"
-   }
+   :alt: LdrColor feeds node a, node a feeds node b, and node b writes Out.
 
 Connect the downstream node's input to the upstream node's output. No RenderVar sits between
 them:

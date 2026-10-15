@@ -64,11 +64,14 @@ What the Script Is Handed
    * - It has
      - It does not have
    * - Descriptors for every bound resource: shape, dtype and rank
-     - The contents of those resources. No pixel, point or buffer value is readable here.
+     - The contents of those resources. No pixel, point or buffer value is readable here, and no
+       result of this frame's GPU work, which has not run yet.
    * - The value-inputs authored in USD
      - Anything a previous frame computed, unless it was written to a stateful output
-   * - The current frame number
-     - Any result of this frame's GPU work, which has not run yet
+   * - The frame and the scene, through the ``rtx`` table: the current frame number, the product
+       the node's prim sits under with its cameras, and any prim on the stage with its attributes
+       and transforms
+     - Anything the load did not publish, and any way to write the scene
 
 The practical consequence catches people out: a launch script cannot branch on data. A lidar's
 ``Counts`` channel, for example, says how many returns a sweep produced, but the script sees
@@ -94,11 +97,6 @@ two tables:
 
 The function returns the launch configuration produced by ``cuda.kernel(...)`` or by one of the
 ``slang`` launch calls.
-
-An older three-argument form, ``f(inputs, outputs, params)``, is still accepted, with ``params``
-holding the value-inputs alone. It pairs with the ``params:X`` USD spelling described in
-:doc:`usd`. Both are kept so existing nodes load; write the two-argument form, where ``inputs``
-already carries the value-inputs.
 
 Resource-Inputs and Value-Inputs
 --------------------------------
@@ -209,8 +207,16 @@ Global Variables
    * - Variable
      - Description
    * - ``rtx.frameId``
-     - The current rendered frame, counted by the renderer. The same in either language. One host
-       ``step`` can render several frames, so this advances faster than the calls that drive it.
+     - The current rendered frame. Refer to :doc:`lua_rtx`.
+   * - ``rtx.product``
+     - The RenderProduct the node's prim sits under: its cameras, RenderVars, resolution and
+       tiling. ``nil`` when the prim is not under one. Refer to :doc:`lua_rtx`.
+   * - ``rtx.stage``
+     - The scene: one prim by path, or the attributes of many prims in one call. Refer to
+       :doc:`lua_rtx`.
+   * - ``LOCAL_MATRIX``, ``WORLD_MATRIX``
+     - The names of a prim's two transforms, for ``rtx.stage.query_attributes``. Refer to
+       :doc:`lua_rtx`.
 
 Logging Functions
 -----------------
@@ -241,14 +247,31 @@ the log level, or use ``warning`` while you are debugging.
 several frames while the image converges, so anything logged unconditionally arrives many times
 over. ``rtx.frameId`` counts those rendered frames.
 
+.. _spg-lua-sandbox:
+
 Sandbox
 -------
 
 Launch scripts run in a restricted Lua 5.4 interpreter. Only the ``base``, ``math``,
 ``string`` and ``table`` libraries are available. File, OS, module and coroutine access are
-removed, and each script is bounded in both memory and instruction count. Keep the script to
-validation, output descriptions and building the launch table; the work belongs in the GPU
-source.
+removed, as are ``pcall`` and ``xpcall``. The string pattern functions ``string.find``,
+``string.match``, ``string.gmatch`` and ``string.gsub`` are removed too, because a single call
+can run for an unbounded time; the rest of the ``string`` library is available.
+
+Each script is bounded in memory, 10 MB. Loading the file and each call of the launch function
+may run at most one million Lua instructions and write at most 64 KB of log output through
+``info``, ``warning`` and ``print``. ``table.move`` rejects a range longer than the number of
+elements a table can hold within the memory limit. SPG's own functions count the work they do
+on a script's data against the same limits: ``rtx.stage.query_attributes`` counts one instruction
+per prim path and attribute name, and an array in the launch table counts its elements against
+the instruction limit and its size against the memory limit. These limits are fixed.
+
+A script that reaches one of these limits fails its node, including when the limit is reached
+inside a function passed to ``cuda.static`` or ``slang.static``, and the node stops: the log
+says once that it is stopped, and the node does not run its script again until the stage's SPG
+setup changes, such as a node's source asset or connections, or the stage is opened again. Keep
+the script to validation, output descriptions and building the launch table; the work belongs in
+the GPU source.
 
 Before a script runs, its source is scanned for forbidden constructs. The scan is a plain
 substring match over the whole file, **including comments and identifiers**, so a comment
@@ -260,7 +283,7 @@ Editor Support
 
 ovrtx ships a ``.luarc/`` folder, under ``docs/spg/.luarc/``, with type stubs for the Lua
 Language Server declaring the globals SPG injects at runtime (``cuda``, ``slang``, ``rtx``,
-``info``, ``warning``). Any editor with a Lua Language Server integration can use them for
+``info``, ``warning``, ``LOCAL_MATRIX``, ``WORLD_MATRIX``). Any editor with a Lua Language Server integration can use them for
 completions, hover hints and diagnostics when authoring launch scripts.
 
 To enable it for your own project:
@@ -277,7 +300,7 @@ To enable it for your own project:
         "<path-to-spg-luarc>"
       ],
       "Lua.workspace.checkThirdParty": false,
-      "Lua.diagnostics.globals": ["cuda", "slang", "rtx", "info", "warning"],
+      "Lua.diagnostics.globals": ["cuda", "slang", "rtx", "info", "warning", "LOCAL_MATRIX", "WORLD_MATRIX"],
       "Lua.diagnostics.disable": ["lowercase-global"]
     }
 

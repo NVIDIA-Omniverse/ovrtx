@@ -1,0 +1,57 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+# Slang variant of overlay_scene.usda. The rendered world is referenced from that scene, so
+# this file shows only what differs between the two backends: the shader definition it
+# instantiates.
+(
+    defaultPrim = "World"
+    upAxis = "Y"
+    metersPerUnit = 1
+)
+
+def Xform "World" (
+    references = @overlay_scene.usda@</World>
+)
+{
+}
+
+def Scope "Render"
+{
+    def RenderProduct "OverlayDemo"
+    {
+        uniform int2 resolution = (512, 512)
+        rel camera = </World/Rig/Camera>
+        rel orderedVars = [ <LdrColor>, <Overlay> ]
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+            opaque omni:rtx:aov
+        }
+
+        def RenderVar "Overlay"
+        {
+            uniform string sourceName = "Overlay"
+            opaque omni:rtx:aov.connect = <../MarkerOverlay.outputs:Overlay>
+        }
+
+        # The only difference from overlay_scene.usda: this references the Slang shader
+        # definition instead of the CUDA one. The wiring is identical because both declare
+        # the same ports.
+        def Shader "MarkerOverlay" (
+            references = @MarkerOverlayKernel.slang.usda@
+        )
+        {
+            opaque inputs:Image.connect = <../LdrColor.omni:rtx:aov>
+        }
+    }
+}

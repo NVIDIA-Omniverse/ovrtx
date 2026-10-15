@@ -24,7 +24,13 @@ endif()
 
 # Include all examples
 add_subdirectory(minimal)
+add_subdirectory(decals)
+add_subdirectory(minimal-dlss)
+add_subdirectory(gaussian-splats)
+add_subdirectory(usd-plugin-paths)
+add_subdirectory(spectral-rendering)
 add_subdirectory(status-queries)
 add_subdirectory(vulkan-interop)
+add_subdirectory(sensor-observer)
 add_subdirectory(lidar)
 add_subdirectory(radar)

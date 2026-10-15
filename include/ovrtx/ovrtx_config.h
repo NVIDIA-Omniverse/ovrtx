@@ -84,6 +84,28 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_binary_package_root_path(o
 }
 
 /**
+ * Enable Spectral PathTracing before creating the first renderer in this process.
+ * Also enable spectral rendering on its PathTracing RenderProducts. The choice cannot change
+ * during the process lifetime, including after destroying all renderer instances.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_spectral_rendering(bool enabled)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_SPECTRAL_RENDERING, enabled);
+}
+
+/**
+ * Enable or disable the OVRTX crash reporter. Enabled by default.
+ *
+ * Disable it when the host application owns crash handling: OVRTX then installs no crash
+ * handlers and does not upload crash dumps. The first renderer created in this process
+ * decides; the choice cannot change during the process lifetime. See OVRTX_CONFIG_ENABLE_CRASH_REPORTER.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_crash_reporter(bool enabled)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_CRASH_REPORTER, enabled);
+}
+
+/**
  * Configure synchronous stream execution.
  *
  * When enabled, operations that are normally enqueued for stream-ordered execution will block
@@ -124,6 +146,30 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_read_gpu_transforms(bool r
 static inline ovrtx_config_entry_t ovrtx_config_entry_keep_system_alive(bool keep_system_alive)
 {
     return ovrtx_config_entry_bool(OVRTX_CONFIG_KEEP_SYSTEM_ALIVE, keep_system_alive);
+}
+
+/** Enable or disable Minimal rendering at startup. See OVRTX_CONFIG_ENABLE_MINIMAL. */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_minimal(bool enable_minimal)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_MINIMAL, enable_minimal);
+}
+
+/** Enable or disable real-time path tracing at startup. See OVRTX_CONFIG_ENABLE_REALTIMEPATHTRACING. */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_realtimepathtracing(bool enable_realtimepathtracing)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_REALTIMEPATHTRACING, enable_realtimepathtracing);
+}
+
+/** Enable or disable path tracing at startup. See OVRTX_CONFIG_ENABLE_PATHTRACING. */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_pathtracing(bool enable_pathtracing)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_PATHTRACING, enable_pathtracing);
+}
+
+/** Enable or disable MDL material displacement at renderer creation. */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_mdl_displacement(bool enable_mdl_displacement)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_MDL_DISPLACEMENT, enable_mdl_displacement);
 }
 
 /**
@@ -170,7 +216,9 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_suppress_deprecation_warni
  *
  * @param mode One of @ref ovrtx_motion_bvh_t. Must be set before the first
  *             @ref ovrtx_create_renderer call; changing the value requires recreating
- *             the renderer. When not provided, defaults to @ref OVRTX_MOTION_BVH_DISABLE.
+ *             the renderer. When not provided, the renderer uses the process's own motion
+ *             BVH settings, which default to @ref OVRTX_MOTION_BVH_DISABLE; it does not
+ *             inherit a mode set by an earlier renderer in the process.
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_motion_bvh(ovrtx_motion_bvh_t mode)
 {
@@ -226,12 +274,13 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_log_file_path(ovx_string_t
 }
 
 /**
- * Configure carb logging level (e.g. "verbose", "info", "warn", "error").
+ * Configure carb logging level (e.g. "verbose", "info", "warn", "error", "fatal").
  *
  * This setting should be passed to ovrtx_initialize(). The log level is applied when the first
  * renderer is created via ovrtx_create_renderer().
  *
- * @param level Log level string. level.ptr must remain valid until the API call that consumes the config returns.
+ * @param level Log level string.  The memory behind `level.ptr` must remain valid until the
+ *              API call that consumes the config returns.
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_log_level(ovx_string_t level)
 {
@@ -283,6 +332,42 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_sensors_allowed_deprecatio
 static inline ovrtx_config_entry_t ovrtx_config_entry_datastore_cache(ovx_string_t cache)
 {
     return ovrtx_config_entry_string(OVRTX_CONFIG_DATASTORE_CACHE, cache);
+}
+
+/**
+ * Set the process-wide ${omni_cache} root for OVRTX caches to a nonempty path that resolves to an absolute path.
+ * Takes precedence over both the platform default and an ovrtx.portable marker beside the executable or OVRTX binaries.
+ * Supply this setting to the first ovrtx_initialize() call or when creating the first renderer in the process
+ * with ovrtx_create_renderer(). The chosen root applies to all renderers. If supplied again, use the same path string.
+ * Changing the root within the same process is unsupported, even after destroying all renderers and calling
+ * ovrtx_shutdown(). Start a new process to use a different root.
+ * @param path Nonempty root path. path.ptr must remain valid
+ *             until the API call that consumes the config returns.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_cache_root_path(ovx_string_t path)
+{
+    return ovrtx_config_entry_string(OVRTX_CONFIG_CACHE_ROOT_PATH, path);
+}
+
+/**
+ * Select the platform's global cache root for ${omni_cache} and OVRTX's writable caches.
+ * On Linux, this uses `XDG_CACHE_HOME/ovrtx/<version>` when XDG_CACHE_HOME is absolute,
+ * otherwise `HOME/.cache/ovrtx/<version>`.
+ * On Windows, this uses the `%LOCALAPPDATA%/ovrtx/<version>`.
+ * `<version>` is the compiled OVRTX major.minor.patch version; VERSION.md is not consulted.
+ * True is the default when omitted. False in either ovrtx_initialize() or ovrtx_create_renderer() disables the
+ * platform root when no true value is supplied in the other call. Without a root request, existing cache-path
+ * settings and a nonempty ${omni_cache} token are preserved; an empty token defaults to the application directory.
+ * An ovrtx.portable file beside the executable or OVRTX binaries sets ${omni_cache} to the application directory
+ * even when this entry is true, while retaining the existing local shader-cache subfolders.
+ * A valid path supplied with ovrtx_config_entry_cache_root_path() takes precedence over both.
+ * Configure this option in the first ovrtx_initialize() call or when creating the first renderer in the process.
+ * Changing the cache root within the same process is unsupported, even after destroying all renderers and
+ * calling ovrtx_shutdown(). Start a new process to use a different root.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_global_cache_root(bool enabled)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_GLOBAL_CACHE_ROOT, enabled);
 }
 
 /**

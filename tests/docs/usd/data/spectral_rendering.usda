@@ -1,0 +1,25 @@
+#usda 1.0
+
+# [snippet:doc-spectral-authoring]
+def "World" {
+    def RectLight "RectLight" (
+        prepend apiSchemas = ["PhysicalLightIlluminantAPI"]
+    ) {
+        token physical:illuminant = "blackbody"
+        float inputs:colorTemperature = 3000
+        # This API uses temperature directly, without the UsdLux temperature switch.
+        bool inputs:enableColorTemperature = false
+    }
+}
+def "Render" {
+    def RenderProduct "Camera" {
+        rel camera = </World/Camera>
+        token omni:rtx:rendermode = "PathTracing"
+        # These spectral controls are custom RenderProduct attributes.
+        custom bool omni:rtx:pathtracing:spectral:enabled = true
+        custom float omni:rtx:pathtracing:spectral:wavelengthMin = 360
+        custom float omni:rtx:pathtracing:spectral:wavelengthMax = 830
+        custom uint omni:rtx:pathtracing:spectral:responseCurve = 0
+    }
+}
+# [/snippet:doc-spectral-authoring]

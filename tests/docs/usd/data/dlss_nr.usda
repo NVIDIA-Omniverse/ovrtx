@@ -1,0 +1,26 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-dlss-nr-render-product]
+def Scope "Render" {
+    def RenderProduct "Camera" {
+        int2 resolution = (1280, 720)
+        rel camera = </World/Camera>
+        rel orderedVars = [<LdrColor>]
+
+        # Neural rendering requires real-time path tracing and an LDR output.
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:dlssnr:enabled = true
+
+        def RenderVar "LdrColor" {
+            string sourceName = "LdrColor"
+        }
+    }
+}
+# [/snippet:doc-dlss-nr-render-product]
+
+# The snippet configures an existing scene camera; this prim makes the test self-contained.
+def Scope "World" {
+    def Camera "Camera" {}
+}

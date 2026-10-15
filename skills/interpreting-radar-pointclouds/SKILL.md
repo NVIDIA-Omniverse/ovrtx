@@ -10,7 +10,7 @@
 # its affiliates is strictly prohibited.
 name: interpreting-radar-pointclouds
 description: >
-  Interpreting already-read radar PointCloud tensors: channel meanings, units, valid
+  Interpret already-read radar PointCloud tensors: channel meanings, units, valid
   detection ranges, RCS, signed radial velocity, time offsets, flags, counts, and
   visualization values. Use reading-sensor-pointclouds when the user needs to map or
   fetch the tensors first.
@@ -80,16 +80,16 @@ The radar examples demonstrate the usual interpretation path: slice to the deliv
 
 ## Channels
 
-These are the available radar `PointCloud` channels from `omni.sensors.nv.radar`.
+These are the available radar `PointCloud` channels from `omni.sensors.nv.radar`. `Nmax` is the per-frame allocation bound.
 
 | Channel | Type / Shape | Unit | Meaning |
 |---|---|---|---|
-| `Counts` | `int32` scalar | detections | Model-delivered detection count; use it to bound every per-detection tensor. |
-| `Coordinates` | `float` 2D, `3 x N` | m, rad | Detection coordinates. Representation is controlled by the radar coordinate type: Cartesian positions or spherical range/angle components. Frame is controlled by the configured output frame. |
-| `RCS` | `float` 1D, `N` | dBsm | Radar cross section, a logarithmic measure of how detectable the target is to radar. value range depends on attributes |
-| `TimeOffsetNs` | `int32` 1D, `N` | ns | Per-detection time offset relative to scan start. |
-| `RadialVelocityMs` | `float` 1D, `N` | m/s | Doppler radial velocity. Approaching detections can be negative; use absolute value when checking only for motion. value range depends on attributes |
-| `Flags` | `uint8` 1D, `N` | unitless | Model-delivered detection status flag bit field. `VALID` (`1 << 6`, `0x40`) marks a valid detection. |
+| `Counts` | `int32 [1]` | detections | Model-delivered detection count; use it to bound every per-detection tensor. |
+| `Coordinates` | `float32 [3, Nmax]` | m, or deg / deg / m | Cartesian rows are x/y/z in meters. Spherical rows are azimuth/elevation in degrees followed by range in meters. The configured output frame applies to either representation. |
+| `RCS` | `float32 [Nmax]` | dBsm | Radar cross section, a logarithmic measure of radar detectability; the value range depends on sensor and scene attributes. |
+| `TimeOffsetNs` | `int32 [Nmax]` | ns | Per-detection time offset relative to scan start. |
+| `RadialVelocityMs` | `float32 [Nmax]` | m/s | Signed Doppler radial velocity. Approaching detections can be negative; use absolute value when checking only for motion. |
+| `Flags` | `uint8 [Nmax]` | unitless | Model-delivered detection status bit field. `VALID` (`1 << 6`, `0x40`) marks a valid detection. |
 
 The model auto-enables `Counts` and `Flags`, and they are delivered as ordinary `PointCloud` channel tensors. `RCS`, `RadialVelocityMs`, and `TimeOffsetNs` are present only when requested.
 

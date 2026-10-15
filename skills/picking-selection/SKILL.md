@@ -259,7 +259,7 @@ The group id selects which per-group style that prim uses.
 | `Renderer.set_selection_outline_group()` | `ovrtx_set_selection_outline_group()` |
 | `Renderer.set_pickable()` | `ovrtx_set_pickable()` |
 | `OVRTX_RENDER_VAR_PICK_HIT` | `OVRTX_RENDER_VAR_PICK_HIT` |
-| `OVRTX_PICK_FLAG_GIZMO`, `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` | `OVRTX_PICK_FLAG_GIZMO`, `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` |
+| `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` | `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` |
 
 Pick-hit render-var layout:
 - Params: `magic`, `version`, `hitCount`.
@@ -268,10 +268,11 @@ Pick-hit render-var layout:
 - C path resolution needs `ovx/path_dictionary/path_dictionary_utils.h`; selection and pickability APIs are declared in `ovrtx/ovrtx.h`.
 
 Pick query flags:
-- `OVRTX_PICK_FLAG_GIZMO` also requests gizmo picking.
-- `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` requests tracked hit metadata such as
-  object type, geometry instance id, world position, and world normal when
-  available.
+- `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO` requests object type, geometry instance
+  id, world position in metres, and world normal for the first hit of a
+  one-pixel-equivalent pick. Without the flag, those tensors are present but
+  zero-filled. Multi-pixel picks leave them zero-filled even when the flag is
+  set.
 
 ## UI Integration Notes
 
@@ -291,6 +292,8 @@ Pick query flags:
 - The synthetic pick-hit render var appears only on a step that consumed a pick query.
 - `ovrtx_pick_hit` can only be mapped on CPU/default. Always unmap the output and destroy the step result after use.
 - Hit records contain path ids. Resolve them before printing names or setting selection groups.
+- If position, normal, object type, or geometry instance id is unexpectedly zero, confirm the query is a
+  one-pixel-equivalent click and includes `OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`.
 - Selection drawing requires both renderer config and non-zero per-prim group ids. Write group `0` to prims from the previous selection before writing group `1` to the next selection.
 - Selection fill color has no visible effect unless the renderer's fill mode uses per-group fill color.
 - Outline dashing/stippling is not supported by the underlying RTX outline pipeline.

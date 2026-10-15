@@ -17,6 +17,7 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
 
 class CameraSensorsTest : public DocsOvstageTestBase {
 protected:
@@ -67,10 +68,29 @@ def "Render" {
     ovrtx_result_t result =
         ovrtx_fetch_results(renderer_, step_handle, ovrtx_timeout_infinite, &outputs);
     ASSERT_API_SUCCESS(result.status);
+    ASSERT_EQ(outputs.output_count, 1u);
+    ASSERT_GT(outputs.outputs[0].output_frame_count, 0u);
 
     // [snippet:doc-step-and-map-camera-outputs-c]
-    ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
-    ovrtx_render_var_output_handle_t hdr_handle = find_output(outputs, "/Render/Camera/HdrColor");
+    ovrtx_render_var_output_handle_t ldr_handle = OVRTX_INVALID_HANDLE;
+    ovrtx_render_var_output_handle_t hdr_handle = OVRTX_INVALID_HANDLE;
+
+    // This step requested one RenderProduct. Select its first output frame,
+    // then find RenderVars by their full prim paths.
+    ovrtx_render_product_frame_output_t const& frame = outputs.outputs[0].output_frames[0];
+    for (size_t var_index = 0; var_index < frame.render_var_count; ++var_index) {
+        ovrtx_render_product_render_var_output_t const& var = frame.output_render_vars[var_index];
+        if (!var.render_var_path.ptr) {
+            continue;
+        }
+
+        std::string_view const path(var.render_var_path.ptr, var.render_var_path.length);
+        if (path == "/Render/Camera/LdrColor") {
+            ldr_handle = var.output_handle;
+        } else if (path == "/Render/Camera/HdrColor") {
+            hdr_handle = var.output_handle;
+        }
+    }
     ASSERT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
     ASSERT_NE(hdr_handle, OVRTX_INVALID_HANDLE);
 

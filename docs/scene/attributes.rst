@@ -25,9 +25,10 @@ points or relationships.
 Tensor Layout
 -------------
 
-Ovstage and C attribute tensors use ``DLDataType::lanes`` for multi-component
-values. NumPy backing arrays and DLPack consumers expose lane components as
-trailing dimensions:
+Attribute reads and mapped buffers use scalar ``DLDataType::lanes`` and expose
+components as trailing dimensions in both C and Python. Binding declarations
+and canonical write inputs still use multi-component lanes. Returned tensors
+have the following layouts:
 
 .. list-table::
    :header-rows: 1
@@ -40,16 +41,16 @@ trailing dimensions:
      - ``shape=[N]``, ``{kDLInt, 32, 1}``
    * - ``point3f`` for N prims
      - ``(N, 3)`` ``float32``
-     - ``shape=[N]``, ``{kDLFloat, 32, 3}``
+     - ``shape=[N,3]``, ``{kDLFloat, 32, 1}`` on read
    * - ``matrix4d`` for N prims
-     - ``(N, 16)`` ``float64``
-     - ``shape=[N]``, ``{kDLFloat, 64, 16}``
+     - ``(N, 4, 4)`` ``float64``
+     - ``shape=[N,4,4]``, ``{kDLFloat, 64, 1}`` on read
    * - 4x4 transform semantic for N prims
      - ``(N, 4, 4)`` ``float64``
-     - ``shape=[N]``, ``{kDLFloat, 64, 16}``
+     - ``shape=[N,4,4]``, ``{kDLFloat, 64, 1}`` on read
    * - ``point3f[]`` with M elements
      - ``(M, 3)`` ``float32``
-     - ``shape=[M]``, ``{kDLFloat, 32, 3}``
+     - ``shape=[M,3]``, ``{kDLFloat, 32, 1}`` on read
 
 Reading Attributes
 ------------------
@@ -111,6 +112,14 @@ CPU or CUDA DLPack destinations:
 
 Writing Attributes
 ------------------
+
+Ovstage writes carry explicit ordinals. Under the
+``STRICTLY_INCREASING`` policy, rewriting a cell requires a newer ordinal than
+its retained committed changes, even before sealing. Disjoint cells may share
+an ordinal. Check write completion, then advance and wait for the write floor
+before reading or rendering the new values. See
+:doc:`/core/ovstage_integration` for the configured policies and publication
+sequence. The snippets below show ovstage writes:
 
 .. tab-set::
 

@@ -208,8 +208,8 @@ Every `OVRTX_DEPRECATED` entry point in [`ovrtx.h`](../../include/ovrtx/ovrtx.h)
 | `ovrtx_add_usd_reference_from_string` | `ovstage_population_add_usd_reference_from_string` + `ovstage_population_apply_usd_changes`. |
 | `ovrtx_remove_usd` | `ovstage_population_remove_usd_reference` + `ovstage_population_apply_usd_changes`. |
 | `ovrtx_reset_stage` | `ovstage_population_reset_usd` + `ovstage_population_apply_usd_changes`. |
-| `ovrtx_update_stage_from_usd_time` | `ovstage_population_apply_usd_time`. |
-| `ovrtx_clone_usd` | `ovstage_clone` (ordinal-keyed write; pair with `ovstage_advance_write_floor` -> `ovrtx_update_from_stage` -> `ovrtx_step_with_stage`, Recipe B). Target paths must not already exist. |
+| `ovrtx_update_stage_from_usd_time` | `ovstage_population_apply_usd_time`. Positions the USD timeline only; see [Animation Time Is the Simulation Clock](#animation-time-is-the-simulation-clock). |
+| `ovrtx_clone_usd` | `ovstage_clone` (explicit ordinal satisfying configured admission and applicable floors; wait for completion, then pair with `ovstage_advance_write_floor` -> `ovrtx_update_from_stage` -> `ovrtx_step_with_stage`, Recipe B). The source must exist and target paths must be absent. |
 | `ovrtx_write_attribute` | `ovstage_query` / `ovstage_query_from_path_list` -> `ovstage_write_attribute`. |
 | `ovrtx_map_attribute` / `ovrtx_unmap_attribute` | `ovstage_map_attribute` + `ovstage_fetch_map_next`; commit with `ovstage_unmap_attribute` / `ovstage_unmap_group`. |
 | `ovrtx_read_attribute` / `ovrtx_fetch_read_result` / `ovrtx_release_read_result` | `ovstage_read_attributes` + `ovstage_fetch_read_next` + `ovstage_release_read` (also `ovstage_release_group` for fetched groups). |
@@ -219,6 +219,15 @@ Every `OVRTX_DEPRECATED` entry point in [`ovrtx.h`](../../include/ovrtx/ovrtx.h)
 `ovrtx_step` is **not** deprecated — it remains the standalone-mode step function. While a stage is attached it returns `OVRTX_API_ERROR`; use `ovrtx_step_with_stage(renderer, render_products, delta_time, ordinal, ...)` there instead. The deprecated `ovrtx_query_prims` / read APIs also still function against attached ovstage scene state in the default mode, but new query call sites should be authored against `ovstage_query`.
 
 Non-deprecated ovrtx entry points — `ovrtx_get_path_dictionary`, `ovrtx_enqueue_pick_query`, `ovrtx_set_selection_group_styles`, `ovrtx_map_render_var_output` / `ovrtx_unmap_render_var_output`, `ovrtx_query_op_status` / `ovrtx_release_op_status`, `ovrtx_wait_op`, `ovrtx_set_log_callback`, and so on — remain on the renderer and do not migrate.
+
+## Animation Time Is the Simulation Clock
+
+A migrated app drives two independent clocks and ovrtx infers neither from the other: USD time comes from `ovstage_population_apply_usd_time`, while the simulation clock accumulates the `delta_time` passed to `ovrtx_step_with_stage`. Animation time is the simulation clock, so MDL `state::animation_time()`, video texture frame selection, and animated NuRec volumes and Gaussian splats all advance with the step delta and never follow the applied USD time. See `docs/core/ovstage_integration.rst` for the full contract.
+
+Two consequences for migration:
+
+- A 0.3 app that scrubbed the timeline with `ovrtx_update_stage_from_usd_time` while passing `delta_time = 0` must start passing a real per-frame delta, or its materials will freeze while its time-sampled geometry keeps moving.
+- Aligning a freshly populated stage to its start time code is now the app's job: call `ovstage_population_apply_usd_time(stage, ordinal, startTimeCode / timeCodesPerSecond)`.
 
 ## Consumer Lifecycle Recipes
 
@@ -250,8 +259,8 @@ ovrtx_step_with_stage(renderer, render_products, delta_time, ordinal, &step_resu
 ovrtx_fetch_results / ovrtx_map_render_var_output / ovrtx_unmap_render_var_output
 ovrtx_destroy_results(renderer, step_result)
 ovrtx_detach_ovstage(renderer)
-ovstage_destroy_instance(stage)
 ovrtx_destroy_renderer(renderer)
+ovstage_destroy_instance(stage)
 ```
 
 `ovrtx_update_from_stage` is optional in this recipe: the write floor moves once, and the first `ovrtx_step_with_stage` acts as a safety net that binds Hydra to the attached ovstage scene state (`CHANGELOG.md` `[0.4.0]` Changed on attach-time Hydra binding). Calling it explicitly is still safe and triggers a Hydra rebuild against the wholesale population op — it is not a no-op after wholesale open — but for one-shot loads that go straight to a step it can be omitted.
@@ -261,6 +270,15 @@ ovrtx_destroy_renderer(renderer)
 ### Recipe B — Incremental scene edits (delta on Recipe A)
 
 For apps that mutate the stage after the first frame — add / remove USD references, reset the stage, write attributes, or advance USD time — insert `ovrtx_update_from_stage(renderer, ordinal)` between `ovstage_advance_write_floor` and `ovrtx_step_with_stage`, following the `CHANGELOG.md` `[0.4.0]` pairing contract: `ovstage_population_*` (or `ovstage_write_*`) -> `ovstage_advance_write_floor` -> `ovrtx_update_from_stage` -> `ovrtx_step_with_stage`.
+
+Choose data-plane mutation ordinals using the installed ovstage version's configured
+admission policy, not just its write floors; see the
+[shared ordinal guidance](../update-0_3-0_4-common/Reference.md#ordinals-and-write-floor).
+Under the `STRICTLY_INCREASING` policy, customizing a cloned cell
+needs a newer ordinal than the clone, even before sealing. Disjoint cells may
+share an ordinal. Wait for the clone before customization, check completion of
+all mutations with the matching ovstage wait API, then advance and wait for the
+write floor. Enqueue acceptance alone does not establish publication.
 
 For time-only updates (`ovstage_population_apply_usd_time`), the `ovrtx_update_from_stage` call is a documented no-op — FSD change-tracking picks up time-sampled deltas at the next step — but calling it is still fine, and it keeps mode-agnostic client code simple.
 
@@ -274,7 +292,7 @@ The ported examples factor small helpers into each `main.cpp` (not a shared libr
 | `wait_population_op` | `ovstage_population_wait_op` | USD open / reference / apply / reset population enqueues |
 | `wait_ovstage_op` | `ovstage_wait_op` + `ovstage_release_op` | `ovstage_advance_write_floor` and other data-plane enqueues — `ovstage_release_op` must always be called after `ovstage_wait_op` for every successfully enqueued op |
 | `commit_ovstage_ordinal` | `wait_ovstage_op` + `ovstage_advance_write_floor` | Seal an ordinal before `ovrtx_step_with_stage` |
-| `cleanup` lambda | detach → destroy stage → destroy renderer | Teardown ordering; detach before destroying the stage |
+| `cleanup` lambda | detach → destroy renderer → destroy stage | Teardown ordering. If detach fails, the renderer may be partially torn down and must only be destroyed. ovrtx retains any shared stage state needed for safe destruction |
 
 > **Source:** [`examples/c/minimal/main.cpp`](../../examples/c/minimal/main.cpp) — all helpers above.
 > **Source:** [`examples/c/status-queries/main.cpp`](../../examples/c/status-queries/main.cpp) — same ovstage helpers plus `wait_with_status` / `print_operation_status` for **ovrtx** render ops only.

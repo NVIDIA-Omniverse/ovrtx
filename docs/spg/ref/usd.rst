@@ -76,10 +76,6 @@ The launch script is not authored. It is found by appending ``.lua`` to
 Shader prims must not be nested under a ``Material`` prim, and a shader under an instance
 prototype is ignored.
 
-``params:X`` is accepted in place of ``inputs:X`` and maps to it. It is the older spelling, kept so
-existing scenes load; author ``inputs:``. Where a scene has both, ``inputs:`` wins, and ``inputs:X``
-is the only name that can be written at runtime either way. Refer to :doc:`../do/runtime_changes`.
-
 .. _spg-value-input-types:
 
 Value-Input Types

@@ -39,8 +39,13 @@ bool cuda_init_standalone(int32_t device_id, CUuuid* out_uuid);
 // Must be called after cuda_init()
 bool cuda_compile_kernel();
 
-// Number of double-buffered images
-constexpr int CUDA_SHARED_IMAGE_COUNT = 2;
+// Number of shared images in the presentation ring.
+//
+// Presentation has to be decoupled from copying: with frame generation one step
+// yields several frames at once, and they are shown one at a time on a schedule.
+// A ring needs room for the image being displayed, the frames of a step waiting
+// their turn, and one being written, so two is not enough.
+constexpr int CUDA_SHARED_IMAGE_COUNT = 4;
 
 // Import Vulkan external memory into CUDA at a specific buffer index
 // Returns a CUDA surface object for writing
@@ -54,8 +59,8 @@ CUsurfObject cuda_import_vulkan_image(
     CudaImageFormat format
 );
 
-// Import Vulkan timeline semaphore into CUDA
-void cuda_import_timeline_semaphore(void* handle);
+// Import Vulkan timeline semaphore into CUDA; return false on failure
+bool cuda_import_timeline_semaphore(void* handle);
 #else
 CUsurfObject cuda_import_vulkan_image(
     int index,
@@ -66,15 +71,15 @@ CUsurfObject cuda_import_vulkan_image(
     CudaImageFormat format
 );
 
-// Import Vulkan timeline semaphore into CUDA
-void cuda_import_timeline_semaphore(int timeline_semaphore_fd);
+// Import Vulkan timeline semaphore into CUDA; return false on failure
+bool cuda_import_timeline_semaphore(int timeline_semaphore_fd);
 #endif
 
 // Query the current value of the timeline semaphore (non-blocking)
 auto cuda_query_timeline_value() -> uint64_t;
 
-// Signal the timeline semaphore with a specific value (async)
-void cuda_signal_timeline(uint64_t value, CUstream stream);
+// Signal the timeline semaphore with a specific value (async); return false on failure
+bool cuda_signal_timeline(uint64_t value, CUstream stream);
 
 // Run the UV gradient kernel
 void cuda_run_gradient_kernel(
@@ -99,13 +104,13 @@ void cuda_copy_to_surface(
     CUstream stream
 );
 
-// Copy from CUDA array to the imported Vulkan surface (array-to-array)
+// Copy from CUDA array to the imported Vulkan surface (array-to-array); return false on failure
 // buffer_index: which double-buffer slot to write to (0 or 1)
 // src_array: source CUDA array
 // width, height: dimensions in pixels
 // format: pixel format (determines bytes per pixel)
 // stream: CUDA stream to use
-void cuda_copy_array_to_surface(
+bool cuda_copy_array_to_surface(
     int buffer_index,
     CUarray src_array,
     int width,
@@ -122,6 +127,7 @@ void cuda_wait_event(CUevent event, CUstream stream);
 // Half4 (HdrColor, lin_rec709) data is converted to sRGB.
 // UInt8_4 (LdrColor) data is already sRGB and is copied directly.
 // Returns a vector of width*height*4 bytes.
+// Returns an empty vector if validation or device-to-host readback fails.
 std::vector<uint8_t> cuda_read_surface_rgba8(
     int buffer_index, int width, int height, CudaImageFormat format);
 

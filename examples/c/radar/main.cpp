@@ -520,8 +520,9 @@ int main(int argc, char* argv[])
     // [/snippet:create-renderer]
 
     // Tear down in reverse order on every exit path: detach the stage from the
-    // renderer, destroy the ovstage instance, destroy the renderer, then release
-    // the ovstage loader. Safe to call at any stage of setup.
+    // renderer, destroy the renderer, destroy the ovstage instance, then release
+    // the ovstage loader. Safe to call at any stage of setup. After a detach
+    // failure, only renderer destruction is supported.
     auto cleanup = [&](int exit_code) {
         int result_code = exit_code;
         if (stage_attached) {
@@ -529,15 +530,15 @@ int main(int argc, char* argv[])
                 result_code = 1;
             }
         }
+        if (renderer) {
+            if (!check_api_result(ovrtx_destroy_renderer(renderer), "destroy_renderer")) {
+                result_code = 1;
+            }
+        }
         if (stage) {
             ovstage_api_status_t stage_status = ovstage_destroy_instance(stage);
             if (stage_status != OVSTAGE_OK) {
                 print_ovstage_error(stage, stage_status, "destroy_instance");
-                result_code = 1;
-            }
-        }
-        if (renderer) {
-            if (!check_api_result(ovrtx_destroy_renderer(renderer), "destroy_renderer")) {
                 result_code = 1;
             }
         }

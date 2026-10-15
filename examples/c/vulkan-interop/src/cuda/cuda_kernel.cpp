@@ -83,11 +83,12 @@ extern "C" __global__ void write_uv_gradient(
 // Global state for CUDA Driver API
 static CUdevice g_device = 0;
 static CUcontext g_context = nullptr;
+static bool g_owns_context = false;
 static CUmodule g_module = nullptr;
 static CUfunction g_kernel_function = nullptr;
 
-// Double-buffered image state imported from Vulkan export handles.
-// Each index corresponds to one ping-pong buffer used by main.cpp.
+// Shared image state imported from Vulkan export handles.
+// Each index corresponds to one slot of the presentation ring in main.cpp.
 static CUexternalMemory g_external_memory[CUDA_SHARED_IMAGE_COUNT] = {};
 static CUmipmappedArray g_mipmap_array[CUDA_SHARED_IMAGE_COUNT] = {};
 static CUarray g_cuda_array[CUDA_SHARED_IMAGE_COUNT] = {};
@@ -185,6 +186,7 @@ bool cuda_get_device_uuid(int32_t device_id, CUuuid* out_uuid) {
 // [/snippet:resolve-cuda-device-uuid]
 
 bool cuda_init(int32_t device_id, CUuuid* out_uuid) {
+    g_owns_context = false;
     // Reuse the context that ovrtx already initialized so mapped ovrtx arrays and
     // imported Vulkan memory are visible in the same CUDA context.
     CU_CHECK(cuCtxGetCurrent(&g_context));
@@ -246,11 +248,12 @@ bool cuda_init_standalone(int32_t device_id, CUuuid* out_uuid) {
     // Create context
     #if CUDA_VERSION >= 13000
     // CUDA 13.x+ code path: new cuCtxCreate with CUctxCreateParams
-    cuCtxCreate(&g_context, nullptr, 0, g_device);
+    CU_CHECK(cuCtxCreate(&g_context, nullptr, 0, g_device));
     #else
     // CUDA 12.x and older: legacy cuCtxCreate
-    cuCtxCreate(&g_context, 0, g_device);
+    CU_CHECK(cuCtxCreate(&g_context, 0, g_device));
     #endif
+    g_owns_context = true;
     
     return true;
 }
@@ -401,7 +404,7 @@ CUsurfObject cuda_import_vulkan_image(
     return cuda_import_vulkan_image_finish(index, width, height, format);
 }
 
-void cuda_import_timeline_semaphore(void* handle) {
+bool cuda_import_timeline_semaphore(void* handle) {
     // Use explicit timeline semaphore handle type so CUDA can signal counter
     // values that Vulkan waits on during submit.
     CUDA_EXTERNAL_SEMAPHORE_HANDLE_DESC sem_desc = {};
@@ -409,8 +412,9 @@ void cuda_import_timeline_semaphore(void* handle) {
     sem_desc.handle.win32.handle = handle;
     sem_desc.flags = 0;
     
-    CU_CHECK_VOID(cuImportExternalSemaphore(&g_timeline_semaphore, &sem_desc));
+    CU_CHECK(cuImportExternalSemaphore(&g_timeline_semaphore, &sem_desc));
     printf("Imported Vulkan timeline semaphore into CUDA\n");
+    return true;
 }
 #else
 CUsurfObject cuda_import_vulkan_image(
@@ -444,7 +448,7 @@ CUsurfObject cuda_import_vulkan_image(
     return cuda_import_vulkan_image_finish(index, width, height, format);
 }
 
-void cuda_import_timeline_semaphore(int timeline_semaphore_fd) {
+bool cuda_import_timeline_semaphore(int timeline_semaphore_fd) {
     // Must use timeline semaphore FD type (not opaque FD), otherwise CUDA
     // cannot signal monotonically increasing fence values for Vulkan waits.
     CUDA_EXTERNAL_SEMAPHORE_HANDLE_DESC sem_desc = {};
@@ -452,8 +456,9 @@ void cuda_import_timeline_semaphore(int timeline_semaphore_fd) {
     sem_desc.handle.fd = timeline_semaphore_fd;
     sem_desc.flags = 0;
     
-    CU_CHECK_VOID(cuImportExternalSemaphore(&g_timeline_semaphore, &sem_desc));
+    CU_CHECK(cuImportExternalSemaphore(&g_timeline_semaphore, &sem_desc));
     printf("Imported Vulkan timeline semaphore into CUDA\n");
+    return true;
 }
 #endif
 
@@ -465,10 +470,10 @@ auto cuda_query_timeline_value() -> uint64_t {
     return 0;
 }
 
-void cuda_signal_timeline(uint64_t value, CUstream stream) {
+bool cuda_signal_timeline(uint64_t value, CUstream stream) {
     if (!g_timeline_semaphore) {
         fprintf(stderr, "cuda_signal_timeline: timeline semaphore not imported\n");
-        return;
+        return false;
     }
     
     // Signal happens on the CUDA stream so it is ordered after queued copies.
@@ -476,7 +481,8 @@ void cuda_signal_timeline(uint64_t value, CUstream stream) {
     params.params.fence.value = value;
     params.flags = 0;
     
-    CU_CHECK_VOID(cuSignalExternalSemaphoresAsync(&g_timeline_semaphore, &params, 1, stream));
+    CU_CHECK(cuSignalExternalSemaphoresAsync(&g_timeline_semaphore, &params, 1, stream));
+    return true;
 }
 
 static float g_time = 0.0f;
@@ -568,7 +574,7 @@ void cuda_copy_to_surface(
     }
 }
 
-void cuda_copy_array_to_surface(
+bool cuda_copy_array_to_surface(
     int buffer_index,
     CUarray src_array,
     int width,
@@ -578,17 +584,17 @@ void cuda_copy_array_to_surface(
 ) {
     if (buffer_index < 0 || buffer_index >= CUDA_SHARED_IMAGE_COUNT) {
         fprintf(stderr, "cuda_copy_array_to_surface: invalid buffer index %d\n", buffer_index);
-        return;
+        return false;
     }
     
     if (!g_cuda_array[buffer_index]) {
         fprintf(stderr, "cuda_copy_array_to_surface: no destination CUDA array for buffer %d\n", buffer_index);
-        return;
+        return false;
     }
     
     if (!src_array) {
         fprintf(stderr, "cuda_copy_array_to_surface: no source CUDA array provided\n");
-        return;
+        return false;
     }
     
     // ovrtx output and imported Vulkan targets are both CUDA arrays; array->array
@@ -615,7 +621,9 @@ void cuda_copy_array_to_surface(
         char const* err_str;
         cuGetErrorString(err, &err_str);
         fprintf(stderr, "cuMemcpy2DAsync (array-to-array) to buffer %d failed: %s\n", buffer_index, err_str);
+        return false;
     }
+    return true;
 }
 
 void cuda_wait_event(CUevent event, CUstream stream) {
@@ -682,11 +690,11 @@ std::vector<uint8_t> cuda_read_surface_rgba8(
 
     if (buffer_index < 0 || buffer_index >= CUDA_SHARED_IMAGE_COUNT) {
         fprintf(stderr, "cuda_read_surface_rgba8: invalid buffer index %d\n", buffer_index);
-        return rgba8;
+        return {};
     }
     if (!g_cuda_array[buffer_index]) {
         fprintf(stderr, "cuda_read_surface_rgba8: no CUDA array for buffer %d\n", buffer_index);
-        return rgba8;
+        return {};
     }
 
     int bytes_per_pixel = (format == CudaImageFormat::Half4) ? 8 : 4;
@@ -710,7 +718,7 @@ std::vector<uint8_t> cuda_read_surface_rgba8(
         char const* err_str;
         cuGetErrorString(err, &err_str);
         fprintf(stderr, "cuda_read_surface_rgba8: cuMemcpy2D failed: %s\n", err_str);
-        return rgba8;
+        return {};
     }
 
     if (format == CudaImageFormat::UInt8_4) {
@@ -747,6 +755,7 @@ void cuda_cleanup() {
         if (g_mipmap_array[i]) {
             cuMipmappedArrayDestroy(g_mipmap_array[i]);
             g_mipmap_array[i] = nullptr;
+            g_cuda_array[i] = nullptr;
         }
         if (g_external_memory[i]) {
             cuDestroyExternalMemory(g_external_memory[i]);
@@ -757,8 +766,8 @@ void cuda_cleanup() {
         cuModuleUnload(g_module);
         g_module = nullptr;
     }
-    if (g_context) {
-        cuCtxDestroy(g_context);
-        g_context = nullptr;
-    }
+    // Only standalone initialization owns a context; cuda_init() borrows from ovrtx.
+    if (g_context && g_owns_context) cuCtxDestroy(g_context);
+    g_context = nullptr;
+    g_owns_context = false;
 }

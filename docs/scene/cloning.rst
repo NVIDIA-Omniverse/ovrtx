@@ -18,10 +18,13 @@ Cloning Prims
    ``skills/update-0_3-0_4-python/SKILL.md``. Ovstage cloning differs from the
    compatibility API:
 
-   - An ordinal is assigned to the clone operation for change tracking.
+   - The caller supplies an ordinal that must satisfy ovstage's configured
+     :ref:`admission policy <ovstage-ordinal-admission>` and applicable write floors.
    - The ``_usd`` suffix is dropped from clone destination paths.
-   - A missing source prim returns ``OVSTAGE_ERROR_NOT_FOUND`` rather than a
-     generic error.
+   - A missing source prim or an already-existing target is rejected with a
+     specific status (``OVSTAGE_ERROR_NOT_FOUND`` / ``OVSTAGE_ERROR_PRIM_NOT_FOUND``)
+     rather than the generic ``OVRTX_API_ERROR``. Both APIs reject before anything
+     is cloned and name the offending path in the operation error.
 
    Refer to :doc:`/core/ovstage_integration` for the attached-stage workflow.
 
@@ -33,8 +36,19 @@ Clone destinations must be new absolute prim paths. If the cloned subtree
 contains relationships, make sure the copied content still points at the desired
 targets after cloning.
 
+For attached ovstage clones, customizing a copied attribute under the
+``STRICTLY_INCREASING`` policy requires a newer ordinal than the clone, even
+before sealing. See the :ref:`admission-policy summary <ovstage-ordinal-admission>`
+for other policy choices.
+
+Wait for the clone to complete successfully before customizing its results.
+Then wait for all customizations and the write-floor advance before rendering.
+An accepted async enqueue alone does not establish successful publication.
+
 Clone a Subtree
 ---------------
+
+These snippets clone at an explicit ordinal and wait for write-floor publication:
 
 .. tab-set::
 
@@ -56,6 +70,8 @@ Clone a Subtree
 
 Async Cloning
 -------------
+
+Wait for the async clone before advancing and waiting for the write floor:
 
 .. literalinclude:: ../../tests/docs/python/test_stage_mutation.py
    :language: python

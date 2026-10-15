@@ -80,8 +80,8 @@ Run the minimal example first when validating an ovrtx environment:
 | Path | Command | Success signal |
 |------|---------|----------------|
 | Python minimal | `cd examples/python/minimal && uv run main.py --png` | Writes `_output/render.png`; compare it to `img/example-minimal.jpg`. |
-| C minimal (Linux) | `cd examples/c/minimal && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ./build/minimal` | Writes `out.png`; compare it to `img/example-minimal.jpg`. |
-| C minimal (Windows) | `cd examples/c/minimal && cmake -B build && cmake --build build --config Release && .\build\Release\minimal.exe` | Writes `out.png`; compare it to `img/example-minimal.jpg`. |
+| C minimal (Linux) | `cd examples/c/minimal && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ./build/static/minimal` | Writes `out.png`; compare it to `img/example-minimal.jpg`. |
+| C minimal (Windows) | `cd examples/c/minimal && cmake -B build && cmake --build build --config Release && .\build\static\Release\minimal.exe` | Writes `out.png`; compare it to `img/example-minimal.jpg`. |
 
 Do not claim runtime validation from parse-only checks, docs-only checks, or execution on a host without a supported RTX GPU and driver.
 

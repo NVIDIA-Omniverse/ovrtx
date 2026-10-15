@@ -1,0 +1,77 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+# Small, self-contained version of data/usd/tests/Gaussian/ten-gaussians.usda.
+# Semi-transparent splats produce stochastic noise even with a static camera.
+def Xform "World"
+{
+    def Points "Gaussians" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        point3f[] points = [(-45, 0, 0), (0, 0, 0), (45, 0, 0)]
+        float3[] extent = [(-75, -60, -30), (75, 60, 30)]
+        int primvars:type = 1 (interpolation = "constant")
+        float[] widths = [100] (interpolation = "constant")
+        # GaussianEmissive uses SH DC coefficients, logit opacity and log scales.
+        float[] primvars:f_dc_0 = [1.7724539, -1.0634723, -1.0634723] (interpolation = "vertex")
+        float[] primvars:f_dc_1 = [-1.0634723, 1.7724539, -1.0634723] (interpolation = "vertex")
+        float[] primvars:f_dc_2 = [-1.0634723, -1.0634723, 1.7724539] (interpolation = "vertex")
+        float[] primvars:opacity = [0, 0, 0] (interpolation = "vertex")
+        float[] primvars:rot_0 = [1, 1, 1] (interpolation = "vertex")
+        float[] primvars:rot_1 = [0, 0, 0] (interpolation = "vertex")
+        float[] primvars:rot_2 = [0, 0, 0] (interpolation = "vertex")
+        float[] primvars:rot_3 = [0, 0, 0] (interpolation = "vertex")
+        float[] primvars:scale_0 = [2.0794415, 2.0794415, 2.0794415] (interpolation = "vertex")
+        float[] primvars:scale_1 = [2.9957323, 2.9957323, 2.9957323] (interpolation = "vertex")
+        float[] primvars:scale_2 = [2.0794415, 2.0794415, 2.0794415] (interpolation = "vertex")
+        rel material:binding = </World/GaussianEmissive>
+    }
+
+    def Material "GaussianEmissive"
+    {
+        token outputs:mdl:surface.connect = <Shader.outputs:out>
+        def Shader "Shader"
+        {
+            uniform token info:implementationSource = "sourceAsset"
+            uniform asset info:mdl:sourceAsset = @GaussianEmissive.mdl@
+            uniform token info:mdl:sourceAsset:subIdentifier = "GaussianEmissive"
+            token outputs:out
+        }
+    }
+
+    def Camera "Camera"
+    {
+        float focalLength = 45
+        float horizontalAperture = 24
+        float verticalAperture = 18
+        float2 clippingRange = (1, 10000)
+        double3 xformOp:translate = (0, 0, 300)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+def Scope "Render"
+{
+    def RenderProduct "Camera" (
+        prepend apiSchemas = ["OmniRtxSettingsMinimalAPI_1"]
+    )
+    {
+        rel camera = </World/Camera>
+        int2 resolution = (640, 480)
+        rel orderedVars = [<LdrColor>]
+        token omni:rtx:rendermode = "MinimalRendering"
+        int omni:rtx:minimal:mode = 3
+        token omni:rtx:minimal:dlss:execMode = "quality"
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+}

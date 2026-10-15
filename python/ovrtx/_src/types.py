@@ -15,6 +15,7 @@ from .bindings import (  # noqa: F401 — re-exported public API
     AftermathMode,
     AttributeFilterMode,
     BindingFlag,
+    BuildInfo,
     DataAccess,
     Device,
     EventStatus,
@@ -371,10 +372,11 @@ class MappedRenderVar(_DLPackable):
 
        **Known driver scheduling interaction on Linux.** Patterns (1) and (2) are
        stream-ordered CUDA waits that can reduce throughput when concurrent with the
-       renderer's Vulkan work (on Linux only). This applies to every CUDA stream 
-       and event argument in the Python API. Refer to the 
-       "Known driver scheduling interaction on Linux" note in 
+       renderer's Vulkan work (on Linux only). This applies to every CUDA stream
+       and event argument in the Python API. Refer to the
+       "Known driver scheduling interaction on Linux" note in
        :doc:`/core/cuda_vulkan_scheduling` for more details.
+
     Usage::
 
         # Context-manager form.
@@ -876,12 +878,13 @@ class FrameOutput(Generic[T]):
 
     This is the sensor's own capture window, not the step's simulation window.
     A :meth:`Renderer.step` of ``delta_time`` simulates ``[t, t + delta_time]``
-    and places each capture inside that window according to the sensor's
-    authored timing.
+    and advances each sensor according to its authored timing. A capture
+    accumulated across several steps can begin before ``t``.
 
     A step may also emit more than one :class:`FrameOutput` per render product
     (DLSS-G interpolated frames, for instance, sit at earlier instants than the
-    real frame), so only the final frame of a step ends at ``t + delta_time``.
+    real frame). Read each frame's capture times separately from the step's
+    simulation window.
 
     """
     end_time: float
@@ -904,7 +907,7 @@ class FrameOutput(Generic[T]):
 
     Once ``True``, additional :meth:`Renderer.step` calls will not result in additional
     sample accumulation until :meth:`Renderer.reset` is called or the scene changes. Always ``False`` 
-    for non-PT render modes.
+    for render modes other than PathTracing.
     """
 
 
@@ -951,8 +954,8 @@ class RenderProductSetOutputs(Generic[T]):
     :meth:`Renderer.reset` with ``time=T``, the next
     :meth:`~Renderer.step` reports ``simulation_start_time == T``. This is
     the step clock base; it is distinct from
-    :attr:`FrameOutput.start_time`, which is each sensor's own capture
-    instant inside the window.
+    :attr:`FrameOutput.start_time`, which is when each sensor's capture began
+    and can precede this step when a capture accumulates across steps.
     """
     simulation_end_time: float = 0.0
     """Sensor simulation time when this step ended, in seconds.
@@ -1529,6 +1532,36 @@ class RendererConfig:
     ``grpcdns://host:port``, ``grpcdns_notls://host:port``, and ``local://path``. When omitted,
     existing defaults and environment-variable behavior are preserved."""
 
+    enable_global_cache_root: Optional[bool] = None
+    """Select the platform's global cache root for the process-wide ``${omni_cache}`` token and writable caches.
+
+    On Linux, this uses ``XDG_CACHE_HOME/ovrtx/<version>`` when ``XDG_CACHE_HOME`` is absolute,
+    otherwise ``HOME/.cache/ovrtx/<version>``. On Windows, this uses the ``%LOCALAPPDATA%/ovrtx/<version>``.
+    ``<version>`` is the compiled OVRTX major.minor.patch version; ``VERSION.md`` is not consulted.
+
+    ``None`` uses the native default (enabled). ``False`` in either ``ovrtx_initialize()`` or
+    ``ovrtx_create_renderer()`` disables the platform root when no explicit ``True`` is supplied in the other call.
+    Without a root request, existing cache-path settings and a nonempty ``${omni_cache}`` token are preserved;
+    an empty token defaults to the application directory.
+
+    An ``ovrtx.portable`` file beside the executable or OVRTX binaries selects the application directory even when
+    this setting is enabled, while retaining the existing local shader-cache subfolders.
+    A valid ``cache_root_path`` takes precedence over both.
+
+    Configure this option in the ``RendererConfig`` passed to the first ``Renderer`` in the process.
+    Changing the cache root within the same process is unsupported, even after destroying all renderers and
+    calling the native ``ovrtx_shutdown()``. Start a new process to use a different root."""
+
+    cache_root_path: Optional[str] = None
+    """Set the process-wide ``${omni_cache}`` root for OVRTX caches to a nonempty path that resolves to an absolute path.
+
+    Takes precedence over both the platform default and an ``ovrtx.portable`` marker beside the executable or
+    OVRTX binaries. Supply this setting in the ``RendererConfig`` passed to the first ``Renderer`` in the process.
+    If supplied to later renderers, use the same path string.
+
+    Changing cache roots within the same process is unsupported, even after destroying all renderers and
+    calling the native ``ovrtx_shutdown()``. Start a new process to use a different root."""
+
     selection_outline_enabled: Optional[bool] = None
     """Enable the selection-outline post-process pass. Defaults to ``True`` when unset.
     Init-time only; toggling requires recreating the renderer."""
@@ -1598,6 +1631,57 @@ class RendererConfig:
     Synchronous mode controls texture-feedback processing; it does not make all
     texture loading operations synchronous. This setting is process-global and
     applies to all active renderer instances."""
+
+    enable_minimal: Optional[bool] = None
+    """Control whether Minimal rendering is available when creating an ovrtx renderer instance.
+
+    The first ovrtx renderer instance initializes graphics resources shared by all
+    ovrtx renderer instances. By default, all three rendering modes are enabled.
+    ``True`` enables Minimal, ``False`` disables it, and ``None`` leaves availability unchanged. Additional
+    ovrtx renderer instances inherit initialized availability when this option is omitted;
+    an explicit conflicting value fails creation of the new instance.
+
+    To reset availability, create an ovrtx renderer instance with ``keep_system_alive=False``
+    and omit all ``enable_*`` options. This inherits the current rendering mode availability
+    and clears retention left by earlier ``keep_system_alive=True`` instances. Then destroy
+    every ovrtx renderer instance, including this temporary instance, before creating one
+    with different mode options. Do not create another keep-alive instance during teardown.
+    At least one rendering mode must remain enabled. A RenderProduct requesting a disabled
+    mode logs a warning and uses the first enabled mode in RT2, PathTracing, then Minimal order.
+    For example, an RT2 request uses Minimal when only Minimal is enabled."""
+
+    enable_realtimepathtracing: Optional[bool] = None
+    """Control whether real-time path tracing (RT2) is available when creating an ovrtx renderer instance.
+
+    Uses the same creation-time, shared graphics resource, omission, and reset rules as ``enable_minimal``.
+    By default, all three rendering modes are enabled."""
+
+    enable_pathtracing: Optional[bool] = None
+    """Control whether PathTracing is available when creating an ovrtx renderer instance.
+
+    Uses the same creation-time, shared graphics resource, omission, and reset rules as ``enable_minimal``.
+    By default, all three rendering modes are enabled."""
+
+    enable_mdl_displacement: Optional[bool] = None
+    """Enable MDL material displacement when creating the renderer. Disabled by default when ``None``."""
+
+    enable_spectral_rendering: Optional[bool] = None
+    """Enable Spectral PathTracing shaders, materials, and physical illuminants before the first renderer.
+
+    Defaults to disabled. Later instances inherit the process choice when omitted; conflicting
+    explicit values fail even after all instances are destroyed. Start a new process to change it.
+    Also author ``omni:rtx:pathtracing:spectral:enabled = true`` on each PathTracing RenderProduct.
+    Mixed RGB/spectral transport within one scene is unsupported.
+    """
+
+    enable_crash_reporter: Optional[bool] = None
+    """Start the ovrtx crash reporter. Enabled when ``None``.
+
+    Set ``False`` when the host application owns crash handling: ovrtx then installs no crash handlers
+    and does not upload crash dumps. The first renderer in the process decides; later instances inherit
+    the choice when omitted, and a conflicting explicit value fails even after all instances are destroyed.
+    Start a new process to change it.
+    """
 
     def __repr__(self) -> str:
         set_fields = ", ".join(

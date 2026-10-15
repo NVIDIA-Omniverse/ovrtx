@@ -18,7 +18,8 @@ For how to configure RenderProducts and RenderVars, refer to :doc:`configuration
 Example USD
 -----------
 
-A RenderProduct that outputs both ``LdrColor`` and ``HdrColor`` from a camera:
+A RenderProduct that outputs both :ref:`LdrColor <camera-output-tables>` and
+:ref:`HdrColor <camera-output-tables>` from a camera:
 
 .. tab-set::
 
@@ -63,5 +64,10 @@ After stepping the renderer with a RenderProduct path, the outputs are available
 .. toctree::
    :maxdepth: 1
 
+   cameras/usd_camera_attributes
+   cameras/lens_calibration
+   cameras/rolling_shutter
+   cameras/scene_partitions
    cameras/render_modes
    cameras/outputs
+   cameras/light_path_expressions

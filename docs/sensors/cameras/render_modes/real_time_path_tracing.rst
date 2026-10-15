@@ -27,26 +27,16 @@ Sampling and Caching
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:rtpt:cached:enabled``
-
-       Enables caching path-tracing results for improved performance at the cost of some accuracy.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:rtpt:lightcache:cached:enabled``
-
-       Enables the many-light sampling algorithm, which can improve performance in scenes with many lights.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:rtpt:ris:meshLights``
-
-       Enables direct illumination sampling of geometry with emissive materials.
-     - ``bool``
-     - ``false``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:rtpt:cached:enabled = true``
+     - Enables caching path-tracing results for improved performance at the cost of some accuracy.
+   * - ``bool omni:rtx:rtpt:lightcache:cached:enabled = true``
+     - Enables the many-light sampling algorithm, which can improve performance in scenes with many lights.
+   * - ``bool omni:rtx:rtpt:ris:meshLights = false``
+     - Enables direct illumination sampling of geometry with emissive materials.
 
 Ray Bounces and Shading
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -111,36 +101,20 @@ Other Ray Bounce and Shading Settings
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:rtpt:maxVolumeBounces``
-
-       Maximum number of ray bounces for SSS.
-     - ``uint``
-     - ``3``
-   * - ``omni:rtx:pt:fractionalCutoutOpacity``
-
-       If enabled, fractional cutout opacity values are treated as a measure of surface 'presence', resulting in a translucency effect similar to alpha-blending.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:rtpt:maxRoughness``
-
-       Roughness threshold above which a surface is considered rough and rendered with performance-favoring approximations.
-     - ``float``
-     - ``0.3``
-   * - ``omni:rtx:rt:reflections:roughnessCacheThreshold``
-
-       Roughness threshold above which a surface is considered rough and rendered with performance-favoring approximations.
-     - ``float``
-     - ``0.3``
-   * - ``omni:rtx:rtpt:translucency:virtualMotion:enabled``
-
-       Enables motion vectors for translucent (refractive) objects, which can improve temporal rendering such as denoising but can reduce performance.
-     - ``bool``
-     - ``true``
+   * - USD declaration
+     - Description
+   * - ``uint omni:rtx:rtpt:maxVolumeBounces = 3``
+     - Maximum number of ray bounces for SSS.
+   * - ``bool omni:rtx:pt:fractionalCutoutOpacity = true``
+     - If enabled, fractional cutout opacity values are treated as a measure of surface 'presence', resulting in a translucency effect similar to alpha-blending.
+   * - ``float omni:rtx:rtpt:maxRoughness = 0.3``
+     - Roughness threshold above which a surface is considered rough and rendered with performance-favoring approximations.
+   * - ``float omni:rtx:rt:reflections:roughnessCacheThreshold = 0.3``
+     - Roughness threshold above which a surface is considered rough and rendered with performance-favoring approximations.
+   * - ``bool omni:rtx:rtpt:translucency:virtualMotion:enabled = true``
+     - Enables motion vectors for translucent (refractive) objects, which can improve temporal rendering such as denoising but can reduce performance.
 
 Firefly Filter
 ~~~~~~~~~~~~~~
@@ -149,54 +123,37 @@ Firefly Filter
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:rtpt:fireflyFilter:enabled``
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:rtpt:fireflyFilter:maxUnexposedIntensityPerSample``
-
-       Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
-     - ``float``
-     - ``3200.0``
-   * - ``omni:rtx:rtpt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse``
-
-       Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
-     - ``float``
-     - ``3200.0``
-   * - ``omni:rtx:rtpt:fireflyFilter:maxPerEmissiveUnexposedIntensity``
-
-       Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
-     - ``float``
-     - ``3200.0``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:rtpt:fireflyFilter:enabled = true``
+     - Enables the firefly filter.
+   * - ``float omni:rtx:rtpt:fireflyFilter:maxUnexposedIntensityPerSample = 3200.0``
+     - Clamps the maximum ray intensity for glossy bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
+   * - ``float omni:rtx:rtpt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse = 3200.0``
+     - Clamps the maximum ray intensity for diffuse bounces. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
+   * - ``float omni:rtx:rtpt:fireflyFilter:maxPerEmissiveUnexposedIntensity = 3200.0``
+     - Clamps the maximum ray intensity for emissive contribution after primary bounce. Can help prevent fireflies, but can result in energy loss. Automatically scaled with exposure.
 
 Gaussian Splatting
 ~~~~~~~~~~~~~~~~~~
+
+See :doc:`../../../geometry/gaussian_splats` for particle-field authoring and runnable examples.
 
 .. rst-class:: compact-table
 
 .. list-table::
    :header-rows: 1
-   :widths: 70 15 15
+   :widths: 46 54
 
-   * - USD Attribute
-     - Type
-     - Default
-   * - ``omni:rtx:rtpt:gaussian:accumulatedDepth:enabled``
-
-       When enabled, gaussian hit depth is opacity-weighted across up to ``maxGaussiansToAccumulate`` hits, producing a more stable depth than the stochastic single-hit depth. Useful for reducing ghosting in DLSS-RR.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:rtpt:gaussian:accumulatedAlbedo:enabled``
-
-       When enabled, gaussian SH0 albedo is opacity-weighted across up to ``maxGaussiansToAccumulate`` hits and the result overrides the GBuffer diffuse albedo, which usually improves image quality.
-     - ``bool``
-     - ``true``
-   * - ``omni:rtx:rtpt:gaussian:maxGaussiansToAccumulate``
-
-       Total hit budget for gaussian depth/albedo accumulation. Values up to 48 use a single pass over the closest N hits. Values above 48 enable a multi-batch traversal that continues until the budget is reached, the 95% opacity threshold is hit, or no more candidates are found. Set to -1 for unlimited accumulation (stops only on opacity threshold or BVH exhaust). Set to 0 to disable accumulation entirely (depth/albedo accumulation settings are ignored).
-     - ``int``
-     - ``48``
+   * - USD declaration
+     - Description
+   * - ``bool omni:rtx:rtpt:gaussian:accumulatedDepth:enabled = true``
+     - When enabled, gaussian hit depth is opacity-weighted across up to ``maxGaussiansToAccumulate`` hits, producing a more stable depth than the stochastic single-hit depth. Useful for reducing ghosting in DLSS-RR.
+   * - ``bool omni:rtx:rtpt:gaussian:accumulatedAlbedo:enabled = true``
+     - When enabled, gaussian SH0 albedo is opacity-weighted across up to ``maxGaussiansToAccumulate`` hits and the result overrides the GBuffer diffuse albedo, which usually improves image quality.
+   * - ``int omni:rtx:rtpt:gaussian:maxGaussiansToAccumulate = 48``
+     - Total hit budget for gaussian depth/albedo accumulation. Values up to 48 use a single pass over the closest N hits. Values above 48 enable a multi-batch traversal that continues until the budget is reached, the 95% opacity threshold is hit, or no more candidates are found. Set to -1 for unlimited accumulation (stops only on opacity threshold or BVH exhaust). Set to 0 to disable accumulation entirely (depth/albedo accumulation settings are ignored).
+   * - ``bool omni:rtx:rtpt:gaussian:nonStochastic:enabled = false``
+     - When enabled, RTPT deterministically composites supported Gaussian splats for primary camera rays instead of using stochastic transparency. This requires inline Gaussian tracing. Pipeline fallback, secondary rays, spectral materials, and shadows remain stochastic. At most three overlapping Gaussian objects are composited.

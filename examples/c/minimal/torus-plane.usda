@@ -197,9 +197,7 @@ def "Render" (
                 token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
                 token omni:rtx:background:source:type = "domeLight"
                 bool omni:rtx:debug:view:pixelDebug:enableFixedTextPos = 1
-                token omni:rtx:directLighting:sampledLighting:denoisingTechnique = "None"
                 bool omni:rtx:dlss:frameGeneration = 1
-                bool omni:rtx:indirectDiffuse:denoiser:enabled = 0
                 bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
                 bool omni:rtx:post:registeredCompositing:invertToneMap = 1
                 int omni:rtx:pt:maxSamplesPerLaunch = 2073600

@@ -1,0 +1,87 @@
+#usda 1.0
+(
+    subLayers = [
+        @./ovrtx-robot-lineup.usda@
+    ]
+)
+
+over "World"
+{
+    def Sphere "GlassSphere" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double radius = 0.5
+        rel material:binding = </World/Looks/LpeOmniGlass>
+        double3 xformOp:translate = (-6, 1, 0.5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Scope "Looks"
+    {
+        def Material "LpeOmniGlass"
+        {
+            token outputs:mdl:displacement.connect = </World/Looks/LpeOmniGlass/Shader.outputs:out>
+            token outputs:mdl:surface.connect = </World/Looks/LpeOmniGlass/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Looks/LpeOmniGlass/Shader.outputs:out>
+
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniGlass.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniGlass"
+                token outputs:out (
+                    renderType = "material"
+                )
+            }
+        }
+    }
+}
+
+# [snippet:doc-example-lpe-render-vars]
+def "Render"
+{
+    def RenderProduct "Camera" (
+        prepend apiSchemas = ["OmniRtxSettingsPtAdvancedAPI_1"]
+    )
+    {
+        bool omni:rtx:pt:radianceCache:enabled = false
+        bool omni:rtx:pt:denoising:enabled = true
+        bool omni:rtx:pt:denoising:optix:denoiseAOVs = true
+        uint omni:rtx:pt:samplesPerPixel = 128
+        rel camera = </World/Camera>
+        int2 resolution = (1920, 1080)
+        token omni:rtx:rendermode = "PathTracing"
+        rel orderedVars = [<HdrColor>, <DiffuseReflection>, <GlossyReflection>, <GlossyTransmission>, <Caustics>]
+
+        def RenderVar "HdrColor"
+        {
+            string sourceName = "HdrColor"
+        }
+
+        def RenderVar "DiffuseReflection"
+        {
+            string sourceName = "E<RD>.*L"
+            token sourceType = "lpe"
+        }
+
+        def RenderVar "GlossyReflection"
+        {
+            string sourceName = "E<RG>.*L"
+            token sourceType = "lpe"
+        }
+
+        def RenderVar "GlossyTransmission"
+        {
+            string sourceName = "E<TG>.*L"
+            token sourceType = "lpe"
+        }
+
+        def RenderVar "Caustics"
+        {
+            string sourceName = "EDG.*L"
+            token sourceType = "lpe"
+        }
+    }
+}
+# [/snippet:doc-example-lpe-render-vars]

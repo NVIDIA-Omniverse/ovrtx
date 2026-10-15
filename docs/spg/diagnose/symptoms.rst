@@ -57,12 +57,25 @@ is missing and does not run. Refer to
 **A composite channel or parameter was asked for by a name it does not carry.** The node fails
 without publishing, and the message names the port, the name used and the nearest match.
 
+**The launch script does not parse.** The node fails, and the log has a ``Lua load error`` line
+naming the script and the line of the error. The renderer keeps running.
+
 **The launch script was rejected.** Scripts run in a sandbox and the source is scanned before
 it runs. The scan is a plain substring match over the whole file, **including comments**, so a
 comment mentioning a forbidden construct is enough. A rejected script produces no GPU work.
 
+**A node stopped after one failure.** A launch script that reaches a sandbox limit stops its
+node, and the log says once that the node is stopped until its graph is rebuilt. Fix the script,
+then change the stage's SPG setup or open the stage again. Refer to
+:ref:`the sandbox <spg-lua-sandbox>`.
+
 **An output was never described.** Every declared output must be assigned a descriptor before
 the launch script returns.
+
+**A scene read came back** ``nil`` **and the script indexed it.** The tell is
+``attempt to index a nil value`` in the log. ``rtx.stage.prim`` is ``nil`` for a path with no prim
+on the stage, and a prim table reads ``nil`` for an attribute the prim does not carry. A custom
+attribute is there only when the load named its prim. Refer to :doc:`../do/scene_queries`.
 
 **The shader failed to compile.** Check the log. A Slang compile failure reports that it will
 use the existing shader and the run continues with an empty AOV **and a zero exit code**, so
@@ -96,7 +109,8 @@ wrong order is only a warning, and a value carrying no name cannot be cross-chec
 :ref:`value-inputs are wrappers <spg-value-wrapper>`.
 
 **A tiled product was treated as one image.** A product bound to more than one camera renders
-one camera per tile, and pixel coordinates alone do not say which view a pixel belongs to.
+one camera per tile, and pixel coordinates alone do not say which view a pixel belongs to. The
+grid is ``rtx.product.tiling``; refer to :doc:`../ref/lua_rtx`.
 
 .. _spg-symptom-stale:
 

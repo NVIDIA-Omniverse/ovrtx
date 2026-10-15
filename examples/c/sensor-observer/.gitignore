@@ -1,0 +1,4 @@
+build*/
+.pixi/
+*.csv
+*.png

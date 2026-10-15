@@ -43,13 +43,13 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 - Use an ovrtx checkout that contains the referenced examples and docs tests.
 - Read the relevant `> **Source:**` snippet before writing or explaining API usage.
-- Confirm the source prim already exists on the runtime stage and destination paths do not conflict with existing prims unless replacement is intended.
+- Confirm the source prim already exists on the runtime stage and every destination path is absent; clone does not replace existing targets.
 
 ## Instructions
 
 1. Identify the source prim path and every destination path the caller wants to create.
 2. Confirm whether the workflow needs a synchronous Python ovstage clone, Python async ovstage clone, or C ovstage clone.
-3. Read the matching snippet and preserve its source-path, destination-list, wait, and error-checking pattern.
+3. Read the matching snippet and preserve its source-path, destination-list, wait, and error-checking pattern. Choose explicit clone and customization ordinals that satisfy the configured ovstage admission policy and applicable floors.
 4. Do not use cloning when the caller actually needs USD instancing, references, or authoring new geometry from scratch; route to the loading or writing skills instead.
 5. When changing code, run the stage-mutation docs test that owns the clone snippet whenever practical.
 
@@ -68,7 +68,11 @@ This skill has no scripts.
 
 ## Overview
 
-`stage.clone` creates copies of an existing prim subtree at one or more new target paths and publishes the change at an ordinal. This is useful for duplicating geometry, creating arrays of objects, or spawning instances from a template.
+`stage.clone` creates copies of an existing prim subtree at one or more new target paths and commits the copied cells at an explicit ordinal. Advance and wait for the write floor before reading or rendering that ordinal. This is useful for duplicating geometry, creating arrays of objects, or spawning instances from a template.
+
+Follow the ordinal and completion rules in
+[Cloning Prims](../../docs/scene/cloning.rst). For policy choices, see the
+[admission-policy summary](../../docs/core/ovstage_integration.rst#ordinals-and-write-floor-gates).
 
 ## Python
 
@@ -113,18 +117,25 @@ clone snippet; the two are kept for parity with the Python `clone` /
 
 ## Troubleshooting
 
-- The source path **must exist** in the stage.
-- The target paths **must not already exist** in the stage.
+- The source path **must exist** in the stage; a missing source fails the clone and the
+  error names it.
+- The target paths **must not already exist** in the stage. A batch with any existing
+  target clones nothing, and the error names the existing target(s) (e.g.
+  `target prim already exists at '/World/Tile3'`), so the whole batch can be corrected
+  in one pass.
 - Cloning copies the entire subtree under the source path, including all children.
 - Relationship targets, path values, and USD attribute connections under the source
   subtree are rebased to the corresponding clone. Paths outside the subtree stay unchanged.
-- In Python, advance the ovstage write floor after the clone completes and before rendering its ordinal.
+- Enqueue success does not guarantee successful admission or publication. In Python, wait for `clone_async()` with `op.wait()`; `clone()` already waits. Wait for the clone before customizing copied cells, and wait for all customizations before advancing and waiting for the write floor.
 - In C, `ovstage_clone` returns an `ovstage_enqueue_result_t`; wait on the returned `op_index` with `ovstage_wait_op()` before advancing the write floor or using the cloned prims (e.g., writing attributes or stepping).
 
 ## Deprecated Standalone APIs
 
 `ovrtx_clone_usd` (C) and `Renderer.clone_usd*` (Python) are deprecated in 0.4
-and retained for standalone compatibility. New code should clone through
+and retained for standalone compatibility. They enforce the same create-only
+contract: a missing source or an already-existing target fails the operation
+(`RuntimeError` in Python; `ovrtx_wait_op` + `ovrtx_get_last_op_error` in C)
+with the offending path named. New code should clone through
 ovstage at an application-owned ordinal, wait for the clone, and advance the
 write floor before rendering it.
 

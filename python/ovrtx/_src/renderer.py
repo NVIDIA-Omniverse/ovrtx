@@ -308,6 +308,7 @@ class Renderer:
             from copy import copy
 
             config = copy(config)
+        self._suppress_deprecation_warnings = bool(config.suppress_deprecation_warnings)
 
         # get bindings to ovrtx library (including lazy-loading and initializing the library if necessary)
         ovrtx_config = self._to_c_config(config)
@@ -319,10 +320,10 @@ class Renderer:
             error_msg = _bindings.get_last_error() or "Unknown error"
             raise RuntimeError(f"Failed to create renderer: {error_msg}\nconfig: {config}")
 
-        # Store bindings, renderer handle and config for other methods to use
+        # Store bindings and renderer handle for other methods to use.
         self._handle = c_renderer
         self._bindings = _bindings
-        self._config = config
+        self._cleanup_only = False
 
         # Live mapping registry: map_handle -> _UnmapState
         # Used to force-unmap all active mappings before destroying the renderer.
@@ -344,41 +345,63 @@ class Renderer:
         or ``try/finally``) for deterministic teardown: the Python wrapper can be kept alive past
         its last use by reference cycles, which would otherwise defer native cleanup to a GC pass.
 
+        If native destruction fails, the wrapper becomes cleanup-only. Retry
+        :meth:`destroy`; no other renderer operation is supported.
+
         Raises:
-            RuntimeError: If detaching an attached ovstage or destroying the renderer fails.
+            RuntimeError: If destroying the renderer fails.
         """
         if self._handle is None:
             return
-        cleanup_errors = []
+        destroyed = False
         try:
-            self._force_unbind_all()
-            self._force_unmap_all()
-            if self._attached_ovstage is not None:
-                result = self._bindings.detach_ovstage(self._handle)
-                if result.status != bindings.OVRTX_API_SUCCESS:
-                    error_msg = self._bindings.get_last_error() or "Unknown error"
-                    cleanup_errors.append(f"Failed to detach ovstage: {error_msg}")
+            self._force_unbind_all(call_native=not self._cleanup_only)
+            self._force_unmap_all(call_native=not self._cleanup_only)
             result = self._bindings.destroy_renderer(self._handle)
 
             if result.status != bindings.OVRTX_API_SUCCESS:
+                self._cleanup_only = True
                 error_msg = self._bindings.get_last_error() or "Unknown error"
-                cleanup_errors.append(f"Failed to destroy renderer: {error_msg}")
-            if cleanup_errors:
-                raise RuntimeError("; ".join(cleanup_errors))
+                raise RuntimeError(f"Failed to destroy renderer: {error_msg}")
+            destroyed = True
         finally:
-            # Always clear references to prevent double-cleanup attempts
-            self._handle = None
-            self._bindings = None
-            self._config = None
-            self._path_dict = None
-            self._attached_ovstage = None
+            if destroyed:
+                self._handle = None
+                self._bindings = None
+                self._suppress_deprecation_warnings = False
+                self._path_dict = None
+                self._attached_ovstage = None
+                self._cleanup_only = False
 
     def __del__(self):
         """Automatically clean up renderer resources on destruction."""
+        if bindings._ovrtx_loader.is_process_cleanup_started:
+            return
         try:
             self.destroy()
         except Exception as e:
             print(f"Warning: Exception during renderer cleanup in __del__: {e}", file=sys.stderr)
+
+    def _require_usable(self) -> None:
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+        if self._cleanup_only:
+            raise RuntimeError("Renderer can only be destroyed after ovstage detach failed")
+
+    def _native_cleanup_allowed(self) -> bool:
+        return self._handle is not None and not self._cleanup_only
+
+    def _destroy_step_results(self, step_handle: Any) -> None:
+        if self._native_cleanup_allowed():
+            self._bindings.destroy_results(self._handle, step_handle)
+
+    def _release_query_results(self, query_handle: Any) -> None:
+        if self._native_cleanup_allowed():
+            self._bindings.release_query_results(self._handle, query_handle)
+
+    def _release_read_result(self, read_handle: Any) -> None:
+        if self._native_cleanup_allowed():
+            self._bindings.release_read_result(self._handle, read_handle)
 
     def _register_mapping(self, handle: int, state: Any) -> None:
         """Register an active mapping's shared state for force-unmap on renderer destruction."""
@@ -390,7 +413,7 @@ class Renderer:
         with self._live_mappings_lock:
             self._live_mappings.pop(handle, None)
 
-    def _force_unmap_all(self) -> None:
+    def _force_unmap_all(self, *, call_native: bool = True) -> None:
         """Force-unmap all active mappings before renderer destruction.
 
         Sets ``state.unmapped = True`` on each mapping so that deferred deleters
@@ -409,12 +432,13 @@ class Renderer:
             for handle, state in mappings:
                 if not state.unmapped:
                     state.unmapped = True
-                    try:
-                        self._unmap_output(handle, state.cuda_sync)
-                    except Exception:
-                        pass
+                    if call_native:
+                        try:
+                            self._unmap_output(handle, state.cuda_sync)
+                        except Exception:
+                            pass
 
-    def _force_unbind_all(self) -> None:
+    def _force_unbind_all(self, *, call_native: bool = True) -> None:
         """Destroy all live attribute binding C handles before renderer destruction."""
         handles = list(self._live_binding_handles)
         self._live_binding_handles.clear()
@@ -425,24 +449,33 @@ class Renderer:
                 RuntimeWarning,
                 stacklevel=2,
             )
-            for h in handles:
-                try:
-                    self._bindings.destroy_attribute_binding(self._handle, bindings.ovrtx_attribute_binding_handle_t(h))
-                except Exception:
-                    pass
+            if call_native:
+                for h in handles:
+                    try:
+                        self._bindings.destroy_attribute_binding(
+                            self._handle, bindings.ovrtx_attribute_binding_handle_t(h)
+                        )
+                    except Exception:
+                        pass
 
     @property
     def version(self) -> tuple:
         """Runtime library version as a (major, minor, patch) tuple."""
         return self._bindings.version
 
+    @property
+    def build_info(self) -> bindings.BuildInfo:
+        """Complete build identity embedded in the OVRTX loader library."""
+        return self._bindings.build_info
+
     def attach_ovstage(self, stage: Any) -> None:
         """Attach an externally owned ``ovstage.Stage`` to this renderer.
 
-        The renderer borrows the Stage's native instance and retains the Python
-        object until detach or renderer destruction. Do not explicitly destroy
-        the Stage while it is attached. A Stage may be attached to only one
-        renderer at a time; detach it before attaching it to another renderer.
+        The renderer retains its own native Stage handle and keeps the Python
+        object until detach or renderer destruction. Calling ``stage.destroy()``
+        after attach invalidates the caller's handle but leaves the renderer's
+        attachment valid. A Stage may be attached to only one renderer at a time;
+        detach it before attaching it to another renderer.
 
         Args:
             stage: A live ``ovstage.Stage`` instance.
@@ -454,8 +487,7 @@ class Renderer:
             TypeError: If ``stage`` does not expose a compatible native handle.
             ValueError: If the Stage has already been destroyed.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
         if self._attached_ovstage is not None:
             raise RuntimeError("Renderer already has an ovstage attached")
 
@@ -479,14 +511,20 @@ class Renderer:
         """Detach the attached ovstage and return the renderer to standalone mode.
 
         The renderer may then attach the same or a different live Stage.
+
+        Detaching rebuilds renderer state on the calling thread, so wait for
+        in-flight operations before calling it. If it raises, teardown may be
+        partial; do not use the renderer again except to call :meth:`destroy`.
+        The caller may still destroy its Stage because the renderer retains any
+        native stage state needed for safe destruction.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
         if self._attached_ovstage is None:
             raise RuntimeError("Renderer has no ovstage attached")
 
         result = self._bindings.detach_ovstage(self._handle)
         if result.status != bindings.OVRTX_API_SUCCESS:
+            self._cleanup_only = True
             error_msg = self._bindings.get_last_error() or "Unknown error"
             raise RuntimeError(f"Failed to detach ovstage: {error_msg}")
         self._attached_ovstage = None
@@ -519,15 +557,14 @@ class Renderer:
             TypeError: If ``ordinal`` is not an integer.
             ValueError: If ``ordinal`` is outside the uint64 range.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
         if self._attached_ovstage is None:
             raise RuntimeError("Renderer has no ovstage attached")
 
         ordinal_value = self._normalize_ordinal(ordinal)
         result = self._bindings.update_from_stage(self._handle, ordinal_value)
         if result.status != bindings.OVRTX_API_SUCCESS:
-            error_msg = self._bindings.get_last_error() or "Unknown error"
+            error_msg = self._consume_enqueue_error(result)
             raise RuntimeError(f"Failed to enqueue update_from_stage: {error_msg}")
 
         return Operation(
@@ -580,8 +617,7 @@ class Renderer:
             op.wait(timeout_ns=1_000_000_000)
             ```
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         result = self._bindings.open_usd_from_file(self._handle, usd_file_path)
         if result.status != bindings.OVRTX_API_SUCCESS:
@@ -635,8 +671,7 @@ class Renderer:
             RuntimeError: If renderer is invalid or enqueue fails.
             ValueError: If root_layer_content is empty.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         if not root_layer_content or not root_layer_content.strip():
             raise ValueError("root_layer_content cannot be empty")
@@ -692,8 +727,7 @@ class Renderer:
         Raises:
             RuntimeError: If renderer is invalid or enqueue fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         result, usd_handle = self._bindings.add_usd_reference_from_file(self._handle, layer_file, prefix_path)
         if result.status != bindings.OVRTX_API_SUCCESS:
@@ -765,8 +799,7 @@ class Renderer:
             RuntimeError: If renderer is invalid or enqueue fails.
             ValueError: If layer_content is empty.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         if not layer_content or not layer_content.strip():
             raise ValueError("layer_content cannot be empty")
@@ -808,8 +841,7 @@ class Renderer:
         Raises:
             RuntimeError: If renderer is invalid or enqueue fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         result = self._bindings.remove_usd(self._handle, usd_handle)
         if result.status != bindings.OVRTX_API_SUCCESS:
@@ -849,8 +881,7 @@ class Renderer:
         Raises:
             RuntimeError: If the enqueue fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         result = self._bindings.update_stage_from_usd_time(self._handle, usd_time)
         if result.status != bindings.OVRTX_API_SUCCESS:
@@ -892,8 +923,7 @@ class Renderer:
             RuntimeError: If renderer is invalid or enqueue fails.
             ValueError: If target_paths is empty.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         if not target_paths:
             raise ValueError("At least one target path is required")
@@ -911,6 +941,16 @@ class Renderer:
         op._storage_refs = [source_string, target_strings, target_array]
         return op
 
+    def _consume_enqueue_error(self, result: bindings.ovrtx_enqueue_result_t) -> str:
+        """Copy an enqueue error and consume any synchronously failed operation."""
+        # A sync-mode execution failure still returns a valid op ID. The C API
+        # retains its error until wait_op; no Python Operation will own it here.
+        # Copy the diagnostic first because wait_op can overwrite the TLS error.
+        error_msg = self._bindings.get_last_error() or "Unknown error"
+        if result.op_index.value:
+            self._bindings.wait_op(self._handle, result.op_index, bindings.OVRTX_TIMEOUT_INFINITE)
+        return error_msg
+
     def _wait_operation(self, operation: Operation, timeout_ns: Optional[int]) -> Operation._Result:
         """Internal: Wait for an operation to complete.
 
@@ -921,6 +961,7 @@ class Renderer:
         Returns:
             Operation._Result with status and any errors.
         """
+        self._require_usable()
         timeout = _normalize_timeout(timeout_ns)
         result, c_wait_result = self._bindings.wait_op(self._handle, bindings.ovrtx_op_id_t(operation.op_id), timeout)
 
@@ -955,8 +996,7 @@ class Renderer:
         Calls the C query, copies fields into a Python dataclass, and
         immediately releases the C status struct.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         result, c_status = self._bindings.query_op_status(self._handle, bindings.ovrtx_op_id_t(op_id))
         if result.status != bindings.OVRTX_API_SUCCESS:
@@ -1005,7 +1045,13 @@ class Renderer:
                 Required in attached mode and invalid in standalone mode.
 
         Returns:
-            :class:`RenderProductSetOutputs` with rendering results.
+            :class:`RenderProductSetOutputs` with rendering results and the step's
+            simulation window in :attr:`~RenderProductSetOutputs.simulation_start_time`
+            and :attr:`~RenderProductSetOutputs.simulation_end_time`, in seconds.
+            Use the end time to synchronize external logging with this completed
+            step without maintaining a separate simulation clock. These fields
+            are distinct from each sensor frame's :attr:`~FrameOutput.start_time` and
+            :attr:`~FrameOutput.end_time`, which describe its capture window.
 
         Raises:
             RuntimeError: If renderer is invalid, enqueue fails, step fails,
@@ -1029,6 +1075,14 @@ class Renderer:
         Enqueues a step operation and returns an :class:`Operation`. Call
         ``.wait()`` to get a :class:`PendingFetch`, then ``.fetch()``
         to retrieve the :class:`RenderProductSetOutputs`.
+
+        The fetched results expose this step's simulation window in
+        :attr:`~RenderProductSetOutputs.simulation_start_time` and
+        :attr:`~RenderProductSetOutputs.simulation_end_time`, in seconds.
+        Use the end time to timestamp external logging for that step, even if
+        later steps have already completed. Each sensor frame's
+        :attr:`~FrameOutput.start_time` and :attr:`~FrameOutput.end_time`
+        describe its capture window instead.
 
         When an ovstage is attached, the step first enqueues synchronization with
         committed Stage changes through ``ordinal`` while attribute values remain
@@ -1054,8 +1108,7 @@ class Renderer:
                 render products are provided, or ``ordinal`` is outside the
                 uint64 range.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         attached = self._attached_ovstage is not None
         if attached and ordinal is None:
@@ -1088,7 +1141,7 @@ class Renderer:
         else:
             update_result = self._bindings.update_from_stage(self._handle, ordinal_value)
             if update_result.status != bindings.OVRTX_API_SUCCESS:
-                error_msg = self._bindings.get_last_error() or "Unknown error"
+                error_msg = self._consume_enqueue_error(update_result)
                 raise RuntimeError(f"Failed to enqueue update_from_stage: {error_msg}")
             update_op_id = update_result.op_index.value
             result, step_result_handle = self._bindings.step_with_stage(
@@ -1097,8 +1150,8 @@ class Renderer:
             operation_name = f"step(dt={delta_time}, ordinal={ordinal_value})"
 
         if result.status != bindings.OVRTX_API_SUCCESS:
-            error_msg = self._bindings.get_last_error() or "Unknown error"
-            if update_op_id is not None:
+            error_msg = self._consume_enqueue_error(result)
+            if not result.op_index.value and update_op_id is not None:
                 # The Stage update was already accepted; drain it before raising
                 # so an enqueue rejection does not leave an unobserved operation.
                 try:
@@ -1107,6 +1160,8 @@ class Renderer:
                     )
                 except Exception:
                     pass
+            if step_result_handle is not None:
+                self._bindings.destroy_results(self._handle, step_result_handle)
             raise RuntimeError(f"Failed to enqueue step: {error_msg}")
 
         def _fetch_step(timeout_ns: Optional[int] = None) -> Optional[RenderProductSetOutputs]:
@@ -1118,7 +1173,7 @@ class Renderer:
                 return self._fetch_step_results(step_result_handle, timeout_ns)
             except Exception as e:
                 try:
-                    self._bindings.destroy_results(self._handle, step_result_handle)
+                    self._destroy_step_results(step_result_handle)
                 except Exception:
                     pass
                 raise RuntimeError(f"Failed to fetch step results: {e}") from e
@@ -1129,7 +1184,7 @@ class Renderer:
             handle=step_result_handle,
             operation_name=operation_name,
             fetch_fn=_fetch_step,
-            cleanup_fn=lambda: self._bindings.destroy_results(self._handle, step_result_handle),
+            cleanup_fn=lambda: self._destroy_step_results(step_result_handle),
         )
 
     def reset(self, time: float = 0.0) -> None:
@@ -1163,8 +1218,7 @@ class Renderer:
             RuntimeError: If renderer is invalid or enqueue fails.
             ValueError: If ``time`` is non-finite or negative.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         if not math.isfinite(time):
             raise ValueError(f"time must be finite, got {time}")
@@ -1204,7 +1258,10 @@ class Renderer:
                 (y + 1) / height]. Use [0, 0, 1, 1] for the full RenderProduct. Out-of-bounds values are
                 rejected; boundary values may be clamped to the valid range to account for floating-point
                 roundoff.
-            flags: Combination of ``OVRTX_PICK_FLAG_*``.
+            flags: Optional pick flags. Pass ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`` to request object type,
+                geometry instance id, world position, and world normal for the first hit of a one-pixel-equivalent
+                pick. Without this flag, those tensors are present but zero-filled. Multi-pixel picks leave them
+                zero-filled even when the flag is set.
 
         Returns:
             Operation that completes once the pick query is registered.
@@ -1213,8 +1270,7 @@ class Renderer:
             RuntimeError: If renderer is invalid or enqueue fails.
             ValueError: If ``render_product_path`` is empty.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
         path = (render_product_path or "").strip()
         if not path:
             raise ValueError("render_product_path must be non-empty")
@@ -1286,8 +1342,7 @@ class Renderer:
             ValueError: If any group id is outside ``0..255`` or any color is not
                 a 4-element RGBA sequence.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         count = len(styles)
         ids_array = (ctypes.c_uint8 * count)()
@@ -1378,8 +1433,7 @@ class Renderer:
             RuntimeError: If renderer is invalid or enqueue fails.
             ValueError: If any group id is outside ``0..255`` or list lengths differ.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         path_ids = self._normalize_prim_path_ids(prim_path_ids)
         count = len(path_ids)
@@ -1413,8 +1467,7 @@ class Renderer:
 
         Duplicate paths are allowed; the last occurrence wins.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
         if any(not path or not path.strip() for path in prim_paths):
             raise ValueError(f"all prim_paths must not be empty, got: {prim_paths}")
 
@@ -1461,8 +1514,7 @@ class Renderer:
             RuntimeError: If renderer is invalid or enqueue fails.
             ValueError: If list lengths differ.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         path_ids = self._normalize_prim_path_ids(prim_path_ids)
         count = len(path_ids)
@@ -1490,8 +1542,7 @@ class Renderer:
 
     def set_pickable_strings_async(self, prim_paths: list[str], pickable: bool | list[bool]) -> Operation[bool]:
         """Set viewport pickability for prims by string path (async)."""
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
         if any(not path or not path.strip() for path in prim_paths):
             raise ValueError(f"all prim_paths must not be empty, got: {prim_paths}")
 
@@ -1537,8 +1588,7 @@ class Renderer:
         Raises:
             RuntimeError: If renderer is invalid or enqueue fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         result = self._bindings.reset_stage(self._handle)
         if result.status != bindings.OVRTX_API_SUCCESS:
@@ -1647,8 +1697,7 @@ class Renderer:
         Raises:
             RuntimeError: If enqueue fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         # Build filter arrays
         def build_filters(filter_list):
@@ -1703,12 +1752,13 @@ class Renderer:
             # Called by PendingFetch.fetch(). Retrieves C query results,
             # resolves token handles to strings via the path dictionary,
             # and builds the user-facing dict mapping each prim path to its attributes.
+            self._require_usable()
             timeout = _normalize_timeout(timeout_ns)
             result, c_qr = self._bindings.fetch_query_results(self._handle, query_handle, timeout)
             if result.status == bindings.OVRTX_API_TIMEOUT:
                 return None
             if result.status != bindings.OVRTX_API_SUCCESS:
-                self._bindings.release_query_results(self._handle, query_handle)
+                self._release_query_results(query_handle)
                 error_msg = self._bindings.get_last_error() or "Unknown error"
                 raise RuntimeError(f"Failed to fetch query results: {error_msg}")
             prim_dict: dict[str, dict[str, AttributeInfo]] = {}
@@ -1734,7 +1784,7 @@ class Renderer:
                 for path in group.prim_paths:
                     prim_dict[path] = group.attributes
             # All C data resolved into Python objects — release C handle immediately
-            self._bindings.release_query_results(self._handle, query_handle)
+            self._release_query_results(query_handle)
             return prim_dict
 
         op = Operation(
@@ -1743,7 +1793,7 @@ class Renderer:
             handle=query_handle,
             operation_name="query_prims",
             fetch_fn=_fetch_query,
-            cleanup_fn=lambda: self._bindings.release_query_results(self._handle, query_handle),
+            cleanup_fn=lambda: self._release_query_results(query_handle),
         )
         op._storage_refs = [_all_refs, _any_refs, _exc_refs, _attr_name_refs]
         return op
@@ -1759,8 +1809,7 @@ class Renderer:
         """
         if self._path_dict is not None:
             return self._path_dict
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
         result, pd = self._bindings.get_path_dictionary(self._handle)
         if result.status != bindings.OVRTX_API_SUCCESS:
             error_msg = self._bindings.get_last_error() or "Unknown error"
@@ -1998,8 +2047,7 @@ class Renderer:
         result_fn,
     ) -> Operation:
         """Internal: enqueue a read operation and return an Operation with a fetch closure."""
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         binding = bindings.ovrtx_binding_desc_or_handle_t()
         binding.binding_handle = 0
@@ -2051,12 +2099,13 @@ class Renderer:
             if released:
                 return
             released = True
-            self._bindings.release_read_result(self._handle, read_handle)
+            self._release_read_result(read_handle)
 
         def _fetch_read(timeout_ns: Optional[int] = None):
             if released:
                 raise RuntimeError("Read result has already been released after a prior fetch failure")
 
+            self._require_usable()
             timeout = _normalize_timeout(timeout_ns)
             result, c_output = self._bindings.fetch_read_result(self._handle, read_handle, timeout)
             if result.status == bindings.OVRTX_API_TIMEOUT:
@@ -2117,8 +2166,7 @@ class Renderer:
         Returns:
             :class:`RenderProductSetOutputs`, or None on timeout.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         timeout = _normalize_timeout(timeout_ns)
         result, c_outputs = self._bindings.fetch_results(self._handle, step_handle, timeout)
@@ -2156,8 +2204,7 @@ class Renderer:
             products[product_name] = ProductOutput(name=product_name, frames=frames)
 
         def _destroy():
-            if self._handle is not None:
-                self._bindings.destroy_results(self._handle, step_handle)
+            self._destroy_step_results(step_handle)
 
         return RenderProductSetOutputs(
             destroy_fn=_destroy,
@@ -2194,8 +2241,7 @@ class Renderer:
         Raises:
             RuntimeError: If mapping fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         # Default sync_stream: 1 for CUDA types (default stream), 0 for CPU
         if sync_stream is None:
@@ -2285,8 +2331,7 @@ class Renderer:
         Raises:
             RuntimeError: If unmapping fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         result = self._bindings.unmap_render_var_output(self._handle, map_handle, before_destroy_cuda_sync)
 
@@ -2314,11 +2359,34 @@ class Renderer:
             "sync_mode": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.SYNC_MODE),
             "log_file_path": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.LOG_FILE_PATH),
             "log_level": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.LOG_LEVEL),
+            "enable_spectral_rendering": (
+                bindings.ovrtx_config_entry_bool,
+                bindings.ConfigBoolKey.ENABLE_SPECTRAL_RENDERING,
+            ),
+            "enable_crash_reporter": (
+                bindings.ovrtx_config_entry_bool,
+                bindings.ConfigBoolKey.ENABLE_CRASH_REPORTER,
+            ),
             "enable_profiling": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.ENABLE_PROFILING),
             "read_gpu_transforms": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.READ_GPU_TRANSFORMS),
             "keep_system_alive": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.KEEP_SYSTEM_ALIVE),
+            "enable_minimal": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.ENABLE_MINIMAL),
+            "enable_realtimepathtracing": (
+                bindings.ovrtx_config_entry_bool,
+                bindings.ConfigBoolKey.ENABLE_REALTIMEPATHTRACING,
+            ),
+            "enable_pathtracing": (bindings.ovrtx_config_entry_bool, bindings.ConfigBoolKey.ENABLE_PATHTRACING),
+            "enable_mdl_displacement": (
+                bindings.ovrtx_config_entry_bool,
+                bindings.ConfigBoolKey.ENABLE_MDL_DISPLACEMENT,
+            ),
             "active_cuda_gpus": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.ACTIVE_CUDA_GPUS),
             "datastore_cache": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.DATASTORE_CACHE),
+            "enable_global_cache_root": (
+                bindings.ovrtx_config_entry_bool,
+                bindings.ConfigBoolKey.ENABLE_GLOBAL_CACHE_ROOT,
+            ),
+            "cache_root_path": (bindings.ovrtx_config_entry_string, bindings.ConfigStringKey.CACHE_ROOT_PATH),
             "selection_outline_enabled": (
                 bindings.ovrtx_config_entry_bool,
                 bindings.ConfigBoolKey.SELECTION_OUTLINE_ENABLED,
@@ -2396,6 +2464,76 @@ class Renderer:
         return bindings.ovrtx_config_t(entries)
 
     @staticmethod
+    def _from_c_config(config: bindings.ovrtx_config_t) -> RendererConfig:
+        """Convert an immutable native config snapshot to ``RendererConfig``."""
+        bool_fields = {
+            bindings.ConfigBoolKey.SYNC_MODE: "sync_mode",
+            bindings.ConfigBoolKey.ENABLE_PROFILING: "enable_profiling",
+            bindings.ConfigBoolKey.ENABLE_SPECTRAL_RENDERING: "enable_spectral_rendering",
+            bindings.ConfigBoolKey.ENABLE_CRASH_REPORTER: "enable_crash_reporter",
+            bindings.ConfigBoolKey.READ_GPU_TRANSFORMS: "read_gpu_transforms",
+            bindings.ConfigBoolKey.KEEP_SYSTEM_ALIVE: "keep_system_alive",
+            bindings.ConfigBoolKey.ENABLE_MINIMAL: "enable_minimal",
+            bindings.ConfigBoolKey.ENABLE_REALTIMEPATHTRACING: "enable_realtimepathtracing",
+            bindings.ConfigBoolKey.ENABLE_PATHTRACING: "enable_pathtracing",
+            bindings.ConfigBoolKey.ENABLE_MDL_DISPLACEMENT: "enable_mdl_displacement",
+            bindings.ConfigBoolKey.SELECTION_OUTLINE_ENABLED: "selection_outline_enabled",
+            bindings.ConfigBoolKey.ENABLE_GEOMETRY_STREAMING: "enable_geometry_streaming",
+            bindings.ConfigBoolKey.ENABLE_GEOMETRY_STREAMING_LOD: "enable_geometry_streaming_lod",
+            bindings.ConfigBoolKey.ENABLE_SPG: "enable_spg",
+            bindings.ConfigBoolKey.SUPPRESS_DEPRECATION_WARNINGS: "suppress_deprecation_warnings",
+            bindings.ConfigBoolKey.ENABLE_GLOBAL_CACHE_ROOT: "enable_global_cache_root",
+        }
+        string_fields = {
+            bindings.ConfigStringKey.LOG_FILE_PATH: "log_file_path",
+            bindings.ConfigStringKey.LOG_LEVEL: "log_level",
+            bindings.ConfigStringKey.ACTIVE_CUDA_GPUS: "active_cuda_gpus",
+            bindings.ConfigStringKey.DATASTORE_CACHE: "datastore_cache",
+            bindings.ConfigStringKey.CACHE_ROOT_PATH: "cache_root_path",
+            bindings.ConfigStringKey.SENSORS_ALLOWED_DEPRECATION_BASE: "sensors_allowed_deprecation_base",
+        }
+        int_fields = {
+            bindings.ConfigInt64Key.SELECTION_OUTLINE_WIDTH: ("selection_outline_width", int),
+            bindings.ConfigInt64Key.SELECTION_FILL_MODE: ("selection_fill_mode", bindings.SelectionFillMode),
+            bindings.ConfigInt64Key.MOTION_BVH: ("motion_bvh", bindings.MotionBvh),
+            bindings.ConfigInt64Key.TEXTURE_STREAMING_MODE: (
+                "texture_streaming_mode",
+                bindings.TextureStreamingMode,
+            ),
+            bindings.ConfigInt64Key.AFTERMATH_MODE: ("aftermath_mode", bindings.AftermathMode),
+            bindings.ConfigInt64Key._ATTACH_MODE: ("_attach_mode", bindings._AttachMode),
+        }
+
+        values: dict[str, Any] = {}
+        for i in range(config.entry_count):
+            entry = config.entries[i]
+            key_type = bindings.ConfigKeyType(entry.key_type.value)
+            if key_type == bindings.ConfigKeyType.BOOL:
+                try:
+                    field_name = bool_fields[bindings.ConfigBoolKey(entry.key.bool_key)]
+                except (KeyError, ValueError):
+                    continue
+                values[field_name] = bool(entry.value.bool_value)
+            elif key_type == bindings.ConfigKeyType.STRING:
+                try:
+                    field_name = string_fields[bindings.ConfigStringKey(entry.key.string_key)]
+                except (KeyError, ValueError):
+                    continue
+                string_value = entry.value.string_value
+                values[field_name] = ctypes.string_at(string_value.ptr, string_value.length).decode("utf-8")
+            elif key_type == bindings.ConfigKeyType.INT64:
+                try:
+                    field_name, converter = int_fields[bindings.ConfigInt64Key(entry.key.int64_key)]
+                except (KeyError, ValueError):
+                    continue
+                values[field_name] = converter(entry.value.int_value)
+        attach_mode = values.pop("_attach_mode", None)
+        result = RendererConfig(**values)
+        if attach_mode is not None:
+            result._attach_mode = attach_mode
+        return result
+
+    @staticmethod
     def _normalize_motion_bvh(value: bindings.MotionBvh | int | str) -> bindings.MotionBvh:
         if isinstance(value, bindings.MotionBvh):
             return value
@@ -2443,8 +2581,7 @@ class Renderer:
             except KeyError:
                 return bindings.AftermathMode(int(normalized))
         raise ValueError(
-            f"Invalid aftermath_mode value {value!r}; expected AftermathMode, int 0..2, "
-            "or disable, enable, or auto"
+            f"Invalid aftermath_mode value {value!r}; expected AftermathMode, int 0..2, " "or disable, enable, or auto"
         )
 
     @staticmethod
@@ -2496,40 +2633,23 @@ class Renderer:
             ValueError: If tensor has one component but shape does not match the
                        expected layout for the given semantic.
         """
-        # Layout-compatible rules mapping each semantic to (source_dtype code/bits, trailing_shape_dims, target_lanes).
-        _LAYOUT_RULES = {
-            bindings.Semantic.XFORM_MAT4x4: (
-                DLDataType(code=DLDataTypeCode.kDLFloat, bits=64, lanes=1),
-                (4, 4),
-                16,
-            ),
-        }
-
-        if (rule := _LAYOUT_RULES.get(semantic_constant)) is None:
+        if semantic_constant not in (bindings.Semantic.XFORM_MAT4x4, bindings.Semantic.MATRIX):
             return tensor  # No rules for NONE or unknown semantics
 
-        source_dtype, trailing_dims, target_lanes = rule
-        expected_ndim = 1 + len(trailing_dims)
-
-        # Pass-through: tensor already has the canonical multi-lane dtype (e.g. shape (N,) lanes=16).
-        if tensor.dtype.lanes == target_lanes:
-            return tensor
-
-        # Pass-through: Python shape-compatible input (lanes=1, shape (N, 4, 4)).
-        # The binding descriptor carries the lane-based C attribute type.
+        # Canonical multi-lane inputs are validated against the binding's attribute type.
         if tensor.dtype.lanes != 1:
             return tensor
 
-        if tensor.dtype.code.value != source_dtype.code.value or tensor.dtype.bits != source_dtype.bits:
+        if tensor.dtype.code.value != DLDataTypeCode.kDLFloat or tensor.dtype.bits != 64:
             return tensor  # Let _resolve_semantic_and_dtype catch the mismatch
 
-        if tensor.shape is not None and tensor.ndim == expected_ndim:
-            actual_trailing = tuple(tensor.shape[1 + i] for i in range(len(trailing_dims)))
-            if actual_trailing == trailing_dims:
+        matrix_sizes = (4,) if semantic_constant == bindings.Semantic.XFORM_MAT4x4 else (2, 3, 4)
+        if tensor.shape is not None and tensor.ndim == 3:
+            if tensor.shape[1] in matrix_sizes and tensor.shape[2] == tensor.shape[1]:
                 return tensor  # Keep the Python-provided tensor metadata.
 
         _shape_str = "unknown" if tensor.shape is None else str(tuple(tensor.shape[i] for i in range(tensor.ndim)))
-        _expected_shape = "(N, " + ", ".join(str(d) for d in trailing_dims) + ")"
+        _expected_shape = " or ".join(f"(N, {size}, {size})" for size in matrix_sizes)
         raise ValueError(
             f"write_attribute: tensor shape {_shape_str} does not match expected shape "
             f"{_expected_shape} for this semantic. Provide a tensor with the correct shape."
@@ -2543,7 +2663,15 @@ class Renderer:
     @staticmethod
     def _is_layout_compatible_semantic(semantic: int) -> bool:
         """Return True if the semantic allows layout-compatible tensor input (same code/bits, component count may differ)."""
-        return semantic == Semantic.XFORM_MAT4x4
+        return semantic in (Semantic.XFORM_MAT4x4, Semantic.MATRIX)
+
+    @staticmethod
+    def _matrix_component_count(tensor: DLTensor) -> int:
+        """Count scalar components per matrix across dtype lanes and trailing axes."""
+        trailing_components = (
+            math.prod(tensor.shape[i] for i in range(1, tensor.ndim)) if tensor.shape is not None else 1
+        )
+        return tensor.dtype.lanes * trailing_components
 
     @staticmethod
     def _strings_to_dltensor(strings: list[str]) -> DLTensor:
@@ -2601,7 +2729,13 @@ class Renderer:
             ValueError: If dtype is required but not provided,
                        or if provided dtype doesn't match semantic.
         """
-        if semantic == Semantic.XFORM_MAT4x4:
+        if semantic == Semantic.MATRIX:
+            lanes = dtype.lanes if dtype is not None and dtype.lanes != 1 else 16
+            if lanes not in (4, 9, 16):
+                raise ValueError(f"{context}: Semantic.MATRIX requires 4, 9, or 16 components")
+            inferred_dtype = DLDataType(code=DLDataTypeCode.kDLFloat, bits=64, lanes=lanes)
+            layout_compatible = True
+        elif semantic == Semantic.XFORM_MAT4x4:
             inferred_dtype = DLDataType(code=DLDataTypeCode.kDLFloat, bits=64, lanes=16)
             layout_compatible = True  # Python accepts shape-compatible input, e.g. lanes=1 with shape (N,4,4).
         elif semantic in (Semantic.TOKEN_STRING, Semantic.PATH_STRING):
@@ -2621,7 +2755,7 @@ class Renderer:
                             f"components={dtype.lanes}) must match scalar type for {semantic!r} "
                             f"(code={inferred_dtype.code}, bits={inferred_dtype.bits}); "
                             f"component count may differ for layout-compatible input "
-                            f"(e.g. shape (N, 4, 4) with 1 component)."
+                            f"(e.g. a square matrix shape with 1 component)."
                         )
                 else:
                     if not (code_bits_ok and dtype.lanes == inferred_dtype.lanes):
@@ -2734,10 +2868,12 @@ class Renderer:
     ) -> DLTensor:
         """Create reshaped DLTensor view for interop-friendly consumption.
 
-        When ``element_shape`` is provided (new dtype/shape API path), reshapes
-        ``(N,)`` with ``K`` components to ``(N, *element_shape)`` with a scalar element.
+        When ``element_shape`` is provided, exposes the known components as
+        ``(N, *element_shape)`` with scalar lanes. This also preserves explicit
+        element views when the native map already has scalar component axes.
         When ``element_shape`` is None, applies semantic-specific reshaping
-        (XFORM_MAT4x4 reshapes to ``(N, 4, 4)``).
+        (MATRIX reshapes to ``(N, S, S)`` for S=2, 3, or 4;
+        XFORM_MAT4x4 reshapes to ``(N, 4, 4)``).
 
         Args:
             original_dl_tensor: Original DLTensor from C API.
@@ -2753,12 +2889,27 @@ class Renderer:
 
         N = original_dl_tensor.shape[0]
         lanes = original_dl_tensor.dtype.lanes
+        # Native maps already expose scalar component axes. Preserve explicit
+        # caller-requested element views using that width, as for lane inputs.
+        components = lanes
+        for axis in range(1, original_dl_tensor.ndim):
+            components *= int(original_dl_tensor.shape[axis])
 
-        if element_shape is not None and lanes > 1:
+        if element_shape is not None:
+            if math.prod(element_shape) != components:
+                raise ValueError("requested element shape does not match mapped component count")
             new_dims = (N, *element_shape)
-        elif semantic == bindings.Semantic.XFORM_MAT4x4 and lanes == 16:
+        elif semantic == bindings.Semantic.MATRIX and components in (4, 9, 16):
+            matrix_size = math.isqrt(components)
+            new_dims = (N, matrix_size, matrix_size)
+        elif semantic == bindings.Semantic.XFORM_MAT4x4 and components == 16:
             new_dims = (N, 4, 4)
         else:
+            return original_dl_tensor
+
+        if lanes == 1 and tuple(
+            original_dl_tensor.shape[i] for i in range(original_dl_tensor.ndim)
+        ) == new_dims:
             return original_dl_tensor
 
         ndim = len(new_dims)
@@ -3068,8 +3219,7 @@ class Renderer:
         cuda_event: Optional[int] = None,
     ) -> Operation[bool]:
         """Internal: Write attribute data (shared implementation for scalar and array)."""
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         if not prim_paths or not all(p and p.strip() for p in prim_paths):
             raise ValueError(f"all prim_paths must not be empty, got: {prim_paths}")
@@ -3105,17 +3255,22 @@ class Renderer:
                 tensors = [self._normalize_tensor_for_write(semantic, lease.tensor) for lease in leases]
 
             tensor_dtype = tensors[0].dtype
+            if semantic == Semantic.MATRIX:
+                tensor_dtype = DLDataType(
+                    code=tensor_dtype.code, bits=tensor_dtype.bits, lanes=self._matrix_component_count(tensors[0])
+                )
             for i, t in enumerate(tensors[1:], start=1):
+                components = self._matrix_component_count(t) if semantic == Semantic.MATRIX else t.dtype.lanes
                 if (
                     t.dtype.code.value != tensor_dtype.code.value
                     or t.dtype.bits != tensor_dtype.bits
-                    or t.dtype.lanes != tensor_dtype.lanes
+                    or components != tensor_dtype.lanes
                 ):
                     raise ValueError(
                         f"All tensors must have the same element type. "
                         f"tensors[0] has (code={tensor_dtype.code.value}, bits={tensor_dtype.bits}, "
                         f"components={tensor_dtype.lanes}), but tensors[{i}] has "
-                        f"(code={t.dtype.code.value}, bits={t.dtype.bits}, components={t.dtype.lanes})"
+                        f"(code={t.dtype.code.value}, bits={t.dtype.bits}, components={components})"
                     )
 
             resolved_semantic, semantic_dtype = self._resolve_semantic_and_dtype(
@@ -3247,8 +3402,7 @@ class Renderer:
         Raises:
             RuntimeError: If renderer is invalid or write fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         if not tensors:
             raise ValueError("tensors list cannot be empty")
@@ -3271,6 +3425,15 @@ class Renderer:
         else:
             leases = [_from_dlpack(tensor, stream=cuda_stream) for tensor in tensors]
             tensors = [self._normalize_tensor_for_write(binding.semantic, lease.tensor) for lease in leases]
+
+        if binding.semantic == Semantic.MATRIX:
+            for i, tensor in enumerate(tensors):
+                components = self._matrix_component_count(tensor)
+                if components != binding.dtype.lanes:
+                    raise ValueError(
+                        f"tensors[{i}]: matrix has {components} components, "
+                        f"but the binding requires {binding.dtype.lanes} components per matrix"
+                    )
 
         first_dtype = tensors[0].dtype
         for i, t in enumerate(tensors[1:], start=1):
@@ -3375,7 +3538,9 @@ class Renderer:
                 Ignored for string types and ``DLDataType``.
             semantic: Optional attribute semantic (e.g.,
                 ``Semantic.XFORM_MAT4x4``). Alternative to ``dtype``/``shape``
-                for specifying the attribute type.
+                for specifying the attribute type. ``Semantic.MATRIX`` defaults
+                to 4x4; pass a float64 ``DLDataType`` with 4, 9, or 16 lanes
+                for a 2x2, 3x3, or 4x4 matrix respectively.
             prim_mode: Prim binding mode (e.g., ``PrimMode.EXISTING_ONLY``).
             flags: Binding optimization hint. ``BindingFlag.OPTIMIZE`` tells
                 the runtime to optimize for frequent high-volume writes through
@@ -3530,8 +3695,7 @@ class Renderer:
         is_array: bool,
     ) -> Operation[AttributeBinding]:
         """Internal: Create attribute binding (shared implementation for scalar and array)."""
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         _ALL_BINDING_FLAGS = BindingFlag.OPTIMIZE
         if int(flags) & ~int(_ALL_BINDING_FLAGS):
@@ -3618,8 +3782,7 @@ class Renderer:
         Raises:
             RuntimeError: If renderer is invalid or destruction fails
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         # Call C API
         result = self._bindings.destroy_attribute_binding(
@@ -3715,8 +3878,7 @@ class Renderer:
                 np.from_dlpack(mapping)[:] = new_points
             ```
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         element_shape: Optional[tuple] = None
 
@@ -3821,8 +3983,7 @@ class Renderer:
             mapping.unmap()
             ```
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         mapping_desc = bindings.ovrtx_mapping_desc_t(device_type=device, device_id=device_id)
 
@@ -3924,8 +4085,7 @@ class Renderer:
         Raises:
             RuntimeError: If renderer is invalid or C call fails.
         """
-        if self._handle is None:
-            raise RuntimeError("Renderer is not valid")
+        self._require_usable()
 
         sync = cuda_sync or bindings.ovrtx_cuda_sync_t()
 
@@ -3956,5 +4116,11 @@ class Renderer:
 
     @property
     def config(self) -> RendererConfig:
-        """Get the configuration used to create this renderer."""
-        return self._config
+        """Get a copy of the configuration used to create this renderer."""
+        if self._handle is None:
+            raise RuntimeError("Renderer is not valid")
+        result, native_config = self._bindings.get_config(self._handle)
+        if result.status != bindings.OVRTX_API_SUCCESS:
+            error_msg = self._bindings.get_last_error() or "Unknown error"
+            raise RuntimeError(f"Failed to read renderer config: {error_msg}")
+        return self._from_c_config(native_config)

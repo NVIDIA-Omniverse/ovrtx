@@ -123,7 +123,7 @@ Set a process-global callback to receive log messages, with severity filtering a
 
 > **Source:** `tests/docs/c/test_logging.cpp` snippet `doc-log-callback-prefix-filter-c`
 
-Log severity levels follow carb's numeric ordering: `OVRTX_LOG_INFO` (-1), `OVRTX_LOG_WARNING` (0), `OVRTX_LOG_ERROR` (1), `OVRTX_LOG_FATAL` (2); the unexposed verbose level is -2. The callback is process-global: its lifetime is `ovrtx_initialize` to `ovrtx_shutdown`, so it observes messages emitted before the first renderer is created and after the last one is destroyed (e.g. plugin-load and asset-eviction messages). The callback may be invoked from any thread but invocations are serialized for the process. Message strings are only valid during the callback.
+Log severity levels follow carb's numeric ordering: `OVX_LOG_VERBOSE` (-2), `OVX_LOG_INFO` (-1), `OVX_LOG_WARNING` (0), `OVX_LOG_ERROR` (1), `OVX_LOG_FATAL` (2). The callback is process-global: its lifetime is `ovrtx_initialize` to `ovrtx_shutdown`, so it observes messages emitted before the first renderer is created and after the last one is destroyed (e.g. plugin-load and asset-eviction messages). The callback may be invoked from any thread.  Message strings are only valid during the callback.  Note that if multiple OV libraries are used in an app, multiple logging callbacks may be registered, one from each OV library.  In this case, it is the host app's responsibility to ensure that the callback's access to the host app's logging system is thread-safe.
 
 #### channel_filter syntax
 

@@ -217,3 +217,28 @@ See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and 
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+## gaussian-splats example
+
+> **Source:** `examples/python/gaussian-splats/main.py` snippet `gaussian-render-python`
+
+## usd-plugin-paths example
+
+> **Source:** `examples/python/usd-plugin-paths/main.py` snippet `plugin-paths-external-python`
+>
+> **Source:** `examples/python/usd-plugin-paths/main.py` snippet `plugin-paths-verify-python`
+>
+> **Source:** `examples/python/usd-plugin-paths/main.py` snippet `plugin-paths-register-python`
+>
+> **Source:** `examples/python/usd-plugin-paths/test_example.py` snippet `plugin-paths-first-root-wins-python`
+>
+> Enumeration and registration share the first selected root. The test uses two
+> existing schema roots in fresh processes, checks both initial call orders, and
+> verifies that requesting the other root warns while retaining the first paths.
+>
+> **Source:** `examples/c/usd-plugin-paths/main.cpp` snippet `plugin-paths-validate-c`
+>
+> The external example uses an explicitly applied physical-lighting schema and
+> checks its provider and unauthored fallback. The C example validates descriptor
+> files before publishing paths. Descriptor presence alone does not prove a USD
+> consumer loaded the schema.

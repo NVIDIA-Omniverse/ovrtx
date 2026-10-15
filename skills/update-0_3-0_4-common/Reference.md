@@ -60,8 +60,10 @@ Attached rendering consumes committed ovstage state at an application-owned ordi
 Rules of thumb:
 
 - Keep application ordinals monotonically increasing for frames that commit new scene state.
+- For current ovstage data-plane mutations, clearing the write floor is only part of admission. The `STRICTLY_INCREASING` policy also rejects ordinals older than or equal to retained committed changes on affected cells and prim lifecycle. Disjoint cells may share an ordinal; customizing a cloned cell requires a newer ordinal than the clone, even before sealing.
+- `NONDECREASING` permits equality with retained changes while rejecting older ordinals; `FLOOR_ONLY` skips retained-history admission and the additional prim-lifecycle check. Every policy still enforces the operation's write floors and preserves type and create-only checks. See the [admission-policy summary](../../docs/core/ovstage_integration.rst#ordinals-and-write-floor-gates) and consult the installed ovstage version's documentation for its supported configuration settings.
 - Do not render an ordinal above the current ovstage write floor.
-- Wait for population/write-floor work to complete before rendering the committed ordinal.
+- Wait for each population or data-plane mutation to complete successfully, then advance and wait for the write floor before rendering the committed ordinal. Enqueue acceptance alone does not establish successful admission or publication.
 - For frame loops that mutate the stage every frame, fence the previous render step before publishing writes for the next ordinal if the language/API exposes asynchronous render operations.
 
 ## Async Boundaries

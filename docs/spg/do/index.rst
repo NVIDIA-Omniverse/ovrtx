@@ -93,6 +93,8 @@ Reach Beyond an AOV
      - Consume a lidar or radar point cloud in a node.
    * - :doc:`raygen`
      - Have a node render the scene itself rather than transform an AOV.
+   * - :doc:`scene_queries`
+     - Read a camera's transform and lens values, or any prim's attributes, inside the launch script.
 
 Slang Specifics
 ---------------
@@ -126,4 +128,5 @@ Slang Specifics
    runtime_changes
    composites
    raygen
+   scene_queries
    descriptor_sets

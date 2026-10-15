@@ -18,13 +18,13 @@ _DEPRECATION_DEPTH = contextvars.ContextVar("ovrtx_deprecation_depth", default=0
 
 def _deprecation_warnings_suppressed(owner) -> bool:
     """Return whether the owner or its renderer suppresses deprecation warnings."""
-    config = getattr(owner, "_config", None)
-    if config is None:
+    suppress_warnings = getattr(owner, "_suppress_deprecation_warnings", None)
+    if suppress_warnings is None:
         renderer = getattr(owner, "_renderer", None)
         if isinstance(renderer, weakref.ReferenceType):
             renderer = renderer()
-        config = getattr(renderer, "_config", None)
-    return bool(getattr(config, "suppress_deprecation_warnings", False))
+        suppress_warnings = getattr(renderer, "_suppress_deprecation_warnings", False)
+    return bool(suppress_warnings)
 
 
 def deprecated(replacement: str):

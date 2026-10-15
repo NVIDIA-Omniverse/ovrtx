@@ -44,6 +44,421 @@ def Xform "World"
         prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Environments/Simple_Warehouse/warehouse.usd@
     )
     {
+        # Floors: an independent fourth coverage mask in alpha.
+        over "SM_FloorDecal_Keepclear6_446" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_RecRed1X15" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_RecRed1X16" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m74" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m75" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m76" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m77" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m78" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m79" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m80" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_FloorDecal_StripeFull_4m81" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor27" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor29" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor32" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor33" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor34" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor35" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor36" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor37" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor39" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor44" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor47" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor49" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor51" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor53" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor54" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor55" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor56" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor57" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor58" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor59" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor60" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor62" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor63" {
+            int primvars:multimatte_id = 11
+        }
+        over "SM_floor61" {
+            int primvars:multimatte_id = 11
+        }
+        # Walls: shared matte IDs distinguish these surfaces in PT masks.
+        over "SM_WallA_3M13" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M14" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M16" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M18_460" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M19" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M20" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M21_1371" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M26" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M27" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M28" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M36" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M37" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M38" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M39" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M40" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M41" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M43" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M44" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M8" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M10" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M11" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M15" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M16" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M17" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M18" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M4" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M5" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M6" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M7" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner10" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner11" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner12" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner13" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner14" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner16" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner18" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner24" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner25" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner26" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner27" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner28" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner29" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner30" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner32" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner33" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner34" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner35" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner9_88" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_6M12" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M15" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_InnerCorner15" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M43_01" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M13_01" {
+            int primvars:multimatte_id = 8
+        }
+        over "SM_WallA_3M14_01" {
+            int primvars:multimatte_id = 8
+        }
+        # Shelf frames and decks: shared matte IDs distinguish these surfaces in PT masks.
+        over "SM_RackFrame_159" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_160" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_161" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_162" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_163" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_164" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_165" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_166" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_167" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackFrame_168" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_156" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_157" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_158" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_159" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_160" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_161" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_162" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_163" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_164" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_165" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_166" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_167" {
+            int primvars:multimatte_id = 9
+        }
+        over "SM_RackShelf_170" {
+            int primvars:multimatte_id = 9
+        }
+        # Pallets: shared matte IDs distinguish these surfaces in PT masks.
+        over "SM_PaletteA_11" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_12" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_151" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_161" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_270" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_307" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_308" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_309" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_314" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_315" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_316" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_318" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_319" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_357" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_358" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_359" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_465" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_466" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_470" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_5" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_6" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_76" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_77" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_78" {
+            int primvars:multimatte_id = 10
+        }
+        over "SM_PaletteA_360" {
+            int primvars:multimatte_id = 10
+        }
     }
 
     def "GR1T2_fourier_hand_6dof" (
@@ -193,10 +608,8 @@ def "Render" (
                 token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
                 token omni:rtx:background:source:type = "domeLight"
                 bool omni:rtx:debug:view:pixelDebug:enableFixedTextPos = 1
-                token omni:rtx:directLighting:sampledLighting:denoisingTechnique = "None"
                 bool omni:rtx:dlss:frameGeneration = 1
                 float3 omni:rtx:domeLight:rotationAxis = (0, 1, 0)
-                bool omni:rtx:indirectDiffuse:denoiser:enabled = 0
                 bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
                 bool omni:rtx:post:registeredCompositing:invertToneMap = 1
                 bool omni:rtx:pt:adaptiveSampling:filterError = 0

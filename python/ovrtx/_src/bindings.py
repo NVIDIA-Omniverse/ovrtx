@@ -9,6 +9,7 @@
 import ctypes
 import os
 import sys
+from dataclasses import dataclass
 from enum import IntEnum, IntFlag
 from pathlib import Path
 from typing import Any, Iterable, List, Optional
@@ -68,12 +69,100 @@ class ovx_string_t(ctypes.Structure):
         return int(self.length)
 
     def __str__(self) -> str:
-        """Convert to Python string. Treats string as null-terminated."""
-        return ctypes.string_at(self.ptr).decode("utf-8", errors="replace") if self.ptr is not None else ""
+        """Convert the length-prefixed UTF-8 view to a Python string."""
+        return ctypes.string_at(self.ptr, self.length).decode("utf-8", errors="replace") if self.ptr is not None else ""
 
     def __repr__(self):
         value_repr = repr(str(self)) if self.ptr is not None else "None"
         return f"ovx_string_t({value_repr}, ptr={self.ptr}, length={self.length})"
+
+
+@dataclass(frozen=True)
+class BuildInfo:
+    """Complete build identity embedded in the loaded OVRTX loader library.
+
+    Future versions may append fields while preserving the meaning and order
+    of existing fields. Use :attr:`Renderer.version` for the semantic version.
+    """
+
+    struct_size: int
+    build_number: int
+    build_string: str
+    git_branch: str
+    git_hash: str
+    build_location: str
+
+
+class _ovrtx_build_info_header_t(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", ctypes.c_uint32),
+    ]
+
+
+class _ovrtx_build_info_t(ctypes.Structure):
+    _fields_ = [
+        ("struct_size", ctypes.c_uint32),
+        ("build_number", ctypes.c_uint32),
+        ("build_string", ovx_string_t),
+        ("git_branch", ovx_string_t),
+        ("git_hash", ovx_string_t),
+        ("build_location", ovx_string_t),
+    ]
+
+
+def _read_version(lib: ctypes.CDLL) -> tuple[int, int, int]:
+    """Read the semantic version through the loader's established pre-init API."""
+    lib.ovrtx_get_version.argtypes = [
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.POINTER(ctypes.c_uint32),
+    ]
+    lib.ovrtx_get_version.restype = None
+    major, minor, patch = ctypes.c_uint32(), ctypes.c_uint32(), ctypes.c_uint32()
+    lib.ovrtx_get_version(ctypes.byref(major), ctypes.byref(minor), ctypes.byref(patch))
+    return major.value, minor.value, patch.value
+
+
+def _read_build_info(lib: ctypes.CDLL) -> BuildInfo:
+    lib.ovrtx_get_build_info.argtypes = []
+    lib.ovrtx_get_build_info.restype = ctypes.POINTER(_ovrtx_build_info_t)
+    info_ptr = lib.ovrtx_get_build_info()
+    if not info_ptr:
+        raise RuntimeError("ovrtx_get_build_info returned null")
+    info_header = ctypes.cast(info_ptr, ctypes.POINTER(_ovrtx_build_info_header_t)).contents
+    expected_size = ctypes.sizeof(_ovrtx_build_info_t)
+    if info_header.struct_size < expected_size:
+        raise RuntimeError(
+            f"ovrtx_get_build_info returned struct_size={info_header.struct_size}, smaller than the required {expected_size}"
+        )
+    info = info_ptr.contents
+
+    def decode(name: str, value: ovx_string_t) -> str:
+        if value.ptr is None:
+            if value.length:
+                raise RuntimeError(f"ovrtx_get_build_info returned null {name} with non-zero length {value.length}")
+            return ""
+        return ctypes.string_at(value.ptr, value.length).decode("utf-8")
+
+    return BuildInfo(
+        struct_size=info.struct_size,
+        build_number=info.build_number,
+        build_string=decode("build_string", info.build_string),
+        git_branch=decode("git_branch", info.git_branch),
+        git_hash=decode("git_hash", info.git_hash),
+        build_location=decode("build_location", info.build_location),
+    )
+
+
+def _validate_build_info_version(build_info: BuildInfo, version: tuple[int, int, int]) -> None:
+    """Confirm the canonical build string agrees with ``ovrtx_get_version()``."""
+    runtime_version = ".".join(str(component) for component in version)
+    embedded_version = build_info.build_string.partition("+")[0]
+    if embedded_version != runtime_version:
+        raise RuntimeError(
+            f"ovrtx build identity mismatch: API reports {runtime_version} "
+            f"but the embedded build string reports {embedded_version}"
+        )
 
 
 # ovrtx_config_key_type_t
@@ -102,6 +191,13 @@ class ConfigBoolKey(IntEnum):
     ENABLE_GEOMETRY_STREAMING_LOD = 7
     ENABLE_SPG = 8
     SUPPRESS_DEPRECATION_WARNINGS = 9
+    ENABLE_MINIMAL = 10
+    ENABLE_REALTIMEPATHTRACING = 11
+    ENABLE_PATHTRACING = 12
+    ENABLE_MDL_DISPLACEMENT = 13
+    ENABLE_SPECTRAL_RENDERING = 14
+    ENABLE_CRASH_REPORTER = 15
+    ENABLE_GLOBAL_CACHE_ROOT = 16
 
 
 # ovrtx_config_string_t
@@ -116,6 +212,7 @@ class ConfigStringKey(IntEnum):
     ACTIVE_CUDA_GPUS = 3
     DATASTORE_CACHE = 4
     SENSORS_ALLOWED_DEPRECATION_BASE = 5
+    CACHE_ROOT_PATH = 6
 
 
 # ovrtx_config_int64_t
@@ -462,6 +559,8 @@ class ovrtx_render_product_set_t(ctypes.Structure):
 # Pick query / pick-hit (multi-tensor render variable ``ovrtx_pick_hit``)
 OVRTX_RENDER_VAR_PICK_HIT = "ovrtx_pick_hit"
 OVRTX_PICK_FLAG_GIZMO = 1 << 0
+# Request tracked metadata for the first hit of a one-pixel-equivalent pick. Without this flag, or for a
+# multi-pixel pick, objectType, geometryInstanceId, worldPositionM, and worldNormal are zero-filled.
 OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO = 1 << 1
 # Schema-identity / schema-version handshake. Surfaced as ``uint32`` params named
 # ``magic`` and ``version`` on the mapped render variable; consumers must validate
@@ -726,6 +825,7 @@ class Semantic(IntEnum):
     TOKEN_ID = 6  # Raw token ID (kDLUInt, 64, 1). Resolve via path dictionary.
     PATH_ID = 7  # Raw path ID (kDLUInt, 64, 1). Resolve via path dictionary.
     TAG = 8  # Name-only attribute with no value or storage. Do not read data.
+    MATRIX = 9  # Generic matrix attribute; unlike XFORM_MAT4x4, no transform conversion.
 
 
 class ovrtx_attribute_semantic_t(ctypes.c_int):
@@ -1156,9 +1256,10 @@ class Bindings:
         valid until the next API call on the same thread.
     """
 
-    def __init__(self, lib: ctypes.CDLL, lib_version: tuple):
+    def __init__(self, lib: ctypes.CDLL, lib_version: tuple, build_info: BuildInfo):
         self._lib: ctypes.CDLL = lib
         self._lib_version: tuple = lib_version
+        self._build_info = build_info
 
     @property
     def library_path(self) -> Path:
@@ -1169,6 +1270,11 @@ class Bindings:
     def version(self) -> tuple:
         """Runtime library version as a (major, minor, patch) tuple."""
         return self._lib_version
+
+    @property
+    def build_info(self) -> BuildInfo:
+        """Complete build identity embedded in the OVRTX loader library."""
+        return self._build_info
 
     def create_renderer(self, config: ovrtx_config_t) -> tuple[ovrtx_result_t, Any]:
         """Create a new renderer instance.
@@ -1194,6 +1300,12 @@ class Bindings:
             Result with status.
         """
         return self._lib.ovrtx_destroy_renderer(renderer_handle)
+
+    def get_config(self, renderer_handle: Any) -> tuple[ovrtx_result_t, ovrtx_config_t]:
+        """Return the native config snapshot owned by a renderer."""
+        config = ovrtx_config_t([])
+        result = self._lib.ovrtx_get_config(renderer_handle, ctypes.byref(config))
+        return result, config
 
     def attach_ovstage(self, renderer_handle: Any, stage_handle: ovstage_instance_p) -> ovrtx_result_t:
         """Attach an externally owned ovstage instance to a renderer.
@@ -1422,11 +1534,13 @@ class Bindings:
             delta_time: Time step for simulation.
 
         Returns:
-            Tuple of (enqueue_result, step_result_handle). Handle is None if step failed.
+            Tuple of (enqueue_result, step_result_handle). A synchronous execution
+            failure can still allocate a handle, which the caller must destroy.
+            Handle is None only when no result was allocated.
         """
         step_result_handle = ovrtx_step_result_handle_t()
         result = self._lib.ovrtx_step(renderer_handle, render_product_set, delta_time, ctypes.byref(step_result_handle))
-        handle = step_result_handle if result.status == OVRTX_API_SUCCESS else None
+        handle = step_result_handle if step_result_handle.value else None
         return result, handle
 
     def step_with_stage(
@@ -1453,8 +1567,9 @@ class Bindings:
             ordinal: Minimum committed ovstage publication required by the step.
 
         Returns:
-            Tuple of (enqueue_result, step_result_handle). Handle is None if the
-            step failed to enqueue.
+            Tuple of (enqueue_result, step_result_handle). A synchronous execution
+            failure can still allocate a handle, which the caller must destroy.
+            Handle is None only when no result was allocated.
         """
         step_result_handle = ovrtx_step_result_handle_t()
         result = self._lib.ovrtx_step_with_stage(
@@ -1464,7 +1579,7 @@ class Bindings:
             ovstage_ordinal_t(ordinal),
             ctypes.byref(step_result_handle),
         )
-        handle = step_result_handle if result.status == OVRTX_API_SUCCESS else None
+        handle = step_result_handle if step_result_handle.value else None
         return result, handle
 
     def enqueue_pick_query(self, renderer_handle: Any, desc: ovrtx_pick_query_desc_t) -> ovrtx_enqueue_result_t:
@@ -1918,11 +2033,14 @@ class _LibraryLoader:
     def __init__(self):
         self._lib: Optional[ctypes.CDLL] = None
         self._lib_version: Optional[tuple] = None
+        self._lib_build_info: Optional[BuildInfo] = None
+        self._process_cleanup_started: bool = False
         self._lib_search_paths: List[Path] = _resolve_existing_dirs(ovrtx_loader_candidate_dirs())
         self._dll_dir_cookies: List[object] = []
 
     def _cleanup(self):
         """Cleanup function called at interpreter exit."""
+        self._process_cleanup_started = True
         if self._lib is not None:
             try:
                 # Close the DLPack bridge before Python finalization. Late
@@ -1947,6 +2065,8 @@ class _LibraryLoader:
                 print(f"Warning: Exception during ovrtx library cleanup: {e}", file=sys.stderr)
             finally:
                 self._lib = None
+                self._lib_version = None
+                self._lib_build_info = None
 
     def create_bindings(self, config: ovrtx_config_t) -> Bindings:
         """Get bindings wrapper, loading library lazily on first access.
@@ -1966,21 +2086,16 @@ class _LibraryLoader:
                 library_path_hint = [Path(OVRTX_LIBRARY_PATH_HINT)] if OVRTX_LIBRARY_PATH_HINT else None
                 lib = self._load_library(library_path_hint)
 
-                # Version check: call ovrtx_get_version() before anything else (it works pre-initialize)
-                lib.ovrtx_get_version.argtypes = [
-                    ctypes.POINTER(ctypes.c_uint32),
-                    ctypes.POINTER(ctypes.c_uint32),
-                    ctypes.POINTER(ctypes.c_uint32),
-                ]
-                lib.ovrtx_get_version.restype = None
-                major, minor, patch = ctypes.c_uint32(), ctypes.c_uint32(), ctypes.c_uint32()
-                lib.ovrtx_get_version(ctypes.byref(major), ctypes.byref(minor), ctypes.byref(patch))
-                self._lib_version = (major.value, minor.value, patch.value)
+                # Version check: call ovrtx_get_version() before anything else (it works pre-initialize).
+                self._lib_version = _read_version(lib)
+                self._lib_build_info = _read_build_info(lib)
+                _validate_build_info_version(self._lib_build_info, self._lib_version)
 
                 from .. import __version__ as ovrtx_version
 
-                lib_ver_str = f"{major.value}.{minor.value}.{patch.value}"
-                expected_prefix = f"{major.value}.{minor.value}."
+                major, minor, patch = self._lib_version
+                lib_ver_str = f"{major}.{minor}.{patch}"
+                expected_prefix = f"{major}.{minor}."
                 if not ovrtx_version.startswith(expected_prefix):
                     raise RuntimeError(
                         f"ovrtx version mismatch: Python bindings are {ovrtx_version} "
@@ -2006,6 +2121,12 @@ class _LibraryLoader:
                     ctypes.POINTER(ctypes.POINTER(ovrtx_renderer_t)),
                 ]
                 lib.ovrtx_create_renderer.restype = ovrtx_result_t
+
+                lib.ovrtx_get_config.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ctypes.POINTER(ovrtx_config_t),
+                ]
+                lib.ovrtx_get_config.restype = ovrtx_result_t
 
                 lib.ovrtx_destroy_renderer.argtypes = [ctypes.POINTER(ovrtx_renderer_t)]
                 lib.ovrtx_destroy_renderer.restype = ovrtx_result_t
@@ -2312,15 +2433,18 @@ class _LibraryLoader:
                         self._lib.ovrtx_shutdown()
                     except Exception:
                         pass
-                    finally:
-                        self._lib = None
+                self._lib = None
+                self._lib_version = None
+                self._lib_build_info = None
                 if isinstance(exc, AttributeError):
                     raise RuntimeError(
                         f"Function not found in {lib._name}. Binary version may not match Python bindings."
                     ) from exc
                 raise
 
-        return Bindings(self._lib, self._lib_version)
+        if self._lib is None or self._lib_version is None or self._lib_build_info is None:
+            raise RuntimeError("ovrtx library failed to initialize")
+        return Bindings(self._lib, self._lib_version, self._lib_build_info)
 
     def _add_dll_directories(self, lib_dir: Path) -> None:
         """Register package DLL directories for Windows dependency resolution."""
@@ -2394,10 +2518,29 @@ class _LibraryLoader:
             error_msg = str(error) if error.ptr else "Unknown error"
             raise RuntimeError(f"Failed to register ovrtx USD schema/plugin paths: {error_msg}")
 
+    def get_build_info(self) -> BuildInfo:
+        """Read build identity from the initialized OVRTX loader library."""
+        if self._lib_build_info is not None:
+            return self._lib_build_info
+        if self._lib is None:
+            raise RuntimeError("ovrtx.get_build_info() requires an initialized Renderer")
+
+        lib = self._lib
+        if self._lib_version is None:
+            self._lib_version = _read_version(lib)
+        self._lib_build_info = _read_build_info(lib)
+        _validate_build_info_version(self._lib_build_info, self._lib_version)
+        return self._lib_build_info
+
     @property
     def is_loaded(self) -> bool:
         """Check if library is already loaded."""
         return self._lib is not None
+
+    @property
+    def is_process_cleanup_started(self) -> bool:
+        """Check if interpreter-exit cleanup has started."""
+        return self._process_cleanup_started
 
 
 _ovrtx_loader = _LibraryLoader()
@@ -2406,3 +2549,13 @@ _ovrtx_loader = _LibraryLoader()
 def ovrtx_loaded_bin_dir() -> Optional[Path]:
     """Return the directory containing the OVRTX loader selected for this process."""
     return Path(_ovrtx_loader._lib._name).resolve().parent if _ovrtx_loader._lib is not None else None
+
+
+def get_build_info() -> BuildInfo:
+    """Read build identity from the initialized OVRTX loader library.
+
+    Create a :class:`ovrtx.Renderer` before calling this function. Use the C
+    ``ovrtx_get_build_info()`` API when build identity is required before OVRTX
+    initialization.
+    """
+    return _ovrtx_loader.get_build_info()

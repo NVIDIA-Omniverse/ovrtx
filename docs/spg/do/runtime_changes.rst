@@ -33,9 +33,8 @@ advancing the write floor, then step:
 How It Works
 ------------
 
-``inputs:X`` **is the name that binds.** A value-input authored with the older ``params:X`` spelling
-is also addressed as ``inputs:X``; ``params:X`` is not an addressable name. Refer to
-:doc:`../ref/usd`.
+``inputs:X`` **is the name that binds.** A value-input is written at runtime by its USD name,
+``inputs:X``. Refer to :doc:`../ref/usd`.
 
 **An unconnected input takes effect on the next step.** Nothing else has to be reset or reloaded.
 The blur example changes its radius this way and renders again:

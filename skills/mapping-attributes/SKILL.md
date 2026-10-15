@@ -117,7 +117,7 @@ Reuse the query across map/unmap cycles:
 | `mapping.fetch_next()` | `out_mapping.dl` (DLTensor) |
 | `mapping.unmap()` | `ovrtx_unmap_attribute(renderer, handle, sync)` |
 
-Tensor layout follows the lane-based attribute rules in the `writing-attributes` skill. DLPack consumers expose lane components as trailing dimensions, so a lane-16 matrix group can be reshaped to `(N, 4, 4)`.
+Read and map descriptors use scalar lanes: scalars `(N,)`, generic tuples `(N, C)`, and semantic square matrices `(N, S, S)` for S=2, 3, or 4. Per-prim array tensors use the same trailing axes. Strides count scalar elements. Attribute creation and canonical write inputs still use the lane-based rules in the `writing-attributes` skill.
 
 > **Source:** `tests/docs/python/test_attribute_shapes.py` snippets `doc-shape-scalar-int32`, `doc-shape-float3-array`, `doc-shape-mat4-array`.
 

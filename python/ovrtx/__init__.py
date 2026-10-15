@@ -8,6 +8,7 @@
 
 import logging as _logging
 import os as _os
+from pathlib import Path as _Path
 
 from ._src.bindings import (
     OVRTX_LIBRARY_PATH_HINT,
@@ -20,6 +21,7 @@ from ._src.bindings import (
     AttributeFilterMode,
     FilterKind,
     _ovrtx_loader,
+    get_build_info,
 )
 from ._src.schema_paths import register_schema_paths, usd_plugin_paths, usd_pluginpath_env_keys
 
@@ -53,6 +55,7 @@ from ._src.types import (
     AttributeInfo,
     AttributeMapping,
     BindingFlag,
+    BuildInfo,
     DataAccess,
     Device,
     EventStatus,
@@ -76,10 +79,25 @@ from ._src.types import (
     TextureStreamingMode,
 )
 
-__version__ = "0.5.1"
+# Packaged wheels contain an auto-generated _version.py whose version is the
+# exact distribution version. Source and editable checkouts have no such file,
+# so derive their identity from the same canonical VERSION.md as the native API.
+try:
+    from ._version import version as __version__
+except ModuleNotFoundError as _exc:
+    if _exc.name != f"{__name__}._version":
+        raise
+    _version_path = _Path(__file__).resolve().parents[2] / "VERSION.md"
+    try:
+        __version__ = _version_path.read_text(encoding="utf-8").strip()
+    except OSError as _version_error:
+        raise ImportError(
+            f"ovrtx package is missing both ovrtx._version and its fallback VERSION.md at {_version_path}"
+        ) from _version_error
 
 __all__ = [
     "__version__",
+    "get_build_info",
     # global config
     "OVRTX_LIBRARY_PATH_HINT",
     "OVRTX_RENDER_VAR_PICK_HIT",
@@ -108,6 +126,7 @@ __all__ = [
     "AftermathMode",
     "FilterKind",
     # dataclasses
+    "BuildInfo",
     "AttributeInfo",
     "OperationCounter",
     "OperationStatus",

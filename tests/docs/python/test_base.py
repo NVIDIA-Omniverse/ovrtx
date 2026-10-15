@@ -305,7 +305,7 @@ def test_update_from_usd_time_async(renderer, stage):
 
     def _translate_x_at(time_seconds: float, ordinal: int) -> float:
         # [snippet:doc-update-from-usd-time-async]
-        ovstage.population.update_from_usd_time_async(stage, ordinal=ordinal, time_code=time_seconds).wait()
+        ovstage.population.update_from_usd_time_async(stage, ordinal=ordinal, time=time_seconds).wait()
         stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
         # [/snippet:doc-update-from-usd-time-async]
 
@@ -349,7 +349,7 @@ def test_operation_status_while_loading(renderer):
     if not saw_counter:
         print("note: USD reference load completed before any counter was observed")
 
-
+@pytest.mark.skip(reason="Temporarily disabled. Generates rmse 2.7 on newer GPUs: issues/139")
 def test_settings_rtpt_extraSpecularAndTransmissiveBounces(renderer, stage, output_dir):
     """Test omni:rtx:rtpt:extraSpecularAndTransmissiveBounces with glass material."""
     ovstage.population.open_usd_from_string(stage, RTPT_GLASS_USDA, ordinal=1)

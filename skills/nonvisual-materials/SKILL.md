@@ -36,7 +36,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 - Target API surface: Python, C/C++, USD, or a combination.
 - Sensor modality: lidar, radar, acoustic, or mixed sensor workflow.
-- Material prim paths, desired base material, coating, attributes, prefix, and whether both supported prefixes must be authored.
+- Material prim paths and desired base material, coating, and attributes.
 - Geometry binding targets, existing visual materials, and any `MaterialId` debugging or pointcloud attribution needs.
 - Repository source snippets referenced below. Treat these snippets as the API source of truth.
 
@@ -49,9 +49,9 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 ## Instructions
 
-1. Identify the sensor modality, material prims, nonvisual base/coating/attribute labels, and prefix requirements.
+1. Identify the sensor modality, material prims, and nonvisual base/coating/attribute labels.
 2. Read the matching USD source snippet before writing material metadata.
-3. Preserve exact supported base material, coating, attribute, and prefix strings.
+3. Preserve exact supported base material, coating, and attribute strings.
 4. Keep visual material binding, nonvisual label authoring, and PointCloud `MaterialId` reading as separate steps unless the user asks for the full workflow.
 5. When changing code, run the narrow docs test or example that owns the snippet whenever practical.
 
@@ -84,7 +84,7 @@ Non-visual material labels let lidar, radar, and acoustic sensors map USD materi
 
 Author the labels on the `Material` prim that geometry binds with `rel material:binding`. The base material is required. Coating and attributes are optional; use `none` for unlabeled surfaces.
 
-The default runtime prefix is `omni:simready:nonvisual`. The alternate supported prefix is `inputs:nonvisual`, selected by `/rtx/materialDb/nonVisualMaterialSemantics/prefix`. Public examples may write both prefixes so scenes work with either setting.
+Use the Omniverse SimReady attributes: `omni:simready:nonvisual:base` and `omni:simready:nonvisual:coating` are tokens; `omni:simready:nonvisual:attributes` is a token array.
 
 ## Base Materials
 
@@ -132,7 +132,7 @@ Use behavior remapping settings only when a sensor model needs a non-default BSD
 ## Troubleshooting
 
 - Non-visual labels belong on the bound `Material`, not directly on the mesh.
-- Keep the runtime prefix and authored prefix aligned. If every object behaves like the same material, check `/rtx/materialDb/nonVisualMaterialSemantics/prefix`.
+- If every object behaves like the same material, check that the bound material authors the `omni:simready:nonvisual` attributes with the expected token and token-array types.
 - Preserve coating and attribute flags unless you intentionally want base-material-only behavior. `/app/sensors/nv/materials/preserveMaterialFlags=0xff` keeps all flags.
 - `paint` and `calibration_lambertian` can use visual diffuse color information only when the sensor modality requests reflectance information.
 - Material remapping settings are per modality, such as `/app/sensors/nv/lidar/matNameToIdMapOverrides` and `/app/sensors/nv/radar/matBehaviorToIdOverrides`.

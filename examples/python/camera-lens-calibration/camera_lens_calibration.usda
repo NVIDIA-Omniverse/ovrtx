@@ -1,0 +1,108 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    subLayers = [
+        @../semantic-segmentation/ovrtx-robot-lineup.usda@
+    ]
+)
+
+over "World"
+{
+    # Intrinsics and radial-tangential coefficients from the Kalibr camera
+    # chain example: https://github.com/ethz-asl/kalibr/wiki/yaml-formats
+    over "Camera" (
+        prepend apiSchemas = ["OmniLensDistortionOpenCvPinholeAPI"]
+    )
+    {
+        token omni:lensdistortion:model = "opencvPinhole"
+        int2 omni:lensdistortion:opencvPinhole:imageSize = (752, 480)
+        float omni:lensdistortion:opencvPinhole:fx = 461.629
+        float omni:lensdistortion:opencvPinhole:fy = 460.152
+        float omni:lensdistortion:opencvPinhole:cx = 362.680
+        float omni:lensdistortion:opencvPinhole:cy = 246.049
+        float omni:lensdistortion:opencvPinhole:k1 = -0.27695497
+        float omni:lensdistortion:opencvPinhole:k2 = 0.06712482
+        float omni:lensdistortion:opencvPinhole:p1 = 0.00087538
+        float omni:lensdistortion:opencvPinhole:p2 = 0.00011556
+        double3 xformOp:translate = (-6.747290447338486, -0.5, 1.0727920064412346)
+    }
+
+    # Equidistant coefficients from the KumarRobotics multicamera calibration
+    # example: https://github.com/KumarRobotics/multicam_calibration
+    def Camera "FisheyeCamera" (
+        prepend apiSchemas = ["OmniLensDistortionOpenCvFisheyeAPI"]
+    )
+    {
+        float2 clippingRange = (1, 10000000)
+        float exposure:fStop = 5
+        float exposure:iso = 100
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        token omni:lensdistortion:model = "opencvFisheye"
+        int2 omni:lensdistortion:opencvFisheye:imageSize = (1280, 1024)
+        float omni:lensdistortion:opencvFisheye:fx = 605.054
+        float omni:lensdistortion:opencvFisheye:fy = 604.66
+        float omni:lensdistortion:opencvFisheye:cx = 641.791
+        float omni:lensdistortion:opencvFisheye:cy = 508.728
+        float omni:lensdistortion:opencvFisheye:k1 = -0.0146915
+        float omni:lensdistortion:opencvFisheye:k2 = 0.000370396
+        float omni:lensdistortion:opencvFisheye:k3 = -0.00425216
+        float omni:lensdistortion:opencvFisheye:k4 = 0.0015107
+        float3 xformOp:rotateYXZ = (89.22138, -180, 178.63612)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-6.747290447338486, -0.5, 1.0727920064412346)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+
+    def Camera "OmniDirectionalStereoCamera" (
+        prepend apiSchemas = ["OmniLensDistortionOmniDirectionalStereoAPI"]
+    )
+    {
+        float2 clippingRange = (1, 10000000)
+        float exposure:fStop = 5
+        float exposure:iso = 100
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        token omni:lensdistortion:model = "omniDirectionalStereo"
+        bool omni:lensdistortion:omniDirectionalStereo:isLeftEye = false
+        float omni:lensdistortion:omniDirectionalStereo:interpupillaryDistance = 0.064
+        float3 xformOp:rotateYXZ = (89.22138, -180, 178.63612)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-6.747290447338486, -0.5, 1.0727920064412346)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+}
+
+over "Render"
+{
+    def RenderVar "LdrColor"
+    {
+        string sourceName = "LdrColor"
+    }
+
+    def RenderProduct "Pinhole"
+    {
+        rel camera = </World/Camera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (752, 480)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+    }
+
+    def RenderProduct "Fisheye"
+    {
+        rel camera = </World/FisheyeCamera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (640, 512)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+    }
+
+    def RenderProduct "OmniDirectionalStereo"
+    {
+        rel camera = </World/OmniDirectionalStereoCamera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (1024, 512)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+    }
+}

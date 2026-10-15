@@ -205,10 +205,14 @@ class AllAttributesTest : public DocsOvstageTestBase {
                 break;
             }
             DLTensor const &t = group.data.tensors[0];
-            ASSERT_EQ(t.ndim, 1) << attribute;
+            ASSERT_GE(t.ndim, 1) << attribute;
             ASSERT_EQ(t.dtype.code, dtype.code) << attribute;
             ASSERT_EQ(t.dtype.bits, dtype.bits) << attribute;
-            ASSERT_EQ(t.dtype.lanes, dtype.lanes) << attribute;
+            ASSERT_EQ(t.dtype.lanes, 1u) << attribute;
+            size_t components = 1;
+            for (int axis = 1; axis < t.ndim; ++axis)
+                components *= static_cast<size_t>(t.shape[axis]);
+            ASSERT_EQ(components, dtype.lanes) << attribute;
             if (::testing::Test::HasFatalFailure()) {
                 ovstage_release_group(stage_, &group);
                 break;
@@ -393,8 +397,10 @@ class AllAttributesTest : public DocsOvstageTestBase {
             if (group.data.tensor_count > 0) {
                 DLTensor const &tensor = group.data.tensors[0];
                 bool id_pairs = group.semantic == OVSTAGE_SEMANTIC_ASSET_PATH_ID && !group.is_array &&
-                                tensor.dtype.code == kDLUInt && tensor.dtype.bits == 64 && tensor.dtype.lanes == 2;
-                *available = id_pairs && tensor.data != nullptr && tensor.shape != nullptr && tensor.shape[0] > 0;
+                                tensor.dtype.code == kDLUInt && tensor.dtype.bits == 64 &&
+                                tensor.dtype.lanes == 1 && tensor.ndim == 2 && tensor.shape != nullptr &&
+                                tensor.shape[1] == 2;
+                *available = id_pairs && tensor.data != nullptr && tensor.shape[0] > 0;
             }
             if (!*available && contract_required) {
                 ADD_FAILURE() << version_failure.str()
@@ -706,11 +712,11 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
         << format_ovstage_last_error();
     ASSERT_GT(point3f_group.data.tensor_count, 0u);
     DLTensor const &point3f_tensor = point3f_group.data.tensors[0];
-    // Scalar per-prim point3f: shape=[1], dtype.lanes=3 → 3 floats per prim.
+    // Scalar per-prim point3f: shape=[1,3], dtype.lanes=1.
     float const *point3f_data = reinterpret_cast<float const *>(static_cast<uint8_t const *>(point3f_tensor.data) +
                                                                 point3f_tensor.byte_offset);
     std::vector<float> point3f_values(point3f_data,
-                                      point3f_data + point3f_tensor.shape[0] * point3f_tensor.dtype.lanes);
+                                      point3f_data + point3f_tensor.shape[0] * point3f_tensor.shape[1]);
     ovstage_release_group(stage_, &point3f_group);
     ovstage_release_read(stage_, point3f_read_handle);
     // [/snippet:doc-read-usd-point3f-c]
@@ -771,11 +777,11 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_TRUE(point3f_array_group.is_array);
     ASSERT_GT(point3f_array_group.data.tensor_count, 0u);
     DLTensor const &point3f_array_tensor = point3f_array_group.data.tensors[0];
-    // Array of point3f: shape=[N], dtype.lanes=3 → N tuples of 3 floats.
+    // Array of point3f: shape=[N,3], dtype.lanes=1.
     float const *point3f_array_data = reinterpret_cast<float const *>(
         static_cast<uint8_t const *>(point3f_array_tensor.data) + point3f_array_tensor.byte_offset);
     std::vector<float> point3f_array_values(
-        point3f_array_data, point3f_array_data + point3f_array_tensor.shape[0] * point3f_array_tensor.dtype.lanes);
+        point3f_array_data, point3f_array_data + point3f_array_tensor.shape[0] * point3f_array_tensor.shape[1]);
     ovstage_release_group(stage_, &point3f_array_group);
     ovstage_release_read(stage_, point3f_array_read_handle);
     // [/snippet:doc-read-usd-point3f-array-c]
@@ -834,11 +840,11 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
         << format_ovstage_last_error();
     ASSERT_GT(matrix4d_group.data.tensor_count, 0u);
     DLTensor const &matrix4d_tensor = matrix4d_group.data.tensors[0];
-    // Per-prim 4x4 double matrix: shape=[1], dtype.lanes=16.
+    // Per-prim 4x4 double matrix: shape=[1,4,4], dtype.lanes=1.
     double const *matrix4d_data = reinterpret_cast<double const *>(
         static_cast<uint8_t const *>(matrix4d_tensor.data) + matrix4d_tensor.byte_offset);
     std::vector<double> matrix4d_values(matrix4d_data,
-                                        matrix4d_data + matrix4d_tensor.shape[0] * matrix4d_tensor.dtype.lanes);
+                                        matrix4d_data + matrix4d_tensor.shape[0] * matrix4d_tensor.shape[1] * matrix4d_tensor.shape[2]);
     ovstage_release_group(stage_, &matrix4d_group);
     ovstage_release_read(stage_, matrix4d_read_handle);
     // [/snippet:doc-read-usd-matrix4d-c]
@@ -898,10 +904,10 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
         << format_ovstage_last_error();
     ASSERT_GT(quatf_group.data.tensor_count, 0u);
     DLTensor const &quatf_tensor = quatf_group.data.tensors[0];
-    // Quaternion (i, j, k, real): shape=[1], dtype.lanes=4.
+    // Quaternion (i, j, k, real): shape=[1,4], dtype.lanes=1.
     float const *quatf_data = reinterpret_cast<float const *>(static_cast<uint8_t const *>(quatf_tensor.data) +
                                                               quatf_tensor.byte_offset);
-    std::vector<float> quatf_values(quatf_data, quatf_data + quatf_tensor.shape[0] * quatf_tensor.dtype.lanes);
+    std::vector<float> quatf_values(quatf_data, quatf_data + quatf_tensor.shape[0] * quatf_tensor.shape[1]);
     ovstage_release_group(stage_, &quatf_group);
     ovstage_release_read(stage_, quatf_read_handle);
     // [/snippet:doc-read-usd-quatf-c]
@@ -1286,7 +1292,10 @@ TEST_F(AllAttributesTest, ExtentAndWorldExtentAreReadable) {
         DLTensor const &t = group.data.tensors[0];
         double const *data =
             reinterpret_cast<double const *>(static_cast<uint8_t const *>(t.data) + t.byte_offset);
-        std::vector<double> values(data, data + t.shape[0] * t.dtype.lanes);
+        size_t valueCount = t.dtype.lanes;
+        for (int axis = 0; axis < t.ndim; ++axis)
+            valueCount *= static_cast<size_t>(t.shape[axis]);
+        std::vector<double> values(data, data + valueCount);
         if (group.attribute == q_extent.attr_token) {
             local_extent = std::move(values);
         } else if (group.attribute == world_extent_token) {

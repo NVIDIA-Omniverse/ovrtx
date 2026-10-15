@@ -14,8 +14,10 @@ Non-Visual Sensors
 Non-visual sensors in ovrtx produce structured sensor data rather than camera
 images. Lidar and radar commonly expose composite ``PointCloud`` RenderVars with
 named tensors such as coordinates, counts, intensity, RCS, radial velocity, and
-time offsets. Non-visual material labels let those sensors model material-facing
-return behavior independently of visual shading.
+time offsets. Acoustic sensors report echo envelopes rather than discrete
+returns, and expose a composite ``SignalWays`` RenderVar instead. Non-visual
+material labels let those sensors model material-facing return behavior
+independently of visual shading.
 
 For shared RenderProduct and RenderVar concepts, refer to :doc:`configuration` and
 :doc:`sensor_outputs`.
@@ -25,5 +27,6 @@ For shared RenderProduct and RenderVar concepts, refer to :doc:`configuration` a
 
    lidar
    radar
+   acoustic
    pointclouds
    nonvisual_materials

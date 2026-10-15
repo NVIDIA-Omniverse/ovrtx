@@ -30,3 +30,13 @@ function print(...) end
 ---@param msg? string  Optional error message
 ---@return boolean     Returns true if assertion passed
 function assert(condition, msg) end
+
+--- Names a prim's local transform wherever rtx.stage.query_attributes takes an attribute
+--- name. The same value a prim table reads as .local_matrix.
+---@type string
+LOCAL_MATRIX = nil
+
+--- Names a prim's world transform wherever rtx.stage.query_attributes takes an attribute
+--- name. The same value a prim table reads as .world_matrix.
+---@type string
+WORLD_MATRIX = nil

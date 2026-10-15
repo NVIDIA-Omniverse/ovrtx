@@ -27,6 +27,10 @@ extern "C"
             instance->context, strings, num_strings, out_tokens);
     }
 
+    /** Intern paths from concatenated arrays of component tokens.
+     * See path_dictionary_vtable_t::create_paths_from_tokens for the contract,
+     * including absolute-path and zero-component root behavior.
+     */
     static inline ovx_api_result_t path_dictionary_create_paths_from_tokens(
         path_dictionary_instance_t* instance,
         const ovx_token_t* tokens_per_path,

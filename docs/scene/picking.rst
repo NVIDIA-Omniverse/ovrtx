@@ -73,7 +73,10 @@ selection outline groups; the last occurrence wins.
 
 The picking workflow is:
 
-1. Queue an NDC pick rectangle with :c:func:`ovrtx_enqueue_pick_query()` before the next :c:func:`ovrtx_step()`.
+1. Queue an NDC pick rectangle with :c:func:`ovrtx_enqueue_pick_query()` before
+   the next :c:func:`ovrtx_step()`. Include
+   ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`` when a click query needs surface
+   position, surface normal, object type, or geometry instance id.
 2. Fetch the step results and find the synthetic render var named ``OVRTX_RENDER_VAR_PICK_HIT``.
 3. Map that render var on the CPU with :c:func:`ovrtx_map_render_var_output()`.
 4. Validate the ``magic`` and ``version`` params, read ``hitCount``, then consume the named tensors such as ``primPath`` and ``worldPositionM``.
@@ -123,12 +126,12 @@ of size ``width`` by ``height``, the old pixel rectangle
 multiple pick queries are queued for the same RenderProduct before one
 :c:func:`ovrtx_step()`, the last query wins.
 
-Pick query flags:
-
-* ``OVRTX_PICK_FLAG_GIZMO`` also requests gizmo picking.
-* ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`` requests tracked hit metadata such as
-  object type, geometry instance id, world position, and world normal when
-  available.
+Use ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`` when a one-pixel-equivalent click
+needs tracked metadata. The flag requests object type, geometry instance id,
+world position in metres, and world normal for the first hit. Without the flag,
+those tensors are still present but contain zeros. Multi-pixel picks do not
+provide tracked metadata and leave those tensors zero-filled even when the flag
+is set.
 
 Pick Results
 ------------
@@ -155,7 +158,34 @@ Map the output on the CPU and always validate the schema params before reading t
          :end-before: // [/snippet:doc-read-pick-hit-buffer-c]
          :dedent:
 
-The mapped render var exposes ``uint32`` params named ``magic``, ``version``, and ``hitCount`` plus named tensors such as ``primPath``, ``objectType``, ``geometryInstanceId``, ``worldPositionM``, and ``worldNormal``.
+The mapped render var exposes ``uint32`` params named ``magic``, ``version``, and
+``hitCount`` plus the following named tensors:
+
+.. list-table:: Pick-hit tensors
+   :header-rows: 1
+
+   * - Tensor
+     - Population
+   * - ``primPath``
+     - One renderer path-dictionary id per hit. This tensor is populated
+       independently of the query flags.
+   * - ``objectType``
+     - Tracked object type for the first hit of a one-pixel-equivalent pick when
+       ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`` is set; zero otherwise.
+   * - ``geometryInstanceId``
+     - Opaque geometry instance id for that tracked hit; zero otherwise.
+   * - ``worldPositionM``
+     - Tracked world-space position in metres for that hit; ``(0, 0, 0)``
+       otherwise. A populated hit can legitimately be at the world origin.
+   * - ``worldNormal``
+     - Tracked world-space normal for that hit; ``(0, 0, 0)`` otherwise.
+
+.. warning::
+
+   The tracked tensors are always present. Their presence does not mean that
+   tracked information was requested or populated. Pass
+   ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO`` for a one-pixel-equivalent click
+   before consuming these values.
 
 Resolving Picked Prim Names
 ---------------------------
@@ -380,5 +410,4 @@ Primary types and constants:
 * ``OVRTX_RENDER_VAR_PICK_HIT``
 * ``OVRTX_PICK_HIT_MAGIC``
 * ``OVRTX_PICK_HIT_VERSION``
-* ``OVRTX_PICK_FLAG_GIZMO``
 * ``OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO``

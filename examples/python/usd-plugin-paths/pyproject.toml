@@ -1,0 +1,26 @@
+[project]
+name = "usd-plugin-paths"
+version = "0.2.0"
+description = "ovrtx usd-plugin-paths example"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "ovrtx==0.6.0.1791947691",
+    "usd-core==26.3",
+]
+
+[tool.uv]
+# Windows reports x86-64 as AMD64 in PEP 508 platform_machine markers.
+# Wheel tags still use win_amd64; keep those concepts separate.
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+
+
+[dependency-groups]
+dev = ["pytest==9.0.2"]

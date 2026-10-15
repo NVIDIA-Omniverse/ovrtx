@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1620" viewBox="0 0 1180 1620" role="img" aria-labelledby="title desc">
+<title id="title">Rolling shutter: exposure progress and returned frame outputs</title>
+<desc id="desc">A single exposure can span several simulation steps. Aligned columns show internal scan progress and returned outputs for each step. Intermediate color holds the previous completed image; geometric outputs reflect partial progress; semantic segmentation is recomputed; semantic metadata changes only with scene mapping. Disabling partial outputs suppresses intermediate records. Separate timelines show two supported overlapping exposures and the unsupported three-exposure case.</desc>
+<style>
+text { font-family: Arial, sans-serif; fill: #202b38; font-size: 16px; }
+.title { font-size: 28px; font-weight: 700; }
+.heading { font-size: 21px; font-weight: 700; }
+.subheading { font-size: 18px; font-weight: 700; }
+.bold { font-weight: 700; }
+.small { font-size: 14px; fill: #526171; }
+.mono { font-family: monospace; font-size: 15px; }
+.panel { fill: #f7f9fb; stroke: #cdd5de; }
+.full { fill: #d8edb7; stroke: #5d852e; }
+.partial { fill: #cce7f6; stroke: #397b9f; }
+.held { fill: #e7eaf0; stroke: #8893a3; }
+.empty { fill: #fff; stroke: #8893a3; stroke-dasharray: 5 4; }
+.danger { fill: #fce5df; stroke: #bb4b35; }
+.axis { stroke: #647486; stroke-width: 1.5; }
+</style>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#647486"/></marker>
+<pattern id="unscanned" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fff"/><path d="M0,8 L8,0" stroke="#d7dee6"/></pattern></defs>
+<rect width="1180" height="1620" fill="#fff"/>
+<text x="30" y="42" class="title">Rolling shutter: what each step returns</text>
+<text x="30" y="72" class="">A frame record reports exposure progress. Its RenderVars may contain different output states.</text>
+<rect x="24" y="94" width="1132" height="142" rx="6" class="panel"/>
+<text x="44" y="126" class="heading">1  Full exposure inside one step</text>
+<text x="44" y="155" class="">One step; one completed FrameOutput.</text>
+<rect x="480" y="141" width="300" height="68" rx="6" class="empty"/>
+<text x="630" y="133" class="small" text-anchor="middle">simulation step</text>
+<rect x="506" y="158" width="248" height="36" rx="6" class="full"/>
+<text x="630" y="181" class="small" text-anchor="middle">entire exposure</text>
+<line x1="794" y1="178" x2="840" y2="178" class="axis" marker-end="url(#arrow)"/>
+<rect x="866" y="148" width="232" height="58" rx="6" class="full"/>
+<text x="982" y="172" class="" text-anchor="middle">New full frame</text>
+<text x="982" y="193" class="small" text-anchor="middle">isFullFrame = true</text>
+<rect x="24" y="252" width="1132" height="846" rx="6" class="panel"/>
+<text x="44" y="286" class="heading">2  One exposure across three steps</text>
+<text x="44" y="312" class="small">Example: top-to-bottom scan, one third per step. All three steps contribute to the same exposure.</text>
+<text x="516" y="345" class="bold" text-anchor="middle">Step 1</text>
+<text x="764" y="345" class="bold" text-anchor="middle">Step 2</text>
+<text x="1012" y="345" class="bold" text-anchor="middle">Step 3</text>
+<text x="44" y="385" class="bold">Internal scan progress</text>
+<text x="44" y="411" class="small">Earlier lines are preserved.</text>
+<text x="44" y="433" class="small">Later steps add new lines.</text>
+<rect x="460" y="365" width="112" height="72" fill="url(#unscanned)" stroke="#8893a3"/>
+<rect x="460" y="365" width="112" height="24" fill="#87c4e6"/>
+<text x="516" y="459" class="small" text-anchor="middle">Partial exposure · 1/3</text>
+<rect x="708" y="365" width="112" height="72" fill="url(#unscanned)" stroke="#8893a3"/>
+<rect x="708" y="365" width="112" height="48" fill="#87c4e6"/>
+<text x="764" y="459" class="small" text-anchor="middle">Partial exposure · 2/3</text>
+<rect x="956" y="365" width="112" height="72" fill="url(#unscanned)" stroke="#8893a3"/>
+<rect x="956" y="365" width="112" height="72" fill="#b8dc8a"/>
+<text x="1012" y="459" class="small" text-anchor="middle">Exposure complete</text>
+<rect x="44" y="480" width="1092" height="64" rx="6" fill="#e5ebf2"/>
+<text x="60" y="505" class="subheading">2a  Partial outputs enabled · partialOutputs = true</text>
+<text x="60" y="529" class="small">Each step returns a FrameOutput. Its contents depend on the RenderVar.</text>
+<text x="60" y="603" class="bold">Frame status</text>
+<rect x="400" y="568" width="232" height="58" rx="6" class="partial"/>
+<text x="516" y="603" class="" text-anchor="middle">isFullFrame = false</text>
+<rect x="648" y="568" width="232" height="58" rx="6" class="partial"/>
+<text x="764" y="603" class="" text-anchor="middle">isFullFrame = false</text>
+<rect x="896" y="568" width="232" height="58" rx="6" class="full"/>
+<text x="1012" y="603" class="" text-anchor="middle">isFullFrame = true</text>
+<text x="60" y="661" class="mono">LdrColor / HdrColor</text>
+<text x="60" y="683" class="small">Display color</text>
+<rect x="400" y="640" width="232" height="58" rx="6" class="held"/>
+<text x="516" y="664" class="" text-anchor="middle">Previous full image</text>
+<text x="516" y="685" class="small" text-anchor="middle">Held until completion</text>
+<rect x="648" y="640" width="232" height="58" rx="6" class="held"/>
+<text x="764" y="664" class="" text-anchor="middle">Previous full image</text>
+<text x="764" y="685" class="small" text-anchor="middle">Held until completion</text>
+<rect x="896" y="640" width="232" height="58" rx="6" class="full"/>
+<text x="1012" y="664" class="" text-anchor="middle">New full image</text>
+<text x="1012" y="685" class="small" text-anchor="middle">This exposure</text>
+<text x="60" y="733" class="bold">Geometric image AOVs</text>
+<text x="60" y="755" class="small">Depth, normals, etc.</text>
+<rect x="400" y="712" width="232" height="58" rx="6" class="partial"/>
+<text x="516" y="736" class="" text-anchor="middle">Partial exposure</text>
+<text x="516" y="757" class="small" text-anchor="middle">Recomputed from current GBuffer</text>
+<rect x="648" y="712" width="232" height="58" rx="6" class="partial"/>
+<text x="764" y="736" class="" text-anchor="middle">Partial exposure</text>
+<text x="764" y="757" class="small" text-anchor="middle">Recomputed from current GBuffer</text>
+<rect x="896" y="712" width="232" height="58" rx="6" class="full"/>
+<text x="1012" y="736" class="" text-anchor="middle">Full exposure</text>
+<text x="1012" y="757" class="small" text-anchor="middle">Recomputed from current GBuffer</text>
+<text x="60" y="805" class="mono">SemanticSegmentation</text>
+<rect x="400" y="784" width="232" height="58" rx="6" class="partial"/>
+<text x="516" y="808" class="" text-anchor="middle">Current IDs</text>
+<text x="516" y="829" class="small" text-anchor="middle">Recomputed for this step</text>
+<rect x="648" y="784" width="232" height="58" rx="6" class="partial"/>
+<text x="764" y="808" class="" text-anchor="middle">Current IDs</text>
+<text x="764" y="829" class="small" text-anchor="middle">Recomputed for this step</text>
+<rect x="896" y="784" width="232" height="58" rx="6" class="full"/>
+<text x="1012" y="808" class="" text-anchor="middle">Final IDs</text>
+<text x="1012" y="829" class="small" text-anchor="middle">Recomputed for this step</text>
+<text x="60" y="877" class="mono">SemanticIdMap</text>
+<text x="60" y="899" class="small">Metadata, not a scan-line image</text>
+<rect x="400" y="856" width="232" height="58" rx="6" class="held"/>
+<text x="516" y="880" class="" text-anchor="middle">Scene ID mapping</text>
+<text x="516" y="901" class="small" text-anchor="middle">Changes only if mapping changes</text>
+<rect x="648" y="856" width="232" height="58" rx="6" class="held"/>
+<text x="764" y="880" class="" text-anchor="middle">Scene ID mapping</text>
+<text x="764" y="901" class="small" text-anchor="middle">Changes only if mapping changes</text>
+<rect x="896" y="856" width="232" height="58" rx="6" class="held"/>
+<text x="1012" y="880" class="" text-anchor="middle">Scene ID mapping</text>
+<text x="1012" y="901" class="small" text-anchor="middle">Changes only if mapping changes</text>
+<rect x="44" y="944" width="1092" height="64" rx="6" fill="#e5ebf2"/>
+<text x="60" y="969" class="subheading">2b  Partial outputs disabled · partialOutputs = false</text>
+<text x="60" y="993" class="small">The same exposure accumulates internally; only the completed frame is returned.</text>
+<text x="60" y="1057" class="bold">Returned frame</text>
+<rect x="400" y="1022" width="232" height="58" rx="6" class="empty"/>
+<text x="516" y="1057" class="" text-anchor="middle">No FrameOutput</text>
+<rect x="648" y="1022" width="232" height="58" rx="6" class="empty"/>
+<text x="764" y="1057" class="" text-anchor="middle">No FrameOutput</text>
+<rect x="896" y="1022" width="232" height="58" rx="6" class="full"/>
+<text x="1012" y="1057" class="" text-anchor="middle">Full FrameOutput</text>
+<rect x="24" y="1116" width="1132" height="242" rx="6" class="panel"/>
+<text x="44" y="1150" class="heading">3  Two overlapping exposures: supported</text>
+<text x="44" y="1177" class="small">For a ticked camera, one step can complete A and advance B. Both exposure windows are retained.</text>
+<rect x="392" y="1210" width="144" height="100" rx="6" class="empty"/>
+<text x="464" y="1201" class="small" text-anchor="middle">one step() call</text>
+<text x="44" y="1243" class="bold">Exposure A</text>
+<text x="44" y="1283" class="bold">Exposure B</text>
+<rect x="190" y="1222" width="310" height="28" rx="6" class="full"/>
+<rect x="346" y="1262" width="300" height="28" rx="6" class="partial"/>
+<line x1="180" y1="1321" x2="670" y2="1321" class="axis" marker-end="url(#arrow)"/>
+<text x="678" y="1326" class="small">time</text>
+<line x1="500" y1="1250" x2="500" y2="1258" class="axis" />
+<text x="493" y="1242" class="small" text-anchor="end">ends</text>
+<text x="44" y="1342" class="small">Overlap = separate exposures active at the same time.</text>
+<text x="754" y="1206" class="small">Returned by that call (partialOutputs = true)</text>
+<rect x="760" y="1220" width="232" height="58" rx="6" class="full"/>
+<text x="876" y="1244" class="" text-anchor="middle">A: full frame</text>
+<text x="876" y="1265" class="small" text-anchor="middle">Color = newly completed A</text>
+<rect x="760" y="1288" width="232" height="58" rx="6" class="held"/>
+<text x="876" y="1312" class="" text-anchor="middle">B: intermediate frame</text>
+<text x="876" y="1333" class="small" text-anchor="middle">Color still shows A</text>
+<rect x="24" y="1376" width="1132" height="222" rx="6" class="panel"/>
+<text x="44" y="1410" class="heading">4  Three overlapping exposures: unsupported</text>
+<text x="44" y="1437" class="small">Only two exposure resource windows are retained. A third can lose accumulated strips.</text>
+<rect x="400" y="1451" width="62" height="102" fill="#fce5df"/>
+<text x="160" y="1476" class="bold">A</text>
+<rect x="190" y="1456" width="272" height="24" rx="6" class="full"/>
+<text x="160" y="1510" class="bold">B</text>
+<rect x="294" y="1490" width="272" height="24" rx="6" class="partial"/>
+<text x="160" y="1544" class="bold">C</text>
+<rect x="400" y="1524" width="272" height="24" rx="6" class="danger"/>
+<text x="432" y="1575" class="small" text-anchor="middle">Three active here</text>
+<rect x="760" y="1460" width="164" height="100" rx="6" class="danger"/>
+<rect x="760" y="1524" width="164" height="36" fill="#202b38"/>
+<text x="842" y="1490" class="small" text-anchor="middle">Possible output</text>
+<text x="944" y="1524" class="small">Lost strips can leave</text>
+<text x="944" y="1546" class="small">unfinished black lines.</text>
+</svg>

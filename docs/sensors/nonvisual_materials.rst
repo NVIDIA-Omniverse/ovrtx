@@ -34,10 +34,9 @@ Author Labels
          :start-after: # [snippet:configure-nonvisual-materials]
          :end-before: # [/snippet:configure-nonvisual-materials]
 
-The default runtime prefix is ``omni:simready:nonvisual``. The alternate
-supported prefix is ``inputs:nonvisual``, selected by
-``/rtx/materialDb/nonVisualMaterialSemantics/prefix``. Public examples may
-author both prefixes so scenes work with either runtime setting.
+Use the Omniverse SimReady attributes: ``omni:simready:nonvisual:base``
+and ``omni:simready:nonvisual:coating`` are tokens;
+``omni:simready:nonvisual:attributes`` is a token array.
 
 Labels belong on the ``Material`` prim that geometry binds through
 ``material:binding``. Use :doc:`../materials/material_binding` when the geometry

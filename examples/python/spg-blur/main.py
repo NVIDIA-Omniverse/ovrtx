@@ -26,7 +26,6 @@ lines.
 
 import argparse
 import contextlib
-import os
 import re
 import sys
 import tempfile
@@ -54,27 +53,13 @@ WEIGHTS_BUILT = re.compile(r"blur: building the weight table for radius (\d+)")
 
 @contextlib.contextmanager
 def captured_log(collected: list):
-    """Collect the renderer's log, then replay it.
-
-    The launch script's ``warning`` calls reach the renderer's log, which the
-    renderer writes to standard output. Redirecting the file descriptor catches
-    what native code writes as well as what Python does, and everything is
-    written back out afterwards so nothing is lost.
-    """
-    with tempfile.TemporaryFile("w+") as sink:
-        sys.stdout.flush()
-        saved = os.dup(1)
-        os.dup2(sink.fileno(), 1)
-        try:
-            yield
-        finally:
-            sys.stdout.flush()
-            os.dup2(saved, 1)
-            os.close(saved)
-            sink.seek(0)
-            text = sink.read()
-            sys.stdout.write(text)
-            collected.append(text)
+    """Read the renderer log after shutdown, independently of stdout buffering."""
+    # The log file stays open for the life of the process, which Windows will not
+    # delete; leave the directory to the OS there rather than fail the run.
+    with tempfile.TemporaryDirectory(prefix="ovrtx-spg-blur-", ignore_cleanup_errors=True) as directory:
+        log_path = Path(directory) / "renderer.log"
+        yield log_path
+        collected.append(log_path.read_text(encoding="utf-8", errors="replace"))
 
 
 def read_var(frame, render_var_path: str) -> np.ndarray:
@@ -141,9 +126,9 @@ def main() -> int:
     failures = []
 
     log_pages: list = []
-    with captured_log(log_pages):
+    with captured_log(log_pages) as log_path:
         print(f"Loading {args.scene}...")
-        renderer = ovrtx.Renderer()
+        renderer = ovrtx.Renderer(config=ovrtx.RendererConfig(log_file_path=str(log_path)))
         stage = ovstage.Stage("ovrtx.example.spg-blur")
         renderer.attach_ovstage(stage)
         ordinal = 1

@@ -1,0 +1,134 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    endTimeCode = 60
+    metersPerUnit = 0.01
+    startTimeCode = 0
+    timeCodesPerSecond = 60
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Xform "Ground"
+    {
+        double3 xformOp:scale = (8, 8, 8)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+
+        def Xform "NearLeft" (
+            prepend references = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:translate = (-100, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "NearCenter" (
+            prepend references = @../../../tests/docs/data/ground.usd@
+        )
+        {
+        }
+
+        def Xform "NearRight" (
+            prepend references = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:translate = (100, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "FarLeft" (
+            prepend references = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:translate = (-100, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "FarCenter" (
+            prepend references = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:translate = (0, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "FarRight" (
+            prepend references = @../../../tests/docs/data/ground.usd@
+        )
+        {
+            double3 xformOp:translate = (100, 0, -100)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+
+    def Xform "MovingCube" (
+        prepend payload = @../../../tests/docs/data/cube.usd@
+    )
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        double3 xformOp:translate.timeSamples = {
+            0: (-605, 0, 0),
+            60: (595, 0, 0),
+        }
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+
+        over "Cube"
+        {
+            color3f[] primvars:displayColor = [(0.4627451, 0.7254902, 0.003921569)]
+        }
+    }
+
+    def Camera "Camera" (
+        prepend apiSchemas = ["OmniRtxRollingShutterAPI"]
+    )
+    {
+        double2 omni:rtx:rollingShutter:lineExposure = (1, 32)
+        double2 omni:rtx:rollingShutter:lineOffset = (40, 1000000)
+        token omni:rtx:rollingShutter:scanOrder = "topToBottom"
+        float3 xformOp:rotateXYZ = (-17, 0, 0)
+        double3 xformOp:translate = (0, 300, 1000)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Camera "GlobalShutterCamera"
+    {
+        float3 xformOp:rotateXYZ = (-17, 0, 0)
+        double3 xformOp:translate = (0, 300, 1000)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 1000
+        asset inputs:texture:file = @../../../tests/docs/data/studio.exr@
+        token inputs:texture:format = "latlong"
+        float3 xformOp:rotateXYZ = (0, 270, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+}
+
+def Scope "Render"
+{
+    def RenderVar "LdrColor"
+    {
+        string sourceName = "LdrColor"
+    }
+
+    def RenderProduct "Camera"
+    {
+        rel camera = </World/Camera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (640, 480)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+    }
+
+    def RenderProduct "GlobalShutterCamera"
+    {
+        rel camera = </World/GlobalShutterCamera>
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (640, 480)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+    }
+}

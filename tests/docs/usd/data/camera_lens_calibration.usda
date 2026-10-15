@@ -1,0 +1,18 @@
+#usda 1.0
+# [snippet:doc-camera-lens-calibration]
+def Camera "Camera" (
+    prepend apiSchemas = ["OmniLensDistortionOpenCvPinholeAPI"]
+)
+{
+    token omni:lensdistortion:model = "opencvPinhole"
+    float omni:lensdistortion:opencvPinhole:cx = 1024
+    float omni:lensdistortion:opencvPinhole:cy = 512
+    float omni:lensdistortion:opencvPinhole:fx = 900
+    float omni:lensdistortion:opencvPinhole:fy = 800
+    int2 omni:lensdistortion:opencvPinhole:imageSize = (2048, 1024)
+    float omni:lensdistortion:opencvPinhole:k1 = 0
+    float omni:lensdistortion:opencvPinhole:k2 = 0
+    float omni:lensdistortion:opencvPinhole:p1 = 0
+    float omni:lensdistortion:opencvPinhole:p2 = 0
+}
+# [/snippet:doc-camera-lens-calibration]

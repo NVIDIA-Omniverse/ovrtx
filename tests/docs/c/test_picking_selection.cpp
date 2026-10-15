@@ -30,6 +30,7 @@
 #include <ovrtx/ovrtx_attributes.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -79,6 +80,10 @@ DLTensor const* find_param(ovrtx_render_var_output_t const& output, std::string_
 struct PickResult {
     std::set<std::string> paths;
     std::vector<ovx_primpath_t> prim_path_ids;
+    uint32_t object_type = 0;
+    uint64_t geometry_instance_id = 0;
+    std::array<double, 3> world_position{};
+    std::array<float, 3> world_normal{};
 };
 
 // Enqueue a pick query covering the NDC rect. Renderer-scoped; works the
@@ -94,7 +99,8 @@ void docs_enqueue_pick_rect(ovrtx_renderer_t* renderer, float left_ndc, float to
     pick_desc.top_ndc = top_ndc;
     pick_desc.right_ndc = right_ndc;
     pick_desc.bottom_ndc = bottom_ndc;
-    pick_desc.flags = 0;
+    // Request tracked surface metadata for one-pixel-equivalent click queries.
+    pick_desc.flags = OVRTX_PICK_FLAG_INCLUDE_TRACKED_INFO;
 
     ovrtx_enqueue_result_t enqueue_result = ovrtx_enqueue_pick_query(renderer, &pick_desc);
     ASSERT_API_SUCCESS(enqueue_result.status);
@@ -133,6 +139,8 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
     DLTensor const* version_param = find_param(pick_output, "version");
     DLTensor const* hit_count_param = find_param(pick_output, "hitCount");
     DLTensor const* prim_path_tensor = find_tensor(pick_output, "primPath");
+    DLTensor const* object_type_tensor = find_tensor(pick_output, "objectType");
+    DLTensor const* geometry_instance_id_tensor = find_tensor(pick_output, "geometryInstanceId");
     DLTensor const* world_position_tensor = find_tensor(pick_output, "worldPositionM");
     DLTensor const* world_normal_tensor = find_tensor(pick_output, "worldNormal");
 
@@ -140,10 +148,12 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
     EXPECT_NE(version_param, nullptr);
     EXPECT_NE(hit_count_param, nullptr);
     EXPECT_NE(prim_path_tensor, nullptr);
+    EXPECT_NE(object_type_tensor, nullptr);
+    EXPECT_NE(geometry_instance_id_tensor, nullptr);
     EXPECT_NE(world_position_tensor, nullptr);
     EXPECT_NE(world_normal_tensor, nullptr);
-    if (!magic_param || !version_param || !hit_count_param || !prim_path_tensor || !world_position_tensor ||
-        !world_normal_tensor) {
+    if (!magic_param || !version_param || !hit_count_param || !prim_path_tensor || !object_type_tensor ||
+        !geometry_instance_id_tensor || !world_position_tensor || !world_normal_tensor) {
         ovrtx_cuda_sync_t no_sync = {};
         EXPECT_API_SUCCESS(ovrtx_unmap_render_var_output(renderer, pick_output.map_handle, no_sync).status);
         return pick_result;
@@ -153,13 +163,16 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
     EXPECT_NE(hit_count_param->data, nullptr);
     EXPECT_NE(prim_path_tensor->data, nullptr);
     EXPECT_NE(prim_path_tensor->shape, nullptr);
+    EXPECT_NE(object_type_tensor->data, nullptr);
+    EXPECT_NE(geometry_instance_id_tensor->data, nullptr);
     EXPECT_NE(world_position_tensor->data, nullptr);
     EXPECT_NE(world_position_tensor->shape, nullptr);
     EXPECT_NE(world_normal_tensor->data, nullptr);
     EXPECT_NE(world_normal_tensor->shape, nullptr);
     if (!magic_param->data || !version_param->data || !hit_count_param->data || !prim_path_tensor->data ||
-        !prim_path_tensor->shape || !world_position_tensor->data || !world_position_tensor->shape ||
-        !world_normal_tensor->data || !world_normal_tensor->shape) {
+        !prim_path_tensor->shape || !object_type_tensor->data || !geometry_instance_id_tensor->data ||
+        !world_position_tensor->data || !world_position_tensor->shape || !world_normal_tensor->data ||
+        !world_normal_tensor->shape) {
         ovrtx_cuda_sync_t no_sync = {};
         EXPECT_API_SUCCESS(ovrtx_unmap_render_var_output(renderer, pick_output.map_handle, no_sync).status);
         return pick_result;
@@ -172,6 +185,10 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
     EXPECT_EQ(version, OVRTX_PICK_HIT_VERSION);
     EXPECT_EQ(prim_path_tensor->ndim, 1);
     EXPECT_GE(prim_path_tensor->shape[0], static_cast<int64_t>(hit_count));
+    EXPECT_EQ(object_type_tensor->ndim, 1);
+    EXPECT_GE(object_type_tensor->shape[0], static_cast<int64_t>(hit_count));
+    EXPECT_EQ(geometry_instance_id_tensor->ndim, 1);
+    EXPECT_GE(geometry_instance_id_tensor->shape[0], static_cast<int64_t>(hit_count));
     EXPECT_EQ(world_position_tensor->ndim, 2);
     EXPECT_GE(world_position_tensor->shape[0], static_cast<int64_t>(hit_count));
     EXPECT_GE(world_position_tensor->shape[1], 3);
@@ -179,6 +196,9 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
     EXPECT_GE(world_normal_tensor->shape[0], static_cast<int64_t>(hit_count));
     EXPECT_GE(world_normal_tensor->shape[1], 3);
     if (prim_path_tensor->ndim != 1 || prim_path_tensor->shape[0] < static_cast<int64_t>(hit_count) ||
+        object_type_tensor->ndim != 1 || object_type_tensor->shape[0] < static_cast<int64_t>(hit_count) ||
+        geometry_instance_id_tensor->ndim != 1 ||
+        geometry_instance_id_tensor->shape[0] < static_cast<int64_t>(hit_count) ||
         world_position_tensor->ndim != 2 || world_position_tensor->shape[0] < static_cast<int64_t>(hit_count) ||
         world_position_tensor->shape[1] < 3 || world_normal_tensor->ndim != 2 ||
         world_normal_tensor->shape[0] < static_cast<int64_t>(hit_count) ||
@@ -189,6 +209,8 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
     }
 
     const auto* prim_paths = static_cast<const ovx_primpath_t*>(prim_path_tensor->data);
+    const auto* object_types = static_cast<const uint32_t*>(object_type_tensor->data);
+    const auto* geometry_instance_ids = static_cast<const uint64_t*>(geometry_instance_id_tensor->data);
     const auto* world_positions = static_cast<const double*>(world_position_tensor->data);
     const auto* world_normals = static_cast<const float*>(world_normal_tensor->data);
     std::vector<ovx_primpath_t> prim_path_ids;
@@ -203,6 +225,13 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
         if (std::find(prim_path_ids.begin(), prim_path_ids.end(), prim_paths[i]) == prim_path_ids.end()) {
             prim_path_ids.push_back(prim_paths[i]);
         }
+    }
+
+    if (hit_count > 0) {
+        pick_result.object_type = object_types[0];
+        pick_result.geometry_instance_id = geometry_instance_ids[0];
+        std::copy_n(world_positions, 3, pick_result.world_position.begin());
+        std::copy_n(world_normals, 3, pick_result.world_normal.begin());
     }
     // [/snippet:doc-read-pick-hit-buffer-c]
 
@@ -437,8 +466,19 @@ TEST_F(PickingSelectionTest, PickCenterPixel) {
     docs_enqueue_pick_rect(renderer_, kCenterLeftNdc, kCenterTopNdc, kCenterRightNdc, kCenterBottomNdc);
     ovrtx_step_result_handle_t step_handle = step_once();
 
-    std::set<std::string> picked = docs_collect_pick_paths(renderer_, step_handle);
-    EXPECT_EQ(picked, std::set<std::string>({"/World/CenterCube"}));
+    PickResult pick_result = docs_collect_pick_result(renderer_, step_handle);
+    EXPECT_EQ(pick_result.paths, std::set<std::string>({"/World/CenterCube"}));
+
+    // The camera is at Z=220 looking down -Z. CenterCube spans Z=[-12, 12], and the stage uses
+    // 0.01 metres per unit, so the selected center pixel hits its front face near (0, 0, 0.12) m with a +Z normal.
+    EXPECT_NE(pick_result.object_type, 0u);
+    EXPECT_NE(pick_result.geometry_instance_id, 0u);
+    EXPECT_NEAR(pick_result.world_position[0], 0.0, 0.02);
+    EXPECT_NEAR(pick_result.world_position[1], 0.0, 0.02);
+    EXPECT_NEAR(pick_result.world_position[2], 0.12, 0.02);
+    EXPECT_NEAR(pick_result.world_normal[0], 0.0f, 0.01f);
+    EXPECT_NEAR(pick_result.world_normal[1], 0.0f, 0.01f);
+    EXPECT_NEAR(pick_result.world_normal[2], 1.0f, 0.01f);
 
     ovrtx_destroy_results(renderer_, step_handle);
 }

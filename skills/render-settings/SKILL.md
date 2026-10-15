@@ -11,8 +11,8 @@
 name: render-settings
 description: >
   Writing render settings to control rendering behavior. Use when user asks to change
-  render settings, set max bounces, configure path tracing, change render quality, or
-  modify RTX settings on a RenderProduct.
+  render settings, set max bounces, configure path tracing, change render quality,
+  enable DLSS frame generation, or modify RTX settings on a RenderProduct.
 license: LicenseRef-NvidiaProprietary
 author: NVIDIA ovrtx
 tags:
@@ -28,7 +28,7 @@ tools:
 
 ## When to Use
 
-Use this skill when the user asks to change render settings, set max bounces, configure path tracing, change render quality, or modify RTX settings on a RenderProduct.
+Use this skill when the user asks to change render settings, set max bounces, configure path tracing, change render quality, enable DLSS frame generation, or modify RTX settings on a RenderProduct.
 
 ## Inputs
 
@@ -100,6 +100,21 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 |---------|------|---------|-------------|
 | `omni:rtx:rendermode` | `token` | `"RealTimePathTracing"` | Render mode: `"RealTimePathTracing"`, `"PathTracing"`, or `"MinimalRendering"` |
 
+## DLSS Frame Generation (`dlss:`)
+
+DLSS Frame Generation inserts interpolated frames between rendered ones. It is off by default and is enabled per RenderProduct, like any other render setting.
+
+> **Source:** `examples/c/vulkan-interop/src/main.cpp` snippet `enable-dlssg`
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `omni:rtx:dlss:frameGeneration` | `bool` | `false` | Enable frame generation |
+| `omni:rtx:dlss:frameGenerationInterpolatedFrameCount` | `int` | `0` | Interpolated frames per rendered frame; `0` lets the renderer pick. Clamped to the hardware maximum (1 on Ada, 3 on Blackwell) |
+
+Enabling frame generation changes the shape of the step results: one step returns `output_frame_count == N + 1` output frames instead of 1, ordered with the interpolated frames first and the real rendered frame last. Each frame exposes the same single color render var, and only the last frame carries a meaningful accumulation status. Consumers that assume `output_frames[0]` is the frame to display or inspect need to be updated before turning this on.
+
+The renderer declines frame generation without failing the step, in which case a step keeps returning a single frame. It requires an Ada or newer GPU that drives the display, the `RealTimePathTracing` render mode, `LdrColor` or `HdrColor` as the only render outputs, and a render resolution of at least 126 pixels per side.
+
 ## Real-Time Path-Tracing Settings (`rtpt:`)
 
 ### Sampling and Caching
@@ -138,6 +153,7 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 | `omni:rtx:rtpt:gaussian:accumulatedDepth:enabled` | `bool` | `true` |
 | `omni:rtx:rtpt:gaussian:accumulatedAlbedo:enabled` | `bool` | `true` |
 | `omni:rtx:rtpt:gaussian:maxGaussiansToAccumulate` | `int` | `48` |
+| `omni:rtx:rtpt:gaussian:nonStochastic:enabled` | `bool` | `false` |
 
 ## Path Tracing Settings (`pt:`)
 
@@ -182,6 +198,19 @@ After changing a render setting, call `reset()` and run warm-up frames to allow 
 | `omni:rtx:pt:fireflyFilter:maxPerEmissiveUnexposedIntensity` | `float` | `3200.0` |
 
 ### Spectral Rendering
+
+Enable the process-wide spectral material and light backend before creating the
+first renderer, then enable spectral transport on its PT RenderProducts. Run
+RGB and spectral comparisons in separate processes; the startup choice cannot
+change after initialization, including after destroying all renderer instances.
+
+> **Source (Python startup):** `examples/python/spectral-rendering/main.py` snippet `doc-spectral-config-python`
+>
+> **Source (C startup):** `examples/c/spectral-rendering/main.cpp` snippet `doc-spectral-config-c`
+>
+> **Source (USDA):** `tests/docs/usd/data/spectral_rendering.usda` snippet `doc-spectral-authoring`
+>
+> **Source (USD Python):** `tests/docs/usd/test_spectral_rendering.py` snippet `doc-spectral-authoring-python`
 
 | Setting | Type | Default |
 |---------|------|---------|
@@ -239,13 +268,13 @@ View Lighting Mode replaces all scene lights with a single camera light. By defa
 | `omni:rtx:viewLighting:lightType` | `token` | `"distant"` | Camera light type: `"distant"` or `"spot"` |
 | `omni:rtx:viewLighting:color` | `color3f` | `(1, 1, 1)` | Color of the camera light |
 | `omni:rtx:viewLighting:intensity` | `float` | `3000.0` | Intensity of the camera light |
-| `omni:rtx:viewLighting:normalize` | `bool` | `true` | UsdLux `inputs:normalize` semantics: intensity independent of the spot radius / distant angle. Disable to treat intensity as surface radiance, which grows with the light size |
+| `omni:rtx:viewLighting:normalize` | `bool` | `true` | Removes spot radius-squared brightness gain and normalizes distant angular size. Spot brightness does not attenuate with distance, whether enabled or disabled; radius still affects highlights and grazing illumination |
 | `omni:rtx:viewLighting:angle` | `float` | `0.0` | Angular diameter in degrees (distant only) |
-| `omni:rtx:viewLighting:radius` | `float` | `0.05` | Sphere radius in world units; larger radii soften its specular highlights (spot only) |
+| `omni:rtx:viewLighting:radius` | `float` | `0.05` | Sphere radius in world units; larger radii soften specular highlights (spot only) |
 | `omni:rtx:viewLighting:coneAngle` | `float` | `90.0` | Degrees from the view direction to the cone edge, UsdLux `shaping:cone:angle` semantics (spot only) |
 | `omni:rtx:viewLighting:coneSoftness` | `float` | `0.0` | Softness of the cone falloff, 0 = hard edge (spot only) |
 
-Note: Minimal mode and SDG simple-shading outputs always render the camera light as its distant variant, so the light type and the spot-only settings have no effect there. Camera lights never cast shadows (the light is collocated with the camera, so it is effectively shadowless).
+Note: Minimal mode and SDG simple-shading outputs always render the camera light as its distant variant, so the light type and the spot-only settings have no effect there. Both camera-light types are shadowless inspection lights.
 
 ## DomeLight MDL Material Baking
 
@@ -276,8 +305,35 @@ Minimal mode is optimized for speed-of-light rendering performance and stability
 | `omni:rtx:minimal:mode` | `int` | Minimal render mode variant |
 | `omni:rtx:minimal:constantColor` | `color3f` | Constant color output |
 | `omni:rtx:minimal:castShadows` | `bool` | Enable hard shadows from the first `DistantLight` |
-| `omni:rtx:rt:ambientLight:color` | `color3f` | Ambient light color |
-| `omni:rtx:rt:ambientLight:intensity` | `float` | Ambient light intensity |
+| `omni:rtx:sceneDb:ambientLightColor` | `color3f` | Ambient light color |
+| `omni:rtx:sceneDb:ambientLightIntensity` | `float` | Ambient light intensity |
+
+### Minimal anti-aliasing and DLSS
+
+Author `int omni:rtx:minimal:dlss:mode` on the RenderProduct: `0` disables DLSS,
+`1` enables DLSS-SR, and `2` enables DLSS-RR. Use the token
+`omni:rtx:minimal:dlss:execMode` for `auto`, `performance`, `balanced`, `quality`,
+or `rtxaa` (native-resolution DLAA). Both attributes belong to
+`OmniRtxSettingsMinimalAPI_1`, with defaults of `0` and `auto`, respectively.
+These mode-selection controls are separate from the
+post-processing DLSS execution mode and the Path-Tracing pixel filter.
+Gaussian splats additionally require Minimal shading
+mode `3` and DLSS-RR for denoising.
+
+The USD authoring snippets use equivalent types, values, and RenderProduct paths:
+
+> **Source (USDA):** `examples/python/minimal-dlss/minimal_dlss.usda` snippet `doc-minimal-dlss-render-product`
+>
+> **Source (USD Python):** `tests/docs/usd/test_minimal_dlss.py` snippet `doc-minimal-dlss-render-product-python`
+
+The runtime examples load those settings through attached ovstage and preserve
+DLSS temporal history across render steps:
+
+> **Source (Python):** `examples/python/minimal-dlss/main.py` snippet `doc-render-minimal-dlss-python`
+>
+> **Source (C):** `examples/c/minimal-dlss/main.cpp` snippet `doc-minimal-dlss-c-populate`
+>
+> **Source (C, continued):** `examples/c/minimal-dlss/main.cpp` snippet `doc-minimal-dlss-c-step-renderer`
 
 ## Troubleshooting
 
@@ -290,3 +346,18 @@ Minimal mode is optimized for speed-of-light rendering performance and stability
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+## gaussian-splats example
+
+> **Source:** `examples/python/gaussian-splats/main.py` snippet `gaussian-render-python`
+
+## DLSS 5 3D-Guided Neural Rendering
+
+Configure the RenderProduct for `RealTimePathTracing`, request `LdrColor`, and
+set `omni:rtx:dlssnr:enabled` to true. `OmniRtxPostDlssNrAPI_1` auto-applies.
+The documentation authoring test checks USDA/Python parity without a GPU or
+driver; it does not establish runtime behavior or driver support.
+
+> **Source (USDA):** `tests/docs/usd/data/dlss_nr.usda` snippet `doc-dlss-nr-render-product`
+>
+> **Source (USD Python):** `tests/docs/usd/test_dlss_nr.py` snippet `doc-dlss-nr-render-product-python`

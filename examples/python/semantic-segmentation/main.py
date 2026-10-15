@@ -18,13 +18,16 @@ Usage:
 """
 
 import argparse
+import json
 import os
+import re
 import sys
 from pathlib import Path
 
 import numpy as np
 import ovrtx
 import ovstage
+from PIL import Image, ImageDraw, ImageFont
 
 EXAMPLE_DIR = Path(__file__).resolve().parent
 DEFAULT_USD = Path("ovrtx-robot-lineup.usda")
@@ -54,10 +57,25 @@ def _scene_asset_path(path: Path) -> Path:
 
 
 # [snippet:compose-sublayer-render-product]
-def build_render_layer_usda(scene_path: Path, resolution: tuple[int, int]) -> str:
+def build_render_layer_usda(
+    scene_path: Path, resolution: tuple[int, int], render_mode: str = "RealTimePathTracing"
+) -> str:
     """Compose the robot scene and author a RenderProduct with each requested camera AOV."""
     width, height = resolution
     source_scene = _usd_asset_path(scene_path)
+
+    # Minimal has no HDR color output. Request its clip-depth aliases alongside the shared annotations.
+    hdr_request = "<HdrColor>," if render_mode != "MinimalRendering" else ""
+    minimal_depth_requests = "<Depth>, <XRDepth>," if render_mode == "MinimalRendering" else ""
+    # Minimal ignores dome lighting; add ambient fill so every robot is visible in the preview.
+    minimal_settings_and_vars = """color3f omni:rtx:rt:ambientLight:color = (1, 1, 1)
+    float omni:rtx:rt:ambientLight:intensity = 0.2
+    def RenderVar "Depth" {
+        string sourceName = "Depth"
+    }
+    def RenderVar "XRDepth" {
+        string sourceName = "XRDepth"
+    }""" if render_mode == "MinimalRendering" else ""
 
     return f"""#usda 1.0
 (
@@ -145,18 +163,39 @@ def "Render"
     {{
         rel camera = </World/Camera>
         int2 resolution = ({width}, {height})
-        token omni:rtx:rendermode = "RealTimePathTracing"
+        token omni:rtx:rendermode = "{render_mode}"
         rel orderedVars = [
             <LdrColor>,
-            <HdrColor>,
+            {hdr_request}
+            {minimal_depth_requests}
             <NormalSD>,
             <DepthSD>,
             <DistanceToCameraSD>,
             <DistanceToImagePlaneSD>,
             <DiffuseAlbedoSD>,
             <Camera3dPositionSD>,
+            <TargetMotionSD>,
             <SemanticSegmentation>,
-            <SemanticIdMap>
+            <SemanticIdMap>,
+            <SemanticInstanceSegmentation>,
+            <StableIdSegmentation>,
+            <NonStableInstanceSegmentation>,
+            <BoundingBox2DTightSD>,
+            <BoundingBox2DLooseSD>,
+            <BoundingBox3DSD>,
+            <SemanticBoundingBox2DTight>,
+            <SemanticBoundingBox2DLoose>,
+            <SemanticBoundingBox3D>,
+            <OcclusionSD>,
+            <TruncationSD>,
+            <InstanceIdTokenMapSD>,
+            <StableIdMap>,
+            <InstanceMap>,
+            <StableIdMapDeltas>,
+            <SemanticIdMapDeltas>,
+            <CameraParams>,
+            <CrossCorrespondenceSD>,
+            <StableIdSemanticIdMap>
         ]
 
         def RenderVar "LdrColor" {{
@@ -191,6 +230,10 @@ def "Render"
             string sourceName = "Camera3dPositionSD"
         }}
 
+        def RenderVar "TargetMotionSD" {{
+            string sourceName = "TargetMotionSD"
+        }}
+
         def RenderVar "SemanticSegmentation" {{
             string sourceName = "SemanticSegmentation"
         }}
@@ -198,6 +241,83 @@ def "Render"
         def RenderVar "SemanticIdMap" {{
             string sourceName = "SemanticIdMap"
         }}
+
+        def RenderVar "SemanticInstanceSegmentation" {{
+            string sourceName = "SemanticInstanceSegmentation"
+        }}
+
+        def RenderVar "StableIdSegmentation" {{
+            string sourceName = "StableIdSegmentation"
+        }}
+
+        def RenderVar "NonStableInstanceSegmentation" {{
+            string sourceName = "NonStableInstanceSegmentation"
+        }}
+
+        def RenderVar "BoundingBox2DTightSD" {{
+            string sourceName = "BoundingBox2DTightSD"
+        }}
+
+        def RenderVar "BoundingBox2DLooseSD" {{
+            string sourceName = "BoundingBox2DLooseSD"
+        }}
+
+        def RenderVar "BoundingBox3DSD" {{
+            string sourceName = "BoundingBox3DSD"
+        }}
+
+        def RenderVar "SemanticBoundingBox2DTight" {{
+            string sourceName = "SemanticBoundingBox2DTight"
+        }}
+
+        def RenderVar "SemanticBoundingBox2DLoose" {{
+            string sourceName = "SemanticBoundingBox2DLoose"
+        }}
+
+        def RenderVar "SemanticBoundingBox3D" {{
+            string sourceName = "SemanticBoundingBox3D"
+        }}
+
+        def RenderVar "OcclusionSD" {{
+            string sourceName = "OcclusionSD"
+        }}
+
+        def RenderVar "TruncationSD" {{
+            string sourceName = "TruncationSD"
+        }}
+
+        def RenderVar "InstanceIdTokenMapSD" {{
+            string sourceName = "InstanceIdTokenMapSD"
+        }}
+
+        def RenderVar "StableIdMap" {{
+            string sourceName = "StableIdMap"
+        }}
+
+        def RenderVar "InstanceMap" {{
+            string sourceName = "InstanceMap"
+        }}
+
+        def RenderVar "StableIdMapDeltas" {{
+            string sourceName = "StableIdMapDeltas"
+        }}
+
+        def RenderVar "SemanticIdMapDeltas" {{
+            string sourceName = "SemanticIdMapDeltas"
+        }}
+
+        def RenderVar "CameraParams" {{
+            string sourceName = "CameraParams"
+        }}
+
+        def RenderVar "CrossCorrespondenceSD" {{
+            string sourceName = "CrossCorrespondenceSD"
+        }}
+
+        def RenderVar "StableIdSemanticIdMap" {{
+            string sourceName = "StableIdSemanticIdMap"
+        }}
+        {minimal_settings_and_vars}
     }}
 }}
 """
@@ -277,6 +397,22 @@ def _visualize_normal(values: np.ndarray) -> np.ndarray:
     return _to_uint8_image(normals * 0.5 + 0.5)
 
 
+def _visualize_motion(values: np.ndarray) -> np.ndarray:
+    """Show backward flow direction as hue and magnitude as brightness, with 20 pixels at full brightness."""
+    motion = np.asarray(values, dtype=np.float32)
+    valid = np.all(np.isfinite(motion), axis=-1) & (motion[..., 3] >= 0)
+    flow = np.where(valid[..., None], motion[..., :2], 0.0)
+    magnitude = np.linalg.norm(flow, axis=-1)
+
+    # A fixed scale preserves displacement comparisons; invalid and stationary pixels stay black.
+    hsv = np.zeros((*flow.shape[:2], 3), dtype=np.uint8)
+    hsv[..., 0] = ((np.arctan2(flow[..., 1], flow[..., 0]) / (2.0 * np.pi) + 1.0) % 1.0 * 255).astype(np.uint8)
+    hsv[..., 1] = 255
+    hsv[..., 2] = (np.clip(magnitude / 20.0, 0.0, 1.0) * 255).astype(np.uint8)
+    hsv[magnitude < 1.0e-3] = 0
+    return np.asarray(Image.frombytes("HSV", (hsv.shape[1], hsv.shape[0]), hsv.tobytes()).convert("RGB"))
+
+
 def build_aov_blueprint(rrb, grid_columns: int):
     return rrb.Blueprint(
         rrb.Grid(
@@ -305,6 +441,27 @@ def build_aov_blueprint(rrb, grid_columns: int):
                 contents="+/render/aovs/SemanticSegmentation/class_ids",
                 name="SemanticSegmentation",
             ),
+            rrb.Spatial2DView(
+                origin="/", contents="+/render/aovs/TargetMotionSD/display", name="TargetMotionSD",
+            ),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/SemanticInstanceSegmentation/display", name="SemanticInstanceSegmentation"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/StableIdSegmentation/display", name="StableIdSegmentation"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/NonStableInstanceSegmentation/display", name="NonStableInstanceSegmentation"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/BoundingBox2DTightSD/display", name="BoundingBox2DTightSD"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/BoundingBox2DLooseSD/display", name="BoundingBox2DLooseSD"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/BoundingBox3DSD/display", name="BoundingBox3DSD"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/SemanticBoundingBox2DTight/display", name="SemanticBoundingBox2DTight"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/SemanticBoundingBox2DLoose/display", name="SemanticBoundingBox2DLoose"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/SemanticBoundingBox3D/display", name="SemanticBoundingBox3D"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/OcclusionSD/display", name="OcclusionSD"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/InstanceIdTokenMapSD/display", name="InstanceIdTokenMapSD"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/StableIdMap/display", name="StableIdMap"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/InstanceMap/display", name="InstanceMap"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/StableIdMapDeltas/display", name="StableIdMapDeltas"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/SemanticIdMapDeltas/display", name="SemanticIdMapDeltas"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/CameraParams/display", name="CameraParams"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/StableIdSemanticIdMap/display", name="StableIdSemanticIdMap"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/SemanticIdMap/display", name="SemanticIdMap"),
             grid_columns=grid_columns,
             name="Camera AOVs",
         ),
@@ -650,8 +807,6 @@ def log_aovs_to_rerun(rr, frame) -> int:
 
 def export_aov_pngs(frame, output_dir: Path) -> int:
     """Write display PNGs for no-spawn runs without changing the Rerun logging path."""
-    from PIL import Image
-
     output_dir.mkdir(parents=True, exist_ok=True)
 
     def save_png(name: str, image: np.ndarray) -> None:
@@ -758,6 +913,8 @@ def export_aov_pngs(frame, output_dir: Path) -> int:
         "LdrColor": rgba_or_rgb_uint8,
         "HdrColor": hdr_to_srgb,
         "NormalSD": normal_to_uint8,
+        "Depth": turbo_colormap,
+        "XRDepth": turbo_colormap,
         "DepthSD": turbo_colormap,
         "DistanceToCameraSD": turbo_colormap,
         "DistanceToImagePlaneSD": turbo_colormap,
@@ -776,6 +933,640 @@ def export_aov_pngs(frame, output_dir: Path) -> int:
         exported += 1
 
     return exported
+
+
+def capture_additional_aovs(rr, frame, initial_maps: dict, output_dir: Path) -> int:
+    """Save additional SD tensors and capture diagnostics, including failures, without hiding empty outputs."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report = {}
+    tensors = {name: _map_render_var(frame, name) for name in ("LdrColor", "SemanticIdMap")}
+    np.save(output_dir / "SemanticIdMap.npy", tensors["SemanticIdMap"])
+    names = (
+        "SemanticInstanceSegmentation", "StableIdSegmentation",
+        "NonStableInstanceSegmentation", "BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
+        "SemanticBoundingBox2DTight", "SemanticBoundingBox2DLoose", "SemanticBoundingBox3D", "OcclusionSD",
+        "TruncationSD", "InstanceIdTokenMapSD", "StableIdMap", "InstanceMap", "StableIdMapDeltas",
+        "SemanticIdMapDeltas", "CameraParams", "CrossCorrespondenceSD", "StableIdSemanticIdMap",
+    )
+    names += tuple(name for name in ("Depth", "XRDepth") if f"/Render/Camera/{name}" in frame.render_vars)
+    for name in names:
+        try:
+            values = _map_render_var(frame, name)
+            np.save(output_dir / f"{name}.npy", values)
+            tensors[name] = values
+            entry = {"shape": list(values.shape), "dtype": str(values.dtype), "bytes": values.nbytes}
+            if values.size:
+                entry.update(nonzero=int(np.count_nonzero(values)), finite=bool(np.all(np.isfinite(values))))
+                _log_raw_tensor(rr, name, values)
+                if values.ndim == 3:
+                    entry["occupied_pixels"] = int(np.count_nonzero(np.any(values != 0, axis=-1)))
+                    entry["unique_ids"] = int(np.unique(values.reshape(-1, values.shape[-1]), axis=0).shape[0])
+                    display = (_visualize_scalar(np.squeeze(values)) if name in ("Depth", "XRDepth")
+                               else _visualize_labels(values))
+                    Image.fromarray(display).save(output_dir / f"{name}.png")
+                    rr.log(f"render/aovs/{name}/display", rr.Image(display))
+            report[name] = entry
+            print(f"  Captured {name}: {entry}", file=sys.stderr)
+        except (KeyError, RuntimeError, ValueError) as exc:
+            report[name] = {"error": str(exc)}
+            print(f"  Cannot capture {name}: {exc}", file=sys.stderr)
+
+    visualize_sd_buffers(rr, tensors, initial_maps, output_dir)
+    (output_dir / "capture.json").write_text(json.dumps(report, indent=2) + "\n")
+    return sum(entry.get("bytes", 0) > 0 for entry in report.values())
+
+
+def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path) -> None:
+    """Decode SD records and show their camera-space meaning without presenting metadata as raw pixels."""
+    # Join semantic indices to stable IDs, paths and labels; map ordering alone is not an index contract.
+    id_maps = {}
+    decoded = {}
+    for name in ("SemanticIdMap", "StableIdMap", "StableIdMapDeltas", "SemanticIdMapDeltas"):
+        values = initial_maps.get(name, tensors[name]) if name.endswith("Deltas") else tensors[name]
+        if values is None:
+            continue
+        id_maps[name] = _decode_id_map(values)
+        count = int.from_bytes(values[-4:].tobytes(), "little")
+        entries = values[:count * 24].view("<u4").reshape(-1, 6)
+        # Preserve repeated stable IDs: a mesh and its first subset can share an ID but have different paths.
+        decoded[name] = [
+            {"id": row[:4].tolist(), "label": values[int(row[5]):int(row[5] + row[4])].tobytes().decode("utf-8")}
+            for row in entries
+        ]
+
+    pairs = tensors["StableIdSemanticIdMap"].view("<u4").reshape(-1, 8)
+    decoded["StableIdSemanticIdMap"] = pairs.tolist()
+    stable_paths = id_maps["StableIdMap"]
+    semantic_labels = id_maps["SemanticIdMap"]
+    robot_paths = [
+        "/World/GR1T2_fourier_hand_6dof", "/World/spot", "/World/forklift_c", "/World/forklift_b",
+        "/World/carter_v1", "/World/jetbot", "/World/kaya",
+    ]
+    palette = [(255, 110, 100), (255, 205, 70), (80, 210, 250), (205, 145, 255),
+               (105, 225, 160), (245, 145, 210), (160, 210, 255)]
+    robot_by_index = {}
+    robot_by_stable = {}
+    for index, pair in enumerate(pairs):
+        path = stable_paths.get(pair[:4].tobytes(), "")
+        for robot, root in enumerate(robot_paths):
+            if path == root or path.startswith(root + "/"):
+                robot_by_index[index] = robot
+                robot_by_stable[pair[:4].tobytes()] = robot
+                break
+
+    # InstanceIdToken has native alignment padding; the first record is metadata, not an instance.
+    token_dtype = np.dtype({"names": ["instance", "token", "prototype", "instancer"],
+                           "formats": ["<u4", "<u8", "<u4", "<u4"],
+                           "offsets": [0, 8, 16, 20], "itemsize": 24})
+    tokens = tensors["InstanceIdTokenMapSD"].view(token_dtype)
+    count = int(tokens[0]["instance"])
+    if count + 1 != len(tokens):
+        raise ValueError("Instance token-map count does not match its byte length")
+    min_instance = int(tokens[0]["token"]) & 0xFFFFFFFF
+    instance_map = tensors["InstanceMap"].view("<u4")
+    decoded["InstanceIdTokenMapSD"] = {
+        "count": count, "min_instance": min_instance, "max_instance": int(tokens[0]["token"]) >> 32,
+        "tiles": int(tokens[0]["prototype"]),
+        "records": [[int(row[field]) for field in token_dtype.names] for row in tokens[1:]],
+    }
+    decoded["InstanceMap"] = instance_map.tolist()
+    robot_by_instance = {
+        min_instance + index: robot_by_index[int(semantic_index)]
+        for index, semantic_index in enumerate(instance_map) if int(semantic_index) in robot_by_index
+    }
+
+    # Camera matrices use row vectors. Keep camera and box values in scene units; no extra metre scaling is needed.
+    camera = tensors["CameraParams"]
+    if camera.size != 260:
+        raise ValueError(f"Expected a 260-byte CameraParams record, got {camera.size}")
+    view, projection = camera[:128].view("<f4").reshape(2, 4, 4).astype(np.float64)
+    width, height = map(int, camera[132:140].view("<u4"))
+    near, far = map(float, camera[140:148].view("<f4"))
+    camera_model = camera[148:173].tobytes().split(b"\0", 1)[0].decode("utf-8")
+    if camera_model != "pinhole":
+        raise ValueError("This example's box projection currently supports pinhole cameras only")
+    decoded["CameraParams"] = {
+        "view": view.tolist(), "projection": projection.tolist(),
+        "meters_per_scene_unit": float(camera[128:132].view("<f4")[0]),
+        "resolution": [width, height], "near_far": [near, far], "model": camera_model,
+        "focal_length_distance_fstop_fovx": camera[176:192].view("<f4").tolist(),
+        "fisheye_parameters": camera[192:].view("<f4").tolist(),
+    }
+    base = Image.fromarray(tensors["LdrColor"]).convert("RGB")
+    base = Image.blend(base, Image.new("RGB", base.size, (15, 20, 28)), 0.35)
+    font = ImageFont.load_default(size=max(14, width // 85))
+    small_font = ImageFont.load_default(size=max(12, width // 105))
+    boxes = {}
+    for name in ("BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
+                 "SemanticBoundingBox2DTight", "SemanticBoundingBox2DLoose", "SemanticBoundingBox3D"):
+        semantic = name.startswith("Semantic")
+        three_d = "3D" in name
+        fields = [("stable", "<u4", 4), ("semantic", "<u4", 4)] if semantic else [
+            ("instance", "<u4"), ("tile", "<u4")]
+        fields += [("min", "<f4" if three_d else "<i4", 3 if three_d else 2),
+                   ("max", "<f4" if three_d else "<i4", 3 if three_d else 2)]
+        if three_d:
+            fields += [("transform", "<f4", (4, 4))]
+        dtype = np.dtype(fields)
+        values = tensors[name]
+        count = int.from_bytes(values[-4:].tobytes(), "little") if semantic else values.size // dtype.itemsize
+        if count * dtype.itemsize > values.size - (4 if semantic else 0):
+            raise ValueError(f"Invalid record count for {name}")
+        records = values[:count * dtype.itemsize].view(dtype)
+        decoded[name] = [{field: row[field].tolist() for field in dtype.names} for row in records]
+        selected = []
+        for row in records:
+            robot = (robot_by_stable.get(row["stable"].tobytes()) if semantic
+                     else robot_by_instance.get(int(row["instance"])))
+            if robot is None or np.any(row["max"] < row["min"]):
+                continue
+            # Semantic views show one aggregate box per top-level robot. Raw views retain individual robot parts.
+            if semantic and stable_paths.get(row["stable"].tobytes()) != robot_paths[robot]:
+                continue
+            selected.append((robot, row))
+        boxes[name] = selected
+
+    # Reuse one edge projection for both raw/semantic boxes and the camera-parameter illustration.
+    # [snippet:doc-lineup-project-box]
+    def draw_projected_box(draw, row, color) -> int:
+        """Transform eight local corners and clip each edge against the camera near plane before projection."""
+        corners = np.array([[row["max"][axis] if index & (1 << axis) else row["min"][axis]
+                             for axis in range(3)] + [1] for index in range(8)], dtype=np.float64)
+        clip = corners @ row["transform"] @ view @ projection
+        edges_drawn = 0
+        for first in range(8):
+            for axis in range(3):
+                second = first ^ (1 << axis)
+                if second < first:
+                    continue
+                a, b = clip[first].copy(), clip[second].copy()
+                if not np.all(np.isfinite([a, b])) or max(a[3], b[3]) < near:
+                    continue
+                if a[3] < near:
+                    a += (b - a) * (near - a[3]) / (b[3] - a[3])
+                if b[3] < near:
+                    b += (a - b) * (near - b[3]) / (a[3] - b[3])
+                ndc = np.array([a[:2] / a[3], b[:2] / b[3]])
+                pixels = (ndc * [0.5, -0.5] + 0.5) * [width, height]
+                draw.line([tuple(point) for point in pixels], fill=color, width=max(1, width // 750))
+                edges_drawn += 1
+        return edges_drawn
+    # [/snippet:doc-lineup-project-box]
+
+    displays = {}
+    visual_report = {}
+    for name, selected in boxes.items():
+        image = base.copy()
+        draw = ImageDraw.Draw(image)
+        drawn = 0
+        for robot, row in selected:
+            if "3D" in name:
+                drawn += draw_projected_box(draw, row, palette[robot]) > 0
+            else:
+                bounds = (*map(int, row["min"]), *map(int, row["max"]))
+                draw.rectangle(bounds, outline=palette[robot], width=max(1, width // 750))
+                drawn += 1
+            if name.startswith("Semantic") and "3D" not in name:
+                x, y = map(int, row["min"])
+                label = robot_paths[robot].split("/")[-1].replace("_fourier_hand_6dof", "")
+                draw.text((x, max(75, y - 30)), label, font=small_font, fill=palette[robot], stroke_width=2,
+                          stroke_fill=(0, 0, 0))
+        draw.rectangle((0, 0, width, 65), fill=(15, 20, 28))
+        draw.text((18, 12), f"{name} | {drawn} robot {'boxes' if name.startswith('Semantic') else 'part boxes'}",
+                  font=font, fill="white")
+        displays[name] = image
+        visual_report[name] = {"selected_records": len(selected), "drawn_boxes": drawn}
+
+    # Occlusion is a per-instance statistic, not a pixel image: color the corresponding loose boxes.
+    visibility_dtype = np.dtype([("instance", "<u4"), ("tile", "<u4"), ("ratio", "<f4")])
+    occlusion = tensors["OcclusionSD"].view(visibility_dtype)
+    decoded["OcclusionSD"] = [{field: row[field].tolist() for field in visibility_dtype.names} for row in occlusion]
+    ratios = {int(row["instance"]): float(row["ratio"]) for row in occlusion}
+    image = base.copy()
+    draw = ImageDraw.Draw(image)
+    drawn = 0
+    for robot, row in boxes["BoundingBox2DLooseSD"]:
+        ratio = ratios.get(int(row["instance"]), -1)
+        if not 0 <= ratio <= 1:
+            continue
+        color = (int(70 + 185 * ratio), int(220 - 150 * ratio), 75)
+        draw.rectangle((*map(int, row["min"]), *map(int, row["max"])), outline=color, width=max(1, width // 750))
+        drawn += 1
+    draw.rectangle((0, 0, width, 65), fill=(15, 20, 28))
+    draw.text((18, 12), "OcclusionSD | robot part boxes: green = visible, red = occluded; -1 omitted",
+              font=font, fill="white")
+    displays["OcclusionSD"] = image
+    visual_report["OcclusionSD"] = {"drawn_boxes": drawn}
+
+    # Metadata gets an annotated scene plus readable decoded rows. These are derived illustrations, not image AOVs.
+    token_by_instance = {int(row["instance"]): row for row in tokens[1:]}
+    for name in ("SemanticIdMap", "StableIdMap", "InstanceIdTokenMapSD", "InstanceMap", "StableIdMapDeltas",
+                 "SemanticIdMapDeltas", "StableIdSemanticIdMap", "CameraParams"):
+        image = Image.new("RGB", (width, height), (15, 20, 28))
+        draw = ImageDraw.Draw(image)
+        scene = displays["SemanticBoundingBox3D" if name == "CameraParams" else "SemanticBoundingBox2DTight"].copy()
+        scene.thumbnail((width * 2 // 3, height * 3 // 4))
+        image.paste(scene, (0, height // 7))
+        panel_x = width * 2 // 3 + 12
+        draw.text((18, 20), name + " | decoded metadata", font=font, fill="white")
+        lines = []
+        if name == "CameraParams":
+            params = decoded[name]
+            focal, distance, fstop, fov = params["focal_length_distance_fstop_fovx"]
+            lines = [camera_model, f"Resolution: {width} x {height}",
+                     f"Metres / scene unit: {params['meters_per_scene_unit']:.3g}",
+                     f"Clipping: {near:g} ... {far:g}", f"Focal length: {focal:g}",
+                     f"Focus distance: {distance:g}", f"f-stop: {fstop:g}",
+                     f"Horizontal FOV: {np.degrees(fov):.2f} deg",
+                     "", "Row-vector projection:", "local @ box transform", "@ view @ projection", "divide XY by W",
+                     "map NDC to image pixels", "", "View matrix:"]
+            lines += [" ".join(f"{value: .3f}" for value in row) for row in view]
+            lines += ["", "Projection matrix:"]
+            lines += [" ".join(f"{value: .3f}" for value in row) for row in projection]
+        else:
+            for robot, root in enumerate(robot_paths):
+                indices = [index for index, owner in robot_by_index.items() if owner == robot
+                           and stable_paths.get(pairs[index, :4].tobytes()) == root]
+                if not indices:
+                    continue
+                index = indices[0]
+                key = pairs[index, :4].tobytes()
+                label_key = pairs[index, 4:].tobytes()
+                caption = root.split("/")[-1].replace("_fourier_hand_6dof", "")
+                lines.append((caption, palette[robot]))
+                if name in ("StableIdMap", "StableIdMapDeltas"):
+                    source = id_maps.get(name, {})
+                    lines += [f"ID: {key.hex()}", source.get(key, "No entry in this capture").replace("/World/", "")]
+                elif name in ("SemanticIdMap", "SemanticIdMapDeltas"):
+                    source = id_maps.get(name, {})
+                    lines += [f"Semantic ID: {int(pairs[index, 4])}",
+                              source.get(label_key, "No entry in this capture").replace("label: ", "")]
+                elif name == "StableIdSemanticIdMap":
+                    lines += [f"Semantic-instance index: {index}",
+                              f"Stable {key.hex()[:16]}... -> label {int(pairs[index, 4])}"]
+                else:
+                    instances = [instance for instance, owner in robot_by_instance.items() if owner == robot
+                                 and int(instance_map[instance - min_instance]) == index]
+                    if name == "InstanceMap":
+                        lines += [f"{len(instances)} runtime instances -> index {index}",
+                                  f"Pixels encode index + 2 = {index + 2}"]
+                    else:
+                        token = token_by_instance.get(instances[0]) if instances else None
+                        lines += [f"{len(instances)} matching runtime instances"]
+                        lines += [f"ID {int(token['instance'])}: token {int(token['token']):#x}"
+                                  if token is not None else "No direct token record"]
+                lines.append("")
+        y = 85
+        for line in lines:
+            text, color = line if isinstance(line, tuple) else (line, "white")
+            # Keep labels inside the panel; full strings and complete identifiers remain in decoded.json.
+            text = text if len(text) <= 43 else text[:40] + "..."
+            draw.text((panel_x, y), text, font=small_font, fill=color)
+            y += max(18, height // 36)
+        footer = "Robot subset shown; all decoded records are saved in decoded.json."
+        if name.endswith("Deltas"):
+            current_count = int.from_bytes(tensors[name][-4:].tobytes(), "little")
+            footer = f"First frame: {len(decoded.get(name, []))} entries. Static capture: {current_count} new entries."
+        elif name == "StableIdMap":
+            unique_ids = np.unique(tensors["StableIdSegmentation"].reshape(-1, 4), axis=0)
+            matched = sum(row.tobytes() in stable_paths for row in unique_ids)
+            footer = (f"Partial geometry coverage: {matched}/{len(unique_ids)} visible IDs. "
+                      "Semantic-instance IDs resolve.")
+        draw.text((18, height - 75), footer, font=small_font, fill="white")
+        displays[name] = image
+
+    for name, image in displays.items():
+        image.save(output_dir / f"{name}.png")
+        rr.log(f"render/aovs/{name}/display", rr.Image(np.asarray(image)))
+    (output_dir / "decoded.json").write_text(json.dumps(decoded, indent=2) + "\n")
+    (output_dir / "visualization.json").write_text(json.dumps(visual_report, indent=2) + "\n")
+
+
+# Registered PT output candidates; empty outputs stay in capture diagnostics, not the docs table.
+PT_AOV_NAMES = [
+    'LdrColor', 'HdrColor', 'PtDirectIllumation', 'PtGlobalIllumination',
+    'PtReflections', 'PtRefractions', 'PtSubsurfaceScattering', 'PtSelfIllumination',
+    'PtBackground', 'PtPreDenoisedResult', 'PtWorldNormal', 'PtWorldPos',
+    'PtViewNormal', 'PtZDepth', 'PtVolumes', 'PtDiffuseFilter',
+    'PtReflectionFilter', 'PtRefractionFilter', 'PtSubsurfaceFilter', 'PtLuminance',
+    'PtIlluminance', 'PtMotion', 'PtLpe0', 'PtLpe1',
+    'PtLpe2', 'PtLpe3', 'PtLpe4', 'PtLpe5',
+    'PtLpe6', 'PtLpe7', 'PtLpe8', 'DeveloperDebugTexture',
+    'DlssInput', 'BumpNormal', 'BumpNormalResearch', 'DiffuseAlbedo',
+    'SpecularAlbedo', 'ReflectionsMotion2d', 'ReflectionsFirstBounceDiffuseAlbedo', 'ReflectionsFirstBounceNormal',
+    'DepthLinearized', 'Motion2dXYZ', 'Motion2dDilated', 'Motion2dXYZDilated',
+    'MotionWorld', 'EmissionAndForegroundMask', 'DiffuseLightingDirectAndIndirect', 'SpecularLightingDirectAndIndirect',
+    'LightingComposited', 'Exposure', 'ViewMatricesAux', 'Roughness',
+    'DisocclusionMask', 'ReprojectionQuality', 'ViewspacePosition', 'ReflectionsHitT',
+    'SubsurfaceScattering', 'SubsurfaceTransmission', 'HighResDepth', 'HighResMotion2d',
+    'HighResMotion2dXYZ', 'HighResDisocclusionMask', 'HighResReflectionsMotion2d', 'ReflectionsFirstBounceRayDirAndHitT',
+    'XRDepth', 'GroundTruthDeveloperDebugTexture', 'GroundTruthDiffuseAlbedo', 'GroundTruthSpecularAlbedo',
+    'GroundTruthDiffuseLighting', 'GroundTruthSpecularLighting', 'GroundTruthCustomComposited', 'GroundTruthEmissionAndForegroundMask',
+    'GroundTruthDepthLinearized', 'GroundTruthDepthLinearizedAvgMinMax', 'GroundTruthNormals', 'GroundTruthSubsurfaceScattering',
+    'GroundTruthSubsurfaceTransmission', 'GroundTruthDlssInput', 'GroundTruthDlssInputTonemapped', 'PtMultiMatte0',
+    'PtMultiMatte1', 'PtMultiMatte2', 'PtMultiMatte3', 'PtMultiMatte4',
+    'PtMultiMatte5', 'PtMultiMatte6', 'PtMultiMatte7',
+]
+PT_LPE_EXPRESSIONS = ["E.*L", "E<RD>.*L", "E<RG>.*L", "E<TD>.*L", "E<TG>.*L",
+                      "E<RD>L", "E<RG>L", "E<RD>.+L", "E<RG>.+L"]
+# [snippet:doc-pt-multimatte-channels]
+# Each requested RenderVar selects four independent RGBA masks. -1 disables a component.
+# RGB selectors follow camera position for the sliced preview; alpha is shown separately.
+PT_MULTIMATTE_CHANNELS = [
+    (8, False), (9, False), (10, False), (11, False),
+    (1, False), (2, False), (5, False), (6, False),
+    (4, False), (103, True), (104, True), (7, False),
+    (3, False), (101, True), (102, True), (-1, False),
+]
+# [/snippet:doc-pt-multimatte-channels]
+PT_MOTION_NAMES = {"PtMotion", "Motion2dXYZ", "Motion2dDilated", "Motion2dXYZDilated", "MotionWorld",
+                   "HighResMotion2d", "HighResMotion2dXYZ", "HighResReflectionsMotion2d", "TargetMotionSD"}
+
+
+# [snippet:doc-pt-lineup-render-product]
+def build_pt_render_layer_usda(scene_path: Path, resolution: tuple[int, int], samples_per_pixel: int = 128) -> str:
+    """Request PT outputs on the same labeled lineup without changing its source scene."""
+    base = build_render_layer_usda(scene_path, resolution)
+    # Tag existing objects and bound materials; mask IDs do not change their appearance.
+    robot_names = ["GR1T2_fourier_hand_6dof", "spot", "forklift_c", "forklift_b",
+                   "carter_v1", "jetbot", "kaya"]
+    material_overrides = {
+        "forklift_c": '''over "Looks" {
+            over "M_Forklift_C01" {
+                int multimatte_id = 101
+            }
+            over "M_Forklift_C01_Blue" {
+                int multimatte_id = 102
+            }
+        }''',
+        "forklift_b": '''over "Looks" {
+            over "M_Forklift_B1_Body" {
+                int multimatte_id = 103
+            }
+            over "M_Forklift_B1_Glass" {
+                int multimatte_id = 104
+            }
+        }''',
+    }
+    for identifier, name in enumerate(robot_names, 1):
+        base = re.sub(r'(over "' + name + r'"\s*\([^)]*\)\s*\{)',
+                      lambda match: match[0] + f'\n        int primvars:multimatte_id = {identifier}\n'
+                      + material_overrides.get(name, "") + "\n", base)
+    # The source scene assigns IDs 8/9/10 to warehouse walls, shelves and pallets.
+    # The source scene also tags warehouse floors with ID 11 for an independent alpha mask.
+    # Request only the four configured Multi-Matte RenderVars; each carries its own selectors.
+    names = list(dict.fromkeys(PT_AOV_NAMES + re.findall(r'string sourceName = "(\w+)"', base)))
+    names = [name for name in names if not name.startswith("PtMultiMatte") or int(name[-1]) < 4]
+    definitions = []
+    for name in names:
+        expression = PT_LPE_EXPRESSIONS[int(name[-1])] if name.startswith("PtLpe") else name
+        source_type = 'token sourceType = "lpe"' if name.startswith("PtLpe") else ''
+        matte_selectors = ""
+        if name.startswith("PtMultiMatte"):
+            index = int(name[-1])
+            selectors = PT_MULTIMATTE_CHANNELS[index * 4:index * 4 + 4]
+            for component, (identifier, is_material) in zip("rgba", selectors):
+                matte_selectors += f"int omni:rtx:pt:multimatte:{component}Id = {identifier}\n"
+                matte_selectors += f"bool omni:rtx:pt:multimatte:{component}IsMat = {str(is_material).lower()}\n"
+        definitions.append(f'def RenderVar "{name}" {{\nstring sourceName = "{expression}"\n{source_type}\n{matte_selectors}}}')
+    variables = "\n".join(definitions)
+    ordered = ", ".join(f"<{name}>" for name in names)
+    width, height = resolution
+    # Allow two setup passes after scene edits; samplesPerPixel still caps the render at the requested SPP.
+    return base.split('def "Render"', 1)[0] + f'''def "Render" {{
+    def RenderProduct "Camera" {{
+        rel camera = </World/Camera>
+        int2 resolution = ({width}, {height})
+        token omni:rtx:rendermode = "PathTracing"
+        uint omni:rtx:pt:samplesPerPixel = {samples_per_pixel}
+        int omni:rtx:pt:samplesPerIteration = {min(samples_per_pixel, 32)}
+        int omni:rtx:quality = 100
+        int omni:rtx:quality:minSpp = {samples_per_pixel + 2 * min(samples_per_pixel, 32)}
+        bool omni:rtx:pt:adaptiveSampling:enabled = false
+        bool omni:rtx:pt:radianceCache:enabled = false
+        uint omni:rtx:rt:groundTruth:resolution:width = {width}
+        uint omni:rtx:rt:groundTruth:resolution:height = {height}
+        rel orderedVars = [{ordered}]
+        {variables}
+    }}
+}}
+'''
+# [/snippet:doc-pt-lineup-render-product]
+
+
+# [snippet:doc-pt-pixels-python]
+def decode_pt_pixels(values: np.ndarray) -> np.ndarray:
+    """Read typed PT pixels, converting half floats to float32 and UNORM bytes to [0,1]."""
+    if values.ndim != 3 or values.shape[-1] not in (1, 2, 4):
+        raise ValueError("Expected a channel-last PT image")
+    if values.dtype == np.uint8:
+        return values.astype(np.float32) / 255.0
+    if values.dtype not in (np.float16, np.float32):
+        raise ValueError("Expected uint8, float16, or float32 PT pixels")
+    return values.astype(np.float32)
+# [/snippet:doc-pt-pixels-python]
+
+
+# [snippet:doc-pt-view-data-python]
+def decode_pt_view_data(values: np.ndarray) -> np.void:
+    """Decode the 236 float32 values in ViewMatricesAux, preserving its matrix order."""
+    matrix_names = ["projection", "projection_no_jitter", "inverse_projection", "view", "inverse_view",
+                    "view_projection", "inverse_view_projection", "view_no_roll", "translated_view",
+                    "inverse_translated_view", "overridden_translated_view", "inverse_overridden_translated_view",
+                    "translated_view_projection", "inverse_translated_view_projection"]
+    dtype = np.dtype([(name, "<f4", (4, 4)) for name in matrix_names] + [
+        ("pre_view_translation", "<f4", 4), ("view_origin", "<f4", 4),
+        ("projection_scale", "<f4", 2), ("projection_jitter", "<f4", 2)])
+    if values.dtype != np.float32 or values.size != 236:
+        raise ValueError("ViewMatricesAux must contain exactly 236 float32 values")
+    return np.ascontiguousarray(values).reshape(-1).view(dtype)[0]
+# [/snippet:doc-pt-view-data-python]
+
+
+def pt_display_image(name: str, values: np.ndarray, exposure: float = 1.0) -> np.ndarray:
+    """Make PT previews by output meaning; display remapping never changes saved raw values."""
+    pixels = decode_pt_pixels(values)
+    if name == "ViewMatricesAux":
+        # Give the auxiliary record a readable preview rather than a 236-pixel strip.
+        record = decode_pt_view_data(values)
+        image = Image.new("RGB", (640, 540), "#101820")
+        draw = ImageDraw.Draw(image)
+        draw.text((16, 12), "ViewMatricesAux: 236 float32 values", fill="white")
+        for index, field in enumerate(record.dtype.names):
+            data = np.asarray(record[field]).reshape(-1)
+            summary = ", ".join(f"{value:.4g}" for value in data[:4])
+            draw.text((16, 42 + index * 26), f"{field}: {summary}", fill="white")
+        return np.asarray(image)
+    if name == "Exposure":
+        image = Image.new("RGB", (640, 360), "#101820")
+        ImageDraw.Draw(image).text((40, 160), f"Exposure multiplier: {float(pixels[0, 0, 0]):.7g}", fill="white")
+        return np.asarray(image)
+    if name in PT_MOTION_NAMES:
+        # XY are screen-space pixel displacement; MotionWorld remains in scene units.
+        padded = np.zeros((*pixels.shape[:2], 4), dtype=np.float32)
+        padded[..., :min(3, pixels.shape[-1])] = pixels[..., :min(3, pixels.shape[-1])]
+        padded[..., 3] = 1
+        if name == "MotionWorld":
+            # World displacement is in scene units; normalize XY magnitude for this preview.
+            magnitude = np.linalg.norm(padded[..., :2], axis=-1)
+            scale = max(float(np.percentile(magnitude[magnitude > 0], 99)), 1e-6) if np.any(magnitude > 0) else 1
+            padded[..., :2] *= 20 / scale
+        return _visualize_motion(padded)
+    if "Normal" in name or name == "ReflectionsFirstBounceRayDirAndHitT":
+        return _to_uint8_image(np.clip(pixels[..., :3] * .5 + .5, 0, 1))
+    if name in ("PtWorldPos", "ViewspacePosition", "Camera3dPositionSD"):
+        rgb = pixels[..., :3]
+        lo, hi = np.nanpercentile(rgb, [1, 99], axis=(0, 1))
+        return _to_uint8_image(np.clip((rgb - lo) / np.maximum(hi - lo, 1e-6), 0, 1))
+    if name == "Roughness":
+        return _to_uint8_image(np.repeat(pixels[..., 2:3], 3, axis=-1))
+    if pixels.shape[-1] == 1 or name == "PtZDepth":
+        scalar = pixels[..., 0]
+        valid = np.isfinite(scalar) & (np.abs(scalar) < 1e30)
+        lo, hi = np.percentile(scalar[valid], [1, 99]) if np.any(valid) else (0, 1)
+        gray = np.clip((np.where(valid, scalar, lo) - lo) / max(float(hi - lo), 1e-6), 0, 1)
+        if name in ("DisocclusionMask", "HighResDisocclusionMask", "ReprojectionQuality"):
+            gray = np.clip(scalar, 0, 1)
+        return _to_uint8_image(np.repeat(gray[..., None], 3, axis=-1))
+    if values.dtype == np.uint8 or "Filter" in name or name.startswith("PtMultiMatte"):
+        return _to_uint8_image(pixels[..., :3])
+    if name in {"PtLuminance", "PtIlluminance", "DiffuseLightingDirectAndIndirect",
+                "SpecularLightingDirectAndIndirect", "LightingComposited"}:
+        # Photometric and filter-free lighting have different ranges from beauty radiance.
+        # Log compression retains both bright highlights and darker geometry in their previews.
+        rgb = np.log1p(np.maximum(pixels[..., :3], 0))
+        scale = max(float(np.percentile(rgb, 99)), 1e-6)
+        return _to_uint8_image(np.clip(rgb / scale, 0, 1))
+    # Radiance components use a common exposure from HdrColor and an sRGB display transfer.
+    rgb = np.maximum(pixels[..., :3] * exposure, 0)
+    rgb = np.where(rgb <= .0031308, 12.92 * rgb, 1.055 * np.power(rgb, 1 / 2.4) - .055)
+    return _to_uint8_image(np.clip(rgb, 0, 1))
+
+
+def capture_pt_lineup(args) -> None:
+    """Save PT static outputs before robot motion, then replace only motion previews."""
+    import rerun as rr
+    output_dir = EXAMPLE_DIR / "_output" / "pt"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    rr.init("ovrtx_path_tracing_aovs", spawn=not args.no_spawn)
+    renderer = ovrtx.Renderer()
+    stage = ovstage.Stage("ovrtx.example.path-tracing-aovs")
+    renderer.attach_ovstage(stage)
+    report = {}
+    tensors = {}
+    try:
+        layer = build_pt_render_layer_usda(_scene_asset_path(args.usd), tuple(args.resolution), args.samples_per_pixel)
+        ovstage.population.open_usd_from_string(stage, layer, ordinal=1)
+        stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
+        names = list(dict.fromkeys(PT_AOV_NAMES + re.findall(r'string sourceName = "(\w+)"', build_render_layer_usda(_scene_asset_path(args.usd), tuple(args.resolution)))))
+        initial_maps = {}
+        # PT converges within one frame; RT warmup frames do not apply to this capture.
+        products = renderer.step(render_products={"/Render/Camera"}, delta_time=args.step_dt, ordinal=1)
+        frame = next(iter(products.values())).frames[0]
+        for name in ("StableIdMapDeltas", "SemanticIdMapDeltas"):
+            initial_maps[name] = _map_render_var(frame, name)
+        if not frame.converged:
+            raise RuntimeError("PT static frame did not reach the requested sample count")
+        print(f"PT static capture: one frame at {args.samples_per_pixel} SPP, converged={frame.converged}, iterations={frame.progression}", file=sys.stderr, flush=True)
+        for name in names:
+            try:
+                values = _map_render_var(frame, name)
+                tensors[name] = values
+                np.save(output_dir / f"{name}.npy", values)
+                content = values[..., :min(values.shape[-1], 3)] if values.ndim == 3 else values
+                report[name] = {"shape": list(values.shape), "dtype": str(values.dtype), "size": int(values.size),
+                                "nonzero_content": int(np.count_nonzero(content)), "nonfinite": int(np.count_nonzero(~np.isfinite(values)))}
+            except Exception as exc:
+                report[name] = {"error": str(exc)}
+        # Shared Synthetic Data decoding and overlays use the same records as the RT capture.
+        capture_additional_aovs(rr, frame, initial_maps, output_dir)
+        export_aov_pngs(frame, output_dir)
+        display_exposure = 1 / max(float(np.percentile(tensors["HdrColor"][..., :3].astype(np.float32), 99)), 1e-6)
+        for name in PT_AOV_NAMES:
+            values = tensors.get(name)
+            if values is None or values.ndim != 3 or not values.size:
+                continue
+            image = pt_display_image(name, values, display_exposure)
+            Image.fromarray(image).save(output_dir / f"{name}.png")
+            rr.log(f"render/aovs/{name}/display", rr.Image(image))
+        # Use corresponding vertical slices to fit each output family into one table image.
+        width, height = args.resolution
+        families = [
+            ("LightPathExpressions", [f"PtLpe{i}" for i in range(9)],
+             [f"{i}: {expression}" for i, expression in enumerate(PT_LPE_EXPRESSIONS)]),
+            ("MultiMatte", [f"PtMultiMatte{i}" for i in range(4)],
+             [f"{i}: " + "/".join(f"{'M' if material else 'G'}{identifier}"
+                                   for identifier, material in PT_MULTIMATTE_CHANNELS[i * 4:i * 4 + 4])
+              for i in range(4)]),
+        ]
+        for filename, outputs, captions in families:
+            # Empty buffers cannot produce an illustration; retain them only in capture diagnostics.
+            if any(name not in tensors or not tensors[name].size for name in outputs):
+                continue
+            if filename == "MultiMatte" and any(not np.any(tensors[name][..., channel])
+                                                for name in outputs for channel in range(3)):
+                print("Multi-Matte has empty masks; skipping its combined preview", file=sys.stderr)
+                continue
+            # Alpha is independent coverage, not opacity for the RGB mask preview.
+            alpha_height = height // 4 if filename == "MultiMatte" else 0
+            preview = Image.new("RGB", (width, height + 24 + alpha_height), "#101820")
+            labels = ImageDraw.Draw(preview)
+            for index, (name, caption) in enumerate(zip(outputs, captions)):
+                left, right = index * width // len(outputs), (index + 1) * width // len(outputs)
+                with Image.open(output_dir / f"{name}.png") as image:
+                    preview.paste(image.crop((left, 0, right, height)), (left, 24))
+                labels.text((left + 3, 5), caption, fill="white")
+                if alpha_height:
+                    alpha = np.rint(np.clip(tensors[name][..., 3], 0, 1) * 255).astype(np.uint8)
+                    alpha_image = Image.fromarray(alpha).resize((right - left, alpha_height))
+                    preview.paste(alpha_image.convert("RGB"), (left, height + 24))
+            preview.save(output_dir / f"{filename}.png")
+        del frame, products
+
+        robot_paths = ["/World/GR1T2_fourier_hand_6dof", "/World/spot", "/World/forklift_c", "/World/forklift_b",
+                       "/World/carter_v1", "/World/jetbot", "/World/kaya"]
+        velocities = np.array([(3,0,0),(-3,0,0),(2,0,1),(-2,0,1),(3,0,1),(-3,0,1),(2,0,1)], dtype=np.float64)
+        ordinal = 1
+        with ovstage.PathDictionary(stage) as paths:
+            path_list = paths.create_path_list_from_strings(robot_paths)
+            with stage.query_from_path_list(path_list) as query:
+                attribute = paths.intern_token("omni:xform")
+                transforms = np.full((len(robot_paths),4,4), np.nan, dtype=np.float64)
+                with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                    while (group := read.fetch_next()) is not None:
+                        values = np.from_dlpack(group.dlpack(0)).reshape(-1,4,4)
+                        for i in range(group.prim_count):
+                            transforms[group.prim_index(i)] = values[group.data_row_index(i)]
+                        del values
+                        stage.release_group(group)
+                if not np.isfinite(transforms).all():
+                    raise RuntimeError("Missing robot transforms for PT motion capture")
+                dtype = ovstage.numpy_to_dldatatype(transforms.dtype, lanes=16)
+                # Render one moved frame after saving the static outputs.
+                transforms[:,3,:3] += velocities * args.step_dt
+                ordinal += 1
+                tensor = ovstage.make_dltensor(transforms, dtype=dtype, shape=[len(robot_paths)], ndim=1)
+                stage.write_attribute(query, attribute, ordinal=ordinal, tensors=tensor, is_array=False).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                products = renderer.step(render_products={"/Render/Camera"}, delta_time=args.step_dt, ordinal=ordinal)
+                frame = next(iter(products.values())).frames[0]
+                print(f"PT motion capture: converged={frame.converged}, iterations={frame.progression}", file=sys.stderr, flush=True)
+                if not frame.converged:
+                    raise RuntimeError("PT motion frame did not reach the requested sample count")
+                for name in PT_MOTION_NAMES | {"DisocclusionMask", "HighResDisocclusionMask", "ReprojectionQuality"}:
+                    motion = _map_render_var(frame, name)
+                    if not motion.size:
+                        continue
+                    np.save(output_dir / f"{name}.npy", motion)
+                    Image.fromarray(pt_display_image(name, motion)).save(output_dir / f"{name}.png")
+                    report[name]["motion_nonzero"] = int(np.count_nonzero(motion[..., :2]))
+                del frame, products
+            paths.destroy_path_list(path_list)
+        (output_dir / "capture.json").write_text(json.dumps(report, indent=2) + "\n")
+    finally:
+        renderer.detach_ovstage()
+        stage.destroy()
+        renderer.destroy()
 
 
 def parse_args() -> argparse.Namespace:
@@ -797,8 +1588,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--warmup-frames",
         type=int,
-        default=5,
-        help="Frames to render before logging the final AOVs (default: 5)",
+        default=50,
+        help="Frames to render before logging the static AOVs (default: 50)",
     )
     parser.add_argument(
         "--step-dt",
@@ -817,15 +1608,26 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not spawn a Rerun viewer; log to an already-running recording stream.",
     )
+    parser.add_argument(
+        "--render-mode", choices=["RealTimePathTracing", "PathTracing", "MinimalRendering"],
+        default="RealTimePathTracing",
+    )
+    parser.add_argument("--samples-per-pixel", type=int, default=128, help="PT samples per frame (default: 128)")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.render_mode == "PathTracing":
+        capture_pt_lineup(args)
+        return
     scene_path = _resolve_scene_path(args.usd)
     if not scene_path.exists():
         raise SystemExit(f"USD file not found: {scene_path}")
     scene_asset_path = _scene_asset_path(args.usd)
+    output_dir = EXAMPLE_DIR / "_output"
+    if args.render_mode == "MinimalRendering":
+        output_dir /= "minimal"
 
     try:
         import rerun as rr
@@ -850,7 +1652,7 @@ def main() -> None:
     ordinal = 1
     ovstage.population.open_usd_from_string(
         stage,
-        build_render_layer_usda(scene_asset_path, tuple(args.resolution)),
+        build_render_layer_usda(scene_asset_path, tuple(args.resolution), args.render_mode),
         ordinal=ordinal,
     )
     stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
@@ -862,9 +1664,22 @@ def main() -> None:
     sim_step = 0
     sim_time = 0.0
 
+    initial_maps = {}
     for frame_index in range(max(args.warmup_frames, 0)):
         print(f"Warming up frame {frame_index + 1}/{args.warmup_frames}...", file=sys.stderr)
-        renderer.step(render_products={render_product_path}, delta_time=step_dt, ordinal=ordinal)
+        warmup_products = renderer.step(render_products={render_product_path}, delta_time=step_dt, ordinal=ordinal)
+        if frame_index == 0:
+            # Delta maps report newly introduced IDs; save scene creation before warmup consumes the changes.
+            for warmup_product in warmup_products.values():
+                for warmup_frame in warmup_product.frames:
+                    for name in ("StableIdMapDeltas", "SemanticIdMapDeltas"):
+                        values = _map_render_var(warmup_frame, name)
+                        initial_maps[name] = values
+                        initial_dir = output_dir / "initial"
+                        initial_dir.mkdir(parents=True, exist_ok=True)
+                        np.save(initial_dir / f"{name}.npy", values)
+            del warmup_frame, warmup_product
+        del warmup_products
         sim_step += 1
         sim_time = sim_step * step_dt
 
@@ -886,9 +1701,69 @@ def main() -> None:
             rr.set_time("sim_time", duration=sim_time)
             rr.set_time("step", sequence=sim_step)
             logged += log_aovs_to_rerun(rr, frame)
+            logged += capture_additional_aovs(rr, frame, initial_maps, output_dir)
             if args.no_spawn:
-                exported = export_aov_pngs(frame, EXAMPLE_DIR / "_output")
-                print(f"  Wrote {exported} AOV PNGs to {EXAMPLE_DIR / '_output'}", file=sys.stderr)
+                exported = export_aov_pngs(frame, output_dir)
+                print(f"  Wrote {exported} AOV PNGs to {output_dir}", file=sys.stderr)
+
+    # Release the static capture before moving anything. Only TargetMotionSD is logged/exported below.
+    del frame, product, products
+    robot_paths = [
+        "/World/GR1T2_fourier_hand_6dof", "/World/spot", "/World/forklift_c", "/World/forklift_b",
+        "/World/carter_v1", "/World/jetbot", "/World/kaya",
+    ]
+    # Different directions distinguish the robots; upward offsets keep the small robots above the floor.
+    velocities = np.array(
+        [(3, 0, 0), (-3, 0, 0), (2, 0, 1), (-2, 0, 1), (3, 0, 1), (-3, 0, 1), (2, 0, 1)],
+        dtype=np.float64,
+    )
+    with ovstage.PathDictionary(stage) as paths:
+        path_list = paths.create_path_list_from_strings(robot_paths)
+        with stage.query_from_path_list(path_list) as query:
+            attribute = paths.intern_token("omni:xform")
+            transforms = np.full((len(robot_paths), 4, 4), np.nan, dtype=np.float64)
+            # Preserve authored orientation and scale, including the centimetre-scaled forklift payload.
+            with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
+                while (group := read.fetch_next()) is not None:
+                    values = np.from_dlpack(group.dlpack(0)).reshape(-1, 4, 4)
+                    for i in range(group.prim_count):
+                        transforms[group.prim_index(i)] = values[group.data_row_index(i)]
+                    del values
+                    stage.release_group(group)
+            if not np.all(np.isfinite(transforms)):
+                raise RuntimeError("The motion capture requires transforms for all seven lineup robots.")
+
+            matrix_dtype = ovstage.numpy_to_dldatatype(transforms.dtype, lanes=16)
+            for motion_step in range(10):
+                # Alternate between the rest pose and a small offset so every robot stays in the camera frame.
+                direction = 1.0 if motion_step % 2 == 0 else -1.0
+                transforms[:, 3, :3] += direction * velocities * step_dt
+                ordinal += 1
+                matrix_tensor = ovstage.make_dltensor(transforms, dtype=matrix_dtype, shape=[len(robot_paths)], ndim=1)
+                stage.write_attribute(query, attribute, ordinal=ordinal, tensors=matrix_tensor, is_array=False).wait()
+                stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
+                products = renderer.step(render_products={render_product_path}, delta_time=step_dt, ordinal=ordinal)
+                sim_step += 1
+                sim_time = sim_step * step_dt
+                print(f"Moving robots: frame {motion_step + 1}/10...", file=sys.stderr)
+        paths.destroy_path_list(path_list)
+
+    for product in products.values():
+        for frame in product.frames:
+            motion = _map_render_var(frame, "TargetMotionSD")
+            display = _visualize_motion(motion)
+            rr.set_time("sim_time", duration=sim_time)
+            rr.set_time("step", sequence=sim_step)
+            _log_raw_tensor(rr, "TargetMotionSD", motion)
+            rr.log("render/aovs/TargetMotionSD/display", rr.Image(display))
+            _print_logged("TargetMotionSD", motion)
+            logged += 1
+            if args.no_spawn:
+                display_path = output_dir / "TargetMotionSD.png"
+                # Retain the raw vectors and flags beside the display image for quantitative inspection.
+                np.save(display_path.with_suffix(".npy"), motion)
+                Image.fromarray(display).save(display_path)
+                print(f"  Wrote motion PNG to {display_path}", file=sys.stderr)
 
     print(f"Logged {logged} AOVs to Rerun.", file=sys.stderr)
     del frame, product, products

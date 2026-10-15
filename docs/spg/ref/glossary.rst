@@ -29,3 +29,7 @@ Glossary
      - How many dimensions a resource has, which is how many entries its ``shape`` holds.
    * - **dtype**
      - What one element of a resource is: the kind of number, its width in bits, and how many of them make an element. A dtype is a value taken from the ``cuda`` or ``slang`` table, such as ``cuda.uchar4`` or ``slang.float``, not a type name. It can be compared against another dtype and called to wrap a value for the GPU. Refer to :ref:`spg-shapes-and-types`.
+   * - **Prim table**
+     - What a launch script gets for a prim of the scene: ``rtx.stage.prim(path)``, an entry of ``rtx.product.cameras`` or ``rtx.product.render_vars``, or ``rtx.product`` itself. It answers ``path``, ``local_matrix``, ``world_matrix`` and any attribute by name, reads them when asked, and cannot be assigned to. Refer to :doc:`lua_rtx`.
+   * - **On the stage**
+     - Published for the renderer at the time a launch script runs. Loading a scene puts its prims on the stage with what the renderer needs of them; custom attributes arrive only when the load names their prim. Refer to :ref:`spg-rtx-availability`.

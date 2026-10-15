@@ -63,28 +63,9 @@ the connection that fills it, and the ``orderedVars`` entry that puts it in the 
 downstream need to know nothing about SPG; they read the name they always read. The producing node
 may sit in the same product or in another one:
 
-.. graphviz::
+.. image:: ../../img/spg/aovs-overwrite-across-products.svg
    :align: center
-
-   digraph {
-      rankdir=LR
-      bgcolor="transparent"
-      node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=0]
-      edge [color="#9aa0a6" penwidth=1.2 arrowsize=0.7]
-      subgraph cluster_A {
-         label="product A" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "A:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-      }
-      subgraph cluster_B {
-         label="product B" fontname="Helvetica" fontsize=10 fontcolor="#9aa0a6"
-         color="#9aa0a6" style=dashed
-         "b" [fillcolor="#76b900" fontcolor="#1b1b1b"]
-         "B:LdrColor" [fillcolor="#4c566a" fontcolor="white" label="LdrColor"]
-      }
-      "A:LdrColor" -> "b"
-      "b" -> "B:LdrColor"
-   }
+   :alt: Product A publishes LdrColor. Node b in product B reads it and publishes its result as LdrColor in product B.
 
 Four rules constrain those choices.
 

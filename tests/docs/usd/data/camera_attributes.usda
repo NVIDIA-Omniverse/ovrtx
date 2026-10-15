@@ -1,0 +1,25 @@
+#usda 1.0
+# [snippet:doc-camera-attributes]
+(
+    metersPerUnit = 1
+)
+
+def Camera "Camera"
+{
+    float4[] clippingPlanes = [(0, 1, 0, 0)]
+    float2 clippingRange = (0.1, 1000)
+    float exposure = 0
+    float exposure:fStop = 2.8
+    float exposure:iso = 100
+    float exposure:responsivity = 1
+    float exposure:time = 0.008333333
+    float focalLength = 0.5
+    float focusDistance = 5
+    float fStop = 2.8
+    float horizontalAperture = 0.36
+    float horizontalApertureOffset = 0
+    token projection = "perspective"
+    float verticalAperture = 0.24
+    float verticalApertureOffset = 0
+}
+# [/snippet:doc-camera-attributes]

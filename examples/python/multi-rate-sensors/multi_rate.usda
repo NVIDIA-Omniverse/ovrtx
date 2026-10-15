@@ -1,0 +1,172 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+    timeCodesPerSecond = 40
+    startTimeCode = 0
+    endTimeCode = 80
+)
+
+def Xform "World"
+{
+    def Xform "Ground" (
+        prepend references = @../../../tests/docs/data/ground.usd@
+    )
+    {
+        double3 xformOp:scale = (20, 20, 20)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+    }
+
+    def Xform "MovingCube" (
+        prepend references = @../../../tests/docs/data/cube.usd@
+    )
+    {
+        double3 xformOp:translate.timeSamples = {
+            0: (-150, 0, 0),
+            40: (150, 0, 0),
+            80: (-150, 0, 0),
+        }
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        over "Cube"
+        {
+            color3f[] primvars:displayColor = [(0.9, 0.12, 0.025)]
+        }
+    }
+
+    def Xform "Sphere" (
+        prepend references = @../../../tests/docs/data/sphere.usd@
+    )
+    {
+        double3 xformOp:translate = (180, 0, -180)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        over "Sphere"
+        {
+            color3f[] primvars:displayColor = [(0.025, 0.3, 0.85)]
+        }
+    }
+
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 1000
+        asset inputs:texture:file = @../../../tests/docs/data/studio.exr@
+        token inputs:texture:format = "latlong"
+        float3 xformOp:rotateXYZ = (0, 270, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    # [snippet:doc-multi-rate-lidar-usda]
+    def OmniLidar "Lidar40" (
+        prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+    )
+    {
+        # A full scan completes in each 1/40-second simulation step.
+        double2 omni:sensor:frameRate = (40, 1)
+        bool omni:sensor:Core:partialOutputs = false
+        bool omni:sensor:Core:includeInvalidPoints = false
+        token omni:sensor:Core:elementsCoordsType = "CARTESIAN"
+        # World-space points let both scans share the camera's viewpoint.
+        token omni:sensor:Core:outputFrameOfReference = "WORLD"
+        # Keep the emitter firing sequence shorter than each angular tick.
+        float omni:sensor:Core:rotPatternFiringResDeg = 1
+        double3 xformOp:translate = (-150, 150, 300)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    # [/snippet:doc-multi-rate-lidar-usda]
+
+    def OmniLidar "Lidar20" (
+        prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+    )
+    {
+        # A full scan spans two 1/40-second simulation steps.
+        double2 omni:sensor:frameRate = (20, 1)
+        bool omni:sensor:Core:partialOutputs = false
+        bool omni:sensor:Core:includeInvalidPoints = false
+        token omni:sensor:Core:elementsCoordsType = "CARTESIAN"
+        token omni:sensor:Core:outputFrameOfReference = "WORLD"
+        # Keep the emitter firing sequence shorter than each angular tick.
+        float omni:sensor:Core:rotPatternFiringResDeg = 1
+        double3 xformOp:translate = (150, 150, 300)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "Camera10" (
+        prepend apiSchemas = ["OmniSensorAPI"]
+    )
+    {
+        double2 omni:sensor:frameRate = (10, 1)
+        float3 xformOp:rotateXYZ = (-20, 0, 0)
+        double3 xformOp:translate = (0, 350, 1000)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    # [snippet:doc-multi-rate-camera-usda]
+    def Camera "Camera20" (
+        prepend apiSchemas = ["OmniSensorAPI", "OmniRtxRollingShutterAPI"]
+    )
+    {
+        double2 omni:sensor:frameRate = (20, 1)
+        float focalLength = 50
+        float horizontalAperture = 20.955
+        # At 240 rows, 239 / 9560 + 1 / 40 = 1 / 20 second.
+        # Each exposure spans exactly two 25 ms simulation steps.
+        double2 omni:rtx:rollingShutter:lineExposure = (1, 40)
+        double2 omni:rtx:rollingShutter:lineOffset = (1, 9560)
+        token omni:rtx:rollingShutter:scanOrder = "topToBottom"
+        float3 xformOp:rotateXYZ = (-20, 0, 0)
+        double3 xformOp:translate = (0, 350, 1000)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+    # [/snippet:doc-multi-rate-camera-usda]
+}
+
+def Scope "Render"
+{
+    def RenderProduct "Lidar40"
+    {
+        rel camera = </World/Lidar40>
+        rel orderedVars = <PointCloud>
+        def RenderVar "PointCloud"
+        {
+            string sourceName = "PointCloud"
+            token[] channels = ["Coordinates", "Counts", "TimeOffsetNs"]
+        }
+    }
+
+    def RenderProduct "Lidar20"
+    {
+        rel camera = </World/Lidar20>
+        rel orderedVars = <PointCloud>
+        def RenderVar "PointCloud"
+        {
+            string sourceName = "PointCloud"
+            token[] channels = ["Coordinates", "Counts", "TimeOffsetNs"]
+        }
+    }
+
+    def RenderProduct "Camera10"
+    {
+        rel camera = </World/Camera10>
+        rel orderedVars = <LdrColor>
+        int2 resolution = (320, 240)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+
+    def RenderProduct "Camera20"
+    {
+        rel camera = </World/Camera20>
+        rel orderedVars = <LdrColor>
+        int2 resolution = (320, 240)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+}

@@ -22,6 +22,8 @@
 #include <gtest/gtest.h>
 #include "helpers.h"
 
+#include <ovrtx/ovrtx_logging.h>
+
 #include <atomic>
 #include <cstring>
 #include <string>
@@ -29,10 +31,8 @@
 namespace {
 std::atomic<int> g_message_count{0};
 
-void count_messages(ovrtx_log_severity_t /*severity*/,
-                    double /*timestamp*/,
-                    ovx_string_t /*message*/,
-                    void* user_data) {
+void count_messages(const ovx_log_message_t* /*message*/, void* user_data)
+{
     auto* counter = static_cast<std::atomic<int>*>(user_data);
     counter->fetch_add(1, std::memory_order_relaxed);
 }
@@ -51,7 +51,7 @@ protected:
     static void TearDownTestSuite() {
         if (renderer_) {
             // Clear any active log callback before destroying the renderer.
-            ovrtx_set_log_callback(OVRTX_LOG_INFO, nullptr, nullptr, nullptr);
+            ovrtx_set_log_callback(OVX_LOG_INFO, nullptr, nullptr, nullptr);
             ovrtx_destroy_renderer(renderer_);
             renderer_ = nullptr;
         }
@@ -76,7 +76,7 @@ TEST_F(LoggingTest, LogCallbackPrefixFilter) {
     // [snippet:doc-log-callback-prefix-filter-c]
     // First pass: receive all messages (NULL channel filter).
     g_message_count.store(0);
-    ovrtx_result_t r = ovrtx_set_log_callback(OVRTX_LOG_INFO,
+    ovrtx_result_t r = ovrtx_set_log_callback(OVX_LOG_INFO,
                                               nullptr, // NULL = all channels
                                               &count_messages,
                                               &g_message_count);
@@ -101,7 +101,7 @@ TEST_F(LoggingTest, LogCallbackPrefixFilter) {
     g_message_count.store(0);
     std::string bogus = "this.channel.does.not.exist.42=info";
     ovx_string_t filter{bogus.c_str(), bogus.size()};
-    r = ovrtx_set_log_callback(OVRTX_LOG_FATAL, &filter, &count_messages, &g_message_count);
+    r = ovrtx_set_log_callback(OVX_LOG_FATAL, &filter, &count_messages, &g_message_count);
     ASSERT_API_SUCCESS(r.status);
 
     // Re-run the same work and flush — the callback should not fire.
@@ -115,7 +115,7 @@ TEST_F(LoggingTest, LogCallbackPrefixFilter) {
     int observed_bogus_filter = g_message_count.load();
 
     // Disable the callback before the renderer is torn down.
-    ovrtx_set_log_callback(OVRTX_LOG_INFO, nullptr, nullptr, nullptr);
+    ovrtx_set_log_callback(OVX_LOG_INFO, nullptr, nullptr, nullptr);
     // [/snippet:doc-log-callback-prefix-filter-c]
 
     EXPECT_GT(observed_any_channel, 0) << "expected at least one log message with NULL filter";

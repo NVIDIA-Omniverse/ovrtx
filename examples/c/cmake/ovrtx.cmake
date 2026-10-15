@@ -47,14 +47,14 @@ macro(ovrtx_fetch)
         # Platform-specific package selection
         if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             set(OVRTX_PACKAGE_SYSTEM "windows-x86_64")
-            set(OVRTX_HASH "a79ea8db7f3f138139c272748a69a4f4e7c34c7204f9e63ac0720b3e1bb33596")
+            set(OVRTX_HASH "96de03fdcbee3a398f059f1ffb15a3d8f30bb8bcc6ae5d84a08e8875769ce296")
         elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_aarch64")
-                set(OVRTX_HASH "c3aa4cb2e13200079f66b6cce11f8525ca62ec4965af27443f57e77c5a915ea2")
+                set(OVRTX_HASH "c91048d75743a06cf887031721d37508564c853e321a92ec3bfb6ec7a74bc568")
             elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_x86_64")
-                set(OVRTX_HASH "591d382a7f6af0310b646e306d067eb1d4fc6bb94e2f22486f0ec7887c9b9247")
+                set(OVRTX_HASH "63639c3eabaf31553dbf883ac2376d8b6e361806dee4e17bafaa0962ce23dd51")
             else()
                 message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}")
             endif()
@@ -79,7 +79,7 @@ macro(ovrtx_fetch)
         FetchContent_Declare(
             ovrtx
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.5.1/ovrtx@0.5.1.385782.d4f26803.${OVRTX_PACKAGE_SYSTEM}.zip"
+            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.6.0/ovrtx@0.6.0.1791947691.c6d71501.${OVRTX_PACKAGE_SYSTEM}.zip"
             URL_HASH SHA256=${OVRTX_HASH}
         )
 
@@ -126,6 +126,7 @@ function(_ovrtx_add_dir_junction TARGET_NAME LINK_PATH TARGET_PATH COMMENT_TEXT)
         COMMAND ${CMAKE_COMMAND} -E env powershell -NoProfile -Command
             "$link='${LINK_PATH}'; $i=Get-Item $link -Force -ErrorAction SilentlyContinue; if ($i) { if ($i.LinkType -eq 'Junction') { $i.Delete() } else { Write-Error 'link path exists and is not a junction; remove it and rebuild'; exit 1 } }; New-Item -ItemType Junction -Path $link -Target '${TARGET_PATH}' | Out-Null"
         COMMENT "${COMMENT_TEXT}"
+        VERBATIM
     )
 endfunction()
 

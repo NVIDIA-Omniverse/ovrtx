@@ -124,18 +124,18 @@ schedule, and warnings remain enabled by default.
 ## Instructions
 
 1. Update dependencies first. Install the ovstage 0.1 Python wheel alongside ovrtx 0.4.
-2. Create one externally owned `ovstage.Stage` for scene data. A Stage may be attached to only one renderer at a time; detach it before attaching it to another renderer, and keep it alive until detached.
+2. Create one externally owned `ovstage.Stage` for scene data. A Stage may be attached to only one renderer at a time; detach it before attaching it to another renderer. OVRTX retains the native stage state it needs, so the caller may destroy its own Stage handle after a successful attach.
 3. Move USD population from `Renderer.open_usd*` to `ovstage.population.open_usd*`.
 4. Move reference add, remove, and reset operations to `ovstage.population`. Follow source edits with `apply_usd_changes` at the application-owned ordinal. Move time-sampled updates to ovstage population's USD-time operation.
 5. Publish each completed mutation by advancing the ovstage write floor to the operation's ordinal. Do not render an ordinal above the current write floor.
 6. Attach the stage with `Renderer.attach_ovstage`. Render with `Renderer.step(..., ordinal=ordinal)`; it performs the ovrtx stage update automatically.
-7. Move cloning from `Renderer.clone_usd*` to `Stage.clone*`, assign an ordinal above the current floor, wait for completion, then advance the floor.
+7. Move cloning from `Renderer.clone_usd*` to `Stage.clone*`. Supply an explicit ordinal that clears applicable floors and satisfies the installed ovstage version's configured admission policy; see the [shared ordinal guidance](../update-0_3-0_4-common/Reference.md#ordinals-and-write-floor). The source must exist and all targets must be absent. Wait for the clone before customizing its copied cells; under the `STRICTLY_INCREASING` policy, customization needs a newer ordinal even before sealing. Wait for all mutations, then advance and wait for the floor.
 8. Move stage discovery from `Renderer.query_prims*` to ovstage queries. Use the ovstage-owned path dictionary for reusable path lists and token identities.
 9. Move attribute reads to `Stage.read_attributes`. Iterate fetched groups, consume or copy borrowed tensor data, release each group, then release the read handle.
 10. Move attribute writes to `Stage.write_attribute`. Supply the application ordinal, explicit array/scalar kind, prim mode, semantic, and synchronization required by the current ovstage API.
 11. Replace persistent ovrtx attribute bindings with reusable ovstage query handles. Release the query when the repeated read/write/map workflow ends.
 12. Move zero-copy mappings to `Stage.map_attribute`. Fetch writable groups, unmap each committed group as required, then unmap the overall map handle. Advance the write floor after the map commit completes.
-13. Detach ovstage before destroying either object. Release read groups, reads, maps, queries, and caller-owned path lists according to ovstage ownership rules.
+13. Detach ovstage before destroying either object. Wait for in-flight operations first; if detach raises, the renderer may be partially torn down and must only be destroyed. The caller may release its own Stage handle independently. Release read groups, reads, maps, queries, and caller-owned path lists according to ovstage ownership rules.
 14. Run the narrowest application tests that cover scene population, one mutation, one render step, and teardown. Keep deprecated standalone calls only where compatibility behavior is intentionally being tested.
 
 ## Output Format
@@ -162,7 +162,7 @@ This skill has no scripts. Use repository search and targeted edits directly.
 - If a populated scene does not render, ensure the rendering population domain was requested, the stage was attached, and Python `step` received the committed ordinal.
 - If a query, read, or write uses invalid path/token ids, obtain the path dictionary from the ovstage instance rather than the renderer.
 - If mapped or read data becomes invalid, check group and handle release order; ovstage result buffers are borrowed unless explicitly copied.
-- If writes fail with a write-floor violation, allocate an ordinal above the current floor and advance the floor only after the writes complete.
+- If writes fail with a write-floor violation, allocate an ordinal above the applicable floors. A retained-history admission failure also requires satisfying the configured policy for affected cells and prim lifecycle; clearing the floor alone is insufficient. Check async completion before advancing and waiting for the floor.
 
 ## References
 
