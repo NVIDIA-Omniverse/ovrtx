@@ -1,0 +1,12 @@
+[project]
+name = "camera-calibration"
+version = "0.1.0"
+description = "Calibrate a USD camera from checkerboard photographs using OpenCV"
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+    "numpy>=2,<3",
+    # Fisheye calibration is validated against the locked OpenCV 4.x version.
+    "opencv-python>=4.8,<5",
+    "usd-core>=25,<27",
+]

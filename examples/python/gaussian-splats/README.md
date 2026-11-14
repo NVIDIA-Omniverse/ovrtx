@@ -1,39 +1,85 @@
 # gaussian-splats
 
-Render the supplied 73-splat scene in RTPT, PT, or Minimal.
+The scene references [cactus-100.usdc](https://huggingface.co/buckets/nvidia/ovrtx-storage/resolve/cactus-100.usdc)
+(a ParticleField containing 139,410 Gaussians), rotated 180 degrees around X and placed upright on the ground.
+Internet access is required on first load.
+Capture: [Steam Studio](https://www.steam-studio.jp), CC0-1.0;
+[source dataset](https://note.com/steam_studio/n/ne9736d94f162).
+
+Compare smoother Gaussians with non-stochastic RTPT rendering and relight the
+cactus with `ParticleFieldSHDiffuse.mdl`.
 The default is one frame without warmup. Use `--steps` to request later frames.
 
 `uv run main.py --mode rtpt --png _output/render.png`
 
 `uv run main.py --rrd _output/render.rrd`
 
-## Feature code
+## Comparison images
 
-The following code loads the scene, selects a render mode, renders the requested frames,
-and copies the rendered image before releasing its CPU mapping.
+Camera_close, RTPT first frame: non-stochastic off (left), on (right).
+Matching crops enlarged 3× without smoothing.
 
-```python
-renderer = ovrtx.Renderer()
-stage = ovstage.Stage("ovrtx.example.gaussian-splats")
-try:
-    renderer.attach_ovstage(stage)
-    # Layer a mode override over the same scene; render one mode per run.
-    layer = ('#usda 1.0\n(subLayers = [@' + args.scene.resolve().as_posix() + '@])\n'
-             'over "Render" {\n over "Camera" {\n token omni:rtx:rendermode = "' + mode + '"\n }\n }\n')
-    ovstage.population.open_usd_from_string(stage, layer, ordinal=1)
-    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
-    # Render one frame by default; --steps can request later frames.
-    for _ in range(args.steps):
-        products = renderer.step(render_products={"/Render/Camera"}, delta_time=1/60, ordinal=1)
-    output = products["/Render/Camera"].frames[0].render_vars["/Render/Camera/LdrColor"]
-    mapped = output.map(device=ovrtx.Device.CPU)
-    view = np.from_dlpack(mapped)
-    pixels = view.copy()
-    del view
-    mapped.unmap()
-    del mapped, output, products
-finally:
-    renderer.detach_ovstage()
-    renderer.destroy()
-    stage.destroy()
+![Non-stochastic comparison](../../../docs/img/gaussian-splats-non-stochastic.avif)
+
+Camera, RTPT after 32 frames: default emissive (left), SH diffuse with normal tone mapping (right).
+
+![Diffuse lighting comparison](../../../docs/img/gaussian-splats-sh-diffuse.avif)
+
+## Scene variants
+
+`non_stochastic.usda` and `stochastic.usda` use `Camera_close` for an on/off
+comparison of non-stochastic compositing. `sh_diffuse.usda` uses `Camera`
+to show scene lighting with `ParticleFieldSHDiffuse`. All share the same scene.
+
+Run `uv run main.py --scene non_stochastic.usda --mode rtpt --png _output/non-stochastic.png`
+or `uv run main.py --scene sh_diffuse.usda --mode rtpt --steps 32 --png _output/sh-diffuse.png`.
+The diffuse variant also supports `--mode pt`.
+
+Enable non-stochastic primary-ray compositing for emissive Gaussians. This reduces
+transparency noise at a performance cost. It requires RTPT inline tracing and
+disables adaptive disocclusion sampling.
+
+```usda
+over "Render" {
+    over "Camera" {
+        rel camera = </World/Camera_close>
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:rtpt:gaussian:nonStochastic:enabled = true
+        # Adaptive disocclusion sampling would force stochastic rendering.
+        bool omni:rtx:rtpt:adaptiveSampling:disocclusion:enabled = false
+    }
+}
+```
+
+ovrtx supplies `ParticleFieldSHDiffuse.mdl` with its runtime materials, at
+`bin/mdl/ParticleFieldSHDiffuse.mdl` in the extracted SDK package. You do not need
+to write an MDL material. See the [supplied source](../../../docs/_static/mdl/ParticleFieldSHDiffuse.mdl). The snippet below references and binds that supplied
+material to the ParticleField so scene lights illuminate its Gaussians. Diffuse
+albedo is derived from SH0. Captured lighting remains baked into SH0; transparency
+remains stochastic.
+
+```usda
+over "World" {
+    def Material "SHDiffuse" {
+        token outputs:mdl:surface.connect = </World/SHDiffuse/Shader.outputs:out>
+        def Shader "Shader" {
+            uniform token info:implementationSource = "sourceAsset"
+            uniform asset info:mdl:sourceAsset = @ParticleFieldSHDiffuse.mdl@
+            uniform token info:mdl:sourceAsset:subIdentifier = "ParticleFieldSHDiffuse"
+            token outputs:out (renderType = "material")
+        }
+    }
+    over "Splats" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    ) {
+        rel material:binding = </World/SHDiffuse>
+    }
+}
+over "Render" {
+    over "Camera" {
+        # Render scene-lit color through the normal color pipeline.
+        bool omni:rtx:gaussian:skipTonemapping:enabled = false
+        bool omni:rtx:rtpt:gaussian:nonStochastic:enabled = false
+    }
+}
 ```

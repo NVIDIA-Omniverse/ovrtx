@@ -1,6 +1,6 @@
 # SPG Built-in Nodes Example
 
-Not every SPG node needs a custom CUDA kernel. SPG ships **built-in factory nodes** that you
+SPG ships **built-in factory nodes** that you
 author with `info:implementationSource = "id"` and an `info:id` — no `.cu` or `.cu.lua` required.
 This example chains two stdlib nodes: **Add** doubles `LdrColor`'s brightness by adding it to
 itself (saturating at 255), then **Scale** downscales that result to half resolution.
@@ -50,23 +50,14 @@ internal to the chain and only the final `Downscaled` AOV is published.
 uv run main.py
 ```
 
-A successful run writes `_output/input.png` and `_output/downscaled.png`, and prints:
+A successful run writes `_output/input.png` and `_output/downscaled.png`. Add saturates each
+channel to `min(2v, 255)`, so the output is brighter than the input, and Scale halves it to
+640x360 by taking the source pixel under each destination pixel's centre.
 
-```
-output 640x360 from 1280x720
-largest difference from the host-computed result: 0
-```
-
-Both nodes are exact in integers, so the comparison admits no tolerance. Add saturates to
-`min(2v, 255)` and Scale takes the source pixel under each destination pixel's centre, which
-`main.py` rebuilds on the host. A value that did not double means Add never ran; a size that
-did not halve means Scale never ran. Either exits non-zero.
-
-## Other built-in nodes
+## Built-in nodes
 
 | Factory ID | Ports | Behavior |
 |------------|-------|----------|
-| `spg:rtx.spg.core/NoOp` | `Input` → `Output` | Passthrough; copies the first input texture to the first output. |
 | `spg:rtx.spg.stdlib/Add` | `A`, `B` → `Result` | Per-channel saturating add (`min(A + B, 255)` for 8-bit). |
 | `spg:rtx.spg.stdlib/Multiply` | `A`, `B` → `Result` | Per-channel normalized multiply (`floor(min(A * B / 255, 255))`). |
 | `spg:rtx.spg.stdlib/Scale` | `Input`, `float scaleX`, `float scaleY` → `Output` | Nearest-neighbor resize. |

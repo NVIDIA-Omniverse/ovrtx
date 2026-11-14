@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="350" viewBox="0 0 860 350" role="img" aria-labelledby="title desc">
+<title id="title">Companding alignment: a 12-bit code in a 16-bit unsigned integer</title>
+<desc id="desc">Two 16-bit unsigned integers drawn as rows of bit cells numbered 15 to 0. In the upper row the 12-bit code occupies bits 15 to 4 and bits 3 to 0 are padding; in the lower row the code occupies bits 11 to 0 and bits 15 to 12 are padding.</desc>
+<defs><marker id="arrow-313131-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#313131"/></marker></defs>
+<rect width="860" height="350" fill="#fff"/>
+<text x="24" y="30" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">12-bit code in a 16-bit unsigned integer (bit 15 on the left)</text>
+<rect x="646.82" y="16" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="665.82" y="26.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">code bits</text>
+<rect x="743.49" y="17" width="10" height="10" rx="2" fill="none" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="761.49" y="26.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">padding bits</text>
+<rect x="250" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="268" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">15</text>
+<rect x="286" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="304" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">14</text>
+<rect x="322" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="340" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">13</text>
+<rect x="358" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="376" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">12</text>
+<rect x="394" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="412" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">11</text>
+<rect x="430" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="448" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">10</text>
+<rect x="466" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="484" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">9</text>
+<rect x="502" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="520" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">8</text>
+<rect x="538" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="556" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">7</text>
+<rect x="574" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="592" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">6</text>
+<rect x="610" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="628" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">5</text>
+<rect x="646" y="94" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="664" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<rect x="682" y="94" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="700" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">3</text>
+<rect x="718" y="94" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="736" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">2</text>
+<rect x="754" y="94" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="772" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">1</text>
+<rect x="790" y="94" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="808" y="116.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">0</text>
+<text x="24" y="108" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">compandingAlignment = 15</text>
+<text x="24" y="125" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">bits 15–4 (most significant)</text>
+<text x="268" y="64" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">code's most significant bit</text>
+<line x1="268" y1="70" x2="268" y2="82" stroke="#313131" stroke-width="2" marker-end="url(#arrow-313131-2)"/>
+<path d="M253,133 L253,138 L679,138 L679,133" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="466" y="156" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">12-bit code (shift left by 4)</text>
+<path d="M685,133 L685,138 L823,138 L823,133" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="754" y="156" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">padding</text>
+<rect x="250" y="222" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="268" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">15</text>
+<rect x="286" y="222" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="304" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">14</text>
+<rect x="322" y="222" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="340" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">13</text>
+<rect x="358" y="222" width="36" height="36" rx="2" fill="#F2F2F2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="376" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle" font-weight="bold">12</text>
+<rect x="394" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="412" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">11</text>
+<rect x="430" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="448" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">10</text>
+<rect x="466" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="484" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">9</text>
+<rect x="502" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="520" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">8</text>
+<rect x="538" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="556" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">7</text>
+<rect x="574" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="592" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">6</text>
+<rect x="610" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="628" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">5</text>
+<rect x="646" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="664" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<rect x="682" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="700" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">3</text>
+<rect x="718" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="736" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<rect x="754" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="772" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">1</text>
+<rect x="790" y="222" width="36" height="36" rx="2" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="808" y="244.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">0</text>
+<text x="24" y="236" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">compandingAlignment = 11</text>
+<text x="24" y="253" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">bits 11–0 (least significant)</text>
+<text x="412" y="192" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">code's most significant bit</text>
+<line x1="412" y1="198" x2="412" y2="210" stroke="#313131" stroke-width="2" marker-end="url(#arrow-313131-2)"/>
+<path d="M397,261 L397,266 L823,266 L823,261" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="610" y="284" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">12-bit code (no shift)</text>
+<path d="M253,261 L253,266 L391,266 L391,261" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="322" y="284" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">padding</text>
+<text x="24" y="318" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">shift = alignment − code width + 1: &#160;15 − 12 + 1 = 4 (shift left by 4), &#160;11 − 12 + 1 = 0 (no shift)</text>
+</svg>

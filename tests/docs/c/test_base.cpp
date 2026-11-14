@@ -57,7 +57,7 @@ void write_render_setting_uint32(ovstage_instance_t* stage,
     write_data.tensor_count = 1;
     write_data.is_array = false;
 
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = attr_token;
 
     ovstage_enqueue_result_t wq = ovstage_write_attribute(
@@ -79,7 +79,7 @@ void render_and_save(ovrtx_renderer_t* renderer,
     render_products.num_render_products = 1;
 
     for (int i = 0; i < 40; ++i) {
-        ovrtx_step_result_handle_t warmup_handle = 0;
+        ovrtx_step_result_handle_t warmup_handle{};
         ovrtx_enqueue_result_t eq = ovrtx_step_with_stage(
             renderer, render_products, 1.0 / 60.0, ordinal, &warmup_handle);
         ASSERT_API_SUCCESS(eq.status);
@@ -87,7 +87,7 @@ void render_and_save(ovrtx_renderer_t* renderer,
         ovrtx_destroy_results(renderer, warmup_handle);
     }
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     ovrtx_enqueue_result_t eq = ovrtx_step_with_stage(
         renderer, render_products, 1.0 / 60.0, ordinal, &step_handle);
     ASSERT_API_SUCCESS(eq.status);
@@ -99,7 +99,7 @@ void render_and_save(ovrtx_renderer_t* renderer,
     ASSERT_API_SUCCESS(result.status);
 
     ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
-    ASSERT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
+    ASSERT_NE(ldr_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
     ovrtx_map_output_description_t map_desc = {};
     map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
     ovrtx_render_var_output_t ldr_output = {};
@@ -178,7 +178,7 @@ TEST_F(BaseTest, BindMaterial) {
     write_data.is_array = true;
     write_data.semantic = OVSTAGE_SEMANTIC_RELATIONSHIP_PATH_ID;
 
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = binding_token;
 
     ovstage_enqueue_result_t wq = ovstage_write_attribute(
@@ -199,7 +199,7 @@ TEST_F(BaseTest, BindMaterial) {
     render_products.render_products = &rp_path;
     render_products.num_render_products = 1;
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     int const WARMUP_FRAMES = 40;
     for (int i = 0; i < WARMUP_FRAMES; ++i) {
         ovrtx_enqueue_result_t eq = ovrtx_step_with_stage(
@@ -222,7 +222,7 @@ TEST_F(BaseTest, BindMaterial) {
     ASSERT_API_SUCCESS(result.status);
 
     ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
-    ASSERT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
+    ASSERT_NE(ldr_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
     ovrtx_map_output_description_t map_desc = {};
     map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
     ovrtx_render_var_output_t ldr_output = {};
@@ -280,7 +280,7 @@ TEST_F(BaseTest, SettingsRtptMaxBounces) {
         write_data.tensor_count = 1;
         write_data.is_array = false;
 
-        ovx_string_or_token_t attr_ref{};
+        ovx_token_or_string_t attr_ref{};
         attr_ref.token = attr_token;
 
         ovstage_enqueue_result_t wq = ovstage_write_attribute(
@@ -338,7 +338,7 @@ TEST_F(BaseTest, SettingsRtptExtraSpecularAndTransmissiveBounces) {
         write_data.is_array = true;
         write_data.semantic = OVSTAGE_SEMANTIC_RELATIONSHIP_PATH_ID;
 
-        ovx_string_or_token_t attr_ref{};
+        ovx_token_or_string_t attr_ref{};
         attr_ref.token = binding_token;
 
         ovstage_enqueue_result_t wq = ovstage_write_attribute(
@@ -395,7 +395,7 @@ TEST_F(BaseTest, UpdateFromUsdTimeAsync) {
 
         // Drive the render pipeline once so the time-sampled attribute writes
         // are consumed before we read the composed transform back.
-        ovrtx_step_result_handle_t step_handle = 0;
+        ovrtx_step_result_handle_t step_handle{};
         ovrtx_enqueue_result_t eq = ovrtx_step_with_stage(
             renderer_, render_products, 1.0, ordinal, &step_handle);
         ASSERT_API_SUCCESS(eq.status);

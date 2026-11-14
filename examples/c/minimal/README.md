@@ -8,7 +8,7 @@ The example loads a scene from S3 and writes the resulting image to `out.png`. A
 
 Runtime validation requires an NVIDIA RTX-capable GPU, a supported NVIDIA driver, internet access to download the remote S3 scene asset, and unsandboxed execution.
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 > _“Create the smallest useful C/C++ example that initializes ovrtx, loads a USD scene asynchronously, waits for it, renders one camera frame, fetches and CPU-maps the color output, writes it to an image file, and releases all ovrtx resources explicitly.”_
 

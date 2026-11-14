@@ -1,8 +1,8 @@
 .. SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 .. SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 
-C/C++: USD Plugin Paths
-=======================
+C: USD Plugin Paths
+===================
 
 This example lists ovrtx's schema directories, checks their plugin descriptors,
 and publishes the paths for the

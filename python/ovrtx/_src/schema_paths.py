@@ -8,11 +8,10 @@
 
 """Thin Python wrapper around the C ``ovrtx_register_schema_paths`` API.
 
-USD schema/plugin path registration is implemented in a single place:
-``rendering/source/sharedlibs/ovrtx/CRenderApiLibLoader.cpp`` (the
-``registerUsdPluginPathsBody`` / ``registerSchemaPathsIfNeeded`` pair). This
-module loads the ovrtx loader shared library and calls the exported
-``ovrtx_register_schema_paths`` C entry point, so the same code path runs
+USD schema/plugin path registration is implemented in a single place, the
+native ovrtx loader library. This module loads that shared library and calls
+the exported ``ovrtx_register_schema_paths`` C entry point, so the same code
+path runs
 whether the registration originates from Python (auto-import hook in
 ``ovrtx/__init__.py``), from a C/C++ host's ``ovrtx_register_schema_paths``
 call, or implicitly from ``ovrtx_initialize`` / ``ovrtx_create_renderer``.
@@ -44,8 +43,8 @@ from .bindings import (
     ovx_string_t,
 )
 
-# Highest-precedence root override env-var. The C resolver in
-# ``CRenderApiLibLoader::registerSchemaPathsIfNeeded`` consults this before
+# Highest-precedence root override env-var. The C resolver in the native
+# loader consults this before
 # falling back to the loader's own location (``GetModuleFileName`` / ``dladdr``).
 # ``register_schema_paths`` forwards ``binary_package_root`` through it (documented
 # side effect); ``usd_plugin_paths`` forwards through the
@@ -153,7 +152,7 @@ def register_schema_paths(binary_package_root: Optional[str] = None) -> None:
 
     Thin wrapper that loads ``ovrtx-dynamic`` and invokes the C-side
     :c:func:`ovrtx_register_schema_paths`. All path-resolution and env-var
-    update logic lives in ``CRenderApiLibLoader.cpp`` so every entry point
+    update logic lives in the native ovrtx loader so every entry point
     (Python auto-import hook, ``ovrtx_initialize``, ``ovrtx_create_renderer``,
     explicit ``ovrtx_register_schema_paths`` call from a C/C++ host) runs
     the same code.

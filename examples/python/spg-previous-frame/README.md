@@ -4,7 +4,7 @@ An SPG node that reads the **same AOV twice**: once as the renderer produced it 
 once as it was one frame ago. It publishes the difference, so whatever moved lights up and whatever
 held still goes dark.
 
-The whole mechanism is one suffix on a RenderVar:
+One suffix on a RenderVar selects the previous frame:
 
 ```usda
 def RenderVar "PreviousColor"
@@ -14,7 +14,7 @@ def RenderVar "PreviousColor"
 }
 ```
 
-Nothing on the node says anything about time. It declares two ordinary `opaque inputs:` ports, and
+The node declares two `opaque inputs:` ports, and
 which of them is a past frame follows from what the scene connects them to.
 
 | File | Role |
@@ -38,20 +38,14 @@ uv run main.py                                  # CUDA
 uv run main.py --scene motion_scene_slang.usda  # Slang
 ```
 
-The first step compiles the kernel and may block for up to a minute on a fresh shader cache. A
-successful run writes three PNGs to `_output/` and prints:
-
-```
-pixels changed while moving: 3281
-pixels changed while still:  50
-```
-
-Neither count repeats exactly between runs. The check is the gap between them, and a run that
-fails it exits non-zero.
+The first step compiles the kernel and may block for up to 5 minutes on a fresh shader cache. A
+successful run writes three PNGs to `_output/`: `colour.png`, the last frame the renderer drew;
+`motion-moving.png`, the difference while the ball moves; and `motion-still.png`, the difference
+once the ball has held still.
 
 ## How it works
 
-The run has two halves, and the contrast between them is the whole check.
+The run has two halves.
 
 - **Moving.** The ball is driven a step around a circle before each render, so this frame and the
   last one disagree wherever it went. The difference image shows the ball and the hole it left.
@@ -59,11 +53,8 @@ The run has two halves, and the contrast between them is the whole check.
 - **Still.** The ball is written to the same position before each render. This frame and the last
   one now agree, and the difference collapses to the sampling noise of a converged render.
 
-A node wired to the live AOV twice would print a near-zero count in **both** halves, so the moving
-half is what proves the `:-1` binding resolved to a past frame rather than to the current one.
-
-The count while still is not exactly zero, and should not be expected to be: a path-traced render
-keeps refining, so consecutive frames of a static scene differ slightly. What matters is the ratio.
+The still image is not completely black: a path-traced render
+keeps refining, so consecutive frames of a static scene differ slightly.
 
 See the **Read a Previous Frame** page in the SPG documentation for the same material in prose,
-including how `:-N` behaves for N up to 8 and how it differs from a stateful output.
+including how far back `:-N` can read and how it differs from a stateful output.

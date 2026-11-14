@@ -1,0 +1,409 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+)
+
+# A street with a glass bus shelter ahead of a Lidar generic wpm model sensor: the scene of the model's overview
+# figure, rendered by ../_render_example_scenes.py.
+def Xform "World"
+{
+    def OmniLidar "Lidar" (
+        prepend apiSchemas = ["OmniSensorGenericLidarWpmAPI"]
+    )
+    {
+        token visibility = "invisible"
+        double2 omni:sensor:frameRate = (10, 1)
+        token omni:sensor:LidarWpm:scanType = "rotary"
+        float omni:sensor:LidarWpm:rotPatternFiringResDeg = 0.2
+        uint omni:sensor:LidarWpm:maxReturns = 2
+        token omni:sensor:LidarWpm:elementsCoordsType = "CARTESIAN"
+        token omni:sensor:LidarWpm:outputFrameOfReference = "WORLD"
+        float omni:sensor:LidarWpm:jitterAzimuthStdDevDeg = 0
+
+        float[] omni:sensor:LidarWpm:firingPattern:p001:azimuthDeg = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        float[] omni:sensor:LidarWpm:firingPattern:p001:elevationDeg = [-15.000, -14.603, -14.206, -13.810, -13.413, -13.016, -12.619, -12.222, -11.825, -11.429, -11.032, -10.635, -10.238, -9.841, -9.444, -9.048, -8.651, -8.254, -7.857, -7.460, -7.063, -6.667, -6.270, -5.873, -5.476, -5.079, -4.683, -4.286, -3.889, -3.492, -3.095, -2.698, -2.302, -1.905, -1.508, -1.111, -0.714, -0.317, 0.079, 0.476, 0.873, 1.270, 1.667, 2.063, 2.460, 2.857, 3.254, 3.651, 4.048, 4.444, 4.841, 5.238, 5.635, 6.032, 6.429, 6.825, 7.222, 7.619, 8.016, 8.413, 8.810, 9.206, 9.603, 10.000]
+        uint[] omni:sensor:LidarWpm:firingPattern:p001:fireTimeNs = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000, 25000, 26000, 27000, 28000, 29000, 30000, 31000, 32000, 33000, 34000, 35000, 36000, 37000, 38000, 39000, 40000, 41000, 42000, 43000, 44000, 45000, 46000, 47000, 48000, 49000, 50000, 51000, 52000, 53000, 54000, 55000, 56000, 57000, 58000, 59000, 60000, 61000, 62000, 63000]
+        uint[] omni:sensor:LidarWpm:firingPattern:p001:channelId = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64]
+        uint[] omni:sensor:LidarWpm:firingPattern:p001:rangeId = []
+
+        double3 xformOp:translate = (0, 0, 1.8)
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Mesh "GroundPlane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-200, -200, 0), (200, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Asphalt>
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-200, -200, 0), (200, -200, 0), (200, 200, 0), (-200, 200, 0)]
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.05)]
+    }
+    def Cube "Sidewalk" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Concrete>
+        color3f[] primvars:displayColor = [(0.55, 0.55, 0.52)]
+        double3 xformOp:translate = (8.5, 0, 0.075)
+        float3 xformOp:scale = (9, 18, 0.15)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Mesh "ShelterFrontPane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(7, -2, 0.15), (7, 2, 2.4)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Glass>
+        normal3f[] normals = [(-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(7, 2, 0.15), (7, -2, 0.15), (7, -2, 2.4), (7, 2, 2.4)]
+        color3f[] primvars:displayColor = [(0.7, 0.85, 0.9)]
+    }
+    def Mesh "ShelterSidePaneRight" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(7, -2, 0.15), (8.5, -2, 2.4)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Glass>
+        normal3f[] normals = [(0, 1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(7, -2, 0.15), (8.5, -2, 0.15), (8.5, -2, 2.4), (7, -2, 2.4)]
+        color3f[] primvars:displayColor = [(0.7, 0.85, 0.9)]
+    }
+    def Mesh "ShelterSidePaneLeft" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(7, 2, 0.15), (8.5, 2, 2.4)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Glass>
+        normal3f[] normals = [(0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(8.5, 2, 0.15), (7, 2, 0.15), (7, 2, 2.4), (8.5, 2, 2.4)]
+        color3f[] primvars:displayColor = [(0.7, 0.85, 0.9)]
+    }
+    def Cube "ShelterPost0" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Aluminum>
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.82)]
+        double3 xformOp:translate = (7, -2.05, 1.325)
+        float3 xformOp:scale = (0.1, 0.1, 2.35)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "ShelterPost1" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Aluminum>
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.82)]
+        double3 xformOp:translate = (7, 2.05, 1.325)
+        float3 xformOp:scale = (0.1, 0.1, 2.35)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "ShelterPost2" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Aluminum>
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.82)]
+        double3 xformOp:translate = (8.5, -2.05, 1.325)
+        float3 xformOp:scale = (0.1, 0.1, 2.35)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "ShelterPost3" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Aluminum>
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.82)]
+        double3 xformOp:translate = (8.5, 2.05, 1.325)
+        float3 xformOp:scale = (0.1, 0.1, 2.35)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "ShelterRoof" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Aluminum>
+        color3f[] primvars:displayColor = [(0.8, 0.8, 0.82)]
+        double3 xformOp:translate = (7.75, 0, 2.45)
+        float3 xformOp:scale = (1.8, 4.3, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "BenchSeat" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Steel>
+        color3f[] primvars:displayColor = [(0.6, 0.6, 0.62)]
+        double3 xformOp:translate = (8.2, 0, 0.6)
+        float3 xformOp:scale = (0.4, 3.0, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "BenchBack" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Steel>
+        color3f[] primvars:displayColor = [(0.6, 0.6, 0.62)]
+        double3 xformOp:translate = (8.45, 0, 0.9)
+        float3 xformOp:scale = (0.05, 3.0, 0.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "BuildingWall" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Concrete>
+        color3f[] primvars:displayColor = [(0.58, 0.56, 0.52)]
+        double3 xformOp:translate = (9.65, 0, 2.5)
+        float3 xformOp:scale = (0.3, 16, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Cube "LeftBuilding" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Concrete>
+        color3f[] primvars:displayColor = [(0.58, 0.56, 0.52)]
+        double3 xformOp:translate = (5, 14.15, 2.5)
+        float3 xformOp:scale = (30, 0.3, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Mesh "SignFace" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(5, -3.8, 2.0), (5, -3.2, 2.6)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/SignRetro>
+        normal3f[] normals = [(-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(5, -3.2, 2.0), (5, -3.8, 2.0), (5, -3.8, 2.6), (5, -3.2, 2.6)]
+        color3f[] primvars:displayColor = [(0.9, 0.2, 0.1)]
+    }
+    def Cube "SignPost" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1
+        rel material:binding = </World/Materials/Steel>
+        color3f[] primvars:displayColor = [(0.6, 0.6, 0.62)]
+        double3 xformOp:translate = (5.04, -3.5, 1.0)
+        float3 xformOp:scale = (0.06, 0.06, 2.0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def DistantLight "DistantLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float intensity = 4000
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    def DomeLight "Sky"
+    {
+        float inputs:intensity = 1000
+        color3f inputs:color = (0.78, 0.84, 0.95)
+    }
+
+    def Camera "PreviewCamera"
+    {
+        float focalLength = 14.42
+        float horizontalAperture = 20.955
+        float verticalAperture = 11.787
+        float2 clippingRange = (0.1, 500)
+        matrix4d xformOp:transform = ( (0.447214, -0.894427, 0.000000, 0.000000), (0.180804, 0.090402, 0.979356, 0.000000), (-0.875962, -0.437981, 0.202145, 0.000000), (-5.500000, -6.500000, 4.200000, 1.000000) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def "Render"
+    {
+        def "Products"
+        {
+            def RenderProduct "LidarProduct"
+            {
+                rel camera = </World/Lidar>
+                rel orderedVars = [<../../Vars/PointCloud>]
+            }
+
+            def RenderProduct "CameraProduct"
+            {
+                rel camera = </World/PreviewCamera>
+                int2 resolution = (960, 540)
+                token omni:rtx:rendermode = "RealTimePathTracing"
+                rel orderedVars = [<../../Vars/LdrColor>]
+            }
+        }
+
+        def "Vars"
+        {
+            def RenderVar "PointCloud"
+            {
+                uniform string sourceName = "PointCloud"
+                token[] channels = []
+            }
+
+            def RenderVar "LdrColor"
+            {
+                uniform string sourceName = "LdrColor"
+            }
+        }
+    }
+
+    def Xform "Materials"
+    {
+        def Material "Asphalt"
+        {
+            token omni:simready:nonvisual:base = "asphalt"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.07, 0.07, 0.08)
+                float inputs:reflection_roughness_constant = 0.95
+                float inputs:metallic_constant = 0
+                token outputs:out
+            }
+        }
+        def Material "Concrete"
+        {
+            token omni:simready:nonvisual:base = "concrete"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Concrete/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Concrete/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Concrete/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.58, 0.56, 0.52)
+                float inputs:reflection_roughness_constant = 0.9
+                float inputs:metallic_constant = 0
+                token outputs:out
+            }
+        }
+        def Material "Glass"
+        {
+            token omni:simready:nonvisual:base = "clear_glass"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Glass/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Glass/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Glass/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniGlass.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniGlass"
+                color3f inputs:glass_color = (0.82, 0.93, 0.96)
+                float inputs:glass_ior = 1.5
+                bool inputs:thin_walled = true
+                token outputs:out
+            }
+        }
+        def Material "Aluminum"
+        {
+            token omni:simready:nonvisual:base = "aluminum"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Aluminum/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Aluminum/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Aluminum/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.85, 0.85, 0.87)
+                float inputs:reflection_roughness_constant = 0.3
+                float inputs:metallic_constant = 1
+                token outputs:out
+            }
+        }
+        def Material "Steel"
+        {
+            token omni:simready:nonvisual:base = "steel"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Steel/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Steel/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Steel/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.72, 0.72, 0.74)
+                float inputs:reflection_roughness_constant = 0.32
+                float inputs:metallic_constant = 1
+                token outputs:out
+            }
+        }
+        def Material "SignRetro"
+        {
+            token omni:simready:nonvisual:base = "aluminum"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["retroreflective"]
+            token outputs:mdl:surface.connect = </World/Materials/SignRetro/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/SignRetro/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/SignRetro/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.9, 0.2, 0.1)
+                float inputs:reflection_roughness_constant = 0.4
+                float inputs:metallic_constant = 0
+                token outputs:out
+            }
+        }
+    }
+}

@@ -20,6 +20,67 @@ The Python API provides a high-level interface to the ovrtx rendering library.
 ovrtx
 -----
 
+.. _python-handle-types:
+
+Handle Types
+^^^^^^^^^^^^
+
+.. automodule:: ovrtx.handles
+   :no-members:
+   :no-special-members:
+
+.. autoclass:: ovrtx.Token
+
+.. autoclass:: ovrtx.PrimPath
+
+.. autoclass:: ovrtx.PrimPathList
+
+.. autoclass:: ovrtx.UsdHandle
+
+.. autoclass:: ovrtx.EventHandle
+
+.. autoclass:: ovrtx.AttributeBindingHandle
+
+.. autoclass:: ovrtx.MapHandle
+
+.. autoclass:: ovrtx.StepResultHandle
+
+.. autoclass:: ovrtx.RenderVarOutputHandle
+
+.. autoclass:: ovrtx.RenderVarOutputMapHandle
+
+.. autoclass:: ovrtx.OpId
+
+.. autoclass:: ovrtx.QueryHandle
+
+.. autoclass:: ovrtx.ReadHandle
+
+.. autoclass:: ovrtx.DataProviderId
+
+.. autoclass:: ovrtx.DataArrayLeaseId
+
+.. autodata:: ovrtx.INVALID_USD_HANDLE
+
+.. autodata:: ovrtx.INVALID_EVENT_HANDLE
+
+.. autodata:: ovrtx.INVALID_ATTRIBUTE_BINDING_HANDLE
+
+.. autodata:: ovrtx.INVALID_MAP_HANDLE
+
+.. autodata:: ovrtx.INVALID_STEP_RESULT_HANDLE
+
+.. autodata:: ovrtx.INVALID_RENDER_VAR_OUTPUT_HANDLE
+
+.. autodata:: ovrtx.INVALID_RENDER_VAR_OUTPUT_MAP_HANDLE
+
+.. autodata:: ovrtx.INVALID_OP_ID
+
+.. autodata:: ovrtx.INVALID_QUERY_HANDLE
+
+.. autodata:: ovrtx.INVALID_READ_HANDLE
+
+.. autodata:: ovrtx.INVALID_DATA_PROVIDER_ID
+
 Version and Constants
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -73,6 +134,18 @@ See :doc:`../core/usd_plugin_paths` for complete, tested workflows.
 
 .. autofunction:: ovrtx.usd_pluginpath_env_keys
 
+Data Collection
+^^^^^^^^^^^^^^^
+
+ovrtx sends one anonymous report per process, when it first initializes, which happens when
+the first :class:`ovrtx.Renderer` is created. Set
+``NVIDIA_OMNIVERSE_PRODUCT_TELEMETRY_DISABLED=1`` before starting the process, or call
+:func:`ovrtx.library_telemetry_opt_out` before creating that renderer, to turn it off.
+See `Data Collection & Use <https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/TELEMETRY.md>`_
+for every field in the report.
+
+.. autofunction:: ovrtx.library_telemetry_opt_out
+
 Renderer
 ^^^^^^^^
 
@@ -86,10 +159,45 @@ Renderer
       Enums are also available as class attributes for convenience
       (for example, ``Renderer.Semantic.NONE``). Refer to :ref:`enums` below for details.
 
+Performance Profiling
+^^^^^^^^^^^^^^^^^^^^^
+
+Collect simplified performance metrics, grouped RTX stages, and grouped memory data.
+Use :py:func:`ovrtx.start_profiling()` after renderer creation and
+:py:func:`ovrtx.stop_profiling()` before renderer teardown. The update functions
+document retained-batch ownership, measurement meanings, and recommended copy intervals
+for data collection and live visualization.
+
+.. autofunction:: ovrtx.start_profiling
+
+.. autofunction:: ovrtx.stop_profiling
+
+.. autofunction:: ovrtx.get_performance_data_update
+
+.. autofunction:: ovrtx.get_performance_data_update_as_json
+
+.. autofunction:: ovrtx.release_performance_data_update
+
+.. autoclass:: ovrtx.ovrtx_performance_data_update_t
+
+.. autofunction:: ovrtx.add_performance_metric_value
+
+.. autofunction:: ovrtx.add_performance_metric_value_with_thread_execution_id
+
+.. autofunction:: ovrtx.add_performance_metric_value_with_custom_execution_id
+
+.. autodata:: ovrtx.OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_FPS
+
+.. autodata:: ovrtx.OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_RENDER_THREAD_TIME
+
 Configuration
 ^^^^^^^^^^^^^
 
 .. autoclass:: ovrtx.RendererConfig
+   :members:
+   :undoc-members:
+
+.. autoclass:: ovrtx.RenderQuality
    :members:
    :undoc-members:
 
@@ -115,6 +223,8 @@ Async Operations
 .. autoclass:: ovrtx.OperationCounter
    :members:
    :undoc-members:
+
+.. _python-api-render-outputs:
 
 Render Outputs
 ^^^^^^^^^^^^^^

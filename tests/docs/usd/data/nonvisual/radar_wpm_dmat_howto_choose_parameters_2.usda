@@ -1,0 +1,38 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-radar-wpm-dmat-howto-choose-parameters-2]
+#usda 1.0
+
+def OmniRadar "generic_radar"
+{
+    token omni:sensor:WpmDmat:scan:s001:datacubeMode = "WAVEFORM"
+    uint omni:sensor:WpmDmat:scan:s001:waveformMode = 0
+
+    # waveform: each repetition time must be at least chirpDuration
+    float omni:sensor:WpmDmat:scan:s001:chirpDuration = 2.5e-05
+    float omni:sensor:WpmDmat:scan:s001:chirpBandwidth = 375e6
+    float[] omni:sensor:WpmDmat:scan:s001:chirpRepetitionTimeSequence = [3.5e-05]
+    float omni:sensor:WpmDmat:scan:s001:frequencyStepBetweenChirps = 0.0
+    float omni:sensor:WpmDmat:scan:s001:supportFactor = 1.0
+
+    # sampling, and the transform lengths after zero padding
+    uint omni:sensor:WpmDmat:scan:s001:slowTimeSamples = 379
+    uint omni:sensor:WpmDmat:scan:s001:fastTimeSamples = 625
+    uint omni:sensor:WpmDmat:scan:s001:slowTimePaddingSamples = 512
+    uint omni:sensor:WpmDmat:scan:s001:fastTimePaddingSamples = 1024
+    uint omni:sensor:WpmDmat:scan:s001:azimuthPaddingSamples = 128
+    uint omni:sensor:WpmDmat:scan:s001:elevationPaddingSamples = 32
+    token omni:sensor:WpmDmat:scan:s001:windowSlowTime = "RECT"
+    token omni:sensor:WpmDmat:scan:s001:windowFastTime = "RECT"
+
+    # the receiving aperture: 85 x 14 elements
+    uint omni:sensor:WpmDmat:scan:s001:apertureArrayAzimuthElements = 85
+    uint omni:sensor:WpmDmat:scan:s001:apertureArrayElevationElements = 14
+    float omni:sensor:WpmDmat:scan:s001:apertureAzimuthElementSpacing = 0.00236
+    float omni:sensor:WpmDmat:scan:s001:apertureElevationElementSpacing = 0.00332
+    token omni:sensor:WpmDmat:scan:s001:apertureWindowAzimuth = "RECT"
+    token omni:sensor:WpmDmat:scan:s001:apertureWindowElevation = "RECT"
+}
+# [/snippet:doc-nonvisual-radar-wpm-dmat-howto-choose-parameters-2]

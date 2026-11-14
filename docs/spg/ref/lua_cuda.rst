@@ -17,8 +17,7 @@ Every function and constant a ``.cu.lua`` launch script can use. For what a laun
 and when it runs, refer to :doc:`lua_contract`.
 
 Accepted source assets: ``.cu``, compiled with NVRTC on load, and the pre-compiled ``.ptx``,
-``.cubin`` and ``.fatbin``. Extensions are matched case-insensitively. That is the complete
-list.
+``.cubin`` and ``.fatbin``. Extensions are matched case-insensitively.
 
 The CUDA headers are reachable from a ``.cu`` source through ``#include``, for example
 ``#include <cuda_fp16.h>``. They come from one directory, the CUDA installation SPG finds:
@@ -41,11 +40,16 @@ Output descriptors state what an output has to be; SPG owns the memory.
      - A texture-backed output. Preferred for image data. Note the argument order against height-first shapes.
    * - ``cuda.empty(shape, dtype)``
      - A buffer-backed output of arbitrary shape, up to 8 dimensions. Use for non-image data.
-   * - ``cuda.zeros(shape, dtype)``, ``cuda.ones(shape, dtype)``, ``cuda.full(shape, value, dtype)``
-     - A buffer filled with zeros, ones, or a stated value.
 
-``cuda.image`` and ``cuda.empty`` take an optional trailing ``cuda.stateful``, which marks the
-output persistent so SPG hands the same resource back next frame instead of a fresh one:
+The same functions describe the node's **memory**: storage only the node reads and writes,
+kept across frames for as long as the node lives. A memory is stated on ``self.memory`` under
+its name instead of on ``outputs``, and passed to the kernel with the same wrappers as an
+output, as in the snippet below. Refer to
+:doc:`../do/state`.
+
+``cuda.image`` and ``cuda.empty`` also take an optional trailing ``cuda.stateful``, which marks
+an output persistent so SPG hands the same resource back next frame instead of a fresh one:
+state the scene reads as well.
 
 .. filtered-literalinclude:: ../../../examples/python/spg-stateful/TrailKernel.cu.lua
    :language: lua
@@ -77,7 +81,10 @@ Each wrapper turns a descriptor or a value into the CUDA type the kernel paramet
      - Raw device pointer to an input or output resource.
    * - ``cuda.array(luaTable, dtype)``
      - ``cudaRawPointer_t``
-     - Upload a Lua table of numbers to a GPU device array.
+     - Upload a Lua table of numbers to a GPU device array. An empty table gives the kernel a null pointer.
+   * - ``cuda.zeros(shape, dtype)``, ``cuda.ones(shape, dtype)``, ``cuda.full(shape, value, dtype)``
+     - ``cudaRawPointer_t``
+     - A GPU device array of that shape filled with zeros, ones, or a stated value, passed to the kernel as an uploaded Lua table is.
    * - ``cuda.array(tokenOrAssetInput)``
      - ``cudaRawPointer_t``
      - Upload a ``token`` value-input as a null-terminated ``const char*``, or an ``asset``
@@ -122,15 +129,18 @@ Kernel Launch
 
 ``block`` and ``grid`` map directly to the CUDA launch configuration (``<<<grid, block>>>``).
 Left out, they are derived from the first output's shape: a block of 16 x 16 x 1, or 256 x 1 x 1
-for a rank-1 or rank-0 resource, and a grid covering that shape. Value-inputs on the shader prim supply them instead when the script
-states neither. Set them explicitly whenever the iteration domain is not the output image, such as
+for a rank-1 or rank-0 resource, and a grid covering that shape. Value-inputs ``blockDimX``,
+``blockDimY`` and ``blockDimZ`` supply the block when the script states no ``block``.
+Set ``block`` and ``grid`` explicitly whenever the iteration domain is not the output image, such as
 a kernel whose threads walk a buffer. Refer to :doc:`../do/launch_geometry`.
 
 dtype Constants
 ---------------
 
-All dtype constants live in the ``cuda`` table and can also be called as constructors for
-kernel arguments, for example ``cuda.int(42)``.
+A numeric vector constructor passes all components as one by-value kernel argument, with
+the element type and component count the dtype names. The kernel parameter must match:
+``cuda.float4`` takes a ``float4`` parameter, ``cuda.double3`` a ``double3``, and
+``cuda.double4`` a ``double4``. Use ``cuda.array`` for a pointer to the components instead.
 
 .. list-table::
    :header-rows: 1
@@ -143,7 +153,7 @@ kernel arguments, for example ``cuda.int(42)``.
      - bool
      - 1 byte
    * - ``cuda.uchar``
-     - uint8
+     - unsigned char
      - 1 byte
    * - ``cuda.uchar4``
      - uchar4
@@ -177,6 +187,8 @@ Cached Computation
    * - Function
      - Description
    * - ``cuda.static(fn, ...)``
-     - Call ``fn(...)`` once and cache the result, keyed on the arguments. Later calls with the
-       same arguments reuse it; a changed argument runs ``fn`` again. Refer to
+     - Call ``fn(...)`` once and cache the result. Later calls with the same arguments reuse it; a
+       changed argument runs ``fn`` again, and its result replaces the cached one. An error from
+       ``fn`` propagates and fails the launch; the failed call stores no result. A function
+       written inline in the launch function is the same function on every launch. Refer to
        :doc:`../do/caching`.

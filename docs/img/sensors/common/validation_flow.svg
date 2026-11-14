@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1188" height="382" viewBox="0 0 1188 382" role="img" aria-labelledby="title desc">
+<title id="title">One validation check, end to end</title>
+<desc id="desc">A sensor definition enters the sensor introspection utility, which was initialized for one model. The utility applies the model's own validation rules and returns either no error, after which the validated parameters and the scheduler information can be read, or a reason string.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-76b900-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#76B900"/></marker><marker id="arrow-c8102e-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#C8102E"/></marker></defs>
+<rect width="1188" height="382" fill="#fff"/>
+<text x="32" y="44" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">the definition, in one of three forms</text>
+<rect x="32" y="58" width="240" height="52" rx="6" fill="#F2F2F2"/>
+<text x="152" y="78.36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">parameter set</text>
+<text x="152" y="96.12" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">names, types, vector lengths, values</text>
+<line x1="278" y1="84" x2="309" y2="84" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<rect x="32" y="124" width="240" height="52" rx="6" fill="#F2F2F2"/>
+<text x="152" y="144.36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">USD file + prim path</text>
+<text x="152" y="162.12" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">the layer's file and the prim's path</text>
+<line x1="278" y1="150" x2="309" y2="150" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<rect x="32" y="190" width="240" height="52" rx="6" fill="#F2F2F2"/>
+<text x="152" y="210.36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">opened Usd.Prim</text>
+<text x="152" y="228.12" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">Python; a UsdPrim address in C++</text>
+<line x1="278" y1="216" x2="309" y2="216" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<rect x="326" y="57" width="340" height="186" rx="8" fill="#fff" stroke="#757575" stroke-width="2"/>
+<text x="496" y="83" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" text-anchor="middle" font-weight="bold">sensor introspection utility</text>
+<text x="496" y="103" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">init(ModelInfo)</text>
+<rect x="340" y="119" width="312" height="110" rx="6" fill="#F2F2F2"/>
+<text x="496" y="143" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">the model's own validation rules</text>
+<text x="496" y="163" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">one library per model, chosen by modelName:</text>
+<text x="496" y="181" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">lidar.core, lidar.wpm,</text>
+<text x="496" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">radar.dmatapprox, acoustic</text>
+<text x="496" y="217" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#9A9A9A" text-anchor="middle">the camera models have no check</text>
+<line x1="496" y1="243" x2="496" y2="263" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<rect x="326" y="263" width="340" height="50" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="496" y="284" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">the renderer applies the same rules at sensor</text>
+<text x="496" y="301" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">creation and on a live update</text>
+<line x1="672" y1="150" x2="758" y2="150" stroke="#757575" stroke-width="2"/>
+<circle cx="758" cy="150" r="4" fill="#757575"/>
+<text x="676" y="140" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">validateParams</text>
+<path d="M758,150 C813.02,150 833.98,127 889,127" fill="none" stroke="#76B900" stroke-width="2" marker-end="url(#arrow-76b900-2)"/>
+<path d="M758,150 C813.02,150 833.98,274 889,274" fill="none" stroke="#C8102E" stroke-width="2" marker-end="url(#arrow-c8102e-2)"/>
+<text x="819" y="120" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#76B900" text-anchor="middle">valid: None / nullptr</text>
+<text x="768" y="268" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#C8102E" text-anchor="middle">invalid: reason string</text>
+<rect x="906" y="36" width="250" height="182" rx="8" fill="none" stroke="#76B900" stroke-width="2"/>
+<text x="918" y="52" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#76B900">after a valid check, read back:</text>
+<rect x="916" y="62" width="230" height="52" rx="6" fill="#F2F2F2"/>
+<text x="1031" y="82.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">getValidatedParams()</text>
+<text x="1031" y="100.12" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">the accepted parameter set</text>
+<rect x="916" y="124" width="230" height="84" rx="6" fill="#F2F2F2"/>
+<text x="1031" y="146" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">getSchedulerInfo()</text>
+<text x="1031" y="165" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">frameRate, startTime,</text>
+<text x="1031" y="181.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">captureDuration, frameLimit,</text>
+<text x="1031" y="198" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">partialOutputs, errorString</text>
+<rect x="906" y="248" width="250" height="52" rx="6" fill="#fff" stroke="#C8102E" stroke-width="2"/>
+<text x="1031" y="268.36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">reason string</text>
+<text x="1031" y="286.12" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">why the definition was refused</text>
+<line x1="32" y1="342" x2="48" y2="342" stroke="#0074DF" stroke-width="2"/>
+<text x="55" y="346.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">the definition</text>
+<line x1="157" y1="342" x2="173" y2="342" stroke="#76B900" stroke-width="2"/>
+<text x="180" y="346.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">valid</text>
+<line x1="230.75" y1="342" x2="246.75" y2="342" stroke="#C8102E" stroke-width="2"/>
+<text x="253.75" y="346.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">invalid</text>
+</svg>

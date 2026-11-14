@@ -62,9 +62,10 @@ The key rendering loop renders every debug view before logging any of them:
             # Preserve orientation and scale, including the centimetre-scaled forklift payload.
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
                 while (group := read.fetch_next()) is not None:
-                    values = np.from_dlpack(group.dlpack(0)).reshape(-1, 4, 4)
+                    column = group.columns[0]
+                    values = np.from_dlpack(column.dlpack(0)).reshape(-1, 4, 4)
                     for index in range(group.prim_count):
-                        transforms[group.prim_index(index)] = values[group.data_row_index(index)]
+                        transforms[group.prim_index(index)] = values[column.data_row_index(index)]
                     del values
                     stage.release_group(group)
             if not np.all(np.isfinite(transforms)):

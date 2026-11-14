@@ -1,18 +1,11 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: renderer-creation
 description: >
   Creating and configuring an ovrtx renderer instance. Use when user asks to create a
   renderer, initialize ovrtx, configure renderer options, or set up ovrtx.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -155,7 +148,7 @@ change the deprecated APIs' removal schedule.
 
 ## Troubleshooting
 
-- **First-run shader compilation:** The first time an ovrtx application runs on a system (or after a driver update), the renderer compiles and caches GPU shaders. This can take several minutes. Subsequent runs reuse the cached shaders and start quickly. If you're running tests or examples for the first time and see a long pause after creating the renderer, this is expected.
+- **First-run shader compilation:** The first time an ovrtx application runs on a system (or after a driver update), the renderer compiles and caches GPU shaders. This can take up to 5 minutes. Subsequent runs reuse the cached shaders and start quickly. If you're running tests or examples for the first time and see a long pause after creating the renderer, this is expected.
 - In C, forgetting to call `ovrtx_destroy_renderer()` will leak GPU resources.
 - `binary_package_root_path` is only required when static linking ovrtx, or when your install layout breaks apart the ovrtx `bin/` directory.
 - With the shared-loader model, ovrtx expects runtime directories under `bin/` (`cache/`, `library/`, `libs/`, `mdl/`, `plugins/`, `rendering-data/`, `usd_plugins/`) to be found next to `ovrtx-dynamic.dll` / `libovrtx-dynamic.so`.

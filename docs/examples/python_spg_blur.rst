@@ -13,11 +13,10 @@ Python: SPG Separable Blur
 
 Two chained SPG nodes blur ``LdrColor``, first along x and then along y, and publish the result as
 ``LdrBlurred``. The tap weights are built in the launch script rather than on the GPU, because they
-depend on nothing but the radius.
+depend only on the radius.
 
-The radius is a USD attribute the run rewrites between renders, which is what makes the checks
-exact: at radius 0 the weight table is ``{1.0}``, the blur is the identity, and the published AOV
-has to equal ``LdrColor`` byte for byte.
+The radius is a USD attribute the run rewrites between renders: at radius 0 the weight table is
+``{1.0}`` and the blur is the identity.
 
 Running
 -------
@@ -27,20 +26,18 @@ Running
    uv run main.py                                # CUDA
    uv run main.py --scene blur_scene_slang.usda  # Slang
 
-The first step compiles the kernel and can take up to a minute on a cold shader cache. A successful
-run writes ``_output/input.png`` and ``_output/blurred.png`` and prints::
-
-    radius 0, pixels differing from the input: 0
-    radius 8, sharpest edge: 122 -> 24
-    radius 8, sharpest edge after one pass: 55
-    radius 8, mean brightness drift: 0.003
-    weight tables built: 2 (radii 8, 0)
+The first step compiles the kernel and can take up to 5 minutes on a cold shader cache. A successful
+run writes five PNGs to ``_output/``: ``input.png``, the rendered ``LdrColor``;
+``blurred-one-pass.png``, after the horizontal pass only; ``blurred.png``, after both passes at
+radius 8; and, once the radius is set to 0, ``radius-0-input.png`` and ``radius-0.png``, that
+frame's ``LdrColor`` and the published AOV, which match pixel for pixel.
 
 The Weights
 -----------
 
-Built once per distinct radius rather than once per frame. The ``warning`` is what makes that
-countable: over some fifty rendered frames it appears twice.
+Each of the two blur nodes builds its table for the first radius and again when the radius changes,
+rather than once per frame: the radius changes once during the run, so each node builds its table
+twice.
 
 .. filtered-literalinclude:: ../../examples/python/spg-blur/BlurKernel.cu.lua
    :language: lua
@@ -51,8 +48,7 @@ countable: over some fifty rendered frames it appears twice.
 The Two Launches
 ----------------
 
-The horizontal pass takes one thread per output pixel, which is what SPG derives when the launch
-script states nothing:
+The horizontal pass takes one thread per output pixel, which is SPG's default launch geometry:
 
 .. filtered-literalinclude:: ../../examples/python/spg-blur/BlurKernel.cu.lua
    :language: lua
@@ -85,14 +81,6 @@ with ``import BlurTaps;``:
 CUDA has no equivalent. One include directory is searched and it is never the ``.cu``'s own, so
 the two CUDA passes share the loop through a ``__device__`` function in the same file. Refer to
 :doc:`../spg/do/precompiled`.
-
-Reading Back the Half-Finished Blur
------------------------------------
-
-The first pass feeds the second pass and a RenderVar of its own, so all three stages are readable
-from the host. The run checks that the sharpest edge in the image falls at each step, which only
-holds if the fan-out reached both consumers. The three figures move with the render; their order
-does not.
 
 Changing the Radius
 -------------------

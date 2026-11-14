@@ -141,11 +141,11 @@ bool wait_for_success(ovrtx_renderer_t* renderer,
     for (size_t i = 0; i < wait_result.num_error_ops; ++i) {
         ovx_string_t msg = ovrtx_get_last_op_error(wait_result.error_op_ids[i]);
         if (msg.ptr && msg.length > 0) {
-            std::cerr << operation << ": op " << wait_result.error_op_ids[i]
+            std::cerr << operation << ": op " << wait_result.error_op_ids[i].raw_id
                       << " failed: " << std::string_view(msg.ptr, msg.length)
                       << "\n";
         } else {
-            std::cerr << operation << ": op " << wait_result.error_op_ids[i]
+            std::cerr << operation << ": op " << wait_result.error_op_ids[i].raw_id
                       << " failed\n";
         }
     }
@@ -177,7 +177,7 @@ ovrtx_render_var_output_handle_t find_render_var_output(
             }
         }
     }
-    return OVRTX_INVALID_HANDLE;
+    return OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE;
 }
 // [/snippet:find-render-var-output-helper]
 
@@ -331,14 +331,14 @@ bool print_pointcloud_step(ovrtx_render_var_output_t const& output,
 bool destroy_step_results(ovrtx_renderer_t* renderer,
                           ovrtx_step_result_handle_t* step_handle)
 {
-    if (*step_handle == OVRTX_INVALID_HANDLE) {
+    if (*step_handle == OVRTX_INVALID_STEP_RESULT_HANDLE) {
         return true;
     }
 
     ovrtx_result_t result = ovrtx_destroy_results(renderer, *step_handle);
 
     // Clear the handle so repeated cleanup attempts are harmless.
-    *step_handle = OVRTX_INVALID_HANDLE;
+    *step_handle = OVRTX_INVALID_STEP_RESULT_HANDLE;
     return check_api_result(result, "destroy_results");
 }
 // [/snippet:destroy-results-helper]
@@ -386,7 +386,7 @@ bool wait_population_op(ovstage_instance_t* stage,
     for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
         ovstage_population_op_id_t op_id = wait_result.error_op_ids[i];
         ovx_string_t error = ovstage_population_get_last_op_error(op_id);
-        std::cerr << "ovstage " << operation << ": op " << op_id << " failed";
+        std::cerr << "ovstage " << operation << ": op " << op_id.raw_id << " failed";
         if (error.ptr && error.length > 0) {
             std::cerr << ": " << std::string_view(error.ptr, error.length);
         }
@@ -416,7 +416,7 @@ bool wait_ovstage_op(ovstage_instance_t* stage,
     for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
         ovstage_op_id_t op_id = wait_result.error_op_ids[i];
         ovx_string_t error = ovstage_get_last_op_error(stage, op_id);
-        std::cerr << "ovstage " << operation << ": op " << op_id << " failed";
+        std::cerr << "ovstage " << operation << ": op " << op_id.raw_id << " failed";
         if (error.ptr && error.length > 0) {
             std::cerr << ": " << std::string_view(error.ptr, error.length);
         }
@@ -611,7 +611,7 @@ int main(int argc, char* argv[])
     // frames from that committed ordinal without reading outputs. In attach mode
     // we drive the renderer with ovrtx_step_with_stage().
     for (int i = 0; i < kWarmupStepCount; ++i) {
-        ovrtx_step_result_handle_t warmup_handle = OVRTX_INVALID_HANDLE;
+        ovrtx_step_result_handle_t warmup_handle{};
 
         // Warmup frames let the sensor pipeline settle before reading the
         // first PointCloud.
@@ -646,7 +646,7 @@ int main(int argc, char* argv[])
             return cleanup(1);
         }
 
-        ovrtx_step_result_handle_t step_handle = OVRTX_INVALID_HANDLE;
+        ovrtx_step_result_handle_t step_handle{};
 
         // Render one radar frame from the committed ordinal and keep the result
         // handle for fetching.
@@ -673,7 +673,7 @@ int main(int argc, char* argv[])
 
         ovrtx_render_var_output_handle_t pointcloud_handle =
             find_render_var_output(outputs, kPointCloudRenderVarPath);
-        if (pointcloud_handle == OVRTX_INVALID_HANDLE) {
+        if (pointcloud_handle == OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
             std::cerr << "PointCloud render var output not found\n";
             destroy_step_results(renderer, &step_handle);
             return cleanup(1);

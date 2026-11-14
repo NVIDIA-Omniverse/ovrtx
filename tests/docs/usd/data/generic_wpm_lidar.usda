@@ -1,0 +1,34 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-lidar]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_depth.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        # Full-circle azimuth excludes +180, which duplicates -180.
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:numRows = [4]
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:numCols = [16]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:startColUnits = [-180]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:endColUnits = [180]
+        token[] omni:sensor:GenericWpm:gridPatterns:tx:layouts = ["columnMajor"]
+        uint[] omni:sensor:GenericWpm:gridPatterns:rx:numRows = [4]
+        uint[] omni:sensor:GenericWpm:gridPatterns:rx:numCols = [16]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:startColUnits = [-180]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:endColUnits = [180]
+        token[] omni:sensor:GenericWpm:gridPatterns:rx:layouts = ["columnMajor"]
+        # Times follow the 64-cell flattened traversal, including both endpoints.
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:startTimeOffsetsNs = [0]
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:endTimeOffsetsNs = [1000000]
+    }
+}
+# [/snippet:doc-generic-wpm-lidar]

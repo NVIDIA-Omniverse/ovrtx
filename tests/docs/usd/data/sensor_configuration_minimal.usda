@@ -1,0 +1,11 @@
+#usda 1.0
+
+# [snippet:doc-sensor-config-minimal]
+def OmniLidar "Lidar" (
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    # Capture at 10 Hz; other parameters use schema defaults.
+    double2 omni:sensor:frameRate = (10, 1)
+}
+# [/snippet:doc-sensor-config-minimal]

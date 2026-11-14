@@ -54,7 +54,7 @@ static bool check_op_errors(ovrtx_op_wait_result_t const &wait_result,
     for (size_t i = 0; i < wait_result.num_error_ops; ++i) {
         ovrtx_op_id_t op_id = wait_result.error_op_ids[i];
         ovx_string_t error = ovrtx_get_last_op_error(op_id);
-        std::cerr << "  op " << op_id << ": ";
+        std::cerr << "  op " << op_id.raw_id << ": ";
         if (error.ptr && error.length > 0) {
             std::cerr << std::string_view(error.ptr, error.length);
         } else {
@@ -147,7 +147,7 @@ find_output(ovrtx_render_product_set_outputs_t const &outputs,
             }
         }
     }
-    return OVRTX_INVALID_HANDLE;
+    return OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,8 +229,8 @@ void OvrtxEngine::startRender(int iterations)
     }
 
     // Immediate first step for fast feedback
-    uint64_t handle = stepOnce();
-    if (handle != 0) {
+    ovrtx_step_result_handle_t handle = stepOnce();
+    if (handle != OVRTX_INVALID_STEP_RESULT_HANDLE) {
         mapAndEmit(handle);
     }
 
@@ -249,11 +249,11 @@ void OvrtxEngine::onRenderTick()
     }
 
     int chunk = std::min(kChunkSize, render_iterations_remaining_);
-    uint64_t last_handle = 0;
+    ovrtx_step_result_handle_t last_handle{};
 
     for (int i = 0; i < chunk; ++i) {
-        uint64_t handle = stepOnce();
-        if (handle == 0) {
+        ovrtx_step_result_handle_t handle = stepOnce();
+        if (handle == OVRTX_INVALID_STEP_RESULT_HANDLE) {
             render_timer_->stop();
             return;
         }
@@ -266,7 +266,7 @@ void OvrtxEngine::onRenderTick()
 
     render_iterations_remaining_ -= chunk;
 
-    if (last_handle != 0) {
+    if (last_handle != OVRTX_INVALID_STEP_RESULT_HANDLE) {
         mapAndEmit(last_handle);
     }
 
@@ -275,7 +275,7 @@ void OvrtxEngine::onRenderTick()
     }
 }
 
-uint64_t OvrtxEngine::stepOnce()
+ovrtx_step_result_handle_t OvrtxEngine::stepOnce()
 {
     ovrtx_render_product_set_t render_products{};
     ovx_string_t rp_str = {render_product_path_.c_str(),
@@ -283,23 +283,23 @@ uint64_t OvrtxEngine::stepOnce()
     render_products.render_products = &rp_str;
     render_products.num_render_products = 1;
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     ovrtx_enqueue_result_t enqueue =
         ovrtx_step(renderer_, render_products, 1.0 / 60.0, &step_handle);
     if (check_error(enqueue, "step")) {
-        return 0;
+        return OVRTX_INVALID_STEP_RESULT_HANDLE;
     }
 
     if (!wait_for_op(renderer_, enqueue.op_index, ovrtx_timeout_infinite,
                      "wait_op (step)")) {
         ovrtx_destroy_results(renderer_, step_handle);
-        return 0;
+        return OVRTX_INVALID_STEP_RESULT_HANDLE;
     }
 
     return step_handle;
 }
 
-void OvrtxEngine::mapAndEmit(uint64_t step_handle)
+void OvrtxEngine::mapAndEmit(ovrtx_step_result_handle_t step_handle)
 {
     ovrtx_render_product_set_outputs_t outputs{};
     ovrtx_result_t result = ovrtx_fetch_results(
@@ -311,7 +311,7 @@ void OvrtxEngine::mapAndEmit(uint64_t step_handle)
 
     ovrtx_render_var_output_handle_t color_handle =
         find_output(outputs, "/Render/Camera/LdrColor");
-    if (color_handle == OVRTX_INVALID_HANDLE) {
+    if (color_handle == OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
         std::cerr << "LdrColor output not found\n";
         ovrtx_destroy_results(renderer_, step_handle);
         return;
@@ -368,7 +368,7 @@ void OvrtxEngine::mapAndEmit(uint64_t step_handle)
     emit frameReady(copy);
 }
 
-void OvrtxEngine::destroyStep(uint64_t step_handle)
+void OvrtxEngine::destroyStep(ovrtx_step_result_handle_t step_handle)
 {
     ovrtx_render_product_set_outputs_t outputs{};
     ovrtx_fetch_results(renderer_, step_handle, ovrtx_timeout_infinite, &outputs);

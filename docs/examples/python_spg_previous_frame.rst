@@ -23,17 +23,16 @@ Running
    uv run main.py                                  # CUDA
    uv run main.py --scene motion_scene_slang.usda  # Slang
 
-The first step compiles the kernel and can take up to a minute on a cold shader cache. A successful
-run writes three PNGs to ``_output/`` and prints::
-
-    pixels changed while moving: 3281
-    pixels changed while still:  50
+The first step compiles the kernel and can take up to 5 minutes on a cold shader cache. A successful
+run writes three PNGs to ``_output/``: ``colour.png``, the last frame the renderer drew;
+``motion-moving.png``, the difference while the ball moves; and ``motion-still.png``, the
+difference once the ball has held still.
 
 The Scene
 ---------
 
-The whole mechanism is the ``:-1`` on one ``sourceName``. Highlighted: the two RenderVars the node
-reads, which name the same AOV at two different times.
+The ``:-1`` on one ``sourceName`` selects the previous frame. Highlighted: the two RenderVars
+the node reads, which name the same AOV at two different times.
 
 .. literalinclude:: ../../examples/python/spg-previous-frame/motion_scene.usda
    :language: usda
@@ -45,7 +44,7 @@ reads, which name the same AOV at two different times.
 The Node
 --------
 
-Two ordinary ``opaque`` ports. Nothing here says one of them is a past frame:
+Two ``opaque`` ports; the scene decides which one reads the past frame:
 
 .. filtered-literalinclude:: ../../examples/python/spg-previous-frame/MotionKernel.usda
    :language: usda
@@ -59,15 +58,14 @@ Two ordinary ``opaque`` ports. Nothing here says one of them is a past frame:
    :end-before: -- [/snippet:motion-launch]
    :exclude-pattern: ^\s*--\s*\[/?snippet:
 
-What the Run Proves
--------------------
+What the Two Halves Show
+------------------------
 
-A node wired to the live AOV twice would report a near-zero count while the ball moves as well as
-while it holds still. The moving half is what shows that ``:-1`` resolved to a past frame.
+The moving half shows the ball and the hole it left; once the ball holds still, the difference
+collapses to sampling noise.
 
-The count while still is not zero, and should not be expected to be: a path-traced render keeps
-refining, so consecutive frames of a static scene differ slightly. Neither count repeats exactly
-between runs. The gap between them is what carries the result.
+The still image is not completely black: a path-traced render
+keeps refining, so consecutive frames of a static scene differ slightly.
 
-Refer to :doc:`../spg/do/previous_frame` for how ``:-N`` behaves for N up to 8, and for how it
-differs from a stateful output.
+Refer to :doc:`../spg/do/previous_frame` for how far back ``:-N`` can read, and for how it differs
+from a stateful output.

@@ -1,0 +1,55 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+    subLayers = [@data/selection_geometry.usda@]
+)
+
+# [snippet:selection-spg-render-graph]
+over "Render"
+{
+    over "Camera"
+    {
+        int2 resolution = (1920, 1080)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        rel orderedVars = [<LdrColor>, <SelectionState>, <CustomSelection>]
+
+        over "LdrColor"
+        {
+            opaque omni:rtx:aov
+        }
+        def RenderVar "SelectionState"
+        {
+            string sourceName = "SelectionState"
+            opaque omni:rtx:aov
+        }
+        def RenderVar "CustomSelection"
+        {
+            string sourceName = "CustomSelection"
+            opaque omni:rtx:aov.connect = <../SelectionOutline.outputs:Color>
+        }
+        def Shader "SelectionOutline"
+        {
+            uniform token info:implementationSource = "sourceAsset"
+            uniform asset info:spg:sourceAsset = @SelectionOutline.slang@
+            uniform token info:spg:sourceAsset:subIdentifier = "selectionOutline"
+
+            # All morphology and styling is controlled by SPG, independently of native outline settings.
+            int inputs:width = 6 # Maximum radius; group 2 uses half.
+            int inputs:shape = 0 # Base shape: 0=circle, 1=square, 2=diamond; groups 2/3 rotate by 1/2.
+            float inputs:fillAlpha = 0.18
+            int inputs:dashPeriod = 16
+            int inputs:hatchSpacing = 12
+            int inputs:hatchLineWidth = 1
+            float inputs:hiddenFillAlpha = 0.35
+
+            opaque inputs:Color.connect = <../LdrColor.omni:rtx:aov>
+            opaque inputs:SelectionState.connect = <../SelectionState.omni:rtx:aov>
+            opaque outputs:Color
+        }
+    }
+}
+# [/snippet:selection-spg-render-graph]

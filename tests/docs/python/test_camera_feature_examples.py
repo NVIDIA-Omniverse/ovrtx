@@ -8,6 +8,7 @@
 
 """Run the public Camera feature examples against the active OVRTX build."""
 
+import json
 import subprocess
 import sys
 from itertools import combinations
@@ -18,7 +19,79 @@ import pytest
 from PIL import Image
 
 EXAMPLE_ROOT = Path(__file__).parents[3] / "examples" / "python"
+# A remote payload that never loads must fail the example, not hang the run.
+EXAMPLE_TIMEOUT = 900
 DOC_DATA = Path(__file__).parents[1] / "data"
+
+
+@pytest.mark.parametrize("denoise", [None, "aovs"], ids=["raw-default", "denoised"])
+def test_aov_compositing_example(output_dir, denoise):
+    """Capture raw/denoised contributions and check the validated denoised sum."""
+    import OpenEXR
+    import ovrtx
+
+    # The pinned release predates PtVolumes denoising; keep this regression
+    # active for development builds and future packages that should include it.
+    if denoise == "aovs" and ovrtx.__version__ == "0.6.0.1791947691":
+        pytest.skip("ovrtx 0.6.0.1791947691 lacks PtVolumes AOV denoising support")
+
+    example = EXAMPLE_ROOT / "aov-compositing"
+    aov_dir = output_dir / "aov-compositing" / (denoise or "raw")
+    render_args = [
+        sys.executable,
+        str(example / "render-aovs.py"),
+        "--output-dir",
+        str(aov_dir),
+        "--resolution",
+        "1280",
+        "720",
+        "--spp",
+        "64",
+    ]
+    if denoise is not None:
+        render_args.extend(["--denoise", denoise])
+    subprocess.run(render_args, check=True, timeout=EXAMPLE_TIMEOUT)
+    composite_args = [sys.executable, str(example / "composite-aovs.py"), "--aov-dir", str(aov_dir)]
+    if denoise == "aovs":
+        composite_args.append("--check")
+    subprocess.run(composite_args, check=True, timeout=EXAMPLE_TIMEOUT)
+
+    metadata = json.loads((aov_dir / "metadata.json").read_text())
+    assert metadata["converged"]
+    assert metadata["denoise"] == (denoise or "none")
+    # A zero volume or SSS buffer would not exercise their contribution or
+    # detect a regression in denoising the volume component with the others.
+    components = (
+        "PtDirectIllumation",
+        "PtGlobalIllumination",
+        "PtReflections",
+        "PtRefractions",
+        "PtSubsurfaceScattering",
+        "PtSelfIllumination",
+        "PtVolumes",
+    )
+    for name in components:
+        with OpenEXR.File(str(aov_dir / f"{name}.exr"), separate_channels=True) as image:
+            channels = image.channels()
+            rgb = np.stack([channels[channel].pixels for channel in "RGB"], axis=-1)
+        assert rgb.shape == (720, 1280, 3)
+        assert np.isfinite(rgb).all(), name
+        assert np.any(rgb > 0), f"{name} did not contribute to the scene"
+
+    with Image.open(aov_dir / "LdrColor.png") as image:
+        reference = np.asarray(image.convert("RGB"), dtype=np.int16)
+    with Image.open(aov_dir / "composite" / "sum.aces-srgb.png") as image:
+        composite = np.asarray(image.convert("RGB"), dtype=np.int16)
+    assert reference.shape == composite.shape == (720, 1280, 3)
+    # The validated denoised capture matches within one code value. Raw AOVs
+    # accumulate at a different precision from beauty, so report their error
+    # without applying the denoised capture's bound.
+    error = np.abs(composite - reference)
+    if denoise == "aovs":
+        assert error.max() <= 1, f"Maximum RGB code-value error: {error.max()}"
+    report = json.loads((aov_dir / "composite" / "report.json").read_text())
+    assert {entry["file"] for entry in report["inputs"]} == {f"{name}.exr" for name in components}
+    assert report["sum_aces_srgb_vs_ldr"]["max_absolute_error"] == int(error.max())
 
 
 def test_lpe_example_rejects_rrd_when_rerun_is_disabled(tmp_path):
@@ -33,6 +106,7 @@ def test_lpe_example_rejects_rrd_when_rerun_is_disabled(tmp_path):
         check=False,
         capture_output=True,
         text=True,
+        timeout=EXAMPLE_TIMEOUT,
     )
 
     assert result.returncode == 2
@@ -60,17 +134,7 @@ DEBUG_VIEW_SELECTORS = (
 @pytest.mark.parametrize(
     "example_name",
     (
-        pytest.param(
-            "camera-lens-calibration",
-            marks=pytest.mark.xfail(
-                reason=(
-                    "The remote robot-lineup payloads do not reliably load in GitHub CI; "
-                    "issues/90"
-                ),
-                strict=False,
-            ),
-            id="camera-lens-calibration",
-        ),
+        "camera-lens-calibration",
         "camera-rolling-shutter",
         "camera-scene-partitions",
         "lpes",
@@ -103,6 +167,7 @@ def test_camera_feature_example(example_name, output_dir):
     subprocess.run(
         command,
         check=True,
+        timeout=EXAMPLE_TIMEOUT,
     )
 
     if example_name == "camera-lens-calibration":
@@ -218,6 +283,7 @@ def test_debug_views_example(tmp_path):
             "1",
         ],
         check=True,
+        timeout=EXAMPLE_TIMEOUT,
     )
 
     with Image.open(output_path) as image:

@@ -8,11 +8,7 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// SPG shader: convert the LdrColor AOV to grayscale. Slang counterpart of
-// GrayscaleKernel.cu -- same inputs, same output, same result.
-//
-// The entry point name ("grayscale") must match the subIdentifier authored in
-// GrayscaleKernel.slang.usda and the Lua launch function name.
+// First pass of the pipeline: convert the LdrColor AOV to grayscale.
 //
 // Resources are bound positionally: the Nth resource declared here receives
 // the Nth entry of the launch script's bind list. Slot 0 of the binding space

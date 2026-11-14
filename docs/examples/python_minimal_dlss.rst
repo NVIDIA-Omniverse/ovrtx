@@ -31,7 +31,7 @@ Run the example from its project directory:
 The default is DLSS-SR with Quality, rendered for 32 frames. Use ``--frames``
 to change the capture point. DLSS uses temporal history, so an early frame
 can differ from an image captured after several frames. This scene illustrates
-edge reconstruction and texture detail; it does not contain Gaussian splats.
+edge reconstruction and texture detail; it does not contain ParticleFields.
 Use ``--log PATH`` to save renderer diagnostics. Use ``--usd PATH`` to render
 another scene that defines ``/World/Camera`` and a ``/Render/Camera``
 RenderProduct with an ``LdrColor`` RenderVar; the documentation tests use it

@@ -15,7 +15,6 @@ import numpy as np
 import ovrtx
 import ovstage
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SCENE = SCRIPT_DIR / "acoustic_example.usda"
 OUTPUT_DIR = SCRIPT_DIR / "_output"
@@ -23,7 +22,6 @@ RENDER_PRODUCT = "/World/Render/Products/AcousticProduct"
 SIGNAL_WAYS_RENDER_VAR = "/World/Render/Vars/SignalWays"
 WARMUP_STEPS = 3
 STEP_DT_SECONDS = 0.1
-SPEED_OF_SOUND_M_PER_S = 343.21
 
 
 # [snippet:read-acoustic-signal-ways]
@@ -64,10 +62,14 @@ def read_acoustic_signal_ways(frame) -> dict:
 
 
 # [snippet:acoustic-sample-index-to-range]
+import numpy as np
+
+
 def sample_ranges_m(frame_data: dict) -> np.ndarray:
-    """Return the round-trip range in meters of each envelope sample."""
+    """Return the lower range bound, in meters, of each envelope bin."""
     sample_index = np.arange(frame_data["num_samples"], dtype=np.float64)
-    return sample_index * frame_data["sample_duration_s"] * SPEED_OF_SOUND_M_PER_S / 2.0
+    # Bin s holds round-trip times [(s + 1) dt, (s + 2) dt).
+    return (sample_index + 1) * frame_data["sample_duration_s"] * 343.21 / 2.0
 
 
 # [/snippet:acoustic-sample-index-to-range]
@@ -170,9 +172,7 @@ def main(argv: list[str] | None = None) -> None:
     # Warm up the sensor before reading an envelope: the model publishes nothing
     # on its first frame.
     for _ in range(WARMUP_STEPS):
-        renderer.step(
-            render_products={RENDER_PRODUCT}, delta_time=STEP_DT_SECONDS, ordinal=ordinal
-        )
+        renderer.step(render_products={RENDER_PRODUCT}, delta_time=STEP_DT_SECONDS, ordinal=ordinal)
     # [/snippet:warm-up-acoustic]
 
     # [snippet:step-and-visualize-acoustic]

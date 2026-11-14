@@ -13,13 +13,10 @@
 )
 
 # [snippet:trail-shader-definition]
-# Three outputs. History is the feedback framebuffer: it is carried to the next
-# execution and never published, so it has no RenderVar and nothing in the scene
-# refers to it. Live and Trail are both published and are tone-mapped
-# identically, so the only thing separating them is the previous frame.
-#
-# Nothing here marks History as state. That is decided in the launch script, by
-# the allocator it is created with.
+# One input and two outputs. Live and Trail are both published and are
+# tone-mapped identically.
+# The feedback framebuffer, History, is memory of the node, stated
+# in the launch script.
 def Shader "TrailKernel"
 {
     uniform token info:implementationSource = "sourceAsset"
@@ -33,7 +30,6 @@ def Shader "TrailKernel"
     float inputs:decay = 0.7
 
     opaque inputs:Image
-    opaque outputs:History
     opaque outputs:Live
     opaque outputs:Trail
 }

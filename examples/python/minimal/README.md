@@ -26,4 +26,4 @@ This is the minimal Python example from the ovrtx README. It demonstrates the ba
 uv run main.py --png
 ```
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached. A successful run writes `_output/render.png`; the output should match the reference image above.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached. A successful run writes `_output/render.png`; the output should match the reference image above.

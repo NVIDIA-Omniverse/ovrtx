@@ -1,20 +1,13 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: update-0-4-to-0-5
 description: >
   Upgrade an existing Python or C/C++ application from ovrtx 0.4.x to 0.5.x.
   Use when porting application code, authored sensor USD, RenderVar output
   handling, DLPack interoperability, Windows renderer configuration, or an
   attached ovstage 0.1 workflow to the ovrtx 0.5 release train.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -58,7 +51,10 @@ Resolve these before editing:
   authored USD, and accepted output baselines when visual compatibility matters.
 - Matching OVRTX 0.5.x and OVStage 0.2.x packages from the same release train for
   attached mode.
-- Read the authoritative sources below before changing APIs or data contracts.
+- Read the `[0.5.0]` migration notes in
+  [`../../CHANGELOG.md`](../../CHANGELOG.md) and the installed target headers
+  and Python signatures before changing APIs or data contracts. For attached
+  mode, also consult the release notes for the matching OVStage package.
 - Runtime validation requires the GPU, driver, network, and unsandboxed execution
   prerequisites documented in [`../../AGENTS.md`](../../AGENTS.md).
 
@@ -75,42 +71,6 @@ This skill includes only changes that can require user source, build, deployment
 or authored-USD changes. Renderer bug fixes, performance work, tests, CI,
 packaging reductions, documentation-only work, and optional new features are not
 migration steps.
-
-## Authoritative Sources
-
-Before editing, read:
-
-1. The `[0.5.0]` migration bullets in
-   [`../../CHANGELOG.md`](../../CHANGELOG.md).
-2. The installed 0.5 headers and Python signatures. They override release-note
-   drafts and internal inventories.
-3. [`../../include/ovrtx/ovrtx_types.h`](../../include/ovrtx/ovrtx_types.h),
-   [`../../include/ovrtx/ovrtx_config.h`](../../include/ovrtx/ovrtx_config.h),
-   and [`../reading-render-output/SKILL.md`](../reading-render-output/SKILL.md)
-   when output or tensor APIs are present.
-4. [`../../../../ovstage/public/CHANGELOG.md`](../../../../ovstage/public/CHANGELOG.md)
-   when the application uses attached OVStage, OVStage population, or direct
-   OVStage reads/writes.
-
-Do not infer a migration from a ticket title alone. Confirm that the change is
-present in the target package and absent from 0.4.
-
-## Migration-Relevant Inventory
-
-| Area | Inventory evidence | Applies when |
-|---|---|---|
-| Full RenderVar path identity | OMPE-94127 | The app fetches, indexes, logs, or compares render outputs. |
-| Python DLPack surface | OMPE-102110, OMPE-104349, OMPE-105119, OMPE-105460 | The app imports `ManagedDLTensor`, uses `.tensor`, passes raw `DLTensor`, or inspects mapping metadata/lifetimes. |
-| Vulkan-only Windows package | OMPE-103728 | The app selects DX12/Vulkan, has DX12 interop, or ships a pre-0.5 C binary. |
-| Sensor schema/model versioning | OMPE-74104, OMPE-94528 through OMPE-94535 | The app authors acoustic, IDS, lidar, or radar sensors. |
-| GenericModelOutput removal | OMPE-107766 | USD requests `sourceName = "GenericModelOutput"` or code imports the bundled GMO decoder. |
-| Schema registration order | OMPE-94125, OMPE-103596 | OVRTX and OVStage or another OpenUSD runtime share a process. |
-| One renderer per attached stage | OMPE-105429 | The app attaches one OVStage instance to more than one live OVRTX renderer. |
-| Reset-stack Boolean dtype | OMPE-103960 | Low-level code reads/writes `omni:resetXformStack` and assumes `kDLUInt`. |
-| OVStage population layouts | OMPE-102552 | Attached applications directly consume assets, path expressions, extents, or affected semantics. |
-| OVStage loader packaging | OMPE-106739 | A C/C++ app manually links or deploys OVStage rather than using its package CMake config. |
-| Other OVStage 0.2 public breaks | Paired-package changelog; not fully represented in the OVRTX Jira inventory | Attached applications use OVStage metadata, raw reads/maps, Python resource objects, physics schema fallbacks, or permissive 0.1 argument coercions. |
-| Changed image defaults | OMPE-102343, OMPE-103674, OMPE-105838 | The app requires output equivalent to 0.4 and relied on an omitted setting. |
 
 ## Instructions
 
@@ -168,9 +128,11 @@ Search Python for `frame.render_vars`, `RenderVarOutput.name`,
 
 Search C/C++ for `render_var_name` and `ovrtx_render_var_output_t`.
 
-- Replace `ovrtx_render_var_output_t.render_var_name` with `render_var_path`.
+- Replace `ovrtx_render_product_render_var_output_t.render_var_name` with
+  `render_var_path`.
 - Use the new `source_name` and `source_type` fields only for classification.
-- Treat `ovrtx_render_var_t.name` as a full RenderVar prim path.
+- Treat `ovrtx_render_var_output_t.name` (the mapped output) as a full
+  RenderVar prim path, not a source name.
 - Recompile because the public result structure layout changed.
 
 > **Source (Python):** [`../../examples/python/minimal/main.py`](../../examples/python/minimal/main.py) snippet `read-render-output`.
@@ -226,13 +188,58 @@ Search USD generators and assets for `OmniSensorGeneric`,
 
 - The applied `OmniSensorGeneric*API_N` suffix selects schema version `N`;
   unsuffixed schemas select version 1.
-- Set `omni:sensor:modelVersion` to `latest` or a supported positive integer
-  string for that schema. Dotted semantic versions are invalid.
+- Set `omni:sensor:modelVersion` to `latest` or a supported integer string for
+  that schema. Model versions count from `0` and restart at `0` when the schema
+  version is bumped; the acoustic, IDS, generic lidar and radar models each
+  support only `0` for schema 1 today, so `1` is rejected. Dotted semantic
+  versions such as `0.0.0` are invalid. The `[0.5.0]` changelog bullets and the
+  `modelVersion` doc string in the OVRTX 0.5 sensor schema ("has to be 1 or
+  greater") say the value is a positive integer such as `1`; that is wrong for
+  these four models, and a newer section above `[0.5.0]` in the same changelog
+  restates the rule, counting from `0`. Follow this bullet, not those. The one
+  0.5.x model that does not count from `0` is the wave-propagation (WPM) lidar,
+  `OmniSensorGenericLidarWpmAPI`, which 0.4 did not ship: 0.5.x accepts only
+  `1` for it and later versions renumber it to `0`, so author `latest` there.
 - Replace `sourceName = "GenericModelOutput"` with the composite `PointCloud`
   RenderVar and author the channels the application consumes. Update parsing to
   read named tensors and params rather than a packed GMO buffer.
+
+  This works for lidar and radar only: the idealized depth sensor (IDS)
+  publishes its depth data only as `GenericModelOutput` and has no `PointCloud`
+  output, so under OVRTX 0.5 its `GenericModelOutput` RenderVar is skipped and
+  yields no depth data. Report that gap to the user instead of inventing a
+  replacement. The acoustic model has no `PointCloud` output in 0.5 either:
+  besides `GenericModelOutput` it publishes separate `TransmitterIds`,
+  `ReceiverIds`, `ChannelIds`, `Amplitudes`, `TimeOffsetNs`, `Flags`,
+  `SignalWayShape` and `SensorFrameData` RenderVars, which no OVRTX 0.5 example
+  or test reads and which later versions remove in favor of a `SignalWays`
+  composite. Do not rewrite an acoustic `GenericModelOutput` RenderVar to
+  `PointCloud`; tell the user which acoustic output needs a replacement rather
+  than inventing one.
+
+  On the generic lidar, the replacement can also silently change `HitNormal`
+  and `Velocity` under 0.5.x. The `GenericModelOutput` RenderVar's `channels`
+  token was also the model's auxiliary level (`NONE`, `BASIC`, `EXTRA` or
+  `FULL`). Apart from that token, only the runtime setting
+  `/app/sensors/nv/lidar/auxOutputType` sets the level, which otherwise starts
+  at `NONE`. In 0.5.x the level decides one thing on `PointCloud`: where the
+  sensor prim sets `omni:sensor:Core:outputFrameOfReference` to `WORLD` or
+  `omni:sensor:Core:outputMotionCompensationState` to `COMPENSATED`, the model
+  carries `HitNormal` and `Velocity` into that frame and compensation state only
+  at `FULL`; below `FULL` it leaves both as traced. No other `PointCloud`
+  channel depends on the level. Later versions drop this rule: they carry both
+  vectors into the output frame and compensation state at every level, which
+  is what the channel reference's
+  [lidar mapping](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/outputs.html)
+  describes, so do not take a 0.5.x port's behavior from that page.
+  If the old RenderVar named `FULL` and the app reads either channel under
+  those attributes, preserving what it read on 0.5.x needs that setting at
+  `FULL` after the replacement, and no OVRTX 0.5 `RendererConfig` field or
+  `OVRTX_CONFIG_*` key sets it. Report the dependency to the user as a gap
+  rather than accepting the changed vectors.
 - If a separate consumer still needs packed GMO decoding, depend explicitly on
-  the standalone `generic-model-output` package; OVRTX no longer bundles it.
+  the standalone `generic-model-output` package or wheel, which installs the same
+  `omni.sensors.generic_model_output` Python module; OVRTX no longer bundles it.
 - Prefer a supported sensor version. `sensors_allowed_deprecation_base` is a
   temporary compatibility gate and must exactly match the running OVRTX version,
   so using it creates another required edit at the next upgrade.
@@ -268,6 +275,15 @@ source edit.
 
 ### 6. Attached OVStage 0.2 data contracts
 
+This section covers the OVStage 0.1 to 0.2 dependency migration. If the
+application instead targets OVStage 0.3, also apply OVStage's
+`update-0-2-to-0-3` skill and `docs/guides/upgrading_from_0_2.rst` from that
+version's public distribution. In 0.3, reads expose `ReadGroup.columns`;
+attribute metadata and `array()`, `tensor()`, `dlpack()`, and data-mapping
+accessors belong to each `ReadColumn`. Keep prim mapping and release on the
+group, resolve each column's value mapping independently, and update every
+read consumer and embedded snippet. `MapGroup` keeps its writable API.
+
 Search direct OVStage readers/writers and population consumers for
 `ASSET_STRING`, `ASSET_PATH_ID`, `PATH_EXPRESSION_STRING`, `extent`, and switches
 over attribute semantics.
@@ -288,9 +304,9 @@ over attribute semantics.
   forwarding loader plus its runtime. Applications using the package CMake
   targets and setup helper retain the stable target and need no source change.
 
-Also audit the rest of the OVStage 0.2 public changelog. These changes are
-outside the original OVRTX Jira inventory but can still break an attached OVRTX
-0.4 application when its OVStage dependency moves from 0.1 to 0.2:
+Also audit the rest of the OVStage 0.2 public changelog. The following changes
+can affect an attached OVRTX 0.4 application when its OVStage dependency moves
+from 0.1 to 0.2:
 
 - Stage metadata moved from `/__ovstage_population_stage_info__` to `/`, and
   its columns use the `usd-metadata:` prefix.
@@ -314,8 +330,10 @@ outside the original OVRTX Jira inventory but can still break an attached OVRTX
 - Keep each Python `ReadGroup` alive while using arrays or DLPack views borrowed
   from it; use its context manager and copy data that must outlive the group.
   Do not construct a view from an unbound temporary group.
-- `ReadGroup.array()` is read-only. Replace attempts to mutate committed read
-  storage with a map or write operation.
+- OVStage 0.2's `ReadGroup.array()` is read-only; on OVStage 0.3 the accessor is
+  `ReadColumn.array()`. Replace attempts to mutate committed read storage with
+  a map or write operation. The containing `ReadGroup` still owns the borrowed
+  read storage in both versions.
 - Caller-created Python path lists are now owned `PathList` objects. Reuse or
   explicitly release them; do not add a second manual release for the reference
   the object already owns.
@@ -346,12 +364,22 @@ authored choice; the default change requires no edit.
 
 ## Limitations
 
+### Outside the 0.4-to-0.5 migration
+
 - New optional features such as SPG stateful/raygen nodes, UV projectors,
   decals, spectral rendering, Aftermath control, or DomeLight baking controls.
 - Performance improvements, crash fixes, rendering correctness fixes, package
   size reductions, tests, CI, or documentation-only tickets.
-- `DepthSD`: it is deprecated but not removed in 0.5. Record follow-up work if
-  desired; do not block this port on replacing it.
+- `DepthSD`: it is deprecated but not removed in 0.5. Its replacements,
+  `DistanceToImagePlaneSD` and `DistanceToCameraSD`, are distances in meters,
+  while `DepthSD` is not: for a plain perspective camera it is unitless clip
+  depth, 1 at the near plane to 0 at the far plane and 0 for a miss (an
+  orthographic camera reverses both ends: 0 at the near plane, 1 at the far
+  plane and for a miss), and for a fisheye or other lens projection, the OpenCV
+  pinhole model included, a distance from the camera in scene units, with the
+  far clip distance for a miss. Replacing it changes the consumer's arithmetic,
+  not just the `sourceName`. Record follow-up work if desired; do not block this
+  port on replacing it.
 - Auto-applied Camera and RenderProduct RTX schemas: existing explicit schema
   application remains valid and does not need removal.
 - Strict validation of malformed times, config values, DLPack layouts, and null
@@ -367,9 +395,14 @@ authored choice; the default change requires no edit.
   requested output on its real device.
 - C/C++: cleanly rebuild and relink against the 0.5 package; run once with the
   packaged runtime layout rather than relying only on header compilation.
-- Sensors: instantiate every authored sensor, confirm no version or skipped-
-  output diagnostic, and validate PointCloud channel names, shapes, counts, and
-  units.
+- Sensors: instantiate every authored sensor, confirm no version diagnostic and
+  no skipped-output diagnostic other than for an IDS or acoustic
+  `GenericModelOutput` RenderVar already reported to the user as a gap (see
+  section 4), and validate PointCloud channel names, shapes, counts, and units.
+  The skipped-output diagnostic is logged once per process and names only the
+  first skipped RenderVar, so when such a gap remains, also check the authored
+  USD for any other RenderVar whose `sourceName` is `GenericModelOutput`,
+  `RtxSensorCpu`, or `RtxSensorGpu`.
 - Attached mode: populate through OVStage 0.2, advance the write floor, render a
   committed ordinal, and exercise every directly consumed changed attribute.
 - Behavior preservation: compare representative images/tensors with accepted
@@ -411,4 +444,4 @@ This skill has no scripts.
 - [`../configuring-lidar-sensors/SKILL.md`](../configuring-lidar-sensors/SKILL.md)
 - [`../configuring-radar-sensors/SKILL.md`](../configuring-radar-sensors/SKILL.md)
 - [`../../CHANGELOG.md`](../../CHANGELOG.md)
-- [`../../../../ovstage/public/CHANGELOG.md`](../../../../ovstage/public/CHANGELOG.md)
+- Release notes for the matching OVStage package.

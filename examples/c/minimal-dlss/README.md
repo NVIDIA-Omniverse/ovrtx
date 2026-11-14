@@ -70,7 +70,7 @@ render_products.num_render_products = 1;
 
 // Keep temporal history between steps; save the final frame after
 // warmup.
-ovrtx_step_result_handle_t step_result_handle = 0;
+ovrtx_step_result_handle_t step_result_handle = OVRTX_INVALID_STEP_RESULT_HANDLE;
 ovrtx_enqueue_result_t enqueue_result =
     ovrtx_step_with_stage(renderer,
                           render_products,

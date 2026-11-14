@@ -1,20 +1,13 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: mapping-attributes
 description: >
   Zero-copy attribute map/unmap for direct memory access to ovstage buffers. Use
   when user asks about zero-copy writes, map attribute, direct memory access, or
   repeated mapped updates. Use attribute-bindings for repeated writes with
   caller-owned tensors when a copy is acceptable.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx

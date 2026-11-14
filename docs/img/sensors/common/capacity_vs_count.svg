@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="372" viewBox="0 0 1000 372" role="img" aria-labelledby="title desc">
+<title id="title">Capacity versus count</title>
+<desc id="desc">A per-entry channel is allocated for Nmax entries (its shape, also the maxPoints param). The delivered entries, indices [0, Counts[0]), sit at the front; inside that range an entry is a real return when Flags[i] &amp; 0x40 is set, and a few entries have the bit clear. Everything past Counts[0] holds whatever it held before and is never read.</desc>
+<defs><marker id="arrow-313131-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#313131"/></marker></defs>
+<rect width="1000" height="372" fill="#fff"/>
+<defs><pattern id="hatch" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#C0C0C0" stroke-width="1.5"/></pattern></defs>
+<text x="80" y="64" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">per-entry channel</text>
+<text x="219.36" y="64" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">(shape = capacity Nmax = maxPoints)</text>
+<rect x="80" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="122" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="164" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="206" y="160" width="42" height="44" rx="2" fill="#C0C0C0" stroke="#757575" stroke-width="1"/>
+<rect x="248" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="290" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="332" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="374" y="160" width="42" height="44" rx="2" fill="#C0C0C0" stroke="#757575" stroke-width="1"/>
+<rect x="416" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="458" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="500" y="160" width="42" height="44" rx="2" fill="#C0C0C0" stroke="#757575" stroke-width="1"/>
+<rect x="542" y="160" width="42" height="44" rx="2" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<rect x="584" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<rect x="626" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<rect x="668" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<rect x="710" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<rect x="752" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<rect x="794" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<rect x="836" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<rect x="878" y="160" width="42" height="44" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<text x="101" y="222" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="563" y="222" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">k-1</text>
+<text x="605" y="222" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">k</text>
+<text x="899" y="222" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">Nmax-1</text>
+<path d="M80,150 L80,142 L584,142 L584,150" fill="none" stroke="#313131" stroke-width="1.5"/>
+<text x="329" y="128" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="end">delivered: indices</text>
+<text x="335" y="128" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">[0, Counts[0])</text>
+<rect x="630" y="86" width="80" height="36" rx="4" fill="#fff" stroke="#313131" stroke-width="1.5"/>
+<text x="670" y="108.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">[k]</text>
+<text x="670" y="76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">Counts</text>
+<text x="720" y="108" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">one int32: the delivered count</text>
+<line x1="628" y1="118" x2="594.34" y2="135.24" stroke="#313131" stroke-width="1.5" marker-end="url(#arrow-313131-1p5)"/>
+<path d="M584,234 L584,242 L920,242 L920,234" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="752" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">whatever it held before: never read</text>
+<rect x="80" y="292" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="99" y="301.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">Flags[i] &amp; 0x40 set: real entry</text>
+<rect x="285.74" y="292" width="12" height="12" rx="2" fill="#C0C0C0"/>
+<text x="304.74" y="301.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">bit clear: not a return</text>
+<rect x="444.76" y="292" width="12" height="12" rx="2" fill="url(#hatch)" stroke="#757575" stroke-width="1"/>
+<text x="463.76" y="301.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">past Counts[0]: never read</text>
+<rect x="66" y="333" width="4" height="17" rx="1" fill="#EF9100"/>
+<text x="80" y="346" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">read Counts[0], not the tensor's length; test the bit (Flags[i] &amp; 0x40), not == 0x40</text>
+</svg>

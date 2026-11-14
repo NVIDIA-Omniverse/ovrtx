@@ -1,0 +1,13 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    subLayers = [@selection_scene.usda@]
+)
+over "Render"
+{
+    over "Camera"
+    {
+        token omni:rtx:rendermode = "PathTracing"
+    }
+}

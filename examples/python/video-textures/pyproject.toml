@@ -1,0 +1,29 @@
+[project]
+name = "video-textures"
+version = "0.2.0"
+description = "Render a timestamped H.265 video texture at several source times"
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+    "numpy==2.2.6; python_version < '3.14'",
+    "numpy==2.4.6; python_version >= '3.14'",
+    "ovrtx==0.7.0.1794596436",
+    "ovstage==0.4.0.1794520352",
+    "pillow==12.1.1",
+    "rerun-sdk==0.29.0",
+]
+
+[tool.uv]
+# Windows reports x86-64 as AMD64 in PEP 508 platform_machine markers.
+# Wheel tags still use win_amd64; keep those concepts separate.
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+

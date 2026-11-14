@@ -94,11 +94,20 @@ Common configuration entries include:
          * - ``enable_crash_reporter=False``
            - Do not start the ovrtx crash reporter, for hosts that own crash handling.
              Enabled when omitted or ``None``. See `Embedding in a Host Application`_.
+         * - ``enable_debug_validation=True``
+           - Enable graphics API validation at device creation. See `Graphics API Debug Validation`_.
          * - ``active_cuda_gpus="0,1"``
            - Restrict renderer-level CUDA-visible devices.
          * - ``datastore_cache="grpcdns://host:port"``
            - Configure the UJITSO datastore cache. ``grpcdns_notls://`` and ``local://`` are also supported.
              When omitted, existing cache defaults and environment configuration remain unchanged.
+             Authored relative resource paths in HTTP(S) MDL modules resolve against the current asset when cached
+             material data is reused, provided the resource has the same origin as the module and no query or
+             fragment. Authored absolute HTTP(S) URLs, resources from other origins, and URLs with a query or
+             fragment keep their original location. Absolute MDL paths that resolve through an MDL search path,
+             such as ``/nvidia/texture.png``, are stored as logical MDL paths and resolve through the current
+             search paths. Older material cache entries are rebuilt automatically after the processor version
+             change; the datastore does not need to be deleted.
          * - ``cache_root_path=...``
            - Choose an absolute directory for writable caches. See :ref:`cache-locations`.
          * - ``enable_global_cache_root=True``
@@ -106,7 +115,9 @@ Common configuration entries include:
          * - ``enable_geometry_streaming=True``
            - Opt in to geometry streaming. Disabled by default when omitted or ``None``.
          * - ``motion_bvh=...``
-           - Motion BVH mode: ``"disable"`` (default), ``"enable"``, or ``"auto"``.
+           - Per-instance motion BVH mode: ``"disable"``, ``"enable"``, or ``"auto"``.
+             When omitted, snapshots the global motion BVH defaults (disabled by default).
+             Other renderer instances and later global settings changes do not alter this policy.
              Sensors that require motion effects (for example, lidar, radar, acoustic, rolling-shutter camera)
              should use ``"auto"`` or ``"enable"``.
          * - ``texture_streaming_mode=...``
@@ -144,6 +155,8 @@ Common configuration entries include:
          * - :c:func:`ovrtx_config_entry_enable_crash_reporter`
            - Do not start the ovrtx crash reporter when ``false``, for hosts that own crash handling.
              Enabled when omitted. See `Embedding in a Host Application`_.
+         * - :c:func:`ovrtx_config_entry_enable_debug_validation`
+           - Enable or disable graphics API validation. See `Graphics API Debug Validation`_.
          * - :c:func:`ovrtx_config_entry_active_cuda_gpus`
            - Restrict renderer-level CUDA-visible devices.
          * - :c:func:`ovrtx_config_entry_datastore_cache`
@@ -156,8 +169,9 @@ Common configuration entries include:
          * - :c:func:`ovrtx_config_entry_enable_geometry_streaming`
            - Opt in to geometry streaming. Disabled by default when omitted.
          * - :c:func:`ovrtx_config_entry_motion_bvh`
-           - Motion BVH mode: ``OVRTX_MOTION_BVH_DISABLE`` (default),
+           - Per-instance motion BVH mode: ``OVRTX_MOTION_BVH_DISABLE``,
              ``OVRTX_MOTION_BVH_ENABLE``, or ``OVRTX_MOTION_BVH_AUTO``.
+             When omitted, snapshots the global motion BVH defaults (disabled by default).
          * - :c:func:`ovrtx_config_entry_texture_streaming_mode`
            - Texture streaming mode: ``OVRTX_TEXTURE_STREAMING_DISABLE``,
              ``OVRTX_TEXTURE_STREAMING_SYNCHRONOUS``, or
@@ -301,6 +315,8 @@ This option defaults to enabled when omitted (``None`` in Python). An explicit
 :c:func:`ovrtx_initialize()` or :c:func:`ovrtx_create_renderer()` explicitly
 enables it, that takes precedence over ``false`` in the other call.
 
+.. _renderer-startup-mode-availability:
+
 Startup Render Mode Availability
 --------------------------------
 
@@ -397,6 +413,47 @@ selects the first enabled rendering mode in RT2, PathTracing, then Minimal order
 an unavailable PathTracing or RT2 request renders in Minimal.
 
 Supported Minimal sensor outputs and motion features remain available.
+
+Graphics API Debug Validation
+-----------------------------
+
+Use Python ``RendererConfig(enable_debug_validation=True)`` or C
+:c:func:`ovrtx_config_entry_enable_debug_validation()` with ``true`` to request
+Vulkan/D3D12 debug validation before graphics devices are created. Pass ``False``
+or ``false`` to disable it. The option applies to both Debug and Release builds
+and requires the corresponding validation layers to be installed.
+
+Pass this option to :c:func:`ovrtx_create_renderer()`, not
+:c:func:`ovrtx_initialize()`. The first renderer configures graphics devices
+shared by additional renderers in the same runtime.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 58
+
+   * - Renderer creation
+     - Validation behavior
+   * - First renderer, option omitted (``None`` in Python)
+     - Preserve GPU Foundation's default, currently disabled, and any existing startup setting.
+   * - First renderer, explicit ``true`` or ``false``
+     - Apply the value before graphics initialization, taking precedence over queued settings.
+   * - Additional renderer, option omitted or matching
+     - Reuse the shared graphics devices' validation mode.
+   * - Additional renderer, conflicting explicit value
+     - Log a warning and create the renderer using the existing mode. Existing devices do not change.
+   * - Renderer created after complete shared-system teardown
+     - Select the mode again, following the first-renderer rules above.
+
+Complete teardown requires destroying every renderer and releasing retention
+from ``keep_system_alive=True``, as described under Startup Render Mode
+Availability above. Settings changed for validation, including Aftermath defaults
+derived during device creation, are restored on teardown. A later omitted option
+therefore does not inherit a previous renderer's temporary override.
+
+``renderer.config.enable_debug_validation`` reports the supplied entry, including
+a conflicting request that was ignored; it does not query the shared devices.
+Aftermath remains available in Debug and Release builds, but D3D12 validation
+disables Aftermath even when Aftermath was explicitly enabled.
 
 Backend Support
 ---------------

@@ -8,6 +8,10 @@
 .. without an express license agreement from NVIDIA CORPORATION or
 .. its affiliates is strictly prohibited.
 
+.. _sensors-cameras-lens-calibration:
+
+.. _sensors-cameras-howto-lens-calibration:
+
 Lens Calibration
 ================
 
@@ -23,6 +27,7 @@ projection instead of ``focalLength`` and the aperture attributes. Depth of
 field still uses ``focalLength``, ``focusDistance``, and ``fStop``.
 
 .. figure:: ../../img/camera-lens-calibration.avif
+   :width: 700
    :alt: Robot lineup rendered through OpenCV pinhole, OpenCV fisheye, and omni-directional stereo cameras
    :align: center
 
@@ -30,6 +35,10 @@ field still uses ``focalLength``, ``focusDistance``, and ``fStop``.
    calibration schemata. Clockwise from top-left:
    OmniLensDistortionOpenCvPinholeAPI, OmniLensDistortionOpenCvFisheyeAPI,
    OmniLensDistortionOmniDirectionalStereoAPI*
+
+To fit calibration parameters from checkerboard photographs, run
+:doc:`Python: Camera calibration <../../examples/python_camera_calibration>`.
+The example includes the photographs, an OpenCV calibration script and output checks.
 
 Creating A Calibrated Camera
 ----------------------------
@@ -40,13 +49,16 @@ examples create the same OpenCV pinhole calibration.
 .. tab-set::
 
    .. tab-item:: USDA
+      :sync: usda
 
       .. literalinclude:: ../../../tests/docs/usd/data/camera_lens_calibration.usda
          :language: usda
          :start-after: # [snippet:doc-camera-lens-calibration]
          :end-before: # [/snippet:doc-camera-lens-calibration]
+         :prepend: #usda 1.0
 
    .. tab-item:: USD Python
+      :sync: python
 
       .. literalinclude:: ../../../tests/docs/usd/test_usd_python_examples.py
          :language: python
@@ -57,8 +69,12 @@ examples create the same OpenCV pinhole calibration.
 See :doc:`../../examples/python_camera_lens_calibration` for a runnable
 example.
 
+.. _sensors-cameras-lens-calibration-schemas:
+
 Available Schemas
 -----------------
+
+.. _sensors-recipes-calibration-not-kannala-brandt-k3:
 
 .. csv-table::
    :header: "Applied API schema", "Purpose"
@@ -76,6 +92,9 @@ Available Schemas
 For new calibrated cameras, prefer the OpenCV, LUT, or omni-directional stereo
 schemas. Use the compatibility schemas when preserving existing calibration
 data.
+
+.. _sensors-cameras-lens-calibration-pinhole:
+.. _sensors-recipes-calibration-pinhole-attributes:
 
 OpenCV Pinhole
 --------------
@@ -105,10 +124,14 @@ OpenCV Pinhole
    "``float omni:lensdistortion:opencvPinhole:s4 = 0``", "Thin-prism coefficient."
 
 .. figure:: ../../img/camera-lens-calibration-pinhole.avif
+   :width: 752
    :alt: Robot lineup rendered through an OpenCV pinhole camera
    :align: center
 
    *OpenCV pinhole projection with radial and tangential distortion.*
+
+.. _sensors-cameras-lens-calibration-fisheye:
+.. _sensors-recipes-calibration-fisheye-attributes:
 
 OpenCV Fisheye
 --------------
@@ -129,7 +152,15 @@ OpenCV Fisheye
    "``float omni:lensdistortion:opencvFisheye:k3 = 0``", "Radial coefficient."
    "``float omni:lensdistortion:opencvFisheye:k4 = 0``", "Radial coefficient."
 
+.. _sensors-recipes-calibration-fisheye-k1-default:
+
+The fisheye ``k1`` default is nonzero, so applying the schema without authoring
+coefficients introduces some distortion. Author all four coefficients for a
+measured calibration; the :doc:`calibration script
+<../../examples/python_camera_calibration>` does this automatically.
+
 .. figure:: ../../img/camera-lens-calibration-fisheye.avif
+   :width: 640
    :alt: Robot lineup rendered through an OpenCV fisheye camera
    :align: center
 
@@ -138,6 +169,8 @@ OpenCV Fisheye
 ``imageSize`` makes an OpenCV calibration independent of output resolution.
 When the RenderProduct resolution differs, ovrtx scales ``fx``, ``fy``, ``cx``,
 and ``cy`` to the output resolution.
+
+.. _sensors-cameras-lens-calibration-lut:
 
 Generalized Projection
 ----------------------
@@ -154,21 +187,33 @@ floating-point textures.
    "``float omni:lensdistortion:lut:nominalWidth = 1936``", "Calibrated sensor width."
    "``float omni:lensdistortion:lut:nominalHeight = 1216``", "Calibrated sensor height."
    "``float2 omni:lensdistortion:lut:opticalCenter = (970.94244, 600.3748)``", "Optical center in calibrated sensor coordinates."
-   "``asset omni:lensdistortion:lut:rayEnterDirectionTexture = @@``", "RGB image whose values contain normalized XYZ ray directions in camera space."
-   "``asset omni:lensdistortion:lut:rayExitPositionTexture = @@``", "RGB image whose RG channels contain normalized screen-space ray origins."
+   "``asset omni:lensdistortion:lut:rayEnterDirectionTexture = @@``", "Maps normalized image-plane positions to normalized camera-space ray directions stored in RGB."
+   "``asset omni:lensdistortion:lut:rayExitPositionTexture = @@``", "Inverse map from camera-space ray directions to normalized image-plane positions stored in RG. Directions index the texture using octahedral encoding after negating their Z component."
+
+Both lookup textures must have the same aspect ratio. Until both textures are
+available, the camera renders as a pinhole camera. The textures define the
+projection; ``nominalWidth``, ``nominalHeight`` and ``opticalCenter`` do not
+reshape the texture-based projection.
 
 .. warning::
 
    Low-resolution lookup textures can produce artifacts at larger output
-   resolutions. Supported file formats, filtering, and failure behavior still
-   need a portable public runtime test. The example on this page validates the
-   OpenCV models, not LUT projection.
+   resolutions.
+
+.. _sensors-cameras-lens-calibration-ods:
 
 Omni-Directional Stereo
 -----------------------
 
 ``OmniLensDistortionOmniDirectionalStereoAPI`` configures one eye of a
-360-degree stereo camera. Use separate left- and right-eye cameras.
+360-degree stereo camera. Use separate left- and right-eye cameras. Each eye
+produces an equirectangular panorama covering 360° horizontally and 180°
+vertically. Use a 2:1 output resolution for equal angular sampling along both
+axes.
+
+Each ray starts at an eye position offset sideways from the camera center by
+half the interpupillary distance. This offset rotates with the ray's azimuth,
+so the eye positions follow the viewing direction around the panorama.
 
 .. csv-table::
    :header: "USD declaration", "Description"
@@ -180,14 +225,31 @@ Omni-Directional Stereo
    "``float omni:lensdistortion:omniDirectionalStereo:interpupillaryDistance = 0.064``", "Eye separation in meters."
 
 .. figure:: ../../img/camera-lens-calibration-omnidirectional-stereo.avif
+   :width: 1024
    :alt: Robot lineup rendered as an omni-directional stereo panorama
    :align: center
 
    *A 1024 by 512 single-eye omni-directional stereo panorama.*
 
-Further Reading
----------------
+.. _sensors-cameras-lens-calibration-resolution:
 
+Calibration resolution versus output resolution
+-----------------------------------------------
+
+``imageSize`` makes an OpenCV calibration independent of the output
+resolution, for the pinhole and the fisheye schema alike. Set it to the
+resolution of the images the calibration was solved from and author ``fx``,
+``fy``, ``cx`` and ``cy`` in pixels of those images. When the RenderProduct's
+resolution differs from ``imageSize``, the renderer scales the four values to
+the output resolution, so the rendered field of view is the one you
+calibrated; if the aspect ratio differs as well, the horizontal field of view
+is kept and the vertical one is cropped or extended to fill the output.
+
+Related
+-------
+
+- :doc:`../../examples/python_camera_calibration`
 - :doc:`usd_camera_attributes`
+- :doc:`decoding_outputs`
 - :doc:`rolling_shutter`
 - `OpenCV camera calibration documentation <https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html>`_

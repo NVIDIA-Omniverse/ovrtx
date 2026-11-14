@@ -17,6 +17,31 @@ The scene is Z-up and contains:
 The scene explicitly sets `includeInvalidPoints = false`, so invalid returns are
 dropped before the point cloud is delivered.
 
+## Alternative Scene
+
+`lidar_example_panels.usda`, which the build copies beside the executable along
+with the default scene, puts the same lidar 1.5 m above the origin, looking
+along world +X, among panels of different materials: a glass pane 3 m ahead
+with a concrete wall 6 m ahead behind it, a silver panel 3 m to the right, a
+wide concrete wall 4 m to the left, and a concrete panel 3 m behind, on the
+asphalt ground plane of the default scene. Its labels are `asphalt`,
+`concrete`, `clear_glass`, and `silver`; every `Material` prim carries both the
+`omni:simready:nonvisual` label the lidar reads and a visual shader, so one
+prim serves the sensor and a camera. The scene also carries a `PreviewCamera`
+with its own `CameraProduct`, which this example does not step; it exists so
+the scene can be looked at. The `PointCloud` request is the same as the default
+scene's.
+
+Pass its path as the first argument:
+
+```bash
+./build/lidar-composite-tensor build/lidar_example_panels.usda
+```
+
+Expected output values vary, but a successful run prints the one-line summary
+shown under Running; the Python example, driving the same scene, printed
+`valid points=441505, mean intensity=0.3046911656856537, max time offset=99996722 ns`.
+
 ## Render Output
 
 The USD requests the lidar `PointCloud` render variable with these channels:
@@ -46,8 +71,12 @@ The example demonstrates this ovrtx + ovstage flow:
 
 ## Renderer Config
 
-Motion BVH is required by the lidar sensor pipeline. The example enables it via
-the renderer config at creation time (alongside the static-loader package root):
+Motion BVH is required for motion effects in the lidar output. Without it the
+lidar still delivers points, but every ray is traced from the sensor's pose at
+the end of its frame against a scene that does not move, and the generic lidar
+model this example uses logs a warning, once, that its point cloud will have no
+motion effects. The example enables motion BVH via the renderer config at
+creation time (alongside the static-loader package root):
 
 ```c
 ovrtx_config_entry_t config_entries[] = {
@@ -85,5 +114,5 @@ You can also pass an explicit scene path:
 Expected output values vary, but a successful run prints:
 
 ```text
-valid points=..., mean intensity=..., max time offset=... ns
+valid points=..., mean intensity=..., max point time offset to point cloud frame start=... ns
 ```

@@ -3,7 +3,8 @@
 # NVIDIA ovrtx
 
 [![Documentation](https://img.shields.io/badge/docs-ovrtx-blue)](https://nvidia-omniverse.github.io/ovrtx)
-[![License](https://img.shields.io/badge/license-NVIDIA%20Proprietary-red)](LICENSE)
+[![SDK License](https://img.shields.io/badge/SDK%20license-NVIDIA%20Proprietary-red)](LICENSE)
+[![Skills License](https://img.shields.io/badge/skills%20license-CC--BY--4.0%20AND%20Apache--2.0-blue)](skills/LICENSE)
 [![GitHub last commit](https://img.shields.io/github/last-commit/NVIDIA-Omniverse/ovrtx)](https://github.com/NVIDIA-Omniverse/ovrtx)
 [![Docs build](https://github.com/NVIDIA-Omniverse/ovrtx/actions/workflows/docs.yml/badge.svg)](https://github.com/NVIDIA-Omniverse/ovrtx/actions/workflows/docs.yml)
 
@@ -23,6 +24,12 @@ To get started with ovrtx follow the instructions below for the included Python 
 Sources live under [`examples/`](examples/) and are the source of truth for the code snippets referenced by the ovrtx skills — see the [examples index](examples/README.md).
 
 ![warehouse](img/warehouse.jpg)
+
+## Custom data providers
+
+The [provider helper guide](helpers/ovrtx/providers/README.md) describes optional, header-only C++
+utilities for building UDIM manifests and reading stored USDZ package members.
+They ship under `helpers/`, separately from the public C interface in `include/`.
 
 ## High-level Feature Set
 
@@ -59,7 +66,7 @@ In addition to these pre-packaged dependencies, two other dependencies are noted
     - The ovrtx library has a C11-compatible interface. It can be loaded dynamically or by statically linking to the `ovrtx-static` loader library, which requires linking to the C++ stdlib.
     - The example code requires a C++17 compiler and CMake 3.16+ (`find_package(ovrtx)` fails on older versions); building the whole example set through the top-level `examples/c/CMakeLists.txt` needs 3.18. The examples use cmake to fetch the prebuilt ovrtx and ovstage packages from their GitHub.com release pages.
 - **Python**:
-    - Python 3.10–3.13 versions are supported. On Windows, use Python 3.11 or newer (see the VC runtime note under [Packaging and Dependencies](#packaging-and-dependencies)).
+    - Python 3.10–3.14 versions are supported. On Windows, use Python 3.11 or newer (see the VC runtime note under [Packaging and Dependencies](#packaging-and-dependencies)).
     - The examples use [uv](https://docs.astral.sh/uv/) to resolve the `ovrtx` wheel.
 - CUDA-capable environment for GPU-resident data paths; CPU payload paths are also part of the API surface.
 - DLPack-compatible tensor data for CPU/GPU interchange.
@@ -82,6 +89,15 @@ behind a restrictive firewall or proxy, allow outbound HTTPS to all of them:
   scenes loaded at runtime by the Python examples (for example, the robot scene
   used by `examples/python/minimal/main.py`).
 
+The ovrtx library itself also sends one anonymous plain-HTTP report to
+`6697362192350625.events.telemetry.data.nvidia.com` per process unless you opt out; see [Data Collection](#data-collection). It does not need to reach that host to work.
+
+## Data Collection
+
+OVRTX collects anonymous initialization data by default to help improve OVRTX. Collection is optional and can be disabled without affecting OVRTX functionality. To opt out, set the environment variable `NVIDIA_OMNIVERSE_PRODUCT_TELEMETRY_DISABLED=1` before launching your application, or call `ovrtx.library_telemetry_opt_out()` (Python) or `ovrtx_library_telemetry_opt_out()` (C) before OVRTX initializes (before `ovrtx_initialize()` or your first renderer is created).
+
+More information is available at [Data Collection & Use](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/TELEMETRY.md).
+
 ## Getting Started in Python
 
 [ovrtx](https://pypi.org/project/ovrtx/) and [ovstage](https://pypi.org/project/ovstage/) Python wheels are distributed on [PyPI](https://pypi.org/). We recommend using [uv](https://docs.astral.sh/uv/getting-started/installation/) to install both packages:
@@ -98,9 +114,9 @@ pip install ovrtx ovstage
 
 ovstage is optional only when maintaining standalone compatibility code, which uses the deprecated renderer-owned scene APIs. See [Packaging and Dependencies](#packaging-and-dependencies).
 
-All the examples in this repository contain pyproject.toml files that are tested with uv. See [System requirements](#system-requirements) for supported Python versions.
+The examples in this repository contain pyproject.toml files tested with uv. Python 3.10–3.13 are supported across the examples; projects that allow Python 3.14 declare it in their pyproject.toml.
 
-If installation fails, first verify that you are using a [supported Python version](#system-requirements) and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
+If installation fails, first verify that your Python version matches the project's pyproject.toml and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
 
 To get started with the repository examples, first clone this repository and run the minimal example with uv:
 
@@ -117,7 +133,7 @@ The minimal example shows how to create the renderer, load an OpenUSD scene and 
 ![minimal example](img/example-minimal.jpg)
 
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 ## Getting Started in C/C++
 
@@ -161,7 +177,7 @@ The minimal example shows how to create the renderer, load an OpenUSD scene and 
 
 The resulting image will be written to `./out.png` and can be inspected with any image viewer.
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 ## Examples
 
@@ -186,6 +202,8 @@ Tests live under `tests/docs/` in three independent suites: Python, C, and USD v
 
 > **Stage ownership in tests:** Stage-owning Python documentation tests request an attached ovstage fixture, with focused compatibility coverage for deprecated renderer wrappers. C documentation tests remain on deprecated standalone renderer stage APIs. USD validation tests do not exercise either stage-ownership model.
 
+> **Windows:** the Python and USD tests read UTF-8 files. Enable Python's UTF-8 mode before running them, for example `$env:PYTHONUTF8 = "1"` in PowerShell.
+
 ### Python tests (GPU required)
 
 ```bash
@@ -201,11 +219,8 @@ uv run pytest test_base.py::test_bind_material -v
 
 ### C tests (GPU required)
 
-**Pinned SDK build limitation:** The standard `ovrtx_docs_tests` target does
-not currently compile with the fallback ovrtx package pinned in
-`examples/c/cmake/ovrtx.cmake`. The existing `test_support_api.cpp` requires
-`ovrtx_get_config()`, which that SDK does not provide. See the [C documentation test build notes](tests/docs/c/README.md)
-for the affected commands, validation scope, and SDK selection instructions.
+See the [C documentation test build notes](tests/docs/c/README.md) for the
+commands, validation scope, and SDK selection instructions.
 
 ```bash
 cd tests/docs/c
@@ -270,7 +285,11 @@ NVIDIA Corporation
 
 ## License and security
 
-The software and materials are governed by the [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) and the [Product Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+Except for the skills directory, the software and materials are governed by the [NVIDIA Software License Agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/) and the [Product Specific Terms for NVIDIA AI Products](https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+The [skills directory](skills/) is licensed under CC-BY-4.0 AND Apache-2.0; see [skills/LICENSE](skills/LICENSE) for the full terms.
+
+Third-party material included in this repository, such as the DLPack header and example data, is listed with its license terms in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 This project will download and install additional third-party open source software projects. Review the license terms of these open source projects before use.
 

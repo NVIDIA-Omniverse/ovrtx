@@ -110,3 +110,107 @@ def test_literalinclude_resolves(rst, lineno, target, options):
             f"{where}: emphasize-lines {number} lands on a blank line in "
             f"{included.name}, which usually means the snippet moved"
         )
+
+
+# --------------------------------------------------------------------------------------------
+# The snippet inventory in tests/docs/AGENTS.md
+#
+# The inventory table is the index agents and reviewers use to find where a snippet is quoted.
+# It only helps while it is true, so each row is checked against the tree: the source file
+# exists and carries the marker, every page the row names exists and literalincludes the
+# marker, every page that literalincludes a marker is listed on that marker's row, every
+# marker in the sources has a row, and the usd/data listing in the directory layout names
+# every data file.
+
+TESTS_DOCS = REPO_ROOT / "tests" / "docs"
+INVENTORY = TESTS_DOCS / "AGENTS.md"
+ROW = re.compile(r"^\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*(.*?)\s*\|\s*$")
+MARKER = re.compile(r"^\s*(?:#|//|/\*|--)\s*\[snippet:([a-z0-9-]+)\]", re.MULTILINE)
+PAGE = re.compile(r"`([^`]+\.rst)`")
+SOURCE_SUFFIXES = {".py", ".usda", ".cpp", ".c", ".h", ".txt", ".lua", ".cu", ".slang"}
+
+
+def _inventory_rows():
+    """(line number, snippet, source path, used-in cell) for every table row of the inventory."""
+    rows = []
+    for lineno, line in enumerate(INVENTORY.read_text().splitlines(), 1):
+        match = ROW.match(line)
+        if match:
+            rows.append((lineno, match.group(1), match.group(2), match.group(3)))
+    return rows
+
+
+def _resolve_source(path):
+    """Inventory source paths are relative to tests/docs, or to the public root for examples/."""
+    for base in (TESTS_DOCS, REPO_ROOT):
+        candidate = base / path
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _page_uses():
+    """marker -> set of pages (relative to docs/) that literalinclude it."""
+    uses = {}
+    for rst in sorted(DOCS.rglob("*.rst")):
+        if "_build" in rst.parts:
+            continue
+        for match in re.finditer(r":start-after:[^\n]*\[snippet:([a-z0-9-]+)\]", rst.read_text()):
+            uses.setdefault(match.group(1), set()).add(rst.relative_to(DOCS).as_posix())
+    return uses
+
+
+def _source_markers():
+    """marker -> first source file (relative to tests/docs or the public root) that defines it."""
+    markers = {}
+    for root in (TESTS_DOCS, REPO_ROOT / "examples"):
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix not in SOURCE_SUFFIXES or any(part in path.parts for part in ("__pycache__", ".venv", "_build", "build", "build-dev", "_deps")):
+                continue
+            rel = path.relative_to(TESTS_DOCS) if root == TESTS_DOCS else path.relative_to(REPO_ROOT)
+            for match in MARKER.finditer(path.read_text(errors="replace")):
+                markers.setdefault(match.group(1), rel.as_posix())
+    return markers
+
+
+ROWS = _inventory_rows()
+assert ROWS, "no inventory rows found; the table in tests/docs/AGENTS.md moved"
+USES = _page_uses()
+SOURCES = _source_markers()
+LISTED = {snippet: set(PAGE.findall(used)) for _, snippet, _, used in ROWS}
+
+
+@pytest.mark.parametrize("lineno, snippet, source, used", ROWS, ids=[r[1] for r in ROWS])
+def test_inventory_row_is_true(lineno, snippet, source, used):
+    where = f"AGENTS.md:{lineno} ({snippet})"
+    resolved = _resolve_source(source)
+    assert resolved is not None, f"{where}: source file not found: {source}"
+    assert f"[snippet:{snippet}]" in resolved.read_text(errors="replace"), (
+        f"{where}: {source} has no marker [snippet:{snippet}]"
+    )
+    for page in PAGE.findall(used):
+        rst = DOCS / page
+        assert rst.is_file(), f"{where}: page not in the tree: {page}"
+        assert page in USES.get(snippet, ()), f"{where}: {page} does not literalinclude [snippet:{snippet}]"
+
+
+USE_CASES = sorted((snippet, page) for snippet, pages in USES.items() for page in pages)
+
+
+@pytest.mark.parametrize("snippet, page", USE_CASES, ids=[f"{s}@{p}" for s, p in USE_CASES])
+def test_every_page_use_is_listed(snippet, page):
+    assert snippet in LISTED, f"[snippet:{snippet}] is quoted by {page} but has no inventory row"
+    assert page in LISTED[snippet], f"the inventory row of {snippet} does not list {page}"
+
+
+@pytest.mark.parametrize("snippet", sorted(SOURCES), ids=sorted(SOURCES))
+def test_every_marker_has_a_row(snippet):
+    assert snippet in LISTED, f"[snippet:{snippet}] in {SOURCES[snippet]} has no inventory row"
+
+
+def test_data_listing_names_every_data_file():
+    inventory = INVENTORY.read_text()
+    data = TESTS_DOCS / "usd" / "data"
+    missing = [p.relative_to(data).as_posix() for p in sorted(data.rglob("*.usda"))
+               if f"── {p.relative_to(data).as_posix()}" not in inventory]
+    assert not missing, f"usd/data files absent from the directory layout in AGENTS.md: {missing}"

@@ -15,8 +15,7 @@ that chains them:
 | `pipeline_scene.usda` | Wires `Grayscale.outputs:LdrGrayscale` → `Invert.inputs:Image`. |
 
 SPG runs the shaders in **topological order of the connection graph**, not the order of
-`orderedVars`. Because the intermediate grayscale image is consumed by `InvertKernel` and never
-published, it does not appear in `orderedVars`.
+`orderedVars`.
 
 > _“Chain two SPG shaders so the renderer's color output is converted to grayscale and then inverted in a single RenderProduct, reading back only the final result.”_
 
@@ -57,26 +56,13 @@ uv run main.py                                  # CUDA
 uv run main.py --scene pipeline_scene_slang.usda  # Slang
 ```
 
-The first step compiles both CUDA kernels with NVRTC and may block for up to a minute on a
+The first step compiles both CUDA kernels with NVRTC and may block for up to 5 minutes on a
 fresh shader cache. A successful run writes `_output/input.png` (the rendered `LdrColor`) and
-`_output/inverted_grayscale.png` (the final SPG output), and prints:
-
-```
-largest difference from 255 - grey(input): 1
-```
-
-The intermediate grayscale image is never published, so `main.py` recomputes it from the input
-with the kernel's own BT.601 weights; inverting that at full strength is exactly `255 - grey`.
-Grey but not inverted means the second node did not run, inverted but still coloured means the
-first did not, and either exits non-zero. The one least-significant bit is float rounding
-between the kernel and the host.
+`_output/inverted_grayscale.png` (the final SPG output): the input turned grey by the first node
+and inverted by the second.
 
 ## How it works
 
-- A shader's `outputs:` port connects straight to the next shader's `inputs:` port, so the
-  intermediate image never becomes a RenderVar and never leaves the graph.
-- Execution order comes from those connections, not from `orderedVars`. Only the final
-  `LdrInverted` is published, so only it is listed there.
 - `InvertKernel` mixes both kinds of port: `opaque inputs:Image` is a resource, and typed
   `float inputs:strength` is a value read by the launch script and passed to the GPU.
 - The final AOV is read back exactly like a built-in render var:

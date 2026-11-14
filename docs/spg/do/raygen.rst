@@ -19,20 +19,18 @@ Trace the Scene
 
 **Before you start.** A Slang node that runs, and :doc:`values`.
 
-A ray-generation node **traces the scene itself**, so its output is an image it rendered rather
-than one it read and transformed.
-
-It is a Slang node in every other respect: the same three files, the same launch script
-contract, the same binders.
+Apart from tracing the scene, a ray-generation node is built like a Slang compute node: the same
+three files, the same launch script contract, the same binders. It cannot be a pre-compiled
+SPIR-V binary, so give it ``.slang`` source or a ``.slang-module``. Refer to :doc:`precompiled`.
 
 The Shape
 ---------
 
 The entry point is marked ``[shader("raygeneration")]``, and the launch script returns one of two
-calls in place of ``slang.dispatch``. Either way the ray grid is the output's shape, one
+calls in place of ``slang.compute``. Either way the ray grid is the output's shape, one
 invocation per output element, so there is no ``numthreads``.
 
-Which of the two you return decides **where the shading happens**, and nothing else:
+Which of the two you return decides **where the shading happens**:
 
 .. list-table::
    :header-rows: 1
@@ -66,8 +64,7 @@ Which of the two you return decides **where the shading happens**, and nothing e
          :emphasize-lines: 5, 17
          :caption: ``RaygenCornellBox.slang.lua``, from the runnable :doc:`ray generation example <../../examples/python_spg_raygen>`
 
-      ``slang.rayQuery`` in place of ``slang.dispatch``, and the scene bound by name. That is the
-      whole difference from a compute node.
+      ``slang.rayQuery`` in place of ``slang.compute``, and the scene bound by name.
 
    .. tab-item:: Pipeline
       :sync: pipeline
@@ -83,7 +80,7 @@ Which of the two you return decides **where the shading happens**, and nothing e
       byte sizes: the payload is the struct a hit or miss writes back, and the attributes are the
       built-in triangle barycentrics.
 
-The acceleration structure is declared like any other resource, in both:
+Both forms declare the acceleration structure as a shader resource:
 
 .. literalinclude:: ../../../examples/python/spg-raygen/RaygenCornellBox.slang
    :language: hlsl
@@ -112,7 +109,7 @@ connection in the scene**:
      - The :doc:`value-inputs <values>` ``sceneTransform``, ``sceneRenderScaleFactor`` and ``sceneMetersPerRenderUnit``.
 
 ``sceneTransform`` is the camera-to-trace-space transform. Rays are therefore authored in
-ordinary scene-unit camera space, the camera at the origin looking down -Z, and placed by that
+scene-unit camera space, the camera at the origin looking down -Z, and placed by that
 matrix, so the shader never needs to know where the camera is in the world.
 
 The transform folds in the render scale, so ray ``TMax`` values are scaled by
@@ -132,8 +129,7 @@ travels back in a payload struct that the hit and miss shaders write:
    :caption: ``RaygenCornellBoxPipeline.slang``, from the runnable :doc:`ray generation example <../../examples/python_spg_raygen>`
 
 **Exactly one hit group is supported.** ``hit`` is an array, but more than one entry is rejected
-by name: the dispatch uses a zero-stride hit-group table, so every scene hit invokes group 0 and a
-second group would never run. ``miss`` may hold several, and the index you pass to ``TraceRay``
+by name. ``miss`` may hold several, and the index you pass to ``TraceRay``
 selects among them.
 
 **A hit group may also name an any-hit shader.** ``{ closesthit = "...", anyhit = "..." }``.
@@ -146,16 +142,15 @@ them from the struct. The payload above is one ``float`` and three ``uint``, so 
 triangle attributes are two floats, so 8. Each is a whole number from 0 to 65535, and anything
 else is rejected by name.
 
-**The two produce the same picture.** The example ships the same Cornell box both ways, and both
-pass the same checks. Choose the pipeline when a hit needs to do work the ray-generation shader
-cannot express inline, not because it renders differently.
+**The two produce nearly the same picture.**
+Choose the pipeline when a hit needs to do work the
+ray-generation shader cannot express inline, not because it renders differently.
 
 No Geometry Is Exposed
 ~~~~~~~~~~~~~~~~~~~~~~
 
 A hit yields the distance and the surface's identity, its instance and primitive index, and
-nothing else. There are no vertex buffers, no index buffers and no material data. This is a
-deliberate boundary, not an oversight.
+nothing else. There are no vertex buffers, no index buffers and no material data.
 
 Anything else a shader needs has to be derived from tracing. The :doc:`ray generation example <../../examples/python_spg_raygen>` does this for
 surface normals: a triangle is flat, so three points on it define its plane exactly. The
@@ -171,21 +166,15 @@ including hard ray-traced shadows from a second trace toward the light.
 Verify It Worked
 ----------------
 
-Render the same scene both ways and check that the assertions hold for each. In the example the
-two agree on 99.85% of pixels: 101 of 65536 differ, deterministically, so a rerun of either form
-reproduces its own image exactly. Expect close agreement rather than an identical image.
+Render the same scene both ways and compare. In the
+:doc:`ray generation example <../../examples/python_spg_raygen>` the two agree on 99.85% of
+pixels: 101 of 65536 differ, deterministically, so a rerun of either form reproduces its own image
+exactly. Expect close agreement rather than an identical image.
 
-Check the render against what the shader encodes rather than against a reference image. The
-:doc:`ray generation example <../../examples/python_spg_raygen>` asserts four things: that no ray
-escaped the box, that each wall's dominant colour channel matches its normal, that off-axis
+Check the render against what the shader encodes: that no
+ray escaped the room, that each wall's dominant colour channel matches its normal, that off-axis
 normals are present in quantity, and that both shadowed and lit pixels exist. Those four fail
-separately if the trace, the shading or the light is wrong, and none of them needs a golden
-image.
-
-**A pre-compiled SPIR-V binary cannot be used.** A ray-tracing pipeline is assembled from shader-database
-handles, which byte code has none of, so a ray-generation node takes ``.slang`` source or a
-``.slang-module``. Refer to :doc:`precompiled`. Everything else that constrains a Slang node
-applies here too, including the Vulkan requirement.
+separately if the trace, the shading or the light is wrong.
 
 When It Goes Wrong
 ------------------

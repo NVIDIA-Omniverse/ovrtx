@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="504" viewBox="0 0 1000 504" role="img" aria-labelledby="title desc">
+<title id="title">Radar custom gain grid layout</title>
+<desc id="desc">A grid with the azimuth angles of AzDeg along the top and the elevation angles of ElDeg down the side, each cell holding the sum of a co-polarization and a cross-polarization gain. Beside it the same values laid out as the one-dimensional gain array: the first row of the grid, for the first elevation angle, walking every azimuth angle, then the second row, and so on.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-952fc6-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#952FC6"/></marker></defs>
+<rect width="1000" height="504" fill="#fff"/>
+<text x="150" y="44" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">AzDeg</text>
+<text x="198.12" y="44" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">lowest → highest</text>
+<text x="44" y="44" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">ElDeg</text>
+<rect x="150" y="60" width="96" height="40" rx="6" fill="#F2F2F2"/>
+<text x="198" y="74.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">−66</text>
+<text x="198" y="91.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">[0]</text>
+<rect x="254" y="60" width="96" height="40" rx="6" fill="#F2F2F2"/>
+<text x="302" y="74.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">0</text>
+<text x="302" y="91.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">[1]</text>
+<rect x="358" y="60" width="96" height="40" rx="6" fill="#F2F2F2"/>
+<text x="406" y="74.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">66</text>
+<text x="406" y="91.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">[2]</text>
+<rect x="44" y="116" width="96" height="56" rx="6" fill="#F2F2F2"/>
+<text x="92" y="138.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">−20</text>
+<text x="92" y="155.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">[0]</text>
+<rect x="150" y="116" width="96" height="56" rx="6" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="198" y="148.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">co + cross</text>
+<rect x="254" y="116" width="96" height="56" rx="6" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="302" y="148.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">co + cross</text>
+<rect x="358" y="116" width="96" height="56" rx="6" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="406" y="148.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">co + cross</text>
+<rect x="44" y="180" width="96" height="56" rx="6" fill="#F2F2F2"/>
+<text x="92" y="202.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">20</text>
+<text x="92" y="219.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">[1]</text>
+<rect x="150" y="180" width="96" height="56" rx="6" fill="#fff" stroke="#952FC6" stroke-width="2"/>
+<text x="198" y="212.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">co + cross</text>
+<rect x="254" y="180" width="96" height="56" rx="6" fill="#fff" stroke="#952FC6" stroke-width="2"/>
+<text x="302" y="212.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">co + cross</text>
+<rect x="358" y="180" width="96" height="56" rx="6" fill="#fff" stroke="#952FC6" stroke-width="2"/>
+<text x="406" y="212.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">co + cross</text>
+<text x="44" y="262" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">lowest ↓ highest</text>
+<rect x="150" y="330" width="96" height="56" rx="6" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="198" y="352" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">El −20</text>
+<text x="198" y="372" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">Az −66</text>
+<text x="198" y="402" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">[0]</text>
+<rect x="254" y="330" width="96" height="56" rx="6" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="302" y="352" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">El −20</text>
+<text x="302" y="372" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">Az 0</text>
+<text x="302" y="402" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">[1]</text>
+<rect x="358" y="330" width="96" height="56" rx="6" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="406" y="352" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">El −20</text>
+<text x="406" y="372" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">Az 66</text>
+<text x="406" y="402" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">[2]</text>
+<rect x="462" y="330" width="96" height="56" rx="6" fill="#fff" stroke="#952FC6" stroke-width="2"/>
+<text x="510" y="352" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">El 20</text>
+<text x="510" y="372" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">Az −66</text>
+<text x="510" y="402" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">[3]</text>
+<rect x="566" y="330" width="96" height="56" rx="6" fill="#fff" stroke="#952FC6" stroke-width="2"/>
+<text x="614" y="352" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">El 20</text>
+<text x="614" y="372" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">Az 0</text>
+<text x="614" y="402" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">[4]</text>
+<rect x="670" y="330" width="96" height="56" rx="6" fill="#fff" stroke="#952FC6" stroke-width="2"/>
+<text x="718" y="352" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">El 20</text>
+<text x="718" y="372" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">Az 66</text>
+<text x="718" y="402" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle">[5]</text>
+<path d="M150,408 L150,414 L454,414 L454,408" fill="none" stroke="#0074DF" stroke-width="1.5"/>
+<text x="302" y="444" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">row for ElDeg[0] walking AzDeg[0..2]</text>
+<path d="M462,408 L462,414 L766,414 L766,408" fill="none" stroke="#952FC6" stroke-width="1.5"/>
+<text x="614" y="444" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">row for ElDeg[1] walking AzDeg[0..2]</text>
+<path d="M44,144 C44,144 26,144 26,144 C26,144 26,300 26,300 C26,300 302,300 302,300 C302,300 302,317 302,317" fill="none" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<path d="M454,208 C454,208 480,208 480,208 C480,208 480,300 480,300 C480,300 614,300 614,300 C614,300 614,317 614,317" fill="none" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<text x="500" y="72" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">Rules for a custom grid</text>
+<text x="500" y="94" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">AzDeg and ElDeg:</text>
+<text x="617.17" y="94" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">txAntennaAzDeg, txAntennaElDeg</text>
+<text x="500" y="116" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">length = len(ElDeg) × len(AzDeg)</text>
+<text x="745.3" y="116" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575">→ 2 × 3 = 6 here</text>
+<text x="500" y="138" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">angles ordered lowest to highest</text>
+<text x="500" y="160" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">at least two angles per axis</text>
+<text x="500" y="182" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">zero gain outside the grid extent</text>
+<text x="500" y="204" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">gain at a grid point = co + cross, the sum of</text>
+<text x="500" y="226" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">txAntennaCoGain + txAntennaCrossGain</text>
+<text x="500" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">the rx arrays follow the same layout and rules</text>
+<rect x="150" y="470" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="169" y="480.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">row for ElDeg[0] = −20°</text>
+<rect x="336.73" y="470" width="12" height="12" rx="2" fill="#952FC6"/>
+<text x="355.73" y="480.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">row for ElDeg[1] = 20°</text>
+</svg>

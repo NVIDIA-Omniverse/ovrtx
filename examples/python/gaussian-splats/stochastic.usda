@@ -1,0 +1,14 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    subLayers = [@non_stochastic.usda@]
+)
+# Keep the close camera and all other settings identical for the on/off comparison.
+# [snippet:doc-gaussian-stochastic]
+over "Render" {
+    over "Camera" {
+        bool omni:rtx:rtpt:gaussian:nonStochastic:enabled = false
+    }
+}
+# [/snippet:doc-gaussian-stochastic]

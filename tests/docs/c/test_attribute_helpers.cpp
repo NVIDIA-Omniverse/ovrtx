@@ -65,7 +65,7 @@ TEST_F(AttributeHelpersTest, SetTokenAttributes) {
     docs_wait_no_errors(renderer_, eq.op_index);
     // [/snippet:doc-set-token-attributes-c]
 
-    ovx_string_or_token_t attr_name{};
+    ovx_token_or_string_t attr_name{};
     attr_name.string = ovx_str("purpose");
 
     ovrtx_filter_t filter{};
@@ -78,7 +78,7 @@ TEST_F(AttributeHelpersTest, SetTokenAttributes) {
     desc.attribute_filter.attribute_names = &attr_name;
     desc.attribute_filter.attribute_name_count = 1;
 
-    ovrtx_query_handle_t query_handle = 0;
+    ovrtx_query_handle_t query_handle{};
     eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
     ASSERT_API_SUCCESS(eq.status);
     docs_wait_no_errors(renderer_, eq.op_index);

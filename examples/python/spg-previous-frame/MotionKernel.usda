@@ -19,8 +19,8 @@ def Shader "MotionKernel"
     uniform asset info:spg:sourceAsset = @MotionKernel.cu@
     uniform token info:spg:sourceAsset:subIdentifier = "motion"
 
-    # Two ordinary resource-inputs. Nothing here marks one of them as a past
-    # frame; that follows from the RenderVar the scene connects it to.
+    # Two resource-inputs. Which one is the past frame follows from
+    # the RenderVar the scene connects it to.
     opaque inputs:Current
     opaque inputs:Previous
     float inputs:gain = 6.0

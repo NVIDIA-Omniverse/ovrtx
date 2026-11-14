@@ -1,11 +1,11 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: sliced-rendering
 description: >
   Render one ovrtx RenderProduct as sequential dataWindowNDC crops and stitch
   the mapped tiles into one image. Use for sliced or chunked image rendering, or when the user asks how to render a very large image; do not use for multi-camera tiled RenderProducts.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -50,8 +50,9 @@ rendering example instead when one RenderProduct combines multiple cameras.
    ``float32`` logical element with four DLPack lanes, not four scalar rows.
 4. For every crop, allocate a monotonically increasing ordinal, wait for the
    attribute write, advance the write floor, and render that same ordinal.
-5. Warm up after publishing each crop when RTPT image quality matters. Discard
-   warmup outputs and capture a separate final step.
+5. In Path Tracing, step each crop until its returned frame is ``converged``
+   before capturing. In RTPT, render additional passes after each crop when
+   temporal image quality matters.
 6. Map the full RenderVar prim path to CPU, copy the DLPack view before unmap,
    and validate tile shape, dtype, and channel count before stitching.
 7. Place tiles using the renderer output's row orientation. The reference
@@ -66,7 +67,7 @@ rendering example instead when one RenderProduct combines multiple cameras.
 
 > **Source (tested crop writes and stitching):** `tests/docs/python/test_base.py` snippet `doc-sliced-rendering`
 > **Source (complete application setup):** `examples/python/sliced-rendering/main.py` snippet `sliced-rendering-setup`
-> **Source (warmup and capture loop):** `examples/python/sliced-rendering/main.py` snippet `sliced-rendering-render-and-stitch`
+> **Source (convergence and capture loop):** `examples/python/sliced-rendering/main.py` snippet `sliced-rendering-render-and-stitch`
 
 ## Validation
 

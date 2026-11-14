@@ -11,9 +11,9 @@
 // [snippet:invert-slang-kernel]
 // Second pass of the pipeline: invert an image. Slang counterpart of
 // InvertKernel.cu. The input is whatever upstream shader is connected to
-// inputs:Image -- here, the grayscale output.
+// inputs:Image; here, the grayscale output.
 //
-// Value-inputs are not passed as arguments like in CUDA. They are packed into
+// On Slang, value-inputs are packed into
 // a constant buffer described by a struct, which the shader reads through a
 // ParameterBlock. The struct field order must match the order the launch
 // script lists the values in slang.ParameterBlock(...).

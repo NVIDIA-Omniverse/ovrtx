@@ -35,7 +35,15 @@ def _schema_plugin_dir(schema_name: str) -> Path:
 
 
 # Register codeless product schemas before any test constructs Usd.SchemaRegistry.
-for _schema in ("omni_lens_distortion", "omni_light_shaping", "physical_lighting", "omni_dome_light", "rtx_settings"):
+for _schema in (
+    "omni_runtime_texture",
+    "omni_lens_distortion",
+    "omni_light_shaping",
+    "physical_lighting",
+    "omni_dome_light",
+    "omni_playback",
+    "rtx_settings",
+):
     _plugin_dir = _schema_plugin_dir(_schema)
     _plugin_descriptor = _plugin_dir / "plugInfo.json"
     if not _plugin_descriptor.is_file():

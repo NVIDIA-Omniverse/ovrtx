@@ -1,0 +1,37 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-acoustic]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_base.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        token omni:sensor:GenericWpm:waveType = "mechanical"
+        # Operating wavelength: 6.7 mm.
+        float omni:sensor:GenericWpm:wavelengthNm = 6700000
+        token[] omni:sensor:GenericWpm:tx:patternTypes = ["free"]
+        uint[] omni:sensor:GenericWpm:freePatterns:tx:numElementsPerPattern = [1]
+        float3[] omni:sensor:GenericWpm:freePatterns:tx:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:freePatterns:tx:orientations = [(0, 0, 0, 1)]
+        token[] omni:sensor:GenericWpm:rx:patternTypes = ["free"]
+        uint[] omni:sensor:GenericWpm:freePatterns:rx:numElementsPerPattern = [1]
+        float3[] omni:sensor:GenericWpm:freePatterns:rx:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:freePatterns:rx:orientations = [(0, 0, 0, 1)]
+        token[] omni:sensor:GenericWpm:ray:patternTypes = ["free"]
+        uint[] omni:sensor:GenericWpm:freePatterns:ray:numElementsPerPattern = [1]
+        float3[] omni:sensor:GenericWpm:freePatterns:ray:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:freePatterns:ray:orientations = [(0, 0, 0, 1)]
+        uint[] omni:sensor:GenericWpm:tx:rayPatternIndices = [0]
+        token[] omni:sensor:GenericWpm:tx:mappingModes = ["1to1"]
+    }
+}
+# [/snippet:doc-generic-wpm-acoustic]

@@ -13,12 +13,12 @@
 How-To
 ======
 
-One page per thing a node or a graph can do. These are not written to be read in order.
+One page per thing a node or a graph can do. Read them in any order.
 Each page states its goal, what it assumes you already have, the shape of the
 solution, how to confirm it worked, and what to check when it does not.
 
-Both languages appear on the same page. Where CUDA and Slang differ, each is shown in its own tab
-rather than in a separate chapter. For the surface each task draws on, refer to :doc:`../ref/index`.
+Both languages appear on the same page. Where CUDA and Slang differ, each is shown in its own tab.
+For the surface each task draws on, refer to :doc:`../ref/index`.
 
 Write a Node
 ------------

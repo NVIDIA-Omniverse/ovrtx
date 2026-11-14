@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="700" viewBox="0 0 1140 700" role="img" aria-labelledby="title desc">
+<title id="title">Anatomy of a firing pattern</title>
+<desc id="desc">A rotary sensor seen from above with ticks spaced by rotPatternFiringResDeg around the rotation; one tick is expanded into its emitters fanned out by azimuthDeg and elevationDeg, with their fireTimeNs offsets on a time axis beneath. Panels show scan scheduling and an emitter-state API instance; a band beneath shows a solid-state sensor with one tick per scan.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-313131-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#313131"/></marker><marker id="arrow-76b900-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#76B900"/></marker></defs>
+<rect width="1140" height="700" fill="#fff"/>
+<rect x="20" y="20" width="440" height="490" rx="8" fill="none" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="36" y="46" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" font-weight="bold">Scan scheduling</text>
+<text x="36" y="68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575">frameRate &#160;rotPatternFiringResDeg &#160;numberOfEmitters</text>
+<text x="36" y="86" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575">numberOfChannels &#160;stateResolutionStep</text>
+<circle cx="240" cy="300" r="110" fill="none" stroke="#C0C0C0" stroke-width="1.5"/>
+<line x1="240" y1="197" x2="240" y2="183" stroke="#757575" stroke-width="1.5"/>
+<line x1="266.66" y1="200.51" x2="270.28" y2="186.99" stroke="#757575" stroke-width="1.5"/>
+<line x1="312.83" y1="227.17" x2="322.73" y2="217.27" stroke="#757575" stroke-width="1.5"/>
+<line x1="329.2" y1="248.5" x2="341.32" y2="241.5" stroke="#757575" stroke-width="1.5"/>
+<line x1="339.49" y1="273.34" x2="353.01" y2="269.72" stroke="#757575" stroke-width="1.5"/>
+<line x1="343" y1="300" x2="357" y2="300" stroke="#757575" stroke-width="1.5"/>
+<line x1="339.49" y1="326.66" x2="353.01" y2="330.28" stroke="#757575" stroke-width="1.5"/>
+<line x1="329.2" y1="351.5" x2="341.32" y2="358.5" stroke="#757575" stroke-width="1.5"/>
+<line x1="312.83" y1="372.83" x2="322.73" y2="382.73" stroke="#757575" stroke-width="1.5"/>
+<line x1="291.5" y1="389.2" x2="298.5" y2="401.32" stroke="#757575" stroke-width="1.5"/>
+<line x1="266.66" y1="399.49" x2="270.28" y2="413.01" stroke="#757575" stroke-width="1.5"/>
+<line x1="240" y1="403" x2="240" y2="417" stroke="#757575" stroke-width="1.5"/>
+<line x1="213.34" y1="399.49" x2="209.72" y2="413.01" stroke="#757575" stroke-width="1.5"/>
+<line x1="188.5" y1="389.2" x2="181.5" y2="401.32" stroke="#757575" stroke-width="1.5"/>
+<line x1="167.17" y1="372.83" x2="157.27" y2="382.73" stroke="#757575" stroke-width="1.5"/>
+<line x1="150.8" y1="351.5" x2="138.68" y2="358.5" stroke="#757575" stroke-width="1.5"/>
+<line x1="140.51" y1="326.66" x2="126.99" y2="330.28" stroke="#757575" stroke-width="1.5"/>
+<line x1="137" y1="300" x2="123" y2="300" stroke="#757575" stroke-width="1.5"/>
+<line x1="140.51" y1="273.34" x2="126.99" y2="269.72" stroke="#757575" stroke-width="1.5"/>
+<line x1="150.8" y1="248.5" x2="138.68" y2="241.5" stroke="#757575" stroke-width="1.5"/>
+<line x1="167.17" y1="227.17" x2="157.27" y2="217.27" stroke="#757575" stroke-width="1.5"/>
+<line x1="188.5" y1="210.8" x2="181.5" y2="198.68" stroke="#757575" stroke-width="1.5"/>
+<line x1="213.34" y1="200.51" x2="209.72" y2="186.99" stroke="#757575" stroke-width="1.5"/>
+<line x1="290" y1="213.4" x2="303" y2="190.88" stroke="#76B900" stroke-width="3"/>
+<circle cx="240" cy="300" r="4" fill="#313131"/>
+<text x="240" y="322" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">sensor</text>
+<line x1="240" y1="300" x2="240" y2="164.25" stroke="#313131" stroke-width="1.5" marker-end="url(#arrow-313131-1p5)"/>
+<text x="240" y="146" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">+X forward (firing angle 0°)</text>
+<path d="M240,430 A130,130 0 0 1 206.35,425.57" fill="none" stroke="#757575" stroke-width="1.5"/>
+<line x1="240" y1="425" x2="240" y2="435" stroke="#757575" stroke-width="1.5"/>
+<line x1="207.65" y1="420.74" x2="205.06" y2="430.4" stroke="#757575" stroke-width="1.5"/>
+<text x="240" y="452" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve" text-anchor="middle"><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">rotPatternFiringResDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> between neighboring ticks</tspan></text>
+<text x="240" y="472" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve" text-anchor="middle"><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">360 / rotPatternFiringResDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> ticks per rotation (floor or ceil)</tspan></text>
+<text x="240" y="492" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve" text-anchor="middle"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">one rotation is one scan; </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">frameRate</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> sets scans per second</tspan></text>
+<path d="M375.48,311.85 A136,136 0 0 1 317.29,411.9" fill="none" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<text x="386" y="372" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF">CW sweep</text>
+<path d="M303,190.88 C325.83,194.07 394.88,187.35 440,210 C485.12,232.65 551.43,307.3 573.71,326.76" fill="none" stroke="#76B900" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-76b900-2)"/>
+<rect x="480" y="20" width="640" height="490" rx="8" fill="none" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="496" y="46" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" font-weight="bold">Emitter-state API instance (s001)</text>
+<text x="496" y="68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575">emitterState:s001: &#160;azimuthDeg &#160;elevationDeg &#160;fireTimeNs &#160;channelId</text>
+<text x="496" y="86" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" xml:space="preserve"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">per-emitter arrays, </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">numberOfEmitters</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> elements in each</tspan></text>
+<rect x="697" y="178" width="216" height="124" rx="2" fill="none" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="590" y1="340" x2="805" y2="240" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="799" y1="240" x2="811" y2="240" stroke="#757575" stroke-width="1.5"/>
+<line x1="805" y1="234" x2="805" y2="246" stroke="#757575" stroke-width="1.5"/>
+<text x="805" y="166" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" xml:space="preserve" text-anchor="middle"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">tick position — </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">azimuthDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> is measured from here</tspan></text>
+<line x1="590" y1="340" x2="730" y2="195" stroke="#0074DF" stroke-width="1.5"/>
+<line x1="590" y1="340" x2="745" y2="287" stroke="#0074DF" stroke-width="1.5"/>
+<line x1="590" y1="340" x2="865" y2="291" stroke="#0074DF" stroke-width="1.5"/>
+<line x1="590" y1="340" x2="835" y2="193" stroke="#0074DF" stroke-width="1.5"/>
+<line x1="590" y1="340" x2="890" y2="260" stroke="#0074DF" stroke-width="1.5"/>
+<circle cx="730" cy="195" r="4.5" fill="#0074DF"/>
+<text x="738" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#0074DF">1</text>
+<circle cx="745" cy="287" r="4.5" fill="#0074DF"/>
+<text x="753" y="281" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#0074DF">2</text>
+<circle cx="865" cy="291" r="4.5" fill="#0074DF"/>
+<text x="873" y="285" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#0074DF">3</text>
+<circle cx="835" cy="193" r="4.5" fill="#0074DF"/>
+<text x="843" y="197" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#0074DF">4</text>
+<circle cx="890" cy="260" r="4.5" fill="#0074DF"/>
+<text x="898" y="254" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#0074DF">5</text>
+<circle cx="590" cy="340" r="5.5" fill="#76B900"/>
+<text x="590" y="364" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" text-anchor="middle">one tick, expanded</text>
+<line x1="697" y1="320" x2="913" y2="320" stroke="#313131" stroke-width="1.2"/>
+<line x1="697" y1="315" x2="697" y2="325" stroke="#313131" stroke-width="1.2"/>
+<line x1="913" y1="315" x2="913" y2="325" stroke="#313131" stroke-width="1.2"/>
+<text x="805" y="340" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve" text-anchor="middle"><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">azimuthDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">: relative to the tick position</tspan></text>
+<line x1="929" y1="178" x2="929" y2="302" stroke="#313131" stroke-width="1.2"/>
+<line x1="934" y1="178" x2="924" y2="178" stroke="#313131" stroke-width="1.2"/>
+<line x1="934" y1="302" x2="924" y2="302" stroke="#313131" stroke-width="1.2"/>
+<text x="939" y="236" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">elevationDeg</text>
+<text x="939" y="252" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131">absolute</text>
+<text x="560" y="394" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve"><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">fireTimeNs</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">: each emitter's delay from the tick start, in nanoseconds</tspan></text>
+<line x1="560" y1="430" x2="1060" y2="430" stroke="#757575" stroke-width="1.5"/>
+<line x1="560" y1="430" x2="560" y2="436" stroke="#757575" stroke-width="1.5"/>
+<text x="560" y="448" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">tick start</text>
+<line x1="620" y1="430" x2="620" y2="436" stroke="#757575" stroke-width="1.5"/>
+<text x="620" y="448" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">1</text>
+<line x1="730" y1="430" x2="730" y2="436" stroke="#757575" stroke-width="1.5"/>
+<text x="730" y="448" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">2, 3</text>
+<line x1="850" y1="430" x2="850" y2="436" stroke="#757575" stroke-width="1.5"/>
+<text x="850" y="448" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">4</text>
+<line x1="940" y1="430" x2="940" y2="436" stroke="#757575" stroke-width="1.5"/>
+<text x="940" y="448" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">5</text>
+<line x1="1060" y1="430" x2="1060" y2="436" stroke="#757575" stroke-width="1.5"/>
+<text x="1060" y="448" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">tick period</text>
+<circle cx="620" cy="422" r="4.5" fill="#0074DF"/>
+<circle cx="730" cy="422" r="4.5" fill="#0074DF"/>
+<circle cx="730" cy="411" r="4.5" fill="#0074DF"/>
+<circle cx="850" cy="422" r="4.5" fill="#0074DF"/>
+<circle cx="940" cy="422" r="4.5" fill="#0074DF"/>
+<text x="730" y="468" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">one group: equal fire times fire together</text>
+<rect x="496" y="486" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="515" y="496.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">the tick that is expanded</text>
+<rect x="687.19" y="486" width="12" height="12" rx="2" fill="#757575"/>
+<text x="706.19" y="496.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">other ticks of the rotation</text>
+<rect x="881.85" y="486" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="900.85" y="496.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">emitters of that tick</text>
+<rect x="20" y="530" width="1100" height="150" rx="8" fill="none" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="36" y="556" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Solid-state sensor — one tick per scan</text>
+<rect x="36" y="572" width="130" height="92" rx="4" fill="#F2F2F2" stroke="#C0C0C0" stroke-width="1.5"/>
+<circle cx="50" cy="586" r="3" fill="#0074DF"/>
+<circle cx="67" cy="586" r="3" fill="#0074DF"/>
+<circle cx="84" cy="586" r="3" fill="#0074DF"/>
+<circle cx="101" cy="586" r="3" fill="#0074DF"/>
+<circle cx="118" cy="586" r="3" fill="#0074DF"/>
+<circle cx="135" cy="586" r="3" fill="#0074DF"/>
+<circle cx="152" cy="586" r="3" fill="#0074DF"/>
+<circle cx="50" cy="607" r="3" fill="#0074DF"/>
+<circle cx="67" cy="607" r="3" fill="#0074DF"/>
+<circle cx="84" cy="607" r="3" fill="#0074DF"/>
+<circle cx="101" cy="607" r="3" fill="#0074DF"/>
+<circle cx="118" cy="607" r="3" fill="#0074DF"/>
+<circle cx="135" cy="607" r="3" fill="#0074DF"/>
+<circle cx="152" cy="607" r="3" fill="#0074DF"/>
+<circle cx="50" cy="628" r="3" fill="#0074DF"/>
+<circle cx="67" cy="628" r="3" fill="#0074DF"/>
+<circle cx="84" cy="628" r="3" fill="#0074DF"/>
+<circle cx="101" cy="628" r="3" fill="#0074DF"/>
+<circle cx="118" cy="628" r="3" fill="#0074DF"/>
+<circle cx="135" cy="628" r="3" fill="#0074DF"/>
+<circle cx="152" cy="628" r="3" fill="#0074DF"/>
+<circle cx="50" cy="649" r="3" fill="#0074DF"/>
+<circle cx="67" cy="649" r="3" fill="#0074DF"/>
+<circle cx="84" cy="649" r="3" fill="#0074DF"/>
+<circle cx="101" cy="649" r="3" fill="#0074DF"/>
+<circle cx="118" cy="649" r="3" fill="#0074DF"/>
+<circle cx="135" cy="649" r="3" fill="#0074DF"/>
+<circle cx="152" cy="649" r="3" fill="#0074DF"/>
+<text x="184" y="606" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">The whole pattern is one tick, applied once per scan, with its emitters laid out in lines (</tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">numLines</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">, </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">numRaysPerLine</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">).</tspan></text>
+<text x="184" y="623" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve"><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">rotPatternFiringResDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> is not read; the angular extent comes from the emitter </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">azimuthDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> and </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">elevationDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> arrays.</tspan></text>
+<text x="184" y="640" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">Every point of a solid-state scan carries </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">TickId</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> 0.</tspan></text>
+</svg>

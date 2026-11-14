@@ -15,7 +15,7 @@ function motion(inputs, outputs)
 
     outputs["Difference"] = slang.image(inputs["Current"].shape, inputs["Current"].dtype)
 
-    return slang.dispatch({
+    return slang.compute({
         bind = {
             slang.ParameterBlock(
                 slang.int(inputs["Current"].shape[2]),   -- -> int   width

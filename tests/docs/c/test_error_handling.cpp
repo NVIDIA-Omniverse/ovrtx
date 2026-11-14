@@ -70,12 +70,12 @@ TEST_F(ErrorHandlingTest, WaitOpErrorRetrieval) {
         // Prefer the explicit length field over the null terminator.
         ASSERT_GT(err.length, 0u);
         printf("op %llu error: %.*s\n",
-               (unsigned long long)wait_result.error_op_ids[i],
+               (unsigned long long)wait_result.error_op_ids[i].raw_id,
                (int)err.length, err.ptr);
     }
 
     // Nothing is still in flight → lowest_pending_op_id is 0.
-    EXPECT_EQ(wait_result.lowest_pending_op_id, 0u);
+    EXPECT_EQ(wait_result.lowest_pending_op_id, OVRTX_INVALID_OP_ID);
     // [/snippet:doc-wait-op-error-retrieval-c]
 
     // Sanity: the failed op id itself shows up in error_op_ids.

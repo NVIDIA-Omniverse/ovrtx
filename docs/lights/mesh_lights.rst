@@ -97,7 +97,7 @@ geometry:
    :class: compact-table
 
    "``bool omni:rtx:pt:ris:meshLights = false``", "Enables mesh-light sampling in Path Tracing mode."
-   "``bool omni:rtx:rtpt:ris:meshLights = false``", "Enables mesh-light sampling in Real-Time Path-Tracing mode."
+   "``bool omni:rtx:rtpt:ris:meshLights = false``", "Enables mesh-light sampling in Real-Time Path Tracing mode."
 
 Minimal mode does not support mesh-light sampling. Authoring both settings is
 safe when a RenderProduct may switch between Path Tracing and Real-Time

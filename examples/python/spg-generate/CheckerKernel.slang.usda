@@ -19,11 +19,8 @@ def Shader "CheckerKernel"
     uniform asset info:spg:sourceAsset = @CheckerKernel.slang@
     uniform token info:spg:sourceAsset:subIdentifier = "checker"
 
-    # Every input here is a typed attribute. There is no `opaque inputs:` port,
-    # because this node reads no AOV: it generates its output from these values.
-    #
-    # The colours are exact at 8 bits, so the host can predict the output byte
-    # for byte without depending on how a float is rounded into a texture.
+    # Every input here is a typed attribute: this node reads no AOV and
+    # generates its output from these values.
     int inputs:width = 512
     int inputs:height = 512
     int inputs:squareSize = 32

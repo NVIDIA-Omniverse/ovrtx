@@ -11,7 +11,7 @@
 -- Launch script for MarkerOverlayKernel.slang.
 --
 -- The scene is read exactly as in MarkerOverlayKernel.cu.lua; the scene query API is the same
--- in both launch-script languages. Only the dispatch differs: scalars go into the parameter
+-- on both backends. Only the dispatch differs: scalars go into the parameter
 -- block in the order the shader's struct declares them, and the two float lists become
 -- read-only buffers.
 
@@ -72,7 +72,7 @@ function markerOverlay(inputs, outputs)
 
     outputs["Overlay"] = slang.image(width, height, inputs["Image"].dtype)
 
-    return slang.dispatch({
+    return slang.compute({
         bind = {
             slang.ParameterBlock(
                 slang.int(width),                          -- -> int   width

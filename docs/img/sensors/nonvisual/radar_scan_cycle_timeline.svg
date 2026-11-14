@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1016" height="446" viewBox="0 0 1016 446" role="img" aria-labelledby="title desc">
+<title id="title">Radar scan cycle and velocity sequence</title>
+<desc id="desc">Eight capture windows for scans s001 and s002, each with maxVelMpsSequence [50, 55] meters per second. Firings alternate scans and advance only that scan's sequence. Windows three and six contain no acquisition and publish no radar frame; the pending scan and both sequence entries remain unchanged.</desc>
+<rect width="1016" height="446" fill="#fff"/>
+<text x="24" y="36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">maxVelMpsSequence = [50, 55]</text>
+<text x="239.2" y="36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575">(m/s); two scans, s001 and s002</text>
+<text x="992" y="36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">only firings advance the active scan and its sequence →</text>
+<text x="36" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" font-weight="bold">capture window</text>
+<text x="272" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">1</text>
+<text x="368" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">2</text>
+<text x="464" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">3</text>
+<text x="560" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">4</text>
+<text x="656" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">5</text>
+<text x="752" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">6</text>
+<text x="848" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">7</text>
+<text x="944" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#757575" text-anchor="middle" font-weight="bold">8</text>
+<rect x="24" y="82" width="968" height="52" rx="4" fill="#F2F2F2"/>
+<text x="36" y="112.7" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">active scan</text>
+<line x1="224" y1="88" x2="224" y2="128" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="24" y="144" width="968" height="52" rx="4" fill="#F2F2F2"/>
+<text x="36" y="166" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">s001 sequence position</text>
+<text x="36" y="184" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">advances only when s001 fires</text>
+<line x1="224" y1="150" x2="224" y2="190" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="24" y="206" width="968" height="52" rx="4" fill="#F2F2F2"/>
+<text x="36" y="228" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">s002 sequence position</text>
+<text x="36" y="246" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">advances only when s002 fires</text>
+<line x1="224" y1="212" x2="224" y2="252" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="418" y="78" width="92" height="184" rx="4" fill="#C0C0C0" fill-opacity="0.55"/>
+<rect x="706" y="78" width="92" height="184" rx="4" fill="#C0C0C0" fill-opacity="0.55"/>
+<rect x="231" y="91" width="82" height="34" rx="6" fill="#0074DF"/>
+<text x="272" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">s001</text>
+<rect x="231" y="153" width="82" height="34" rx="6" fill="#76B900"/>
+<text x="272" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">50</text>
+<rect x="231" y="215" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="272" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">50</text>
+<rect x="327" y="91" width="82" height="34" rx="6" fill="#952FC6"/>
+<text x="368" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">s002</text>
+<rect x="327" y="153" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="368" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">55</text>
+<rect x="327" y="215" width="82" height="34" rx="6" fill="#76B900"/>
+<text x="368" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">50</text>
+<rect x="423" y="91" width="82" height="34" rx="6" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="464" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#9A9A9A" text-anchor="middle" font-weight="bold">s001</text>
+<rect x="423" y="153" width="82" height="34" rx="6" fill="#fff" stroke="#76B900" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="464" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">55</text>
+<rect x="423" y="215" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="464" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">55</text>
+<rect x="519" y="91" width="82" height="34" rx="6" fill="#0074DF"/>
+<text x="560" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">s001</text>
+<rect x="519" y="153" width="82" height="34" rx="6" fill="#76B900"/>
+<text x="560" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">55</text>
+<rect x="519" y="215" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="560" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">55</text>
+<rect x="615" y="91" width="82" height="34" rx="6" fill="#952FC6"/>
+<text x="656" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">s002</text>
+<rect x="615" y="153" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="656" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">50</text>
+<rect x="615" y="215" width="82" height="34" rx="6" fill="#76B900"/>
+<text x="656" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">55</text>
+<rect x="711" y="91" width="82" height="34" rx="6" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="752" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#9A9A9A" text-anchor="middle" font-weight="bold">s001</text>
+<rect x="711" y="153" width="82" height="34" rx="6" fill="#fff" stroke="#76B900" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="752" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">50</text>
+<rect x="711" y="215" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="752" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">50</text>
+<rect x="807" y="91" width="82" height="34" rx="6" fill="#0074DF"/>
+<text x="848" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">s001</text>
+<rect x="807" y="153" width="82" height="34" rx="6" fill="#76B900"/>
+<text x="848" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">50</text>
+<rect x="807" y="215" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="848" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">50</text>
+<rect x="903" y="91" width="82" height="34" rx="6" fill="#952FC6"/>
+<text x="944" y="112.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">s002</text>
+<rect x="903" y="153" width="82" height="34" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="944" y="174.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">55</text>
+<rect x="903" y="215" width="82" height="34" rx="6" fill="#76B900"/>
+<text x="944" y="236.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">50</text>
+<line x1="464" y1="264" x2="464" y2="280" stroke="#757575" stroke-width="1.2"/>
+<line x1="752" y1="264" x2="752" y2="280" stroke="#757575" stroke-width="1.2"/>
+<line x1="464" y1="280" x2="752" y2="280" stroke="#757575" stroke-width="1.2"/>
+<text x="437.36" y="300" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">no scheduled scan time in this window →</text>
+<text x="688.29" y="300" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">no radar frame</text>
+<rect x="24" y="328" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="43" y="338.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">the scan fires in this window and meets this entry</text>
+<rect x="25" y="349" width="10" height="10" rx="2" fill="none" stroke="#76B900" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="43" y="358.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">its turn, but no scan time in the window: no scan fires and the position stays unchanged</text>
+<rect x="24" y="368" width="12" height="12" rx="2" fill="#C0C0C0"/>
+<text x="43" y="378.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">window with no scheduled scan time: no radar frame is published</text>
+<text x="24" y="412" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">Each scan visits every entry as it fires. Read</text>
+<text x="305.99" y="412" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">maxVelMps</text>
+<text x="378.22" y="412" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">from the frame.</text>
+</svg>

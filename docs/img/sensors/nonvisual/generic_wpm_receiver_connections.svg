@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800" role="img" aria-labelledby="title desc">
+<title id="title">Generic wpm model receiver connections</title>
+<desc id="desc">Four logical connection examples. nton connects every transmitter to all active receivers. Zero-bloom 1to1 pairs equal flat element indices. map gives each transmitter in the selected pattern the same ordered group, here receiver indices 2, 0, 2 in slots 0, 1, 2, preserving the repeated receiver. Radius-one bloom on matching three-by-three row-major grids gives the interior transmitter at index 4 nine receiver slots, ordered row by row; the center is slot 4. Connections select receiver candidates, not guaranteed valid contributions, and bloom adds no emitted rays.</desc>
+<defs><marker id="arrow-757575-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#757575"/></marker><marker id="arrow-757575-1p6" markerUnits="userSpaceOnUse" markerWidth="8.8" markerHeight="7.2" refX="0" refY="3.6" orient="auto" overflow="visible"><path d="M0,0 L8.8,3.6 L0,7.2 z" fill="#757575"/></marker></defs>
+<rect width="1000" height="800" fill="#fff"/>
+<text x="24" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="23" fill="#313131" font-weight="bold">Choose receiver connections for the selected transmitter pattern</text>
+<rect x="24" y="70" width="464" height="270" rx="6" fill="#F2F2F2"/>
+<rect x="512" y="70" width="464" height="270" rx="6" fill="#F2F2F2"/>
+<rect x="24" y="365" width="464" height="345" rx="6" fill="#F2F2F2"/>
+<rect x="512" y="365" width="464" height="345" rx="6" fill="#F2F2F2"/>
+<text x="48" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="22" fill="#313131" font-weight="bold">nton · all receivers</text>
+<text x="48" y="133" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Each Tx uses every active Rx</text>
+<line x1="172" y1="195" x2="331.78" y2="180.73" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="172" y1="195" x2="332.03" y2="237.87" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="172" y1="195" x2="333" y2="295.63" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="172" y1="275" x2="332.82" y2="184.06" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="172" y1="275" x2="331.92" y2="241.68" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="172" y1="275" x2="331.84" y2="298.79" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<rect x="80" y="175" width="92" height="40" rx="6" fill="#76B900"/>
+<text x="126" y="201.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 0</text>
+<rect x="80" y="255" width="92" height="40" rx="6" fill="#76B900"/>
+<text x="126" y="281.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 1</text>
+<rect x="340" y="160" width="92" height="40" rx="6" fill="#952FC6"/>
+<text x="386" y="186.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#fff" text-anchor="middle" font-weight="bold">Rx 0</text>
+<rect x="340" y="220" width="92" height="40" rx="6" fill="#952FC6"/>
+<text x="386" y="246.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#fff" text-anchor="middle" font-weight="bold">Rx 1</text>
+<rect x="340" y="280" width="92" height="40" rx="6" fill="#952FC6"/>
+<text x="386" y="306.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#fff" text-anchor="middle" font-weight="bold">Rx 2</text>
+<text x="536" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="22" fill="#313131" font-weight="bold">1to1 · zero bloom</text>
+<text x="536" y="133" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Pairs equal flat element indices</text>
+<line x1="662" y1="180" x2="843.75" y2="180" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<rect x="570" y="160" width="92" height="40" rx="6" fill="#76B900"/>
+<text x="616" y="186.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 0</text>
+<rect x="852" y="160" width="92" height="40" rx="6" fill="#952FC6"/>
+<text x="898" y="186.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#fff" text-anchor="middle" font-weight="bold">Rx 0</text>
+<line x1="662" y1="240" x2="843.75" y2="240" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<rect x="570" y="220" width="92" height="40" rx="6" fill="#76B900"/>
+<text x="616" y="246.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 1</text>
+<rect x="852" y="220" width="92" height="40" rx="6" fill="#952FC6"/>
+<text x="898" y="246.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#fff" text-anchor="middle" font-weight="bold">Rx 1</text>
+<line x1="662" y1="300" x2="843.75" y2="300" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<rect x="570" y="280" width="92" height="40" rx="6" fill="#76B900"/>
+<text x="616" y="306.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 2</text>
+<rect x="852" y="280" width="92" height="40" rx="6" fill="#952FC6"/>
+<text x="898" y="306.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#fff" text-anchor="middle" font-weight="bold">Rx 2</text>
+<text x="48" y="399" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="22" fill="#313131" font-weight="bold">map · ordered receiver group</text>
+<text x="48" y="428" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">One shared group: [2, 0, 2]</text>
+<rect x="270" y="465" width="185" height="195" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="2"/>
+<line x1="154" y1="505" x2="262.6" y2="558.36" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<rect x="62" y="485" width="92" height="40" rx="6" fill="#76B900"/>
+<text x="108" y="511.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 0</text>
+<line x1="154" y1="595" x2="262.06" y2="564.26" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<rect x="62" y="575" width="92" height="40" rx="6" fill="#76B900"/>
+<text x="108" y="601.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 1</text>
+<rect x="285" y="480" width="155" height="45" rx="6" fill="#952FC6"/>
+<text x="362.5" y="508.62" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#fff" text-anchor="middle">slot 0 → Rx 2</text>
+<rect x="285" y="540" width="155" height="45" rx="6" fill="#952FC6"/>
+<text x="362.5" y="568.62" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#fff" text-anchor="middle">slot 1 → Rx 0</text>
+<rect x="285" y="600" width="155" height="45" rx="6" fill="#952FC6"/>
+<text x="362.5" y="628.62" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#fff" text-anchor="middle">slot 2 → Rx 2</text>
+<text x="48" y="687" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Repeated Rx 2 keeps two slots.</text>
+<text x="536" y="399" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="22" fill="#313131" font-weight="bold">1to1 · bloom radius 1</text>
+<text x="536" y="428" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Matching 3 × 3 grids, rowMajor</text>
+<rect x="536" y="466" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="566" y="489" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 0</text>
+<text x="566" y="513" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 0</text>
+<rect x="601" y="466" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="631" y="489" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 1</text>
+<text x="631" y="513" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 1</text>
+<rect x="666" y="466" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="696" y="489" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 2</text>
+<text x="696" y="513" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 2</text>
+<rect x="536" y="531" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="566" y="554" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 3</text>
+<text x="566" y="578" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 3</text>
+<rect x="601" y="531" width="60" height="60" rx="6" fill="#fff" stroke="#76B900" stroke-width="3"/>
+<text x="631" y="554" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 4</text>
+<text x="631" y="578" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 4</text>
+<rect x="666" y="531" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="696" y="554" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 5</text>
+<text x="696" y="578" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 5</text>
+<rect x="536" y="596" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="566" y="619" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 6</text>
+<text x="566" y="643" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 6</text>
+<rect x="601" y="596" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="631" y="619" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 7</text>
+<text x="631" y="643" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 7</text>
+<rect x="666" y="596" width="60" height="60" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="696" y="619" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#952FC6" text-anchor="middle" font-weight="bold">Rx 8</text>
+<text x="696" y="643" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">slot 8</text>
+<line x1="814" y1="561" x2="754.8" y2="561" stroke="#757575" stroke-width="1.6" marker-end="url(#arrow-757575-1p6)"/>
+<rect x="814" y="541" width="116" height="40" rx="6" fill="#76B900"/>
+<text x="872" y="567.48" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" text-anchor="middle" font-weight="bold">Tx 4</text>
+<text x="872" y="515" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Interior element</text>
+<text x="872" y="611" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">9 receiver slots</text>
+<text x="536" y="687" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Center slot 4; no extra emitted rays.</text>
+<text x="24" y="747" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Tx = transmitter · Rx = receiver · lines show connections, not physical return paths</text>
+<text x="24" y="773" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#757575">Schematic; a connected receiver does not guarantee a valid contribution.</text>
+</svg>

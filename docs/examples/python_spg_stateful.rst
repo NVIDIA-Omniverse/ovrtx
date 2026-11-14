@@ -12,12 +12,12 @@ Python: SPG Stateful Node
 =========================
 
 An SPG node that reads back its own previous output, so a moving object drags a fading comet
-tail behind it. The whole node is one line, ``history[n] = current[n] + decay * history[n-1]``:
-fade what you published last time, add what you were handed this time.
+tail behind it. The feedback is one line, ``history[n] = current[n] + decay * history[n-1]``:
+fade what you kept last time, add what you were handed this time.
 
-An output marked stateful keeps its resource across frames instead of being handed a fresh
-one, and is zero-initialised on first use, so the node needs no special case for the first
-frame. That resource is never published, so it needs no RenderVar.
+The frame it reads back is memory of the node, stated in the launch script as
+``self.memory["History"]``: SPG keeps it across frames instead of handing out a fresh resource,
+and zeroes it when it is created, so the node needs no special case for the first frame.
 
 .. image:: ../../img/example-spg-stateful.png
    :alt: SPG stateful node example output, a ball dragging a comet tail
@@ -42,4 +42,4 @@ Running
    uv run main.py                                # CUDA
    uv run main.py --scene trail_scene_slang.usda # Slang
 
-The node ships in both languages, so the two backends can be compared side by side. See :doc:`../spg/do/state` for what stateful means and how an output is marked.
+See :doc:`../spg/do/state` for what a node's memory is and how it is stated.

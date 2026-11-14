@@ -4,6 +4,9 @@ This directory contains example projects demonstrating various features of ovrtx
 
 Camera feature examples:
 
+- [`python/aov-compositing`](python/aov-compositing/) captures seven Path Tracing lighting passes, reconstructs beauty, and compares it with the rendered image.
+
+- [`python/camera-calibration`](python/camera-calibration/) fits camera intrinsics from supplied checkerboard photographs and writes a USD Camera.
 - [`python/camera-lens-calibration`](python/camera-lens-calibration/) compares OpenCV pinhole, OpenCV fisheye, and omni-directional stereo cameras.
 - [`python/camera-rolling-shutter`](python/camera-rolling-shutter/) compares global and rolling shutters.
 - [`python/multi-rate-sensors`](python/multi-rate-sensors/) keeps two lidars and two cameras active at different capture rates and compares partial-output policies.
@@ -17,6 +20,15 @@ Light feature examples:
 - [`python/spectral-rendering`](python/spectral-rendering/) and [`c/spectral-rendering`](c/spectral-rendering/) compare physical illuminants in RGB and spectral PathTracing.
 
 - [`python/projector-light-calibration`](python/projector-light-calibration/) generates an OpenCV-calibrated projector direction texture and renders it.
+
+Material feature examples:
+
+- [`python/runtime-textures`](python/runtime-textures/) drives NVIDIA Carter in a circle and uses Warp to display its previous camera frame in greyscale on a monitor. The [`c/runtime-textures`](c/runtime-textures/) example demonstrates simple CUDA texel updates.
+
+Nonvisual sensor configurations:
+
+- [`python/generic-wpm`](python/generic-wpm/) runs small depth, scan, Gaussian, multistatic, acoustic and stored-pattern recipes.
+- [`c/generic-wpm`](c/generic-wpm/) reads contributions through the C API, filters valid records and exercises live selection updates.
 
 ## Example Projects
 
@@ -54,6 +66,18 @@ Light feature examples:
         <p align="left"><em>“Create a C++ interactive viewer that renders ovrtx camera output directly into a Vulkan presentation path through CUDA interop, with GPU selection, GPU image mapping, exported-image copies, explicit synchronization, double buffering, orbit camera controls, finite-frame capture, and click or marquee picking with selection outlines.”</em></p>
       </blockquote>
       <sub>Build &amp; run in: <a href="c/vulkan-interop/">C →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="../img/example-frame-generation.avif" alt="DLSS Frame Generation Example" width="100%">
+      <br>
+      <b>DLSS Frame Generation</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Create a headless C/C++ example that enables DLSS Frame Generation on a RenderProduct, steps a moving scene, reports how many interpolated frames were actually produced versus requested, identifies which output frame is the simulated one, and writes every frame to disk for comparison.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="c/frame-generation/">C →</a></sub>
     </td>
     <td align="center" width="50%">
       <img src="../img/example-planet-system.jpg" alt="Planet System Example" width="100%">
@@ -190,6 +214,19 @@ Light feature examples:
   </tr>
   <tr>
     <td align="center" width="50%">
+      <img src="../docs/img/video-textures.avif" alt="Four timestamped H.265 video-texture renders" width="100%">
+      <br>
+      <b>Video Textures</b>
+      <br>
+      <blockquote>
+        <p align="left"><em>“Create a video-texture example with a visible timestamp and moving object, render several source times, and make the results playable in Rerun.”</em></p>
+      </blockquote>
+      <sub>Build &amp; run in: <a href="python/video-textures/">Python →</a></sub>
+    </td>
+    <td align="center" width="50%"></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
       <img src="../img/example-spg-grayscale.png" alt="SPG Grayscale Example" width="100%">
       <br>
       <b>SPG: Grayscale</b>
@@ -293,7 +330,7 @@ Light feature examples:
       <blockquote>
         <p align="left">Register ovrtx schemas with external OpenUSD and verify a fallback value in Python. Use C/C++ to enumerate schema directories and publish paths for the bundled USD runtime.</p>
       </blockquote>
-      <sub>Build &amp; run in: <a href="python/usd-plugin-paths/">Python →</a> | <a href="c/usd-plugin-paths/">C/C++ →</a></sub>
+      <sub>Build &amp; run in: <a href="python/usd-plugin-paths/">Python →</a> | <a href="c/usd-plugin-paths/">C →</a></sub>
     </td>
   </tr>
   <tr>
@@ -305,10 +342,18 @@ Light feature examples:
       <p align="left">Compare physical illuminants in RGB and spectral PathTracing, then compare Canon EOS 5D and Sony α7 IV camera responses with the CIE 1931 observer.</p>
       <sub>Build &amp; run in: <a href="c/spectral-rendering/">C →</a>, <a href="python/spectral-rendering/">Python →</a></sub>
     </td>
+    <td align="center" width="50%">
+      <img src="../img/example-selection-spg.avif" alt="Custom selection outlines and patterned fills on a sphere, torus, and cube" width="100%">
+      <br>
+      <b>Custom Selection with SPG</b>
+      <br>
+      <p align="left">Draw custom selection outlines, stippling, and hatching from the output-resolution SelectionState AOV using an SPG graph.</p>
+      <sub>Build &amp; run in: <a href="c/selection-spg/">C →</a></sub>
+    </td>
   </tr>
 </table>
 
 ## Gaussian Splats
 
 - [Python](python/gaussian-splats/): runnable scene and validation.
-- [C/C++](c/gaussian-splats/): equivalent runtime workflow.
+- [C](c/gaussian-splats/): equivalent runtime workflow.

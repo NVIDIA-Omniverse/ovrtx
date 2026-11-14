@@ -26,7 +26,7 @@ differ, refer to :doc:`lua_cuda` and :doc:`lua_slang`.
 A Complete Script
 -----------------
 
-A complete script. It validates the input it was handed, takes the shape from it, describes the
+This script validates the input it was handed, takes the shape from it, describes the
 output, and returns the launch configuration.
 
 .. tab-set::
@@ -52,7 +52,7 @@ output, and returns the launch configuration.
          :caption: ``GrayscaleKernel.slang.lua``, from the runnable :doc:`grayscale example <../../examples/python_spg_grayscale>`
 
 Highlighted: the function, whose name has to match the entry point; the line that describes the
-output; and the return that carries the launch configuration. Those three are the contract.
+output; and the return that carries the launch configuration.
 
 What the Script Is Handed
 -------------------------
@@ -66,14 +66,16 @@ What the Script Is Handed
    * - Descriptors for every bound resource: shape, dtype and rank
      - The contents of those resources. No pixel, point or buffer value is readable here, and no
        result of this frame's GPU work, which has not run yet.
-   * - The value-inputs authored in USD
-     - Anything a previous frame computed, unless it was written to a stateful output
+   * - The value-inputs authored in USD, and ``self``, the table of what the launch states about
+       the node itself: its memory and its statefulness
+     - The results of a previous frame's GPU work. A node's memory and a stateful output keep their
+       contents for the node's GPU code, not for the launch script.
    * - The frame and the scene, through the ``rtx`` table: the current frame number, the product
        the node's prim sits under with its cameras, and any prim on the stage with its attributes
        and transforms
      - Anything the load did not publish, and any way to write the scene
 
-The practical consequence catches people out: a launch script cannot branch on data. A lidar's
+The practical consequence: a launch script cannot branch on data. A lidar's
 ``Counts`` channel, for example, says how many returns a sweep produced, but the script sees
 only its descriptor. The count is passed to the GPU and the bound is applied there.
 
@@ -97,6 +99,19 @@ two tables:
 
 The function returns the launch configuration produced by ``cuda.kernel(...)`` or by one of the
 ``slang`` launch calls.
+
+The values the ``cuda`` and ``slang`` functions return for a launch, the arguments such as
+``cuda.int(...)``, ``cuda.TextureObject(...)`` and ``slang.ParameterBlock(...)`` and the launches
+of ``cuda.kernel{...}`` and ``slang.compute{...}``, are userdata that read, write and iterate like
+tables, with ``pairs`` and ``#``. ``type()`` gives ``"userdata"`` for them, ``next()`` and the
+``table`` library do not take them, and ``tostring()`` names their kind, such as
+``SpgArgWrapper``.
+
+Every argument of a launch is an input, an output, a memory, a value or array data. An argument of another
+kind, such as a table the script builds with a name that carries no port prefix, or one that
+does not describe the resource it stands for, stops the node's graph with an error naming the
+argument and its position among the launch's arguments, where each value of a Slang parameter
+block counts as one.
 
 Resource-Inputs and Value-Inputs
 --------------------------------
@@ -138,23 +153,21 @@ written in terms of them.
    * - ``rank``
      - How many dimensions it has, which is how many entries ``shape`` holds.
    * - ``dtype``
-     - What one element is. A dtype is a value rather than a name: ``cuda.uchar4`` and
+     - What one element is. ``cuda.uchar4`` and
        ``slang.float`` are dtypes, taken from the ``cuda`` and ``slang`` tables and handed to
        the functions that create resources.
 
 **A dtype says three things about an element**: what kind of number it holds, how wide that
 number is, and how many of them make one element. ``cuda.uchar4`` is four unsigned 8-bit
-numbers, so one RGBA pixel; ``cuda.float`` is a single 32-bit float. That is why an image and
-a plain run of numbers are described in the same vocabulary.
+numbers, so one RGBA pixel; ``cuda.float`` is a single 32-bit float.
 
 **A dtype compares, and it is callable.** Comparing is how a script checks what it was handed,
 ``inputs["Image"].dtype == cuda.uchar4``. Calling one wraps a value for the GPU,
-``cuda.int(42)``. Neither is something a plain type name could do, and both are used
-throughout the launch scripts in the examples.
+``cuda.int(42)``.
 
 **Shapes are height-first**: ``shape[1]`` is height and ``shape[2]`` is width. Functions that
 take explicit dimensions, such as ``cuda.image(width, height, dtype)``, take them in the
-opposite order, which is the single most common source of an image that comes out transposed.
+opposite order; swapping them transposes the image.
 
 A resource is also either texture-backed or buffer-backed, and that choice is fixed when it
 is created. Which one an output should be is stated when it is described, and the binder used
@@ -182,8 +195,6 @@ Which function describes it depends on how the output is backed. Refer to
 
           outputs["LdrGrayscale"] = cuda.image(width, height, cuda.uchar4)
 
-      A shape is height-first while width and height are not, so the two orders are reversed.
-
    .. tab-item:: Slang
       :sync: slang
 
@@ -196,6 +207,38 @@ Which function describes it depends on how the output is backed. Refer to
 
 The available descriptor functions, and their exact signatures, are listed in :doc:`lua_cuda`
 and :doc:`lua_slang`.
+
+.. _spg-lua-self:
+
+The ``self`` Table
+------------------
+
+``self`` is the node itself: a global table SPG sets before every call, holding what the
+launch states about the node rather than about its ports. It is new on every call, so nothing a
+script puts there carries over to the next launch or to another node running the same script.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Field
+     - Description
+   * - ``self.memory``
+     - The node's memory, by name: ``self.memory["acc"] = cuda.empty({ n }, cuda.float)``. Each
+       entry is a descriptor, from ``image`` or ``empty``, under a string key. SPG creates the
+       memory, zeroed, hands the same resource back on every run for as long as the node lives,
+       and creates it again, zeroed, when a launch describes it otherwise. A launch that does not
+       state a memory leaves it as it is. Pass a memory to the kernel with the wrapper an output
+       takes: ``cuda.array``, ``cuda.SurfaceObject``, ``slang.RWStructuredBuffer``,
+       ``slang.RWTexture2D`` and the other read-write binders. A memory is not a port. Refer to
+       :doc:`../do/state`.
+   * - ``self.stateful``
+     - Set to ``true`` to mark every output of the node stateful at once, as the trailing
+       ``stateful`` marker does for one output.
+
+An entry of ``self.memory`` that is not a descriptor, a key that is not a string, or a
+``self.memory`` that is not a table fails the launch with an error that names the memory, as an
+argument the node cannot take does.
 
 Global Variables
 ----------------
@@ -217,6 +260,8 @@ Global Variables
    * - ``LOCAL_MATRIX``, ``WORLD_MATRIX``
      - The names of a prim's two transforms, for ``rtx.stage.query_attributes``. Refer to
        :doc:`lua_rtx`.
+   * - ``self``
+     - The node itself: its memory and its statefulness. Refer to :ref:`spg-lua-self`.
 
 Logging Functions
 -----------------
@@ -237,13 +282,13 @@ file.
    * - ``print(...)``
      - Log arguments at VERBOSE level.
    * - ``assert(cond, msg)``
-     - Assert a condition; logs an error on failure.
+     - Assert a condition. On failure it logs an error and raises it, which stops the node's graph.
 
 **Only warnings are visible by default.** At the renderer's default log level ``info`` and ``print``
 are not printed, so a script that reports through them looks silent whether it ran or not. Raise
 the log level, or use ``warning`` while you are debugging.
 
-**The script runs once per rendered frame**, not once per host ``step``. A single step can render
+**The launch function runs once per rendered frame**, not once per host ``step``. A single step can render
 several frames while the image converges, so anything logged unconditionally arrives many times
 over. ``rtx.frameId`` counts those rendered frames.
 
@@ -266,12 +311,16 @@ on a script's data against the same limits: ``rtx.stage.query_attributes`` count
 per prim path and attribute name, and an array in the launch table counts its elements against
 the instruction limit and its size against the memory limit. These limits are fixed.
 
-A script that reaches one of these limits fails its node, including when the limit is reached
-inside a function passed to ``cuda.static`` or ``slang.static``, and the node stops: the log
-says once that it is stopped, and the node does not run its script again until the stage's SPG
-setup changes, such as a node's source asset or connections, or the stage is opened again. Keep
-the script to validation, output descriptions and building the launch table; the work belongs in
-the GPU source.
+A script that reaches one of these limits stops the node's graph, including when the limit is
+reached inside a function passed to ``cuda.static`` or ``slang.static``. The log names the node
+and the limit, and the graph retains that reason. The stopped node retries when one of its own
+value-inputs changes or its graph is rebuilt. Writing an equal value or editing another node
+keeps it stopped; refer to
+:ref:`a graph stopped after one failure <spg-symptom-graph-stopped>`. Keep the script to
+validation, output descriptions and building the launch table; the work belongs in the GPU source.
+
+A launch script must be Lua source text. A file of precompiled Lua bytecode, as ``luac``
+writes it, is rejected and its node's graph stops.
 
 Before a script runs, its source is scanned for forbidden constructs. The scan is a plain
 substring match over the whole file, **including comments and identifiers**, so a comment
@@ -283,7 +332,7 @@ Editor Support
 
 ovrtx ships a ``.luarc/`` folder, under ``docs/spg/.luarc/``, with type stubs for the Lua
 Language Server declaring the globals SPG injects at runtime (``cuda``, ``slang``, ``rtx``,
-``info``, ``warning``, ``LOCAL_MATRIX``, ``WORLD_MATRIX``). Any editor with a Lua Language Server integration can use them for
+``self``, ``info``, ``warning``, ``LOCAL_MATRIX``, ``WORLD_MATRIX``). Any editor with a Lua Language Server integration can use them for
 completions, hover hints and diagnostics when authoring launch scripts.
 
 To enable it for your own project:
@@ -300,7 +349,7 @@ To enable it for your own project:
         "<path-to-spg-luarc>"
       ],
       "Lua.workspace.checkThirdParty": false,
-      "Lua.diagnostics.globals": ["cuda", "slang", "rtx", "info", "warning", "LOCAL_MATRIX", "WORLD_MATRIX"],
+      "Lua.diagnostics.globals": ["cuda", "slang", "rtx", "self", "info", "warning", "LOCAL_MATRIX", "WORLD_MATRIX"],
       "Lua.diagnostics.disable": ["lowercase-global"]
     }
 
@@ -315,9 +364,7 @@ Fill in the placeholder as follows:
    * - ``<path-to-spg-luarc>``
      - Absolute path to the SPG ``.luarc`` folder shipped with ovrtx, the ``docs/spg/.luarc`` directory.
 
-``Lua.runtime.version`` is ``"Lua 5.4"`` because that is the version of the SPG Lua runtime.
-
 Once the file is saved, the language server resolves ``cuda.kernel(...)`` and
-``slang.dispatch(...)``, recognizes the SPG globals, and stops flagging them as undefined. If
+``slang.compute(...)``, recognizes the SPG globals, and stops flagging them as undefined. If
 completions do not appear, restart the Lua Language Server so it picks up the new
 configuration.

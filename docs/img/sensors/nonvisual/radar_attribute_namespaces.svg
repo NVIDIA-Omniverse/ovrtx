@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1188" height="630" viewBox="0 0 1188 630" role="img" aria-labelledby="title desc">
+<title id="title">Radar attribute namespaces</title>
+<desc id="desc">A tree with one OmniRadar prim at the root and three branches: omni:sensor:* with the seven identification and rate attributes, omni:sensor:WpmDmat:* with its six per-sensor attributes, the three output attributes highlighted, and omni:sensor:WpmDmat:scan:s001:* and :s002:* instance branches that each hold the per-scan attributes.</desc>
+<rect width="1188" height="630" fill="#fff"/>
+<rect x="394" y="28" width="400" height="56" rx="6" fill="#313131"/>
+<text x="594" y="51" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#fff" text-anchor="middle" font-weight="bold">OmniRadar prim</text>
+<text x="594" y="72" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#C0C0C0" text-anchor="middle">OmniSensorGenericRadarWpmDmatAPI</text>
+<line x1="594" y1="84" x2="594" y2="108" stroke="#9A9A9A" stroke-width="1.5"/>
+<line x1="122" y1="108" x2="826" y2="108" stroke="#9A9A9A" stroke-width="1.5"/>
+<line x1="122" y1="108" x2="122" y2="124" stroke="#9A9A9A" stroke-width="1.5"/>
+<rect x="32" y="124" width="180" height="40" rx="6" fill="#757575"/>
+<text x="122" y="148.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">omni:sensor:*</text>
+<text x="122" y="180" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">shared by every sensor model</text>
+<line x1="354" y1="108" x2="354" y2="124" stroke="#9A9A9A" stroke-width="1.5"/>
+<rect x="232" y="124" width="244" height="40" rx="6" fill="#757575"/>
+<text x="354" y="148.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">omni:sensor:WpmDmat:*</text>
+<text x="354" y="180" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">once per sensor</text>
+<line x1="826" y1="108" x2="826" y2="124" stroke="#9A9A9A" stroke-width="1.5"/>
+<rect x="496" y="124" width="660" height="40" rx="6" fill="#757575"/>
+<text x="826" y="148.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">omni:sensor:WpmDmat:scan:&lt;instance&gt;:*</text>
+<text x="826" y="180" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">once per scan instance, under the instance name</text>
+<rect x="32" y="192" width="180" height="166" rx="6" fill="#F2F2F2"/>
+<text x="46" y="214" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">modelName</text>
+<text x="46" y="236" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">modelVendor</text>
+<text x="46" y="258" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">modelVersion</text>
+<text x="46" y="280" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">marketName</text>
+<text x="46" y="302" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">frameRate</text>
+<text x="46" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">startTime</text>
+<text x="46" y="346" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">frameLimit</text>
+<rect x="232" y="192" width="244" height="180" rx="6" fill="#F2F2F2"/>
+<rect x="240" y="200" width="228" height="90" rx="6" fill="#fff" stroke="#76B900" stroke-width="2"/>
+<text x="458" y="215" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" text-anchor="end" font-weight="bold">output group</text>
+<text x="246" y="237" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">elementsCoordsType</text>
+<text x="246" y="259" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">outputFrameOfReference</text>
+<text x="246" y="281" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">customFrameOfReferenceTrafo</text>
+<text x="246" y="312" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">waveLengthMm</text>
+<text x="246" y="334" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">traceTreeDepth</text>
+<text x="246" y="356" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">cfarMode</text>
+<line x1="656" y1="164" x2="656" y2="214" stroke="#9A9A9A" stroke-width="1.5"/>
+<rect x="496" y="214" width="320" height="326" rx="6" fill="#F2F2F2"/>
+<text x="510" y="238" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" font-weight="bold">s001</text>
+<text x="510" y="256" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">brought by the main schema, which prepends</text>
+<text x="510" y="272" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575">OmniSensorGenericRadarWpmDmatScanCfgAPI:s001</text>
+<line x1="506" y1="284" x2="806" y2="284" stroke="#C0C0C0" stroke-width="1"/>
+<text x="510" y="304" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">sampling and power</text>
+<text x="802" y="304" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">raysPerDeg</text>
+<text x="510" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">processing mode</text>
+<text x="802" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">datacubeMode</text>
+<text x="510" y="344" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">field of view and range</text>
+<text x="802" y="344" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">maxAzAngDeg</text>
+<text x="510" y="364" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">resolution and bins</text>
+<text x="802" y="364" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">rangeResM</text>
+<text x="510" y="384" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">aliasing</text>
+<text x="802" y="384" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">enableRangeAliasing</text>
+<text x="510" y="404" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">velocity sequence and RCS</text>
+<text x="802" y="404" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">maxVelMpsSequence</text>
+<text x="510" y="424" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">CFAR cells</text>
+<text x="802" y="424" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">cfarRnT</text>
+<text x="510" y="444" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">noise</text>
+<text x="802" y="444" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">rangeNoiseSDev</text>
+<text x="510" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">waveform</text>
+<text x="802" y="464" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">chirpDuration</text>
+<text x="510" y="484" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">Tx/Rx elements</text>
+<text x="802" y="484" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">txAntennaGainMode</text>
+<text x="510" y="504" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">gain grids</text>
+<text x="802" y="504" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">txAntennaCoGain</text>
+<text x="510" y="524" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">aperture</text>
+<text x="802" y="524" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">apertureArrayAzimuthElements</text>
+<line x1="996" y1="164" x2="996" y2="214" stroke="#9A9A9A" stroke-width="1.5"/>
+<rect x="836" y="214" width="320" height="326" rx="6" fill="#F2F2F2"/>
+<text x="850" y="238" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" font-weight="bold">s002</text>
+<text x="850" y="256" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">applied separately, as a second instance</text>
+<text x="850" y="272" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575">OmniSensorGenericRadarWpmDmatScanCfgAPI:s002</text>
+<line x1="846" y1="284" x2="1146" y2="284" stroke="#C0C0C0" stroke-width="1"/>
+<text x="850" y="304" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">sampling and power</text>
+<text x="1142" y="304" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">raysPerDeg</text>
+<text x="850" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">processing mode</text>
+<text x="1142" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">datacubeMode</text>
+<text x="850" y="344" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">field of view and range</text>
+<text x="1142" y="344" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">maxAzAngDeg</text>
+<text x="850" y="364" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">resolution and bins</text>
+<text x="1142" y="364" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">rangeResM</text>
+<text x="850" y="384" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">aliasing</text>
+<text x="1142" y="384" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">enableRangeAliasing</text>
+<text x="850" y="404" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">velocity sequence and RCS</text>
+<text x="1142" y="404" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">maxVelMpsSequence</text>
+<text x="850" y="424" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">CFAR cells</text>
+<text x="1142" y="424" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">cfarRnT</text>
+<text x="850" y="444" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">noise</text>
+<text x="1142" y="444" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">rangeNoiseSDev</text>
+<text x="850" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">waveform</text>
+<text x="1142" y="464" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">chirpDuration</text>
+<text x="850" y="484" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">Tx/Rx elements</text>
+<text x="1142" y="484" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">txAntennaGainMode</text>
+<text x="850" y="504" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">gain grids</text>
+<text x="1142" y="504" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">txAntennaCoGain</text>
+<text x="850" y="524" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">aperture</text>
+<text x="1142" y="524" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">apertureArrayAzimuthElements</text>
+<text x="32" y="596" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">No attribute name appears at two levels: a value authored at the wrong level is read by nothing.</text>
+<rect x="771" y="587" width="10" height="10" rx="2" fill="#fff" stroke="#76B900" stroke-width="2"/>
+<text x="789" y="596" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">output group: the three attributes that reshape the output</text>
+</svg>

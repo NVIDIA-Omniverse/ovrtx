@@ -85,7 +85,7 @@ TEST_F(StageMutationTest, AttachedUpdateLoop) {
         ovrtx_update_from_stage(renderer_, ordinal);
     ASSERT_API_SUCCESS(update.status);
 
-    ovrtx_step_result_handle_t step_results = OVRTX_INVALID_HANDLE;
+    ovrtx_step_result_handle_t step_results{};
     ovrtx_enqueue_result_t step = ovrtx_step_with_stage(
         renderer_, products, 1.0 / 60.0, ordinal, &step_results);
     ASSERT_API_SUCCESS(step.status);

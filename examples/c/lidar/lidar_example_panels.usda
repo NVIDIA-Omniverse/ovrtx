@@ -1,0 +1,284 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    startTimeCode = 0
+    endTimeCode = 1
+    timeCodesPerSecond = 10
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+# An alternative scene for the lidar example, selected with "--scene": the same
+# lidar and the same PointCloud request as lidar_example.usda, standing among
+# panels of different materials. Every Material prim carries both the
+# non-visual label the sensor reads and a visual shader the PreviewCamera
+# renders, so the scene serves the sensor and a camera from one description.
+def Xform "World"
+{
+    # [snippet:configure-lidar-panels-sensor]
+    def OmniLidar "Lidar" (
+        prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+    )
+    {
+        token omni:sensor:Core:elementsCoordsType = "CARTESIAN"
+        bool omni:sensor:Core:includeInvalidPoints = false
+        double2 omni:sensor:frameRate = (10, 1)
+        float omni:sensor:Core:reflectionPowerFraction = 1.0
+
+        double3 xformOp:translate = (0, 0, 1.5)
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+    # [/snippet:configure-lidar-panels-sensor]
+
+    def Mesh "GroundPlane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-200, -200, 0), (200, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Asphalt>
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-200, -200, 0), (200, -200, 0), (200, 200, 0), (-200, 200, 0)]
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.05)]
+    }
+
+    # [snippet:configure-lidar-panels-targets]
+    # A glass pane 3 m ahead of the lidar, with a concrete wall behind it.
+    def Mesh "GlassPane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(3, -1.5, 0), (3, 1.5, 2.5)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Glass>
+        normal3f[] normals = [(-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(3, 1.5, 0), (3, -1.5, 0), (3, -1.5, 2.5), (3, 1.5, 2.5)]
+        color3f[] primvars:displayColor = [(0.7, 0.85, 0.9)]
+    }
+    # The wall behind the glass pane.
+    def Mesh "ConcreteBackstop" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(6, -2, 0), (6, 2, 2.2)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Concrete>
+        normal3f[] normals = [(-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(6, 2, 0), (6, -2, 0), (6, -2, 2.2), (6, 2, 2.2)]
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+    }
+    # A silver panel to the right of the lidar (negative Y).
+    def Mesh "SilverPanel" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(-1.5, -3, 0), (1.5, -3, 3)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Silver>
+        normal3f[] normals = [(0, 1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(1.5, -3, 0), (-1.5, -3, 0), (-1.5, -3, 3), (1.5, -3, 3)]
+        color3f[] primvars:displayColor = [(0.9, 0.9, 0.9)]
+    }
+    # A wide concrete wall to the left of the lidar (positive Y).
+    def Mesh "ConcreteWall" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(-2.5, 4, 0), (2.5, 4, 3.5)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Concrete>
+        normal3f[] normals = [(0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-2.5, 4, 0), (2.5, 4, 0), (2.5, 4, 3.5), (-2.5, 4, 3.5)]
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+    }
+    # A concrete panel behind the lidar (negative X).
+    def Mesh "ConcretePanel" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = 1
+        float3[] extent = [(-3, -1.5, 0), (-3, 1.5, 2.5)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Concrete>
+        normal3f[] normals = [(1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-3, -1.5, 0), (-3, 1.5, 0), (-3, 1.5, 2.5), (-3, -1.5, 2.5)]
+        color3f[] primvars:displayColor = [(0.5, 0.5, 0.5)]
+    }
+    # [/snippet:configure-lidar-panels-targets]
+
+    def DistantLight "DistantLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float intensity = 4000
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    # Sky light for the camera product only; sensors do not use lights.
+    def DomeLight "Sky"
+    {
+        float inputs:intensity = 1000
+        color3f inputs:color = (0.78, 0.84, 0.95)
+    }
+
+    # The camera the CameraProduct below renders through. The lidar example steps
+    # only its sensor product; step the CameraProduct to see the scene.
+    def Camera "PreviewCamera"
+    {
+        float focalLength = 14.42
+        float horizontalAperture = 20.955
+        float verticalAperture = 11.787
+        float2 clippingRange = (0.1, 500)
+        matrix4d xformOp:transform = ( (0.521856, -0.853034, 0.000000, 0.000000), (0.207586, 0.126994, 0.969939, 0.000000), (-0.827390, -0.506168, 0.243350, 0.000000), (-7.000000, -5.200000, 3.300000, 1.000000) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    # [snippet:configure-lidar-panels-output]
+    def "Render"
+    {
+        def "Products"
+        {
+            def RenderProduct "LidarProduct"
+            {
+                rel camera = </World/Lidar>
+                rel orderedVars = [<../../Vars/PointCloud>]
+            }
+
+            def RenderProduct "CameraProduct"
+            {
+                rel camera = </World/PreviewCamera>
+                int2 resolution = (960, 540)
+                token omni:rtx:rendermode = "RealTimePathTracing"
+                rel orderedVars = [<../../Vars/LdrColor>]
+            }
+        }
+
+        def "Vars"
+        {
+            def RenderVar "PointCloud"
+            {
+                uniform string sourceName = "PointCloud"
+                token[] channels = [
+                    "Coordinates",
+                    "Intensity",
+                    "Counts",
+                    "TimeOffsetNs"
+                ]
+            }
+
+            def RenderVar "LdrColor"
+            {
+                uniform string sourceName = "LdrColor"
+            }
+        }
+    }
+    # [/snippet:configure-lidar-panels-output]
+
+    # [snippet:configure-lidar-panels-materials]
+    # One Material prim serves two systems: the omni:simready:nonvisual labels are
+    # what the lidar reads, the MDL shader is what the camera renders.
+    def Xform "Materials"
+    {
+        def Material "Asphalt"
+        {
+            token omni:simready:nonvisual:base = "asphalt"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.07, 0.07, 0.08)
+                float inputs:reflection_roughness_constant = 0.95
+                float inputs:metallic_constant = 0
+                token outputs:out
+            }
+        }
+        def Material "Concrete"
+        {
+            token omni:simready:nonvisual:base = "concrete"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Concrete/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Concrete/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Concrete/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.58, 0.56, 0.52)
+                float inputs:reflection_roughness_constant = 0.9
+                float inputs:metallic_constant = 0
+                token outputs:out
+            }
+        }
+        def Material "Glass"
+        {
+            token omni:simready:nonvisual:base = "clear_glass"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Glass/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Glass/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Glass/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniGlass.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniGlass"
+                color3f inputs:glass_color = (0.82, 0.93, 0.96)
+                float inputs:glass_ior = 1.5
+                bool inputs:thin_walled = true
+                token outputs:out
+            }
+        }
+        def Material "Silver"
+        {
+            token omni:simready:nonvisual:base = "silver"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Silver/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Silver/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Silver/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.93, 0.93, 0.92)
+                float inputs:reflection_roughness_constant = 0.12
+                float inputs:metallic_constant = 1
+                token outputs:out
+            }
+        }
+    }
+    # [/snippet:configure-lidar-panels-materials]
+}

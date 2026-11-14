@@ -16,7 +16,7 @@ function invert(inputs, outputs)
 
     outputs["Inverted"] = slang.image(inputs["Image"].shape, inputs["Image"].dtype)
 
-    return slang.dispatch({
+    return slang.compute({
         -- The bind list is positional. The parameter block comes first and
         -- carries the value-inputs in the order the shader's Params struct
         -- declares them; the resources follow in declaration order.

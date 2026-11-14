@@ -8,6 +8,8 @@
 .. without an express license agreement from NVIDIA CORPORATION or
 .. its affiliates is strictly prohibited.
 
+.. _sensors-cameras-render-modes-minimal:
+
 Minimal
 =======
 
@@ -19,6 +21,8 @@ that do not need full path-traced lighting.
 
    token omni:rtx:rendermode = "MinimalRendering"
 
+.. _sensors-cameras-render-modes-minimal-lighting:
+
 Lighting Behavior
 -----------------
 
@@ -27,6 +31,8 @@ Minimal mode only respects the first ``DistantLight`` found in the scene, and sh
 Other light types, such as ``DomeLight``, are not used for Minimal mode lighting. If the scene has no ``DistantLight``, Minimal mode falls back to a single camera light.
 
 For improved visibility without adding scene lights, use ambient lighting through the ``omni:rtx:sceneDb:ambientLightColor`` and ``omni:rtx:sceneDb:ambientLightIntensity`` attributes listed below, or disable shadows with ``omni:rtx:minimal:castShadows``.
+
+.. _sensors-cameras-render-modes-minimal-settings:
 
 Settings
 --------
@@ -57,6 +63,8 @@ Settings
 
 .. _minimal-anti-aliasing-dlss:
 
+.. _sensors-cameras-render-modes-minimal-dlss:
+
 Anti-Aliasing and DLSS
 ----------------------
 
@@ -67,14 +75,14 @@ DLSS is optional and disabled when ``omni:rtx:minimal:dlss:mode`` is unset or ze
 
 Use DLSS-SR for textured geometry when you want smoother edges or a larger output
 image from a lower internal render resolution. Use DLSS-RR when the image also
-needs denoising, particularly for Gaussian splats. Rendering Gaussian splats in
+needs denoising, particularly for Gaussians. Rendering Gaussians in
 Minimal mode requires ``omni:rtx:minimal:mode = 3`` for full material evaluation;
 DLSS-SR does not provide their denoising.
 
 Both controls belong to ``OmniRtxSettingsMinimalAPI_1``. Configure them on the
 **RenderProduct** that produces the image. These are Minimal-specific controls;
 ``omni:rtx:post:dlss:execMode`` and the
-Path-Tracing pixel filter do not select Minimal's DLSS behavior.
+Path Tracing pixel filter do not select Minimal's DLSS behavior.
 
 .. csv-table:: DLSS controls
    :header: "USD declaration", "Description"
@@ -97,7 +105,7 @@ Choose one of the following execution modes:
    "``quality``", "Uses a higher internal resolution than Balanced or Performance."
    "``rtxaa``", "Selects DLAA: anti-aliasing at native output resolution, without upscaling. Keep DLSS enabled with mode ``1`` or ``2``."
 
-.. figure:: ../../../img/minimal-dlss-comparison.png
+.. figure:: ../../../img/sensors/camera/minimal-dlss-comparison.avif
    :alt: Matching enlarged crops of Jetbot and Kaya with DLSS disabled, DLSS-SR Quality, DLSS-RR Quality, and DLAA.
    :width: 100%
 
@@ -115,13 +123,16 @@ works with the ovrtx Python and C APIs.
 .. tab-set::
 
    .. tab-item:: USDA
+      :sync: usda
 
       .. literalinclude:: ../../../../examples/python/minimal-dlss/minimal_dlss.usda
          :language: usda
          :start-after: # [snippet:doc-minimal-dlss-render-product]
          :end-before: # [/snippet:doc-minimal-dlss-render-product]
+         :prepend: #usda 1.0
 
-   .. tab-item:: Python
+   .. tab-item:: USD Python
+      :sync: python
 
       .. literalinclude:: ../../../../tests/docs/usd/test_minimal_dlss.py
          :language: python
@@ -139,3 +150,9 @@ guarantee a speedup for every scene or output size.
 See the :doc:`Minimal DLSS example <../../../examples/python_minimal_dlss>` for
 a runnable scene, image capture, and Rerun output. The
 :doc:`C example <../../../examples/c_minimal_dlss>` loads the same scene.
+
+Related
+-------
+
+- :doc:`../render_modes`
+- :doc:`../outputs`

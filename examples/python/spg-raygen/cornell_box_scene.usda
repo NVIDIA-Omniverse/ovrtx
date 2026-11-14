@@ -10,7 +10,7 @@
 # its affiliates is strictly prohibited.
 
 (
-    doc = "SPG raygen Cornell-box SHOWCASE (ovrtx). A closed room (floor, ceiling, back wall, left/right walls) with two ROTATED SOLID BOX prims, rendered by a single RaygenCornellBox SPG node using only standard ray-tracing intrinsics: one primary ray per pixel, the geometric normal recovered from two sideways probe rays, and a shadow ray toward the light. Surface colour is the recovered normal (encoded) modulated by N.L and shadowing, so each face's hue identifies its orientation: floor +Y (green-ish), ceiling -Y (magenta-ish), back wall +Z (blue-ish), left wall +X (red-ish), right wall -X (cyan-ish). The two blocks are real 6-sided meshes rotated about Y, so their faces are NOT axis aligned -- each face still resolves to its own correct normal, which is what proves the recovery works on ordinary solid geometry. Room spans x/y in [-200, 200], z in [-400, 100] (open toward the camera at z = 400)."
+    doc = "SPG raygen Cornell-box showcase (ovrtx). A five-sided room (floor, ceiling, back wall, left/right walls) with two rotated solid box prims, rendered by a single RaygenCornellBox SPG node using only standard ray-tracing intrinsics: one primary ray per pixel, the geometric normal recovered from two sideways probe rays, and a shadow ray toward the light. Surface colour is the recovered normal (encoded) modulated by N.L and shadowing, so each face's hue identifies its orientation: floor +Y (green-ish), ceiling -Y (magenta-ish), back wall +Z (blue-ish), left wall +X (red-ish), right wall -X (cyan-ish). The two blocks are 6-sided meshes rotated about Y, so their faces are not axis aligned; each face still resolves to its own correct normal. Room spans x/y in [-200, 200], z in [-400, 100] (open toward the camera at z = 400)."
     defaultPrim = "World"
     metersPerUnit = 0.01
     upAxis = "Y"
@@ -95,9 +95,8 @@ def Xform "World"
     }
 
     # ---------------------------------------------------------------------------------------------
-    # Two SOLID boxes standing on the floor, rotated about Y so their faces are not axis aligned. Each
-    # is one ordinary 6-sided mesh prim -- the kind of geometry a per-object normal could never
-    # describe, and exactly what the probe-ray recovery has to get right.
+    # Two solid boxes on the floor, rotated about Y so their faces are not axis aligned. Each
+    # is one 6-sided mesh prim.
     # ---------------------------------------------------------------------------------------------
 
     # Short block, right side: half extents 60, standing on the floor (centre y = -140).

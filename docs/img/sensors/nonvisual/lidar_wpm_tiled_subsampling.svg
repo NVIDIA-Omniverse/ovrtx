@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="514" viewBox="0 0 1000 514" role="img" aria-labelledby="title desc">
+<title id="title">What a tiledSubSampling factor of 2 keeps on the Lidar generic wpm model</title>
+<desc id="desc">Two panels. Left, a rotary scan: the emitter rows of one sweep drawn as ticks around the full revolution in firing order, one of every two kept and the other faded, so the kept rows are spread evenly over the complete scan and the sweep is still covered. Right, a solid-state scan: two firing patterns of eight rows each, one of every two rows kept inside each pattern independently, because only one pattern fires in a scan. The row counts are illustrative.</desc>
+<defs><marker id="arrow-757575-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#757575"/></marker></defs>
+<rect width="1000" height="514" fill="#fff"/>
+<rect x="24" y="24" width="540" height="430" rx="6" fill="#F2F2F2"/>
+<text x="40" y="52" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" font-weight="bold">Rotary</text>
+<text x="548" y="52" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#757575" text-anchor="end">tiledSubSampling = 2</text>
+<rect x="580" y="24" width="396" height="430" rx="6" fill="#F2F2F2"/>
+<text x="596" y="52" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" font-weight="bold">Solid-state</text>
+<text x="960" y="52" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#757575" text-anchor="end">tiledSubSampling = 2</text>
+<circle cx="214" cy="248" r="118" fill="none" stroke="#C0C0C0" stroke-width="1.5"/>
+<line x1="214" y1="130" x2="214" y2="116" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="244.54" y1="134.02" x2="249.72" y2="114.7" stroke="#76B900" stroke-width="2.5"/>
+<line x1="273" y1="145.81" x2="280" y2="133.68" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="297.44" y1="164.56" x2="311.58" y2="150.42" stroke="#76B900" stroke-width="2.5"/>
+<line x1="316.19" y1="189" x2="328.32" y2="182" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="327.98" y1="217.46" x2="347.3" y2="212.28" stroke="#76B900" stroke-width="2.5"/>
+<line x1="332" y1="248" x2="346" y2="248" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="327.98" y1="278.54" x2="347.3" y2="283.72" stroke="#76B900" stroke-width="2.5"/>
+<line x1="316.19" y1="307" x2="328.32" y2="314" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="297.44" y1="331.44" x2="311.58" y2="345.58" stroke="#76B900" stroke-width="2.5"/>
+<line x1="273" y1="350.19" x2="280" y2="362.32" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="244.54" y1="361.98" x2="249.72" y2="381.3" stroke="#76B900" stroke-width="2.5"/>
+<line x1="214" y1="366" x2="214" y2="380" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="183.46" y1="361.98" x2="178.28" y2="381.3" stroke="#76B900" stroke-width="2.5"/>
+<line x1="155" y1="350.19" x2="148" y2="362.32" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="130.56" y1="331.44" x2="116.42" y2="345.58" stroke="#76B900" stroke-width="2.5"/>
+<line x1="111.81" y1="307" x2="99.68" y2="314" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="100.02" y1="278.54" x2="80.7" y2="283.72" stroke="#76B900" stroke-width="2.5"/>
+<line x1="96" y1="248" x2="82" y2="248" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="100.02" y1="217.46" x2="80.7" y2="212.28" stroke="#76B900" stroke-width="2.5"/>
+<line x1="111.81" y1="189" x2="99.68" y2="182" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="130.56" y1="164.56" x2="116.42" y2="150.42" stroke="#76B900" stroke-width="2.5"/>
+<line x1="155" y1="145.81" x2="148" y2="133.68" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="183.46" y1="134.02" x2="178.28" y2="114.7" stroke="#76B900" stroke-width="2.5"/>
+<circle cx="214" cy="248" r="16" fill="#313131"/>
+<path d="M231,218.56 C232.51,219.82 237.55,223.18 240.05,226.15 C242.54,229.11 244.62,232.73 245.95,236.37 C247.28,240.01 248,244.12 248,248 C248,251.88 247.28,255.99 245.95,259.63 C244.62,263.27 242.54,266.89 240.05,269.85 C237.55,272.82 234.36,275.51 231,277.44 C227.64,279.38 223.72,280.81 219.9,281.48 C216.09,282.16 211.91,282.16 208.1,281.48 C204.28,280.81 200.36,279.38 197,277.44 C193.64,275.51 190.45,272.82 187.95,269.85 C185.46,266.89 183.38,263.27 182.05,259.63 C180.72,255.99 180,251.88 180,248 C180,244.12 180.72,240.01 182.05,236.37 C183.38,232.73 186.52,228.23 187.95,226.15 C189.39,224.06 190.23,224.24 190.68,223.86" fill="none" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<text x="214" y="306" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">complete sweep,</text>
+<text x="214" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">half the rows</text>
+<text x="214" y="200" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">sensor</text>
+<path d="M275.23,100.18 C277.34,101.16 283.76,103.93 287.88,106.08 C292,108.22 296.05,110.56 299.97,113.06 C303.89,115.55 307.71,118.23 311.4,121.06 C315.09,123.89 318.67,126.9 322.09,130.04 C325.52,133.18 328.82,136.48 331.96,139.91 C335.1,143.33 339.44,148.82 340.94,150.6" fill="none" stroke="#313131" stroke-width="1.5"/>
+<line x1="273.32" y1="104.8" x2="277.14" y2="95.56" stroke="#313131" stroke-width="1.5"/>
+<line x1="336.97" y1="153.64" x2="344.9" y2="147.55" stroke="#313131" stroke-width="1.5"/>
+<text x="318.71" y="107.54" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">one quantile of the sweep:</text>
+<text x="318.71" y="125.54" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">two rows, one kept</text>
+<text x="214" y="414" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">24 rows in firing order, 12 kept</text>
+<text x="214" y="432" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">spread evenly over the whole scan</text>
+<rect x="614" y="80" width="150" height="318" rx="8" fill="#fff" stroke="#C0C0C0" stroke-width="2"/>
+<text x="689" y="102" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">pattern 1</text>
+<text x="689" y="119" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">8 rows</text>
+<circle cx="689" cy="142" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="689" y="146" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">1</text>
+<circle cx="689" cy="172" r="10" fill="#76B900"/>
+<text x="689" y="176" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<circle cx="689" cy="202" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="689" y="206" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">3</text>
+<circle cx="689" cy="232" r="10" fill="#76B900"/>
+<text x="689" y="236" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<circle cx="689" cy="262" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="689" y="266" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">5</text>
+<circle cx="689" cy="292" r="10" fill="#76B900"/>
+<text x="689" y="296" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">6</text>
+<circle cx="689" cy="322" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="689" y="326" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">7</text>
+<circle cx="689" cy="352" r="10" fill="#76B900"/>
+<text x="689" y="356" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">8</text>
+<text x="689" y="388" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" text-anchor="middle">4 of 8 kept</text>
+<rect x="790" y="80" width="150" height="318" rx="8" fill="#fff" stroke="#C0C0C0" stroke-width="2"/>
+<text x="865" y="102" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">pattern 2</text>
+<text x="865" y="119" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">8 rows</text>
+<circle cx="865" cy="142" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="865" y="146" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">1</text>
+<circle cx="865" cy="172" r="10" fill="#76B900"/>
+<text x="865" y="176" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<circle cx="865" cy="202" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="865" y="206" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">3</text>
+<circle cx="865" cy="232" r="10" fill="#76B900"/>
+<text x="865" y="236" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<circle cx="865" cy="262" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="865" y="266" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">5</text>
+<circle cx="865" cy="292" r="10" fill="#76B900"/>
+<text x="865" y="296" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">6</text>
+<circle cx="865" cy="322" r="10" fill="#fff" stroke="#9A9A9A" stroke-width="1.5"/>
+<text x="865" y="326" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">7</text>
+<circle cx="865" cy="352" r="10" fill="#76B900"/>
+<text x="865" y="356" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle" font-weight="bold">8</text>
+<text x="865" y="388" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" text-anchor="middle">4 of 8 kept</text>
+<text x="778" y="422" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">one row of every two, inside each pattern</text>
+<text x="778" y="440" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">only one pattern fires in a scan</text>
+<rect x="24" y="474" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="47" y="484.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">kept: still fired at factor 2</text>
+<line x1="222.08" y1="480" x2="238.08" y2="480" stroke="#9A9A9A" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="245.08" y="484.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">dropped by the factor</text>
+</svg>

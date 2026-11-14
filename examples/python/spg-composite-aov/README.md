@@ -11,15 +11,15 @@ bar chart on the `Histogram` AOV.
 
 ![the lidar scene](../../../img/example-spg-composite-aov-scene.png)
 
-`_output/scene.png` is the scene: a sensor post and two boxes, and nothing else at all. The
-orange post is the sensor, standing 1 m tall at the origin. The grey box is 6 m away and
+`_output/scene.png` is the scene: a sensor post and two boxes. The
+orange post marks the sensor, which sits 1 m up at the origin. The grey box is 6 m away and
 1.5 m across; the tan box is 12 m away and 3 m across, which is why it looks the larger of
 the two. This picture comes from a second render product with an ordinary camera, since the
 lidar product's camera is the sensor and has no colour output.
 
 The post itself is inside the sweep's blind zone and never appears in the data. The steepest
 beam leaves at -15 degrees elevation, so by the time it reaches the post's radius it is
-still 0.89 m up, and the post stops at 0.7 m.
+still 0.91 m up, and the post stops at 0.7 m.
 
 ![returns by distance](../../../img/example-spg-composite-aov.png)
 
@@ -27,7 +27,7 @@ still 0.89 m up, and the post stops at 0.7 m.
 across, returns per bin up. Two bars, one per box, at 5.25 m and 10.5 m. Those are the front
 faces, half a box nearer than the centres, because the face is what the beams actually hit.
 
-The two bars come out the same height without any tuning. The far box is twice as far and
+The two bars come out the same height. The far box is twice as far and
 twice as wide, so it covers the same angle of the sweep and collects the same number of
 beams. Distance is the only thing separating the two.
 
@@ -36,12 +36,9 @@ back, so what the node publishes stays plain data.
 
 ## Why the scene looks like that
 
-The scene is spare on purpose, and each piece of it is what makes the chart legible.
-
 **There is no ground.** A flat plane returns from every downward beam, each elevation angle
-meeting it at its own distance. That filled the near half of the chart with roughly 200,000
-returns and buried the boxes under them. With the ground gone the sweep returns 26,000
-points and every one of them is a box.
+meeting it at its own distance, and would bury the boxes under near returns. Without it every
+return is a box.
 
 **The boxes sit at different bearings.** Head on, the near box would stand exactly in front
 of the far one and hide it: at 6 m a 1.5 m box and at 12 m a 3 m box cover the same 14
@@ -51,10 +48,6 @@ degrees of azimuth.
 Its front face then lies at a single distance. Left axis aligned at these bearings the far
 box smears across a metre of range, because a 3 m wide face seen at an angle has its far
 corner further away than its near corner, and its side face further away still.
-
-None of this is done by filtering the data. The kernel counts every entry up to `Counts[0]`,
-the host check re-counts all of them, and neither drops a return by range, intensity or
-anything else. The scene is what makes the chart clean.
 
 ## Files
 
@@ -80,20 +73,8 @@ uv run main.py                                 # CUDA
 uv run main.py --scene lidar_scene_slang.usda    # Slang
 ```
 
-```
-channels: ['Coordinates', 'Intensity', 'Counts', 'TimeOffsetNs', 'Flags']
-Coordinates [3, 921600], Counts [1] = 25989 valid points
-Intensity [921600], 0.0534..0.0985 (unused by the node)
-returns binned: 25989 of 25989, busiest bin 13029, returns span 5.26..10.8 m
-bar heights vs an independent count: largest difference 0 px
-```
-
-How many returns a sweep produces varies between runs. What does not is that the two counts in `returns binned: N of N` agree, and that the bar heights match an independent host-side count exactly.
-
-Both lines are checks. Every valid return was binned, which holds only if the loop was
-bounded by `Counts`. And the bars match, bar for bar, a histogram `main.py` builds on the
-host from the same channels. Read the layout or the bound wrong and both numbers move while
-the chart still looks plausible.
+A successful run writes `_output/histogram.png`, the node's chart with axes and labels drawn
+around it, and `_output/scene.png`, the camera's view of the same scene.
 
 ## Two render products
 
@@ -112,29 +93,25 @@ and takes a few steps to settle.
 | `Intensity` | `[Nmax]` | strength of the return, one value per point. |
 | `Counts` | `[1]` | one number for the whole sweep: how many entries of the other channels were filled. |
 | `TimeOffsetNs` | `[Nmax]` | per point, where in the sweep it was measured. |
-| `Flags` | `[Nmax]` | per point. |
-
-`Counts` is buffer metadata, not a measurement. It says how far into the arrays the real
-data goes, and bounding iteration is all it is for.
+| `Flags` | `[Nmax]` | status bits per point; the `VALID` bit (`0x40`) marks a valid return. |
 
 The scene sets `includeInvalidPoints = false` on the sensor, so the sensor model delivers
 only valid returns and `Counts` bounds exactly them. Set it to `true` and the arrays come
 back capacity-shaped with validity carried by the `Flags` channel, which a consumer then has
-to test per point. That setting is the one place anything is discarded, and it is the sensor
-doing it, before the composite is published.
+to test per point.
 
 Each `renderer.step()` produces one sweep. `Counts[0]` and the channels are refilled every
 frame; nothing accumulates.
 
 ## Consuming a composite
 
-**The scene decides which channels exist.** The `channels` attribute on the `PointCloud`
-RenderVar lists them. Ask for a channel there and it appears; leave it out and it does not.
-This node uses `Coordinates` and `Counts`; the scene also asks for `Intensity`, which
-`main.py` reads from the host without the node touching it.
+**The scene asks for the channels it needs.** The `channels` attribute on the `PointCloud`
+RenderVar lists them, and each one the lidar supports appears. The lidar adds `Counts` and
+`Flags` of its own. This node uses `Coordinates` and `Counts`; the scene also asks for
+`Intensity` and `TimeOffsetNs`, which the node leaves untouched and the host can read on its own.
 
-**The shader definition declares an ordinary `opaque` port.** Nothing in it says
-"composite". That comes from the RenderVar it is connected to, so the same node can be
+**The shader definition declares an `opaque` port.** Whether the input is a composite
+comes from the RenderVar it is connected to, so the same node can be
 pointed at a different sensor without editing the shader.
 
 **The launch script discovers the rest:**
@@ -145,9 +122,9 @@ inputs["PointCloud"].isComposite   -- true only for a composite
                     .channelNames  -- what this composite actually carries
 ```
 
-Each channel is an ordinary resource descriptor and binds like any other buffer:
+Each channel is a resource descriptor and binds like any other buffer:
 `cuda.array(channel)` on CUDA, `slang.StructuredBuffer(channel)` on Slang. That binder name
-is the only difference between the two backends; the discovery surface is identical.
+is the main difference between the two backends; the channels are found the same way on both.
 
 **Bound the work by `Counts`.** `Coordinates` is allocated for the worst case, `[3, Nmax]`,
 and only the first `Counts[0]` entries hold a return. The launch script cannot apply the
@@ -169,9 +146,9 @@ points. Using the valid count as the stride silently reads the wrong coordinates
 32 bins over 12.8 m are 0.4 m wide, which puts each box's front face inside a bin rather
 than on a boundary, where the sensor's range noise would split one bar into two.
 
-`main.py` prints the busiest bin and the span of the returns, so `maxCount` and `maxRange`
-can be retuned for another sensor or scene. It also holds copies of all three, because the check
-rebuilds the same histogram on the host.
+The labelled chart states how many returns the sweep produced and how far the furthest one is,
+which is what `maxRange` and `maxCount` are retuned from for another sensor or scene. `main.py`
+holds copies of all three, because it labels the axes from them.
 
 ## One thread per output column
 
@@ -180,14 +157,15 @@ including the background. That costs one pass over the points per column, where 
 histogram would have every point atomically increment a shared bin.
 
 In exchange there are no atomics, no dependence on the output arriving cleared, and no
-sensitivity to the order threads run in, which is why the two backends agree exactly.
+sensitivity to the order threads run in.
 
 ## Motion BVH
 
 A sweep is traced across the tick rather than captured at an instant, so without the motion
 BVH the lidar returns no points at all: `Counts` comes back zero and the node publishes an
 empty chart instead of failing. `main.py` creates the renderer with
-`motion_bvh=ovrtx.MotionBvh.ENABLE` and prints the point count so a zero is visible.
+`motion_bvh=ovrtx.MotionBvh.ENABLE`, and the labelled chart states the point count, so a zero is
+visible.
 
 ## Reading the composite from Python
 

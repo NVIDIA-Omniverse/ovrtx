@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: configuring-lidar-sensors
 description: >
   Authoring and configuring OmniLidar sensor prims and lidar PointCloud render outputs.
   Use when user asks to create a lidar scene, configure an OmniLidar prim, choose lidar
   output frame/coordinate behavior, or request lidar PointCloud channels.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -87,9 +80,9 @@ The same USDA scene pattern is used from Python and C; the language-specific cod
 
 > **Source:** `examples/c/lidar/lidar_example.usda` snippet `configure-lidar-sensor`
 
-Use `OmniSensorGenericLidarCoreAPI` for the generic lidar model. Add emitter-state API schemas only when authoring custom firing patterns with explicit emitter state arrays.
+Use `OmniSensorGenericLidarCoreAPI` for the Lidar generic core model. Add emitter-state API schemas only when authoring custom firing patterns with explicit emitter state arrays.
 
-In Z-up scenes, keep the physical scene Z-up and rotate the lidar prim so sensor `+X` points along the intended forward direction. Avoid changing the output frame just to satisfy visualization; choose the frame based on the data contract the application needs.
+In Z-up scenes, keep the physical scene Z-up and rotate the lidar prim so that its local `-Z`, the prim's forward direction, points along the intended forward direction with `+Y` up; the lidar example authors `xformOp:rotateXYZ = (90, 0, -90)` to look along world `+X`, and the delivered points are expressed in the output's sensor frame, `+X` forward. Avoid changing the output frame just to satisfy visualization; choose the frame based on the data contract the application needs.
 
 ## Output Attributes
 
@@ -98,21 +91,25 @@ These attributes, among others, live on the lidar prim with the `omni:sensor:Cor
 | Attribute | Values / Shape | Use |
 |---|---|---|
 | `elementsCoordsType` | `CARTESIAN`, `SPHERICAL` | Coordinate representation for basic output elements. |
-| `outputMotionCompensationState` | `NONCOMPENSATED`, `COMPENSATED` | Motion compensation state for all outputs, including auxiliary data. |
-| `outputFrameOfReference` | `SENSOR`, `WORLD`, `CUSTOM` | Frame of reference for all outputs. Prefer `SENSOR` when downstream consumers expect sensor-frame points. |
+| `outputMotionCompensationState` | `NONCOMPENSATED`, `COMPENSATED` | Motion compensation state for `Coordinates`, `HitNormal` and `Velocity` (see PointCloud Render Output). |
+| `outputFrameOfReference` | `SENSOR`, `WORLD`, `CUSTOM` | Frame of reference for `Coordinates`; `HitNormal` and `Velocity` are rotated into it too (see PointCloud Render Output). Prefer `SENSOR` when downstream consumers expect sensor-frame points. |
 | `customFrameOfReferenceTrafo` | `[x, y, z, roll, pitch, yaw]` | Custom transform used only with `outputFrameOfReference = CUSTOM`. |
-| `includeInvalidPoints` | `true`, `false` | When `false` (the default), the model drops invalid lidar returns before output. When `true`, invalid returns are preserved in the point tensors and consumers must use the `Flags` channel's `VALID` bit to distinguish valid from invalid entries. |
+| `includeInvalidPoints` | `true`, `false` | When `false` (the default), the model drops invalid lidar returns before output. When `true`, invalid returns are preserved in the point tensors and consumers must use the `Flags` channel's `VALID` (`0x40`) bit to distinguish valid from invalid entries. |
 
 OmniLidar prims expose many additional sensor, scan, and emitter attributes for range, angular coverage, resolution, timing, firing patterns, and model-specific behavior. Preserve existing attributes when editing a tuned sensor, and author model-specific values from the schema when the example defaults are not enough.
 
-For the full schema-derived attribute list, read `schemas/omni_sensors/schema.usda`.
+For what every attribute means, its unit and how it relates to the others, read the product reference:
+[USD Attributes](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/attributes.html). The exhaustive tables with each attribute's type, default and tokens are generated into
+[Sensor API Schemas](https://nvidia-omniverse.github.io/ovrtx/sensors/reference/schemas.html).
 
 ## Output Behavior
 
 | Attribute | Default | Use |
 |---|---:|---|
-| `partialOutputs` | `true` | Emit the part of the scan covered by the current step. If `false`, output only when the full scan is complete. |
-| `instantLidar` | `false` | Emit a full scan every frame. Useful for simple demonstrations, but not representative of a time-resolved scan. |
+| `partialOutputs` | `false` | Accumulate a scan. Set `true` to emit the part covered by each step. |
+| `instantLidar` | `false` | Emit a full scan every frame. Useful for simple demonstrations, but not representative of a time-resolved scan. Firing uses the supplied interval's start time, with zero point time offsets. See [instant lidar](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/howto/output_shaping.html#sensors-lidar-core-instant-lidar) for pose and timing details. |
+
+See [output cadence](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/howto/output_shaping.html#sensors-output-shaping-lidar-timing) for the three cadences and what a mid-scan step delivers.
 
 ## PointCloud Render Output
 
@@ -136,19 +133,26 @@ Common lidar channels:
 | `Flags` | Per-point flags. |
 | `EmitterId`, `ChannelId`, `TickId`, `EchoId` | Emitter, detector/channel, scan tick, and return identifiers. |
 | `MaterialId`, `ObjectId` | Hit material and object identifiers. |
-| `HitNormal`, `Velocity` | Surface normal and velocity at the hit point. |
-| `TickState` | State of the scan tick. |
+| `HitNormal`, `Velocity` | Unit surface normal at the hit point, and the hit point's velocity relative to the sensor (the sensor's own motion subtracted). |
+| `TickState` | Zero-based index of the emitter state that fired the point; on a solid-state sensor all points of a scan carry the state selected for that scan. |
 | `Counts` | Delivered point entry count used to bound every per-point tensor. With default invalid-point dropping, it is also the valid-point count. |
+
+Naming a channel in `token[] channels` is what fills it. The Lidar generic core model writes `EmitterId`, `ChannelId`, `TickId`, `EchoId`, `TickState`, `MaterialId` and `ObjectId` for every valid return whenever the RenderVar names them, and computes `HitNormal` and `Velocity` whenever a `PointCloud` RenderVar requests them; no attribute switches any of them on or off. The model applies `outputFrameOfReference` and `outputMotionCompensationState` to those two along with `Coordinates` in every combination, `CUSTOM` with `NONCOMPENSATED` included.
+
+A `PointCloud` output carries exactly the channels its RenderVar's `channels` list names, plus `Counts` and `Flags`, which the model adds on its own; the [channel table](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/outputs.html#sensors-nonvisual-lidar-core-outputs-channels) on the Outputs page lists every channel with its type, shape and unit.
 
 ## Troubleshooting
 
-- Output-defining attributes are not intended for runtime mutation; author them in USD before loading the scene.
+- Output-defining attributes (`elementsCoordsType`, `outputFrameOfReference`, `customFrameOfReferenceTrafo`, `outputMotionCompensationState`, `includeInvalidPoints`) can be edited on a running sensor and apply from the next frame; the frame in flight keeps the old values. With `partialOutputs = false`, the step that completes a scan converts every point of that scan with its own coordinate representation, frame of reference, custom transform and motion compensation state, so an edit made mid-scan applies to the whole delivered scan, points traced before the edit included. See [Configure Lidar Output](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/howto/output_shaping.html#sensors-output-shaping-runtime-changes).
+- `scanType` cannot be changed on a running sensor: an update naming the other scanning principle is rejected whole, so author it in USD before loading the scene and recreate the sensor to change it. `rayType` is read when the model is first set up and cannot move between `IDEALIZED` and a beam ray type on a running sensor, so author `rayType` in USD as well and recreate the sensor to change it.
+- If a Lidar generic core model sensor produces no output, check the log for an initial parameter-validation error. Correct the parameters on the existing prim and publish the update to initialize the sensor. Typical causes are an emitter-state array that is neither empty nor `numberOfEmitters` long, fire times that decrease or run past one tick period, more distinct `channelId` values across the emitter states than `numberOfChannels`, and a positive `omni:sensor:frameRate` below 0.466 Hz. See [parameter validation](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/attributes.html#sensors-lidar-core-invalid-parameters).
 - `PointCloud` contains requested payload channels plus model-added `Counts` and `Flags`. If a downstream reader expects `Intensity` or `TimeOffsetNs`, include those names in `token[] channels`.
 - `Counts` defines the delivered range in per-point tensors. Do not iterate over the full tensor allocation.
-- If `includeInvalidPoints = true`, `Counts` bounds the delivered entries, but entries inside that range can still be invalid; test `Flags[i] & VALID` before consuming point attributes that require a real return.
-- MotionBVH is required for correct lidar motion effects. Static scenes may run without it, but moving objects or motion compensation need MBVH enabled through the renderer configuration.
+- If `includeInvalidPoints = true`, `Counts` bounds the delivered entries, but entries inside that range can still be invalid; test the `VALID` (`0x40`) bit, `Flags[i] & 0x40`, before consuming point attributes that require a real return.
+- MotionBVH is required for correct lidar motion effects. Without it the lidar still delivers points, each traced from the sensor's pose at the end of its frame against a scene that does not move, and the model logs a warning once, so a non-zero `Counts[0]` does not show that MBVH is on. Static scenes may run without it, but a moving sensor, moving objects or motion compensation need MBVH enabled through the renderer configuration.
 - Lidar output frame and visualizer frame are separate concerns. If output is in `SENSOR` frame, configure the visualizer to interpret that frame instead of changing the sensor to `WORLD` unless world-frame output is actually desired.
 - The model auto-enables `Flags` and `Counts` even when not requested, and delivers them like ordinary channel tensors.
+- A name in `token[] channels` that the model does not recognize is ignored with a warning, not reported as a failure. The rest of the output is produced as usual, so a consumer indexing the result by that name simply will not find it; check the spelling and case against the Outputs page.
 
 ## Related Skills
 
@@ -160,3 +164,15 @@ Common lidar channels:
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+Product documentation owns the detail this skill only summarizes:
+
+- [Lidar generic core model](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/index.html) -- ticks, emitters, channels and returns, scan types, delivery cadence; the attribute, how-to, output and tutorial pages hang under it.
+- [USD Attributes](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/attributes.html) -- every `omni:sensor:Core:*` attribute's meaning, unit and relations, group by group; the generated [Sensor API Schemas](https://nvidia-omniverse.github.io/ovrtx/sensors/reference/schemas.html) tables carry each attribute's type, default and tokens.
+- [Configure Lidar Output](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/howto/output_shaping.html) -- coordinate type, frame of reference and cadence, and how a runtime edit shows up in the delivered params.
+- [Configure a Firing Pattern](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/howto/firing_pattern.html) -- emitter states, tick structure, per-emitter azimuth/elevation/fire-time offsets.
+- [Outputs](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/outputs.html) -- element type, shape, unit and validity rules for every lidar channel, the params a frame carries, and how scans, frames and steps relate.
+- [Sensor Configuration](https://nvidia-omniverse.github.io/ovrtx/sensors/common/sensor_configuration.html) -- the sensor prim, its applied schema and where overrides are authored.
+- [Output Configuration](https://nvidia-omniverse.github.io/ovrtx/sensors/common/output_configuration.html) -- RenderProduct and RenderVar wiring, channel requests, and the renderer options a sensor scene depends on.
+- [Motion Artifacts](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/howto/motion_artifacts.html) -- motion BVH and motion compensation, and what breaks when only one is set.
+- [Troubleshooting](https://nvidia-omniverse.github.io/ovrtx/sensors/troubleshooting/index.html) -- the symptom index with candidate causes, and the by-design limits of the models.

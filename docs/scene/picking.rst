@@ -15,7 +15,8 @@ ovrtx can perform viewport picking against a RenderProduct and can draw
 selection outlines for prims that the application marks as selected. Picking
 answers the question "which prims are under this normalized RenderProduct region?"
 Selection drawing answers a separate question: "which prims should the renderer
-outline in future frames?"
+outline in future frames?" For custom drawing, the ``SelectionState`` AOV exposes
+selection groups and visibility for an application or SPG shader to style.
 
 The two features are designed to be composed by the application. A viewport UI
 usually turns a click or drag rectangle into an NDC pick query, resolves the picked
@@ -51,8 +52,9 @@ Selection outlines are persistent renderer state. Enable the outline pass when
 creating the renderer, set a non-zero group id on the prims that should be
 outlined, and set group ``0`` to clear the outline for a prim. Different
 non-zero group ids are distinct outline groups. Global renderer-creation
-settings control outline width and fill mode; runtime per-group settings control
-outline and fill colors. Prims opt into a style by passing that group's id to
+settings control the default outline width and fill mode; runtime per-group
+settings control outline color, fill color, and outline width. Prims opt into a
+style by passing that group's id to
 :py:meth:`~ovrtx.Renderer.set_selection_outline_group()` /
 :c:func:`ovrtx_set_selection_outline_group()`.
 
@@ -190,9 +192,11 @@ The mapped render var exposes ``uint32`` params named ``magic``, ``version``, an
 Resolving Picked Prim Names
 ---------------------------
 
-Pick hit records store ``ovx_primpath_t`` handles, not strings. Python exposes
-:py:meth:`~ovrtx.Renderer.resolve_prim_path_id()` for these ids. In C, get the
-renderer path dictionary once and resolve path ids with
+The ``primPath`` tensor stores raw uint64 path IDs. In Python, wrap each value
+in ``ovrtx.PrimPath(raw_id)`` before passing it to
+:py:meth:`~ovrtx.Renderer.resolve_prim_path_id()`. In C or C++, construct an
+``ovx_primpath_t`` from each numeric ID. Get the renderer path dictionary once
+and resolve those handles with
 ``path_dictionary_get_tokens_from_paths()`` and
 ``path_dictionary_get_strings_from_tokens()``:
 
@@ -290,8 +294,8 @@ Group ``0`` clears the outline for a prim. Different non-zero group ids map to d
 Selection Styling
 -----------------
 
-Selection style has a global part and a per-group part. Configure global outline
-width and fill mode when creating the renderer:
+Selection style has a global part and a per-group part. Configure the default
+outline width and fill mode when creating the renderer:
 
 .. tab-set::
 
@@ -311,7 +315,9 @@ width and fill mode when creating the renderer:
          :end-before: // [/snippet:doc-create-styled-selection-renderer-c]
          :dedent:
 
-Then set runtime colors for the selection groups your application uses:
+Then set runtime colors (and optionally outline width) for the selection groups
+your application uses. Omitting ``outline_width`` leaves that group's width
+unchanged, so it keeps the renderer-creation default:
 
 .. tab-set::
 
@@ -355,7 +361,91 @@ what connects a prim to its style:
 Fill colors are visible only when the renderer's fill mode uses per-group fill
 color, such as ``GROUP_FILL_COLOR`` /
 ``OVRTX_SELECTION_FILL_MODE_GROUP_FILL_COLOR``. Outline dashing and stippling
-are not supported by the underlying outline pass.
+are not supported by the built-in outline pass. Use the ``SelectionState`` AOV
+and a custom shader for those effects.
+
+SelectionState AOV
+------------------
+
+``SelectionState`` exposes selected-surface coverage and visibility for custom
+outlines, fills, and hidden-surface patterns. It is available in Path Tracing
+and Real-Time Path Tracing. See :doc:`../examples/c_selection_spg` for a runnable
+C example that uses an SPG shader to composite these effects over ``LdrColor``.
+
+Requesting the Output
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a RenderVar with ``sourceName = "SelectionState"`` to the RenderProduct's
+``orderedVars`` relationship. Assign prims to groups 1–255 with
+:py:meth:`~ovrtx.Renderer.set_selection_outline_group()` or
+:c:func:`ovrtx_set_selection_outline_group()`; group ``0`` removes a prim from
+the selection. The example shows the USD graph wiring and group assignment.
+Picking is optional: applications can assign groups directly without a pick query.
+
+Requesting ``SelectionState`` suppresses the built-in selection overlay for
+that RenderProduct. The AOV is produced even when the renderer's
+``selection_outline_enabled`` option is false. Built-in outline width, color,
+and fill settings do not style this output; the consuming shader controls those
+choices. With no selected prims, the renderer clears a valid output image to
+zero and skips selection ray tracing. Selection updates still run when RTPT
+reuses its beauty image in eco mode.
+
+Sample Format
+~~~~~~~~~~~~~
+
+The output is an ``RGBA16_UINT`` image at the RenderProduct's final output
+resolution: eight bytes per pixel, exposed as ``uint16`` with shape
+``(H, W, 4)``. Its four channels hold coverage samples, not color components.
+Each sample has the following layout:
+
+.. list-table::
+   :header-rows: 1
+   :class: compact-table
+
+   * - Bits
+     - Meaning
+   * - 0–7
+     - Selection group, 1–255. Zero means no selected geometry.
+   * - 8
+     - Visibility: 1 for visible, 0 for occluded selected geometry.
+   * - 9–15
+     - Reserved; always zero.
+
+A background sample is ``0x000``. Group 1 is ``0x001`` when hidden and
+``0x101`` when visible. Decode each sample before combining coverage; averaging
+packed integer values would mix group and visibility bits. The image contains
+no depth, instance ids, outline colors, or fill colors. Objects in the same
+group form one mask and cannot be distinguished by this output alone.
+
+Visibility and Coverage
+~~~~~~~~~~~~~~~~~~~~~~~
+
+For each traced sample, the renderer finds the nearest selected surface through
+unselected geometry, then compares its identity with the full-scene hit along
+the same unjittered camera ray. Only that nearest selected surface is represented;
+a selected object behind another selected object has no separate layer.
+
+Visibility is binary surface visibility, not accumulated transmission through
+translucent materials or volumes. The traces use selection's backface-culling
+and positive-opacity policy and respect camera visibility and camera/section
+clipping. They run at output resolution independently of the beauty G-buffer
+and DLSS rendering resolution.
+
+Coverage is adaptive. Uniform regions replicate the pixel-center result into
+all four channels. Changes in selected-instance identity or visibility between
+neighboring centers trigger four subpixel samples. Their offsets from the pixel
+center, in channel order, are ``(-0.125, -0.375)``, ``(0.375, -0.125)``,
+``(-0.375, 0.125)``, and ``(0.125, 0.375)``. Thin geometry or occluders missed
+by the center sampling pattern can therefore be missed entirely.
+
+When a shader expands this mask into an outline, visibility belongs to the
+selected sample. The AOV has no depth with which to reclassify an expanded
+stroke against geometry beneath it. The SPG example carries the source sample's
+visibility into that stroke.
+
+XR foveation unwarp is unsupported. When unwarp is authored, the renderer clears
+``SelectionState`` and logs a warning while beauty rendering continues. Disable
+unwarp to read the selection output in warped coordinates.
 
 Pickable Prims
 --------------

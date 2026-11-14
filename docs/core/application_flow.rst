@@ -101,6 +101,34 @@ Python vs. C
      - Methods raise ``RuntimeError``.
      - Check status codes and inspect :c:func:`ovrtx_get_last_error`.
 
+Process Exit
+------------
+
+Destroy every renderer and call :c:func:`ovrtx_shutdown` once per :c:func:`ovrtx_initialize`
+before the process exits. That is the only path that releases ovrtx's GPU resources and plug-ins.
+
+A host that exits without doing so, by returning from ``main`` or calling ``exit()``, keeps its own
+exit code: ovrtx does not tear the renderer system down from an exit handler. The process ends in
+an exit handler that ovrtx's runtime installs. That handler does three things:
+
+1. It deregisters ovrtx's profiler, crash-reporter and localization clients without tearing down
+   the runtime. Plug-ins stay loaded, and no GPU teardown runs.
+2. It flushes ``stdout`` and ``stderr``.
+3. It ends the process with the host's exit code: ``_exit()`` on Linux, ``TerminateProcess()`` on Windows.
+
+What the host gives up depends on the platform:
+
+- **Linux**: the handler runs from ``atexit``. ovrtx re-registers it whenever a plug-in is
+  registered, which happens during ovrtx initialization and renderer creation, so it runs before
+  every handler registered earlier. ``atexit`` handlers and static destructors registered before
+  that last re-registration do not run. This includes host handlers registered before
+  :c:func:`ovrtx_initialize`. Handlers registered later run first.
+- **Linux**: other open ``FILE*`` streams are not flushed. ``fflush`` or ``fclose`` them before
+  exiting.
+- **Windows**: ``exit()`` runs the executable's ``atexit`` handlers and static destructors and
+  flushes all streams before the handler runs. DLL static destructors and other DLL detach work
+  do not run.
+
 Where to Go Next
 ----------------
 
@@ -108,5 +136,5 @@ Where to Go Next
 - :doc:`ovstage_integration` - ovstage integration, ordinals, and write-floor gates.
 - :doc:`async_status_errors` - async operation waits, status queries, and errors.
 - :doc:`../scene/loading_usd` - loading files, URLs, inline USDA, and references (standalone mode).
-- :doc:`../sensors/sensor_outputs` - mapping rendered output on CPU or CUDA.
+- :doc:`../sensors/common/sensor_outputs` - mapping rendered output on CPU or CUDA.
 - :doc:`../scene/attributes` - reading and writing runtime stage attributes.

@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: project-setup-c
 description: >
   Setting up a new CMake C/C++ project that uses ovrtx. Use when user asks to create a
   new C project, set up CMake with ovrtx, scaffold a C++ app, or configure build
   dependencies.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -37,8 +30,8 @@ Use this skill when the user asks to create a new C project, set up CMake with o
 Resolve inputs in this order: existing repository files and referenced snippets, explicit user request, then broader agent context.
 
 - Project language, package manager, build system, and target platform from the user request.
-- Whether the project should use packaged ovrtx or the local dev-mode build.
 - Repository source snippets and example projects referenced below. Treat these snippets as the API source of truth.
+
 
 ## Prerequisites
 
@@ -88,13 +81,15 @@ my-ovrtx-app/
 > **Source (continued):** `examples/c/minimal/CMakeLists.txt` snippet `linking-models`
 >
 > The canonical example builds both loader models with ovstage attached. For an
-> ovrtx-only application, omit the ovstage fetch, link target, and setup call.
+> ovrtx-only application, omit the ovstage link target and setup call. The
+> ovstage package is still required at configure time because `ovrtx.h` includes
+> ovstage headers; `ovrtx_fetch()` fetches it.
 
 ## ovrtx.cmake
 
 Copy `examples/c/cmake/ovrtx.cmake` into your project's `cmake/` directory. The key macro it provides:
 
-- `ovrtx_fetch()` -- downloads the ovrtx package via FetchContent and makes both `ovrtx::ovrtx` (shared loader) and `ovrtx::ovrtx_static` (static loader) available.
+- `ovrtx_fetch()` -- downloads the ovstage and ovrtx packages via FetchContent and makes both `ovrtx::ovrtx` (shared loader) and `ovrtx::ovrtx_static` (static loader) available. Copy `examples/c/cmake/ovstage.cmake` beside `ovrtx.cmake`, which includes it.
 - `ovrtx_setup_runtime(TARGET)` -- auto-selects the runtime layout from how the target links ovrtx. For `ovrtx::ovrtx_static` (model #1) it stages a single side-by-side `ovrtx/` link pointing at the package `bin/`. For `ovrtx::ovrtx` (model #2) it configures rpath (Linux) or copies DLLs and creates runtime-directory junctions (Windows).
 
 Update the `FetchContent_Declare` URL inside `ovrtx.cmake` to point to the appropriate GitHub Releases package for your platform.
@@ -170,7 +165,7 @@ structure. The config-entry pattern is identical either way:
 - `binary_package_root_path` is only needed for static linking or custom layouts that split the default `bin/` structure.
 - `ovrtx_setup_runtime()` must be called for each executable target that uses ovrtx.
 - On Linux, the build rpath is set automatically. For installed/packaged binaries, ensure the install rpath points to the ovrtx `bin/` directory.
-- The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure.
+- The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure.
 - CMake >= 3.16 is required: `ovrtxConfig.cmake` calls `cmake_minimum_required(VERSION 3.16)`, so on CMake 3.15 or older `find_package(ovrtx)` fails with "CMake 3.16 or higher is required" from inside `ovrtx_fetch()`. If `cmake` is missing (`cmake: command not found`), is older than 3.16, or configure/build fails because no generator, compiler, or C++ toolchain is available, install the platform toolchain before treating the failure as ovrtx-specific. On Windows, install Visual Studio 2022 17.8 or newer with C++ tools and CMake — ovrtx binaries need the VC runtime 14.38 or newer, which older Visual Studio releases do not ship. On Ubuntu/Linux, install `build-essential cmake`. Ninja is optional; use the default CMake generator unless the project or platform requires another generator.
 
 ## In Attached Mode (ovrtx 0.4+)

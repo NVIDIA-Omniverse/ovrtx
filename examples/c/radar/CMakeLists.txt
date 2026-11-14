@@ -45,7 +45,10 @@ add_custom_command(TARGET radar-composite-tensor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_LIST_DIR}/radar_example.usda"
         "$<TARGET_FILE_DIR:radar-composite-tensor>/radar_example.usda"
-    COMMENT "Copying radar_example.usda to build directory"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_LIST_DIR}/radar_example_field.usda"
+        "$<TARGET_FILE_DIR:radar-composite-tensor>/radar_example_field.usda"
+    COMMENT "Copying radar_example.usda and radar_example_field.usda to build directory"
 )
 
 # Setup runtime dependencies for both packages (side-by-side `ovrtx/` and

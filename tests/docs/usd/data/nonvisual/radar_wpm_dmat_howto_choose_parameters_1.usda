@@ -1,0 +1,23 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-radar-wpm-dmat-howto-choose-parameters-1]
+#usda 1.0
+
+def OmniRadar "generic_radar" (
+    prepend apiSchemas = ["OmniSensorGenericRadarWpmDmatAPI"]
+)
+{
+    # copied from the datasheet's operating mode
+    float omni:sensor:WpmDmat:waveLengthMm = 3.9
+    float omni:sensor:WpmDmat:scan:s001:maxRangeM = 50
+    float omni:sensor:WpmDmat:scan:s001:maxAzAngDeg = 75
+
+    # a simulation approximation: tuned for coverage at an acceptable frame time
+    float omni:sensor:WpmDmat:scan:s001:raysPerDeg = 8.0
+
+    # calibrated against measured return strength; left at its default here
+    float omni:sensor:WpmDmat:scan:s001:powerFactor = 1.0
+}
+# [/snippet:doc-nonvisual-radar-wpm-dmat-howto-choose-parameters-1]

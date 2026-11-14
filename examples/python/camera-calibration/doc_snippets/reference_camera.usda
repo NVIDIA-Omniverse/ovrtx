@@ -1,0 +1,11 @@
+#usda 1.0
+# [snippet:doc-calibration-reference-usda]
+def Xform "World"
+{
+    def Camera "Camera" (
+        prepend references = @calibrated_camera.usda@
+    )
+    {
+    }
+}
+# [/snippet:doc-calibration-reference-usda]

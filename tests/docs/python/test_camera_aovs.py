@@ -52,7 +52,7 @@ _RTPT_IMAGE_AOVS = [
     "ReflectionsFirstBounceRayDirAndHitT",
     # Temporal / quality
     "DisocclusionMask", "ReprojectionQuality", "ViewspacePosition",
-    "Exposure", "ViewMatricesAux",
+    "Exposure",
     # DLSS
     "DlssInput",
     # High-resolution variants
@@ -127,7 +127,7 @@ _RTPT_READBACK_AOVS = frozenset({
     "ReflectionsFirstBounceRayDirAndHitT",
     # Temporal / quality
     "DisocclusionMask", "ReprojectionQuality", "ViewspacePosition",
-    "Exposure", "ViewMatricesAux",
+    "Exposure",
     # DLSS
     "DlssInput",
     # High-resolution variants
@@ -317,6 +317,27 @@ def "Render" {{
             failures.append(f"{aov_name}: missing from render_vars")
             continue
         try:
+            if aov_name in {"SemanticIdMap", "StableIdMap", "SemanticIdMapDeltas", "StableIdMapDeltas"}:
+                decode_sd_identifiers(map_sd_output(frame, var_path, aov_name))
+                continue
+            if aov_name in {"OcclusionSD", "InstanceIdTokenMapSD", "InstanceMap", "StableIdSemanticIdMap"}:
+                fields = map_sd_output(frame, var_path, aov_name)
+                decoder = {"OcclusionSD": decode_sd_occlusion, "InstanceIdTokenMapSD": decode_sd_tokens,
+                           "InstanceMap": decode_sd_instance_map, "StableIdSemanticIdMap": decode_sd_id_pairs}[aov_name]
+                decoder(fields)
+                continue
+            if aov_name == "CameraParams":
+                camera = decode_sd_camera(map_sd_output(frame, var_path, aov_name))
+                if camera["world_to_camera"].shape != (4, 4) or camera["model"] != b"pinhole":
+                    failures.append("CameraParams: invalid camera matrices or model")
+                continue
+            if aov_name in {"BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
+                            "SemanticBoundingBox2DTight", "SemanticBoundingBox2DLoose", "SemanticBoundingBox3D"}:
+                fields = map_sd_output(frame, var_path, aov_name)
+                boxes = decode_sd_boxes(fields, aov_name.startswith("Semantic"), "3D" in aov_name)
+                if not aov_name.startswith("Semantic") and not len(boxes):
+                    failures.append(f"{aov_name}: expected boxes for scene geometry")
+                continue
             t = np.from_dlpack(frame.render_vars[var_path].map(device=ovrtx.Device.CPU))
         except RuntimeError as exc:
             if aov_name in _RTPT_READBACK_AOVS:
@@ -358,7 +379,7 @@ def decode_sd_records(data: np.ndarray, dtype: np.dtype, counted: bool = False) 
     """Decode little-endian records, checking lengths before reading reserved buffers."""
     buffer = np.ascontiguousarray(data).view(np.uint8).reshape(-1)
     if counted:
-        # Semantic boxes reserve unused capacity; their final uint32 is the actual count.
+        # Counted legacy buffers end with their actual record count.
         if buffer.size < 4:
             raise ValueError("Missing record count")
         count = int.from_bytes(buffer[-4:].tobytes(), "little")
@@ -372,87 +393,122 @@ def decode_sd_records(data: np.ndarray, dtype: np.dtype, counted: bool = False) 
 # [/snippet:doc-sd-records-python]
 
 
+# [snippet:doc-sd-map-structured-python]
+def map_sd_output(frame, render_var_path: str, source: str):
+    """Copy structured fields and CPU parameters, or the legacy tensor for other outputs."""
+    with frame.render_vars[render_var_path].map(device=ovrtx.Device.CPU) as mapped:
+        if source in {"BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
+                      "SemanticBoundingBox2DTight", "SemanticBoundingBox2DLoose", "SemanticBoundingBox3D"}:
+            return {key: np.from_dlpack(mapped[key]).copy() for key in mapped}
+        if source in {"SemanticIdMap", "StableIdMap", "SemanticIdMapDeltas", "StableIdMapDeltas"}:
+            return {key: np.from_dlpack(mapped[key]).copy() for key in mapped}
+        if source in {"OcclusionSD", "InstanceIdTokenMapSD", "InstanceMap", "StableIdSemanticIdMap"}:
+            fields = {key: np.from_dlpack(mapped[key]).copy() for key in mapped}
+            if mapped.params:
+                fields["params"] = {key: np.from_dlpack(value).copy() for key, value in mapped.params.items()}
+            return fields
+        if source == "CameraParams":
+            return {"params": {key: np.from_dlpack(value).copy() for key, value in mapped.params.items()}}
+        return np.from_dlpack(mapped).copy()
+# [/snippet:doc-sd-map-structured-python]
+
+
 # [snippet:doc-sd-boxes-python]
-def decode_sd_boxes(data: np.ndarray, semantic: bool = False, three_d: bool = False) -> np.ndarray:
-    """Decode raw or semantic boxes; 3D bounds are local and include a world transform."""
-    fields = [("stable_id", "<u4", 4), ("semantic_id", "<u4", 4)] if semantic else [
-        ("instance_id", "<u4"), ("tile_id", "<u4")]
-    fields += [("min", "<f4" if three_d else "<i4", 3 if three_d else 2),
-               ("max", "<f4" if three_d else "<i4", 3 if three_d else 2)]
+def decode_sd_boxes(data: dict, semantic: bool = False, three_d: bool = False) -> np.ndarray:
+    """Read strided named fields; semantic valid_count limits capacity-sized tensors."""
+    extent = data["extent"]
+    dimensions = 3 if three_d else 2
+    if extent.ndim != 3 or extent.shape[1:] != (2, dimensions):
+        raise ValueError("Invalid bounding-box extent shape")
+    capacity = len(extent)
+    count = int(data["valid_count"][0]) if semantic else capacity
+    if not 0 <= count <= capacity:
+        raise ValueError("Bounding-box count exceeds capacity")
+    fields = {"stable_id": data["id"], "semantic_id": data["semantic_id"]} if semantic else {
+        "instance_id": data["instance_id"], "tile_id": data["render_tile_id"]}
+    fields.update(min=extent[:, 0], max=extent[:, 1])
     if three_d:
-        fields += [("local_to_world", "<f4", (4, 4))]
-    return decode_sd_records(data, np.dtype(fields), counted=semantic)
+        fields["local_to_world"] = data["object_to_world"]
+    if any(len(value) != capacity for value in fields.values()):
+        raise ValueError("Bounding-box fields have unequal capacity")
+    dtype = np.dtype([(name, values.dtype, values.shape[1:]) for name, values in fields.items()])
+    result = np.empty(count, dtype=dtype)
+    for name, values in fields.items():
+        result[name] = values[:count]
+    return result
 # [/snippet:doc-sd-boxes-python]
 
 
 # [snippet:doc-sd-occlusion-python]
-def decode_sd_occlusion(data: np.ndarray) -> np.ndarray:
-    """Read occlusion ratios with their instance/tile keys; negative ratios are invalid."""
-    dtype = np.dtype([("instance_id", "<u4"), ("tile_id", "<u4"), ("ratio", "<f4")])
-    return decode_sd_records(data, dtype)
+def decode_sd_occlusion(data: dict) -> np.ndarray:
+    """Read named occlusion fields; negative ratios are invalid."""
+    fields = {"instance_id": data["instance_id"], "tile_id": data["render_tile_id"],
+              "ratio": data["occlusion_ratio"]}
+    count = len(fields["instance_id"])
+    if any(value.shape != (count,) for value in fields.values()):
+        raise ValueError("Occlusion field shapes differ")
+    result = np.empty(count, dtype=[("instance_id", np.uint32), ("tile_id", np.uint32), ("ratio", np.float32)])
+    for name, value in fields.items():
+        result[name] = value
+    return result
 # [/snippet:doc-sd-occlusion-python]
 
 
 # [snippet:doc-sd-tokens-python]
-def decode_sd_tokens(data: np.ndarray) -> tuple[np.void, np.ndarray]:
-    """Separate the token-map header from aligned instance records."""
-    dtype = np.dtype({"names": ["instance_id", "prim_token", "prototype", "instance_index"],
-                      "formats": ["<u4", "<u8", "<u4", "<u4"],
-                      "offsets": [0, 8, 16, 20], "itemsize": 24})
-    records = decode_sd_records(data, dtype)
-    if not len(records) or int(records[0]["instance_id"]) != len(records) - 1:
-        raise ValueError("Token-map header count does not match records")
-    return records[0], records[1:]
+def decode_sd_tokens(data: dict) -> tuple[dict, np.ndarray]:
+    """Read named instance fields and CPU scalar parameters; tensors contain no header row."""
+    fields = {"instance_id": data["instance_id"], "prim_token": data["prim_token"],
+              "prototype": data["prototype_index"], "instance_index": data["instance_index"]}
+    count = len(fields["instance_id"])
+    if any(value.shape != (count,) for value in fields.values()):
+        raise ValueError("Instance-token field shapes differ")
+    records = np.empty(count, dtype=[("instance_id", np.uint32), ("prim_token", np.uint64),
+                                    ("prototype", np.uint32), ("instance_index", np.uint32)])
+    for name, value in fields.items():
+        records[name] = value
+    return data["params"], records
 # [/snippet:doc-sd-tokens-python]
 
 
 # [snippet:doc-sd-instance-map-python]
-def decode_sd_instance_map(data: np.ndarray) -> np.ndarray:
-    """Read semantic indices; element i corresponds to minInstanceId + i from the token header."""
-    return decode_sd_records(data, np.dtype("<u4"))
+def decode_sd_instance_map(data: dict) -> np.ndarray:
+    """Element i belongs to min_instance_id + i from the token-map CPU params."""
+    return data["semantic_instance_index"]
 # [/snippet:doc-sd-instance-map-python]
 
 
 # [snippet:doc-sd-identifiers-python]
-def decode_sd_identifiers(data: np.ndarray) -> list[tuple[tuple[int, ...], str]]:
-    """Decode labels/paths without dropping repeated IDs or any of their four words."""
-    buffer = np.ascontiguousarray(data).view(np.uint8).reshape(-1)
-    dtype = np.dtype([("id", "<u4", 4), ("length", "<u4"), ("offset", "<u4")])
-    records = decode_sd_records(buffer, dtype, counted=True)
-    labels = []
-    for record in records:
-        offset, length = int(record["offset"]), int(record["length"])
-        if offset < records.nbytes or offset + length > buffer.size - 4:
-            raise ValueError("Identifier string extends outside string storage")
-        labels.append((tuple(int(word) for word in record["id"]),
-                       buffer[offset:offset + length].tobytes().decode("utf-8")))
-    return labels
+def decode_sd_identifiers(data: dict) -> list[tuple[tuple[int, ...], str]]:
+    """Read UTF-8 spans without dropping repeated IDs or any of their four words."""
+    ids, offsets, storage = data["id"], data["label_offsets"], data["label_data"]
+    if (ids.dtype != np.uint32 or ids.shape != (len(ids), 4)
+            or offsets.dtype != np.uint64 or offsets.shape != (len(ids) + 1,)
+            or storage.dtype != np.uint8 or storage.ndim != 1 or offsets[0] != 0
+            or offsets[-1] != len(storage) or np.any(offsets[1:] < offsets[:-1])):
+        raise ValueError("Invalid identifier field shapes or string storage")
+    return [(tuple(int(word) for word in identifier), storage[int(start):int(end)].tobytes().decode("utf-8"))
+            for identifier, start, end in zip(ids, offsets[:-1], offsets[1:])]
 # [/snippet:doc-sd-identifiers-python]
 
 
 # [snippet:doc-sd-id-pairs-python]
-def decode_sd_id_pairs(data: np.ndarray) -> np.ndarray:
-    """Read stable-to-semantic ID pairs; this buffer has no trailing count."""
-    dtype = np.dtype([("stable_id", "<u4", 4), ("semantic_id", "<u4", 4)])
-    return decode_sd_records(data, dtype)
+def decode_sd_id_pairs(data: dict) -> np.ndarray:
+    """Join full-width IDs from named strided tensors, preserving repeated rows."""
+    stable, semantic = data["stable_id"], data["semantic_id"]
+    if stable.shape != (len(stable), 4) or semantic.shape != stable.shape:
+        raise ValueError("ID-pair fields must have matching (N,4) shapes")
+    result = np.empty(len(stable), dtype=[("stable_id", np.uint32, 4), ("semantic_id", np.uint32, 4)])
+    result["stable_id"], result["semantic_id"] = stable, semantic
+    return result
 # [/snippet:doc-sd-id-pairs-python]
 
 
 # [snippet:doc-sd-camera-python]
-def decode_sd_camera(data: np.ndarray) -> np.void:
-    """Decode the 260-byte camera record, including the projection-model padding."""
-    dtype = np.dtype([
-        ("world_to_camera", "<f4", (4, 4)), ("projection", "<f4", (4, 4)),
-        ("meters_per_scene_unit", "<f4"), ("resolution", "<u4", 2), ("near_far", "<f4", 2),
-        ("model", "S25"), ("padding", "u1", 3),
-        ("focal_length", "<f4"), ("focal_distance", "<f4"), ("f_stop", "<f4"), ("fov_x", "<f4"),
-        ("fisheye_width", "<f4"), ("fisheye_height", "<f4"), ("fisheye_center", "<f4", 2),
-        ("fisheye_max_fov", "<f4"), ("fisheye_polynomial", "<f4", 6),
-        ("lens_p", "<f4", 2), ("lens_s", "<f4", 4)])
-    records = decode_sd_records(data, dtype)
-    if len(records) != 1:
-        raise ValueError("Expected one camera record")
-    return records[0]
+def decode_sd_camera(data: dict) -> dict:
+    """Use named CPU camera parameters; CameraParams has no output tensors."""
+    params = data["params"]
+    return {**params, "world_to_camera": params["view_matrix"], "projection": params["projection_matrix"],
+            "resolution": params["render_product_resolution"], "model": params["camera_model"].tobytes()}
 # [/snippet:doc-sd-camera-python]
 
 
@@ -472,43 +528,30 @@ def project_sd_point(point, local_to_world, camera):
 
 def test_sd_decoder_bounds_and_identifier_storage():
     """Reject truncated records and strings; preserve aliases sharing a stable ID."""
-    raw = np.frombuffer(struct.pack("<IIiiii", 7, 0, 10, 20, 30, 40), dtype=np.uint8)
-    boxes = decode_sd_boxes(raw)
+    fields = {"instance_id": np.array([7], np.uint32), "render_tile_id": np.array([0], np.uint32),
+              "extent": np.array([[[10, 20], [30, 40]]], np.int32)}
+    boxes = decode_sd_boxes(fields)
     assert boxes[0]["instance_id"] == 7
     np.testing.assert_array_equal(boxes[0]["min"], [10, 20])
     np.testing.assert_array_equal(boxes[0]["max"], [30, 40])
-    with pytest.raises(ValueError, match="Incomplete record"):
-        decode_sd_boxes(raw[:-1])
-    with pytest.raises(ValueError, match="capacity"):
-        decode_sd_boxes(np.array([1, 0, 0, 0], dtype=np.uint8), semantic=True)
+    with pytest.raises(ValueError):
+        decode_sd_boxes({**fields, "extent": fields["extent"][:, :, :1]})
 
-    # Two paths intentionally share all 128 bits; a dictionary would lose one of them.
-    payload = struct.pack("<4III", 1, 2, 3, 4, 2, 48)
-    payload += struct.pack("<4III", 1, 2, 3, 4, 2, 51) + b"/a\0/b\0" + struct.pack("<I", 2)
-    identifiers = np.frombuffer(payload, dtype=np.uint8)
-    assert decode_sd_identifiers(identifiers) == [((1, 2, 3, 4), "/a"), ((1, 2, 3, 4), "/b")]
-    broken = identifiers.copy()
-    broken[20:24] = np.frombuffer(struct.pack("<I", 0), dtype=np.uint8)
-    with pytest.raises(ValueError, match="storage"):
-        decode_sd_identifiers(broken)
-    broken = identifiers.copy()
-    # Producers supply a byte length; padding after the string need not be NUL.
-    broken[50] = 65
-    assert decode_sd_identifiers(broken) == decode_sd_identifiers(identifiers)
-    broken[16:20] = np.frombuffer(struct.pack("<I", 1024), dtype=np.uint8)
-    with pytest.raises(ValueError, match="storage"):
-        decode_sd_identifiers(broken)
+    # Preserve duplicate full-width IDs and sparse empty rows, not just a dictionary lookup.
+    identifiers = {"id": np.array([[1, 2, 3, 4], [0, 0, 0, 0], [1, 2, 3, 4]], np.uint32),
+                   "label_offsets": np.array([0, 2, 2, 4], np.uint64),
+                   "label_data": np.frombuffer(b"/a/b", dtype=np.uint8)}
+    assert decode_sd_identifiers(identifiers) == [((1, 2, 3, 4), "/a"), ((0, 0, 0, 0), ""), ((1, 2, 3, 4), "/b")]
+    for offsets in ([0, 4, 2, 4], [1, 2, 2, 4], [0, 2, 2, 1024]):
+        with pytest.raises(ValueError, match="storage"):
+            decode_sd_identifiers({**identifiers, "label_offsets": np.array(offsets, np.uint64)})
 
 
 def test_sd_camera_projection_and_reserved_box_capacity():
-    """Check independent byte offsets, pixel orientation, and unused semantic capacity."""
-    camera_bytes = bytearray(260)
-    struct.pack_into("<16f", camera_bytes, 0, *np.eye(4).reshape(-1))
-    struct.pack_into("<16f", camera_bytes, 64, *np.eye(4).reshape(-1))
-    struct.pack_into("<fIIff", camera_bytes, 128, 0.01, 640, 360, 0.1, 100.0)
-    camera_bytes[148:155] = b"pinhole"
-    struct.pack_into("<f", camera_bytes, 176, 35.0)
-    camera = decode_sd_camera(np.frombuffer(camera_bytes, dtype=np.uint8))
+    """Check named camera fields, pixel orientation, and unused semantic capacity."""
+    camera = decode_sd_camera({"params": {"view_matrix": np.eye(4), "projection_matrix": np.eye(4),
+                              "render_product_resolution": np.array([640, 360], dtype=np.uint32),
+                              "camera_model": np.frombuffer(b"pinhole", dtype=np.uint8), "focal_length": 35.0}})
     assert camera["focal_length"] == 35.0
     np.testing.assert_allclose(project_sd_point([0, 0, 0], np.eye(4), camera), [320, 180])
     np.testing.assert_allclose(project_sd_point([1, 1, 0], np.eye(4), camera), [640, 0])
@@ -522,17 +565,23 @@ def test_sd_camera_projection_and_reserved_box_capacity():
     camera["model"] = b"fisheye"
     with pytest.raises(ValueError, match="pinhole"):
         project_sd_point([1, 2, 3], local, camera)
-    reserved = bytearray(48 * 2 + 4)
-    struct.pack_into("<8I4i", reserved, 0, 1, 2, 3, 4, 5, 0, 0, 0, 10, 20, 30, 40)
-    struct.pack_into("<I", reserved, len(reserved) - 4, 1)
-    boxes = decode_sd_boxes(np.frombuffer(reserved, dtype=np.uint8), semantic=True)
+    reserved = {"id": np.array([[1, 2, 3, 4], [0, 0, 0, 0]], np.uint32),
+                "semantic_id": np.array([[5, 0, 0, 0], [0, 0, 0, 0]], np.uint32),
+                "extent": np.array([[[10, 20], [30, 40]], [[0, 0], [0, 0]]], np.int32),
+                "valid_count": np.array([1], np.uint32)}
+    boxes = decode_sd_boxes(reserved, semantic=True)
     assert len(boxes) == 1
     assert tuple(boxes[0]["stable_id"]) == (1, 2, 3, 4)
+    reserved["valid_count"][0] = 0
+    assert len(decode_sd_boxes(reserved, semantic=True)) == 0
+    reserved["valid_count"][0] = 3
+    with pytest.raises(ValueError, match="capacity"):
+        decode_sd_boxes(reserved, semantic=True)
 
 
 @pytest.mark.parametrize("render_mode", ["RealTimePathTracing", "PathTracing"])
 def test_sd_decoders_rendered_scene(renderer, stage, render_mode):
-    """Check packed layouts and ID joins against labeled geometry rendered by RTX."""
+    """Check named fields and ID joins against labeled geometry rendered by RTX."""
     names = ["NormalSD", "StableIdSegmentation", "SemanticSegmentation",
              "SemanticInstanceSegmentation", "NonStableInstanceSegmentation",
              "BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
@@ -570,7 +619,7 @@ def "Render" {{
     stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
     products = renderer.step(render_products={"/Render/Decoded"}, delta_time=1 / 60, ordinal=1)
     frame = next(iter(products.values())).frames[0]
-    initial = {name: map_sd_image(frame, f"/Render/Decoded/{name}") for name in names}
+    initial = {name: map_sd_output(frame, f"/Render/Decoded/{name}", name) for name in names}
     initial_paths = decode_sd_identifiers(initial["StableIdMapDeltas"])
     assert initial_paths
     assert decode_sd_identifiers(initial["SemanticIdMapDeltas"])
@@ -580,7 +629,7 @@ def "Render" {{
         for _ in range(5):
             products = renderer.step(render_products={"/Render/Decoded"}, delta_time=1 / 60, ordinal=1)
         frame = next(iter(products.values())).frames[0]
-    data = {name: map_sd_image(frame, f"/Render/Decoded/{name}") for name in names}
+    data = {name: map_sd_output(frame, f"/Render/Decoded/{name}", name) for name in names}
     assert data["NormalSD"].shape == (180, 320, 4)
     if render_mode == "RealTimePathTracing":
         assert decode_sd_identifiers(data["StableIdMapDeltas"]) == []
@@ -635,8 +684,8 @@ def "Render" {{
         assert 0 <= visibility[key] <= 1
     header, tokens = decode_sd_tokens(data["InstanceIdTokenMapSD"])
     instance_map = decode_sd_instance_map(data["InstanceMap"])
-    minimum = int(header["prim_token"]) & 0xffffffff
-    maximum = int(header["prim_token"]) >> 32
+    minimum = header["min_instance_id"].item()
+    maximum = header["max_instance_id"].item()
     assert minimum <= maximum and len(instance_map) >= maximum - minimum + 1
     assert all(minimum <= int(record["instance_id"]) <= maximum for record in tokens)
     assert len(loose) == len(tight)
@@ -670,6 +719,64 @@ _PT_EXAMPLE = importlib.util.module_from_spec(_PT_SPEC)
 _PT_SPEC.loader.exec_module(_PT_EXAMPLE)
 
 
+def test_sd_example_named_visualization(tmp_path):
+    """Exercise named map/box/camera consumers, including empty delta capture footers."""
+    from types import SimpleNamespace
+
+    ids = np.array([[1, 2, 3, 4]], dtype=np.uint32)
+    semantic_ids = np.array([[5, 0, 0, 0]], dtype=np.uint32)
+    def identifier_map(label):
+        return {"id": ids.copy(), "label_offsets": np.array([0, len(label)], dtype=np.uint64),
+                "label_data": np.frombuffer(label, dtype=np.uint8)}
+    empty = {"id": np.empty((0, 4), dtype=np.uint32), "label_offsets": np.array([0], dtype=np.uint64),
+             "label_data": np.empty(0, dtype=np.uint8)}
+    tensors = {"LdrColor": np.zeros((180, 320, 4), dtype=np.uint8),
+               "StableIdSegmentation": np.zeros((180, 320, 4), dtype=np.uint32),
+               "StableIdMap": identifier_map(b"/World/GR1T2_fourier_hand_6dof"),
+               "SemanticIdMap": identifier_map(b"class: robot; "),
+               "StableIdMapDeltas": empty, "SemanticIdMapDeltas": empty,
+               "StableIdSemanticIdMap": {"stable_id": ids, "semantic_id": semantic_ids},
+               "InstanceMap": {"semantic_instance_index": np.array([0], dtype=np.uint32)},
+               "CameraParams": {"params": {"view_matrix": np.eye(4), "projection_matrix": np.eye(4),
+                   "render_product_resolution": np.array([320, 180]), "near_far": np.array([.1, 100]),
+                   "camera_model": np.frombuffer(b"pinhole", dtype=np.uint8), "meters_per_scene_unit": np.array([1], np.float32),
+                   "focal_length": np.array([35], np.float32), "focal_distance": np.array([10], np.float32), "f_stop": np.array([2], np.float32),
+                   "fov_x_radians": np.array([1], np.float32)}}}
+    for name in ("BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
+                 "SemanticBoundingBox2DTight", "SemanticBoundingBox2DLoose", "SemanticBoundingBox3D"):
+        dimensions = 3 if "3D" in name else 2
+        fields = {"extent": np.array([[[-.5] * dimensions, [.5] * dimensions]], dtype=np.float32)
+                             if dimensions == 3 else np.array([[[10, 20], [30, 40]]], dtype=np.int32)}
+        if name.startswith("Semantic"):
+            fields.update(id=ids, semantic_id=semantic_ids, valid_count=np.array([1], dtype=np.uint32))
+        else:
+            fields.update(instance_id=np.array([7], dtype=np.uint32), render_tile_id=np.array([0], dtype=np.uint32))
+        if dimensions == 3:
+            fields["object_to_world"] = np.eye(4, dtype=np.float32)[None]
+        tensors[name] = fields
+    tensors["InstanceIdTokenMapSD"] = {
+        "instance_id": np.array([7], np.uint32), "prim_token": np.array([2**40], np.uint64),
+        "prototype_index": np.array([0], np.uint32), "instance_index": np.array([0], np.uint32),
+        "params": {"min_instance_id": np.array([7], np.uint32), "max_instance_id": np.array([7], np.uint32),
+                   "render_tile_count": np.array([1], np.uint32)}}
+    tensors["OcclusionSD"] = {"instance_id": np.array([7], np.uint32), "render_tile_id": np.array([0], np.uint32),
+                              "occlusion_ratio": np.array([.25], np.float32)}
+    rr = SimpleNamespace(log=lambda *args: None, Image=lambda pixels: pixels)
+    initial_maps = {"StableIdMapDeltas": tensors["StableIdMap"],
+                    "SemanticIdMapDeltas": tensors["SemanticIdMap"]}
+    _PT_EXAMPLE.visualize_sd_buffers(rr, tensors, initial_maps, tmp_path)
+    import json
+    decoded = json.loads((tmp_path / "decoded.json").read_text())
+    assert decoded["StableIdMapDeltas"][0]["id"] == [1, 2, 3, 4]
+    assert decoded["StableIdMapDeltas"][0]["label"] == "/World/GR1T2_fourier_hand_6dof"
+    assert (tmp_path / "StableIdMapDeltas.png").is_file()
+    assert (tmp_path / "SemanticIdMapDeltas.png").is_file()
+    assert decoded["InstanceIdTokenMapSD"]["records"][0][1] == 2**40
+    assert decoded["BoundingBox2DTightSD"][0]["min"] == [10, 20]
+    assert decoded["CameraParams"]["resolution"] == [320, 180]
+    assert (tmp_path / "SemanticBoundingBox3D.png").is_file()
+
+
 def test_pt_pixel_types_and_view_metadata():
     """Check half floats, UNORM values, rejected ID pixels, and independent metadata offsets."""
     halves = np.array([0x3c00, 0xc000, 0x0001, 0x7c00], dtype=np.uint16).view(np.float16).reshape(1, 1, 4)
@@ -681,15 +788,51 @@ def test_pt_pixel_types_and_view_metadata():
     np.testing.assert_allclose(_PT_EXAMPLE.decode_pt_pixels(unorm)[0, 0], [1, 128 / 255, 0, 1])
     with pytest.raises(ValueError, match="uint8"):
         _PT_EXAMPLE.decode_pt_pixels(np.ones((1, 1, 4), dtype=np.uint32))
-    data = np.arange(236, dtype=np.float32).reshape(1, 236, 1)
-    record = _PT_EXAMPLE.decode_pt_view_data(data)
-    assert record["view"][0, 0] == 48
-    np.testing.assert_array_equal(record["view_origin"], [228, 229, 230, 231])
-    np.testing.assert_array_equal(record["projection_jitter"], [234, 235])
-    with pytest.raises(ValueError, match="236"):
-        _PT_EXAMPLE.decode_pt_view_data(data[:, :-1])
-    with pytest.raises(ValueError, match="float32"):
-        _PT_EXAMPLE.decode_pt_view_data(data.astype(np.float16))
+
+
+@pytest.mark.parametrize("names", [
+    ("ReflectionsFirstBounceNormal",),
+    ("ReflectionsFirstBounceDiffuseAlbedo",),
+    ("ReflectionsFirstBounceNormal", "ReflectionsFirstBounceDiffuseAlbedo"),
+], ids=["normal", "diffuse", "normal-and-diffuse"])
+def test_pt_independent_first_bounce_outputs(renderer, stage, names):
+    """PT must not write unallocated guide buffers when only first-bounce AOVs are requested."""
+    definitions = "\n".join(
+        f'        def RenderVar "{name}" {{\n            string sourceName = "{name}"\n        }}'
+        for name in names
+    )
+    ordered = ", ".join(f"<{name}>" for name in names)
+    # [snippet:doc-pt-independent-first-bounce-outputs]
+    scene = f'''#usda 1.0
+( subLayers = [@{_RTPT_SCENE_PATH}@] )
+def "Render" {{
+    def RenderProduct "Camera" {{
+        rel camera = </Camera0>
+        int2 resolution = (64, 36)
+        token omni:rtx:rendermode = "PathTracing"
+        uint omni:rtx:pt:samplesPerPixel = 128
+        int omni:rtx:pt:samplesPerIteration = 8
+        int omni:rtx:quality = 0
+        int omni:rtx:quality:minSpp = 24
+        bool omni:rtx:pt:adaptiveSampling:enabled = false
+        bool omni:rtx:pt:radianceCache:enabled = false
+        rel orderedVars = [{ordered}]
+        {definitions}
+    }}
+}}
+'''
+    ovstage.population.open_usd_from_string(stage, scene, ordinal=1)
+    stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
+    products = renderer.step(render_products={"/Render/Camera"}, delta_time=1 / 60, ordinal=1)
+    frame = next(iter(products.values())).frames[0]
+    # Capture while still sampling: the no-samples path does not export transient first-bounce AOVs.
+    assert 0 < frame.progression < 128
+    for name in names:
+        pixels = map_sd_image(frame, f"/Render/Camera/{name}")
+        assert pixels.shape == (36, 64, 4), name
+        assert np.isfinite(pixels).all(), name
+    del frame, products
+    # [/snippet:doc-pt-independent-first-bounce-outputs]
 
 
 def test_pt_camera_outputs(renderer, stage):
@@ -709,13 +852,13 @@ def test_pt_camera_outputs(renderer, stage):
              "PtLuminance", "PtIlluminance", "PtMotion", "DlssInput", "BumpNormal", "BumpNormalResearch",
              "DiffuseAlbedo", "SpecularAlbedo", "DepthLinearized", "Motion2dXYZ", "Motion2dDilated",
              "Motion2dXYZDilated", "MotionWorld", "EmissionAndForegroundMask", "DiffuseLightingDirectAndIndirect",
-             "SpecularLightingDirectAndIndirect", "LightingComposited", "Exposure", "ViewMatricesAux",
+             "SpecularLightingDirectAndIndirect", "LightingComposited", "Exposure",
              "Roughness", "DisocclusionMask", "ViewspacePosition", "HighResDepth", "HighResMotion2d",
              "HighResMotion2dXYZ", "HighResDisocclusionMask", "XRDepth"] + [f"PtLpe{i}" for i in range(9)]
     images = {name: map_sd_image(frame, f"/Render/Camera/{name}") for name in names}
     for name, pixels in images.items():
         assert pixels.ndim == 3 and pixels.size, name
-        if name not in {"Exposure", "ViewMatricesAux"} and not name.startswith("HighRes"):
+        if name not in {"Exposure"} and not name.startswith("HighRes"):
             assert pixels.shape[:2] == (180, 320), name
         expected = np.uint8 if name in {"LdrColor", "DiffuseAlbedo", "SpecularAlbedo", "Roughness"} else (
             np.float16 if name.startswith("Pt") and name not in {"PtWorldNormal", "PtWorldPos", "PtLuminance", "PtIlluminance", "PtMotion"}
@@ -724,7 +867,6 @@ def test_pt_camera_outputs(renderer, stage):
         assert np.isfinite(pixels).all(), name
         _PT_EXAMPLE.decode_pt_pixels(pixels)
     assert images["Exposure"].shape == (1, 1, 1) and images["Exposure"][0, 0, 0] > 0
-    _PT_EXAMPLE.decode_pt_view_data(images["ViewMatricesAux"])
     normal_lengths = np.linalg.norm(images["PtWorldNormal"][..., :3], axis=-1)
     visible = normal_lengths > .1
     assert visible.any()

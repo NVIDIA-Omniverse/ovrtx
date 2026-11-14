@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="948" height="830.67" viewBox="0 0 948 830.67" role="img" aria-labelledby="title desc">
+<title id="title">Camera generic core model: pipeline stages and outputs</title>
+<desc id="desc">The seven stages in order from HdrColor to the two primary outputs: read the rendered image, color correction, color filter array, sensor noise, companding, ISP and YUV decode, each labeled with the AOV it publishes and that AOV's element format. OmniCameraSensorPreIsp is marked as the primary RAW output after companding and OmniCameraSensorPostIsp as the primary processed output after the YUV decode; the other five AOVs are marked as optional taps.</desc>
+<defs><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker><marker id="arrow-76b900-2p5" markerUnits="userSpaceOnUse" markerWidth="13.75" markerHeight="11.25" refX="0" refY="5.62" orient="auto" overflow="visible"><path d="M0,0 L13.75,5.62 L0,11.25 z" fill="#76B900"/></marker></defs>
+<rect width="948" height="830.67" fill="#fff"/>
+<rect x="250" y="24" width="250" height="48" rx="6" fill="#F2F2F2" stroke="#757575" stroke-width="1.5"/>
+<text x="375" y="45" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">HdrColor</text>
+<text x="375" y="62" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">the rendered image, the only input</text>
+<line x1="375" y1="73" x2="375" y2="90" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<rect x="250" y="102" width="250" height="64" rx="6" fill="#F2F2F2"/>
+<circle cx="272" cy="134" r="11" fill="#757575"/>
+<text x="272" y="138.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">1</text>
+<text x="391.5" y="139" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">Read the rendered image</text>
+<line x1="375" y1="167" x2="375" y2="180" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="501" y1="134" x2="608" y2="134" stroke="#757575" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-757575-2)"/>
+<text x="560" y="127" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">optional tap</text>
+<rect x="620" y="102" width="304" height="64" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="632" y="123" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">OmniCameraSensorInputSource</text>
+<text x="632" y="141" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">4 components, 16-bit float RGBA</text>
+<rect x="250" y="192" width="250" height="64" rx="6" fill="#F2F2F2"/>
+<circle cx="272" cy="224" r="11" fill="#757575"/>
+<text x="272" y="228.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<text x="391.5" y="229" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">Color correction</text>
+<line x1="375" y1="257" x2="375" y2="270" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="501" y1="224" x2="608" y2="224" stroke="#757575" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-757575-2)"/>
+<text x="560" y="217" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">optional tap</text>
+<rect x="620" y="192" width="304" height="64" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="632" y="213" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">OmniCameraSensorPostColorCorrection</text>
+<text x="632" y="231" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">4 components, 16-bit float RGBA</text>
+<rect x="250" y="282" width="250" height="64" rx="6" fill="#F2F2F2"/>
+<circle cx="272" cy="314" r="11" fill="#757575"/>
+<text x="272" y="318.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">3</text>
+<text x="391.5" y="319" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">Color filter array</text>
+<line x1="375" y1="347" x2="375" y2="360" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="501" y1="314" x2="608" y2="314" stroke="#757575" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-757575-2)"/>
+<text x="560" y="307" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">optional tap</text>
+<rect x="620" y="282" width="304" height="64" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="632" y="303" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">OmniCameraSensorPostCfa</text>
+<text x="632" y="321" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">1 component, 32-bit unsigned integer, or 32-bit</text>
+<text x="632" y="338" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">float with FLOAT32</text>
+<rect x="250" y="372" width="250" height="64" rx="6" fill="#F2F2F2"/>
+<circle cx="272" cy="404" r="11" fill="#757575"/>
+<text x="272" y="408.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<text x="391.5" y="409" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">Sensor noise</text>
+<line x1="375" y1="437" x2="375" y2="450" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="501" y1="404" x2="608" y2="404" stroke="#757575" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-757575-2)"/>
+<text x="560" y="397" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">optional tap</text>
+<rect x="620" y="372" width="304" height="64" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="632" y="393" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">OmniCameraSensorPostNoise</text>
+<text x="632" y="411" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">1 component, 32-bit unsigned integer</text>
+<rect x="250" y="462" width="250" height="64" rx="6" fill="#F2F2F2"/>
+<circle cx="272" cy="494" r="11" fill="#757575"/>
+<text x="272" y="498.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">5</text>
+<text x="391.5" y="499" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">Companding</text>
+<line x1="375" y1="527" x2="375" y2="540" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="501" y1="494" x2="605.25" y2="494" stroke="#76B900" stroke-width="2.5" marker-end="url(#arrow-76b900-2p5)"/>
+<text x="560" y="487" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" text-anchor="middle" font-weight="bold">primary output</text>
+<text x="560" y="509" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#76B900" text-anchor="middle">(RAW)</text>
+<rect x="620" y="462" width="304" height="64" rx="6" fill="#fff" stroke="#76B900" stroke-width="2.5"/>
+<text x="632" y="483" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" font-weight="bold">OmniCameraSensorPreIsp</text>
+<text x="632" y="501" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">1 component, 16-bit unsigned integer; 32-bit if</text>
+<text x="632" y="518" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">the curve exceeds 16 bits</text>
+<rect x="250" y="552" width="250" height="84" rx="6" fill="#F2F2F2"/>
+<circle cx="272" cy="594" r="11" fill="#757575"/>
+<text x="272" y="598.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">6</text>
+<text x="391.5" y="580" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">ISP</text>
+<text x="391.5" y="599" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">runs the program in</text>
+<text x="391.5" y="616" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131" text-anchor="middle">ispSmodelCameraProgram</text>
+<line x1="375" y1="637" x2="375" y2="650" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="501" y1="594" x2="608" y2="594" stroke="#757575" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-757575-2)"/>
+<text x="560" y="587" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="middle">optional tap</text>
+<rect x="620" y="562" width="304" height="64" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="632" y="583" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131">OmniCameraSensorPostYuvIsp</text>
+<text x="632" y="601" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">4 components, 16-bit unsigned integer AYUV,</text>
+<text x="632" y="618" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">not RGB</text>
+<rect x="250" y="662" width="250" height="64" rx="6" fill="#F2F2F2"/>
+<circle cx="272" cy="694" r="11" fill="#757575"/>
+<text x="272" y="698.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">7</text>
+<text x="391.5" y="699" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">YUV decode</text>
+<line x1="501" y1="694" x2="605.25" y2="694" stroke="#76B900" stroke-width="2.5" marker-end="url(#arrow-76b900-2p5)"/>
+<text x="560" y="687" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" text-anchor="middle" font-weight="bold">primary output</text>
+<text x="560" y="709" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#76B900" text-anchor="middle">(processed)</text>
+<rect x="620" y="662" width="304" height="64" rx="6" fill="#fff" stroke="#76B900" stroke-width="2.5"/>
+<text x="632" y="683" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12.5" fill="#313131" font-weight="bold">OmniCameraSensorPostIsp</text>
+<text x="632" y="701" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">4 components, 8-bit unsigned integer RGBA</text>
+<path d="M238,102 L230,102 L230,526 L238,526" fill="none" stroke="#0074DF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M222,102 L214,102 L214,726 L222,726" fill="none" stroke="#952FC6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="200" y="292.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#0074DF" text-anchor="end" font-weight="bold">pre-ISP pipeline</text>
+<text x="200" y="309.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131" text-anchor="end">OmniCameraSensorPreIsp</text>
+<text x="200" y="326.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">requested without</text>
+<text x="200" y="343.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131" text-anchor="end">OmniCameraSensorPostIsp</text>
+<text x="200" y="401" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#952FC6" text-anchor="end" font-weight="bold">full pipeline</text>
+<text x="200" y="418" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131" text-anchor="end">OmniCameraSensorPostIsp</text>
+<text x="200" y="435" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">requested</text>
+<line x1="24" y1="762" x2="40" y2="762" stroke="#76B900" stroke-width="2"/>
+<text x="47" y="766.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">primary output</text>
+<line x1="159.37" y1="762" x2="175.37" y2="762" stroke="#757575" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="182.37" y="766.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">optional tap</text>
+<line x1="276.51" y1="762" x2="292.51" y2="762" stroke="#0074DF" stroke-width="2"/>
+<text x="299.51" y="766.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">pre-ISP pipeline, stages 1–5</text>
+<line x1="487.88" y1="762" x2="503.88" y2="762" stroke="#952FC6" stroke-width="2"/>
+<text x="510.88" y="766.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">full pipeline, stages 1–7</text>
+<text x="24" y="786" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">Request at least one primary output. Requesting both builds the full pipeline and also publishes the companded RAW image. Diagnostic taps publish only</text>
+<text x="24" y="802.67" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">when their stage is built.</text>
+</svg>

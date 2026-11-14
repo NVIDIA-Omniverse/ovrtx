@@ -11,7 +11,7 @@
 Python: SPG Built-In Nodes
 ==========================
 
-Not every SPG node needs a custom CUDA kernel. SPG ships built-in factory nodes that you author
+SPG ships built-in factory nodes that you author
 with ``info:implementationSource = "id"`` and an ``info:id`` — no ``.cu`` or ``.cu.lua`` required.
 This example chains two stdlib nodes: ``Add`` doubles the ``LdrColor`` AOV's brightness by adding
 it to itself (saturating at 255), then ``Scale`` downscales that result to half resolution.
@@ -38,9 +38,6 @@ Running
 
    uv run main.py
 
-A successful run writes ``_output/input.png`` and ``_output/downscaled.png``, half the input's
-width and height.
-
-Both nodes are exact in integers, so the run rebuilds their result on the host and compares with
-no tolerance: a value that did not double means Add never ran, and a size that did not halve means
-Scale never ran. See :ref:`spg-stdlib-nodes` for the full catalog of built-in nodes.
+A successful run writes ``_output/input.png`` and ``_output/downscaled.png``: the input brightened
+by Add, which saturates each channel at ``min(2v, 255)``, and halved in width and height by Scale.
+See :ref:`spg-stdlib-nodes` for the full catalog of built-in nodes.

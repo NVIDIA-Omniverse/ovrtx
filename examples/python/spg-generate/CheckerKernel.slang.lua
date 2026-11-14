@@ -11,7 +11,7 @@
 -- [snippet:checker-slang-launch]
 -- Launch script for a node with no resource-input, on Slang.
 --
--- Nothing hands this node a resource, so there is no descriptor to take a shape
+-- There is no input descriptor to take a shape
 -- from. The size comes from typed USD attributes instead. The values are packed
 -- into one parameter block, in the order the shader's Params struct declares.
 function checker(inputs, outputs)
@@ -22,7 +22,7 @@ function checker(inputs, outputs)
 
     outputs["Checker"] = slang.image(width, height, slang.uchar4)
 
-    return slang.dispatch({
+    return slang.compute({
         bind = {
             slang.ParameterBlock(
                 slang.int(inputs["width"]),            -- -> int    width

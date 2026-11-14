@@ -58,6 +58,25 @@ Example Projects
       +++
       Build and run in: :doc:`C → <c_vulkan_interop>`
 
+   .. grid-item-card:: Custom Selection with SPG
+      :img-top: ../../img/example-selection-spg.avif
+      :img-alt: Custom selection outlines and patterned fills on a sphere, torus, and cube
+
+      Draw custom selection outlines, stippling, and hatching from the
+      output-resolution SelectionState AOV using an SPG graph.
+      +++
+      Build and run in: :doc:`C → <c_selection_spg>`
+
+   .. grid-item-card:: DLSS Frame Generation
+      :img-top: ../../img/example-frame-generation.avif
+      :img-alt: Three interpolated frames followed by the real rendered frame
+
+      .. container:: example-prompt
+
+         *“Create a headless C/C++ example that enables DLSS Frame Generation on a RenderProduct, steps a moving scene, reports how many interpolated frames were actually produced versus requested, identifies which output frame is the simulated one, and writes every frame to disk for comparison.”*
+      +++
+      Build and run in: :doc:`C → <c_frame_generation>`
+
    .. grid-item-card:: Planet System
       :img-top: ../../img/example-planet-system.jpg
       :img-alt: Planet System example output
@@ -127,6 +146,27 @@ Example Projects
       +++
       Build and run in: :doc:`Python → <python_projector_light_calibration>`
 
+   .. grid-item-card:: Video Textures
+      :img-top: ../img/video-textures.avif
+      :img-alt: Four timestamped H.265 video-texture renders
+
+      .. container:: example-prompt
+
+         *“Create a video-texture example with a visible timestamp and moving
+         object, render several source times, and make the results
+         playable in Rerun.”*
+      +++
+      Build and run in: :doc:`Python → <python_video_textures>`
+
+   .. grid-item-card:: AOV Compositing
+      :img-top: ../img/aov-compositing.avif
+      :img-alt: Scene reconstructed from seven Path Tracing lighting outputs
+
+      Reconstruct beauty from seven linear lighting passes and compare the
+      result with the rendered image.
+      +++
+      Build and run in: :doc:`Python → <python_aov_compositing>`
+
    .. grid-item-card:: Light Path Expressions
       :img-top: ../img/light-path-expressions.avif
       :img-alt: Beauty and four Light Path Expression outputs
@@ -155,6 +195,14 @@ Example Projects
       +++
       Build and run in: :doc:`Python → <python_debug_views>`
 
+   .. grid-item-card:: Camera calibration
+      :img-top: ../img/sensors/camera/calibration-inputs.avif
+      :img-alt: Eight checkerboard photographs used for camera calibration
+
+      Fit a camera model from photographs and save the calibration as a USD Camera.
+      +++
+      Build and run in: :doc:`Python → <python_camera_calibration>`
+
    .. grid-item-card:: Camera Lens Calibration
       :img-top: ../img/camera-lens-calibration.avif
       :img-alt: OpenCV pinhole, OpenCV fisheye, and omni-directional stereo camera outputs
@@ -172,10 +220,10 @@ Example Projects
       Build and run in: :doc:`Python → <python_camera_rolling_shutter>`
 
    .. grid-item-card:: Camera Scene Partitions
-      :img-top: ../img/camera-scene-partitions.png
-      :img-alt: Two cameras rendering isolated scene partitions
+      :img-top: ../img/sensors/common/camera-scene-partitions.avif
+      :img-alt: Three cameras rendering the left, right, and combined scene partitions
 
-      Render isolated robot environments from two cameras in one stage.
+      Render the left, right, and combined scene partitions from three cameras in one stage.
       +++
       Build and run in: :doc:`Python → <python_camera_scene_partitions>`
 
@@ -332,13 +380,13 @@ Example Projects
 
       Tested authoring and runtime examples.
       +++
-      Build and run in: :doc:`Python <python_gaussian_splats>`, :doc:`C/C++ <c_gaussian_splats>`
+      Build and run in: :doc:`Python <python_gaussian_splats>`, :doc:`C <c_gaussian_splats>`
 
    .. grid-item-card:: USD Plugin Paths
 
       Register ovrtx schemas and verify that external OpenUSD can use them.
       +++
-      Build and run in: :doc:`Python <python_usd_plugin_paths>`, :doc:`C/C++ <c_usd_plugin_paths>`
+      Build and run in: :doc:`Python <python_usd_plugin_paths>`, :doc:`C <c_usd_plugin_paths>`
 
    .. grid-item-card:: Spectral Rendering
       :img-top: ../img/spectral-banner.avif
@@ -348,6 +396,14 @@ Example Projects
       Canon EOS 5D and Sony α7 IV camera responses with the CIE 1931 observer.
       +++
       Build and run in: :doc:`C → <c_spectral_rendering>`, :doc:`Python → <python_spectral_rendering>`
+
+   .. grid-item-card:: Runtime textures
+      :img-top: ../img/runtime-textures.avif
+      :img-alt: Texture changing from red to green
+
+      Publish CUDA texels through an attached runtime stage.
+      +++
+      Build and run in: :doc:`Python <python_runtime_textures>`, :doc:`C <c_runtime_textures>`
 
 .. toctree::
    :hidden:
@@ -361,11 +417,15 @@ Example Projects
    python_sliced_rendering
    python_projectors
    python_decals
+   python_runtime_textures
    python_projector_light_calibration
+   python_video_textures
    python_lpes
+   python_aov_compositing
    python_status_queries
    python_semantic_segmentation
    python_debug_views
+   python_camera_calibration
    python_camera_lens_calibration
    python_camera_rolling_shutter
    python_camera_scene_partitions
@@ -373,6 +433,8 @@ Example Projects
    python_multi_rate_sensors
    python_sensor_radar
    python_sensor_acoustic
+   python_generic_wpm
+   c_generic_wpm
    python_spg_grayscale
    python_spg_pipeline
    python_spg_builtin_nodes
@@ -385,10 +447,13 @@ Example Projects
    python_spg_scene_query
    c_minimal
    c_decals
+   c_runtime_textures
    c_minimal_dlss
    c_spectral_rendering
    c_vulkan_interop
+   c_selection_spg
    c_sensor_observer
+   c_frame_generation
    c_status_queries
    c_material_editor
    c_sensor_lidar

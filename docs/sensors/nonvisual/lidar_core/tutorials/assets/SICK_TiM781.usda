@@ -1,0 +1,113 @@
+#usda 1.0
+(
+    doc = """Source-based SICK TiM781-2174101 profile.
+Built from SICK datasheet 1096807 and TiM781 operating instructions 8024231."""
+    metersPerUnit = 1
+    upAxis = "Z"
+    defaultPrim = "SICK_TiM781"
+)
+
+def OmniLidar "SICK_TiM781" (
+    doc = """SICK TiM781 nominal 15 Hz profile.
+The profile represents the documented rotating mirror as one emitter sampled
+at encoder ticks. Values described as maxima or approximations require
+validation against the target device."""
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    string omni:sensor:modelName = "LidarCore"
+    string omni:sensor:modelVersion = "0"
+    string omni:sensor:modelVendor = "NVIDIA"
+    string omni:sensor:marketName = "SICK TiM781-2174101"
+    double2 omni:sensor:frameRate = (15, 1)
+
+    token omni:sensor:Core:scanType = "ROTARY"
+    # CCW describes the modeled beam sweep after coordinate conversion, not
+    # an independently published mirror-shaft direction.
+    token omni:sensor:Core:rotationDirection = "CCW"
+    token omni:sensor:Core:rayType = "IDEALIZED"
+    bool omni:sensor:Core:partialOutputs = false
+
+    # SICK timestamps a scan at the -90-degree zero index. The visible scan
+    # runs from -45 to +225 degrees, which maps to the core's internal
+    # interval from 315 down to 45 degrees for this CCW configuration.
+    # The 0.0001-degree endpoint epsilons retain both inclusive visible
+    # boundary ticks across float evaluation without admitting an adjacent
+    # one-third-degree sample.
+    float omni:sensor:Core:validStartAzimuthDeg = 44.9999
+    float omni:sensor:Core:validEndAzimuthDeg = 315.0001
+    float omni:sensor:Core:startAzimuthOffsetDeg = 90.0
+
+    float omni:sensor:Core:nearRangeM = 0.05
+    float omni:sensor:Core:farRangeM = 25.0
+    float omni:sensor:Core:rangeResolutionM = 0.001
+    # The source specifies statistical error below 20 mm (1 sigma) and a
+    # separate systematic error of +/-60 mm. This value approximates only
+    # the statistical term.
+    float omni:sensor:Core:rangeAccuracyM = 0.02
+    # SICK specifies 10% at 8 m as a typical sensing range, whereas this
+    # generic-core pair is a threshold anchor. Validate and calibrate it.
+    float omni:sensor:Core:minReflectance = 0.10
+    float omni:sensor:Core:minReflectionRangeM = 8.0
+
+    float omni:sensor:Core:waveLengthNm = 850.0
+    # Effective HDDM measurement footprint: 8.6 mrad single-pulse divergence
+    # plus a 5.8 mrad horizontal supplement; the vertical value is 8.6 mrad.
+    float omni:sensor:Core:divergenceHorDeg = 0.8251
+    float omni:sensor:Core:divergenceVerDeg = 0.4927
+
+    token omni:sensor:Core:intensityProcessing = "NORMALIZATION"
+    token omni:sensor:Core:intensityMappingType = "LINEAR"
+    float omni:sensor:Core:intensityScalePercent = 254.0
+
+    # Published upper bounds, used as source-based starting values rather
+    # than nominal calibrated radiometric values.
+    float omni:sensor:Core:peakPowerW = 0.88
+    uint omni:sensor:Core:pulseTimeNs = 5
+
+    uint omni:sensor:Core:maxReturns = 1
+    # Nominal 1/3-degree encoder step. The decimal is within the core's
+    # integer-tick snap tolerance and therefore schedules 1080 ticks/rotation.
+    float omni:sensor:Core:rotPatternFiringResDeg = 0.3333333
+    uint omni:sensor:Core:numberOfEmitters = 1
+    uint omni:sensor:Core:numberOfChannels = 1
+    uint omni:sensor:Core:rangeCount = 1
+    float[] omni:sensor:Core:rangesMinM = [0.05]
+    float[] omni:sensor:Core:rangesMaxM = [25.0]
+    uint omni:sensor:Core:stateResolutionStep = 1
+
+    # No random angular distribution is published. Keep synthetic jitter at
+    # zero until it can be fitted to measurements.
+    float omni:sensor:Core:azimuthErrorMean = 0.0
+    float omni:sensor:Core:azimuthErrorStd = 0.0
+    float omni:sensor:Core:elevationErrorMean = 0.0
+    float omni:sensor:Core:elevationErrorStd = 0.0
+
+    float[] omni:sensor:Core:emitterState:s001:azimuthDeg = [0.0]
+    float[] omni:sensor:Core:emitterState:s001:elevationDeg = [0.0]
+    # The optical plane is 62.46 mm above the assumed housing-base prim.
+    # This maps Z only; the mounting asset must establish the X/Y origin.
+    float[] omni:sensor:Core:emitterState:s001:vertOffsetM = [0.06246]
+    uint[] omni:sensor:Core:emitterState:s001:fireTimeNs = [0]
+    # PointCloud ChannelId reports the authored ID, so every point carries 1.
+    uint[] omni:sensor:Core:emitterState:s001:channelId = [1]
+    uint[] omni:sensor:Core:emitterState:s001:rangeId = [0]
+
+    def RenderProduct "RenderedOutputs"
+    {
+        uniform int2 resolution = (1280, 720)
+        rel camera = <../../SICK_TiM781>
+        rel orderedVars = [
+            <SupportedOutputs/PointCloud>
+        ]
+
+        def Scope "SupportedOutputs"
+        {
+            def RenderVar "PointCloud"
+            {
+                string sourceName = "PointCloud"
+                token[] channels = ["Coordinates", "Intensity", "TimeOffsetNs", "EmitterId", "ChannelId", "EchoId"]
+            }
+        }
+    }
+}

@@ -1,0 +1,15 @@
+#usda 1.0
+
+# [snippet:doc-lidar-wpm-output-request]
+def RenderProduct "LidarProduct"
+{
+    rel camera = </Lidar>
+    rel orderedVars = [</PointCloud>]
+}
+
+def RenderVar "PointCloud"
+{
+    uniform string sourceName = "PointCloud"
+    token[] channels = ["Coordinates", "Intensity", "TimeOffsetNs"]
+}
+# [/snippet:doc-lidar-wpm-output-request]

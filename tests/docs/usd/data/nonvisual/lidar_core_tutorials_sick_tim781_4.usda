@@ -1,0 +1,15 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-tutorials-sick-tim781-4]
+#usda 1.0
+
+def OmniLidar "SICK_TiM781"
+{
+    token omni:sensor:Core:rotationDirection = "CCW"
+    float omni:sensor:Core:startAzimuthOffsetDeg = 90.0
+    float omni:sensor:Core:validStartAzimuthDeg = 44.9999
+    float omni:sensor:Core:validEndAzimuthDeg = 315.0001
+}
+# [/snippet:doc-nonvisual-lidar-core-tutorials-sick-tim781-4]

@@ -3,10 +3,11 @@ name = "usd-plugin-paths"
 version = "0.2.0"
 description = "ovrtx usd-plugin-paths example"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 dependencies = [
-    "ovrtx==0.6.0.1791947691",
-    "usd-core==26.3",
+    "ovrtx==0.7.0.1794596436",
+    "usd-core==26.3; python_version < '3.14'",
+    "usd-core==26.5; python_version >= '3.14'",
 ]
 
 [tool.uv]
@@ -23,4 +24,4 @@ required-environments = [
 
 
 [dependency-groups]
-dev = ["pytest==9.0.2"]
+dev = ["pytest==9.2.0", "Pygments>=2.21.0"]

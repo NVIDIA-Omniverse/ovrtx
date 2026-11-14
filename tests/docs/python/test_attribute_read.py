@@ -51,7 +51,8 @@ def test_read_scalar_attribute_cpu(stage):
         read = stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2))
         read.wait()
         group = read.fetch_next()
-        tensor = group.dlpack(0)
+        column = group.columns[0]
+        tensor = column.dlpack(0)
         values = np.from_dlpack(tensor).copy()
         stage.release_group(group)
         read.release().wait()
@@ -107,7 +108,8 @@ def test_read_array_attribute(stage):
         # [snippet:doc-read-array-attribute]
         with stage.read_attributes(query, [points], ovstage.OrdinalRange.latest(1)) as read:
             group = read.fetch_next()
-            values = np.from_dlpack(group.dlpack(0)).copy()
+            column = group.columns[0]
+            values = np.from_dlpack(column.dlpack(0)).copy()
             stage.release_group(group)
         # [/snippet:doc-read-array-attribute]
 
@@ -136,7 +138,8 @@ def test_read_attribute_async(stage):
         read = stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2))
         read.wait()
         group = read.fetch_next()
-        values = np.from_dlpack(group.dlpack(0)).copy()
+        column = group.columns[0]
+        values = np.from_dlpack(column.dlpack(0)).copy()
         stage.release_group(group)
         read.release().wait()
         # [/snippet:doc-read-attribute-async]

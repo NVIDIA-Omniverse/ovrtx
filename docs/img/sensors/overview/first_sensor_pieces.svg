@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" role="img" aria-labelledby="title desc">
+<title id="title">The pieces of the worked lidar example</title>
+<desc id="desc">The lidar prim, the RenderProduct pointing at it through rel camera and at the PointCloud RenderVar through rel orderedVars, and the step result leading to the mapped channel tensors and params</desc>
+<defs><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker></defs>
+<rect width="1200" height="660" fill="#fff"/>
+<text x="24" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#757575" font-weight="bold">Authored in the scene</text>
+<rect x="24" y="50" width="382" height="172" rx="8" fill="#F2F2F2"/>
+<text x="38" y="74" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Sensor prim</text>
+<text x="38" y="93" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">/World/Lidar</text>
+<text x="38" y="111" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">where the sensor is and how it behaves</text>
+<line x1="38" y1="120" x2="392" y2="120" stroke="#C0C0C0" stroke-width="1"/>
+<text x="38" y="138" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">OmniLidar + OmniSensorGenericLidarCoreAPI</text>
+<text x="38" y="156" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">selects the Lidar generic core model</text>
+<text x="38" y="174" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">omni:sensor:Core:elementsCoordsType = "CARTESIAN"</text>
+<text x="38" y="192" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">omni:sensor:Core:includeInvalidPoints = false</text>
+<text x="38" y="210" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">omni:sensor:frameRate = (10, 1)</text>
+<rect x="502" y="92" width="282" height="88" rx="8" fill="#F2F2F2"/>
+<text x="516" y="116" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">RenderProduct</text>
+<text x="516" y="135" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">/World/Render/Products/LidarProduct</text>
+<text x="516" y="153" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">the request</text>
+<rect x="914" y="50" width="254" height="172" rx="8" fill="#F2F2F2"/>
+<text x="928" y="74" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">RenderVar</text>
+<text x="928" y="93" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">/World/Render/Vars/PointCloud</text>
+<text x="928" y="111" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">one requested output</text>
+<line x1="928" y1="120" x2="1154" y2="120" stroke="#C0C0C0" stroke-width="1"/>
+<text x="928" y="138" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">sourceName = "PointCloud"</text>
+<text x="928" y="156" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">channels = ["Coordinates",</text>
+<text x="950" y="174" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">"Intensity", "Counts",</text>
+<text x="950" y="192" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">"TimeOffsetNs"]</text>
+<line x1="502" y1="136" x2="417" y2="136" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="454" y="128" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">rel camera</text>
+<line x1="784" y1="136" x2="903" y2="136" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="849" y="128" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">rel orderedVars</text>
+<text x="24" y="330" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#757575" font-weight="bold">In your program</text>
+<rect x="24" y="429" width="170" height="44" rx="22" fill="#0074DF"/>
+<text x="109" y="455.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle">step(product path)</text>
+<rect x="258" y="423" width="116" height="56" rx="6" fill="#F2F2F2"/>
+<text x="316" y="445.6" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">result</text>
+<text x="316" y="463.6" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">one per product</text>
+<rect x="438" y="423" width="80" height="56" rx="6" fill="#F2F2F2"/>
+<text x="478" y="456.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">frame</text>
+<rect x="582" y="415" width="236" height="72" rx="6" fill="#F2F2F2"/>
+<text x="700" y="439" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">render var output</text>
+<text x="700" y="458" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">keyed by the RenderVar path</text>
+<text x="700" y="476" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">/World/Render/Vars/PointCloud</text>
+<rect x="882" y="429" width="70" height="44" rx="22" fill="#0074DF"/>
+<text x="917" y="455.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle">map</text>
+<rect x="1016" y="338" width="160" height="270" rx="8" fill="none" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<rect x="1026" y="348" width="140" height="30" rx="5" fill="#76B900"/>
+<text x="1096" y="367.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">Coordinates</text>
+<rect x="1026" y="384" width="140" height="30" rx="5" fill="#76B900"/>
+<text x="1096" y="403.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">Intensity</text>
+<rect x="1026" y="420" width="140" height="30" rx="5" fill="#76B900"/>
+<text x="1096" y="439.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">TimeOffsetNs</text>
+<rect x="1026" y="456" width="140" height="46" rx="5" fill="#EF9100"/>
+<text x="1096" y="474" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle">Counts</text>
+<text x="1096" y="493" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle">always delivered</text>
+<rect x="1026" y="508" width="140" height="46" rx="5" fill="#EF9100"/>
+<text x="1096" y="526" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle">Flags</text>
+<text x="1096" y="545" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle">always delivered</text>
+<rect x="1026" y="568" width="140" height="30" rx="5" fill="#F2F2F2" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="1096" y="587.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">params</text>
+<line x1="194" y1="451" x2="247" y2="451" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="226" y="443" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">returns</text>
+<line x1="374" y1="451" x2="427" y2="451" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="406" y="443" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">holds</text>
+<line x1="518" y1="451" x2="571" y2="451" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="550" y="443" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">holds</text>
+<line x1="818" y1="451" x2="871" y2="451" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="952" y1="451" x2="1005" y2="451" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="984" y="443" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">exposes</text>
+<path d="M643,180 L643,272 L172,272 L172,418" fill="none" stroke="#757575" stroke-width="2" stroke-linejoin="round" marker-end="url(#arrow-757575-2)"/>
+<text x="407.5" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">stepped by its path</text>
+<path d="M1041,222 L1041,272 L778,272 L778,404" fill="none" stroke="#757575" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4" marker-end="url(#arrow-757575-2)"/>
+<text x="909.5" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">found under its path</text>
+<rect x="24" y="630" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="43" y="640.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">produced only when listed</text>
+<rect x="223.6" y="630" width="12" height="12" rx="2" fill="#EF9100"/>
+<text x="242.6" y="640.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">delivered whether or not listed</text>
+<rect x="449.94" y="630" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="468.94" y="640.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">a call in your program</text>
+</svg>

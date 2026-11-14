@@ -1,0 +1,80 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-mixed]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_base.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        # Role order consumes successive rows from each named family.
+        token[] omni:sensor:GenericWpm:tx:patternTypes = ["free", "grid", "free"]
+        uint[] omni:sensor:GenericWpm:freePatterns:tx:numElementsPerPattern = [1, 1]
+        float3[] omni:sensor:GenericWpm:freePatterns:tx:positions = [(0, 0, 0), (0, 0.2, 0)]
+        float4[] omni:sensor:GenericWpm:freePatterns:tx:orientations = [(0, 0, 0, 1), (0, 0, 0, 1)]
+        token[] omni:sensor:GenericWpm:gridPatterns:tx:modes = ["PLANAR"]
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:numRows = [1]
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:numCols = [2]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:startRowUnits = [0]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:endRowUnits = [0]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:startColUnits = [-0.5]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:endColUnits = [0.5]
+        token[] omni:sensor:GenericWpm:gridPatterns:tx:layouts = ["rowMajor"]
+        float3[] omni:sensor:GenericWpm:gridPatterns:tx:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:gridPatterns:tx:orientations = [(0, 0, 0, 1)]
+
+        token[] omni:sensor:GenericWpm:rx:patternTypes = ["free", "grid"]
+        uint[] omni:sensor:GenericWpm:freePatterns:rx:numElementsPerPattern = [3]
+        float3[] omni:sensor:GenericWpm:freePatterns:rx:positions = [(0, -1, 0), (0, 0, 0), (0, 1, 0)]
+        float4[] omni:sensor:GenericWpm:freePatterns:rx:orientations = [(0, 0, 0, 1), (0, 0, 0, 1), (0, 0, 0, 1)]
+        token[] omni:sensor:GenericWpm:gridPatterns:rx:modes = ["PLANAR"]
+        uint[] omni:sensor:GenericWpm:gridPatterns:rx:numRows = [1]
+        uint[] omni:sensor:GenericWpm:gridPatterns:rx:numCols = [2]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:startRowUnits = [0]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:endRowUnits = [0]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:startColUnits = [-0.5]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:endColUnits = [0.5]
+        token[] omni:sensor:GenericWpm:gridPatterns:rx:layouts = ["rowMajor"]
+        float3[] omni:sensor:GenericWpm:gridPatterns:rx:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:gridPatterns:rx:orientations = [(0, 0, 0, 1)]
+
+        token[] omni:sensor:GenericWpm:ray:patternTypes = ["free", "grid", "gaussian"]
+        uint[] omni:sensor:GenericWpm:freePatterns:ray:numElementsPerPattern = [1]
+        float3[] omni:sensor:GenericWpm:freePatterns:ray:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:freePatterns:ray:orientations = [(0, 0, 0, 1)]
+        token[] omni:sensor:GenericWpm:gridPatterns:ray:modes = ["SPHERICAL"]
+        uint[] omni:sensor:GenericWpm:gridPatterns:ray:numRows = [1]
+        uint[] omni:sensor:GenericWpm:gridPatterns:ray:numCols = [3]
+        float[] omni:sensor:GenericWpm:gridPatterns:ray:startRowUnits = [0]
+        float[] omni:sensor:GenericWpm:gridPatterns:ray:endRowUnits = [0]
+        float[] omni:sensor:GenericWpm:gridPatterns:ray:startColUnits = [-5]
+        float[] omni:sensor:GenericWpm:gridPatterns:ray:endColUnits = [5]
+        token[] omni:sensor:GenericWpm:gridPatterns:ray:layouts = ["rowMajor"]
+        float3[] omni:sensor:GenericWpm:gridPatterns:ray:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:gridPatterns:ray:orientations = [(0, 0, 0, 1)]
+        uint[] omni:sensor:GenericWpm:gaussianPatterns:ray:numElements = [9]
+        uint[] omni:sensor:GenericWpm:gaussianPatterns:ray:seeds = [7]
+        float[] omni:sensor:GenericWpm:gaussianPatterns:ray:stdDevsHorizontal = [1]
+        float[] omni:sensor:GenericWpm:gaussianPatterns:ray:stdDevsVertical = [0.5]
+        float3[] omni:sensor:GenericWpm:gaussianPatterns:ray:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:gaussianPatterns:ray:orientations = [(0, 0, 0, 1)]
+
+        # Tx role patterns 0, 1, 2 select Free, Grid, Gaussian ray bundles.
+        uint[] omni:sensor:GenericWpm:tx:rayPatternIndices = [0, 1, 2]
+        token[] omni:sensor:GenericWpm:tx:mappingModes = ["map", "map", "map"]
+        uint[] omni:sensor:GenericWpm:tx:mappingTargetRxGroups = [1, 0, 1]
+        uint[] omni:sensor:GenericWpm:txRxMappings:numRxGroupsPerPages = [2, 2]
+        uint[] omni:sensor:GenericWpm:txRxMappings:numRxPerGroups = [3, 2, 1, 2]
+        # Page 0: [0,1,2], [2,0]. Page 1: [1], [0,1].
+        uint[] omni:sensor:GenericWpm:txRxMappings:rxIndices = [0, 1, 2, 2, 0, 1, 0, 1]
+    }
+}
+# [/snippet:doc-generic-wpm-mixed]

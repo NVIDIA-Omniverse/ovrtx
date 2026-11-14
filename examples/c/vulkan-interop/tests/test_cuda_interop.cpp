@@ -16,7 +16,7 @@
 
 constexpr int TEST_TEX_WIDTH = 256;
 constexpr int TEST_TEX_HEIGHT = 256;
-constexpr int SHARED_IMAGE_COUNT = 2;
+constexpr int SHARED_IMAGE_COUNT = CUDA_SHARED_IMAGE_COUNT;
 
 class CudaInteropTest : public ::testing::Test {
 protected:
@@ -105,8 +105,8 @@ TEST_F(CudaInteropTest, CanImportTimelineSemaphoreIntoCuda) {
     });
 }
 
-TEST_F(CudaInteropTest, CanImportBothSharedImages) {
-    // Test that we can import both double-buffered images
+TEST_F(CudaInteropTest, CanImportPresentationRingImages) {
+    // Test every shared image used by the presentation ring.
     for (int i = 0; i < SHARED_IMAGE_COUNT; ++i) {
         SampledImage const& img = vk->sampled_image(shared_images[i]);
         vk->immediate_submit([&img](CommandBuffer cmd) {
@@ -122,6 +122,11 @@ TEST_F(CudaInteropTest, CanImportBothSharedImages) {
         
         EXPECT_NE(surface, 0u) << "CUDA surface object for buffer " << i << " should be non-zero";
     }
+}
+
+TEST(CudaInteropConfigurationTest, RingHoldsDisplayedImageAndMaximumFrameBatch) {
+    constexpr int kBlackwellMaximumFramesPerStep = 4;
+    EXPECT_GE(CUDA_SHARED_IMAGE_COUNT, 1 + kBlackwellMaximumFramesPerStep);
 }
 
 TEST_F(CudaInteropTest, CanRunGradientKernel) {

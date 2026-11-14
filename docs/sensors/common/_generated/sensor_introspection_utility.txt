@@ -1,0 +1,281 @@
+.. GENERATED FILE. DO NOT EDIT.
+   This is a generated copy of the sensor introspection utility's own
+   documentation, which ships inside the sensor-introspection package.
+   Edits belong in that source document; regenerate this file from it.
+   Compared with the source, the title and the sections on the package layout
+   and on building new implementations are dropped, and the section adornments
+   are changed, so the body can sit under a wrapper page title.
+
+.. _sensor_introspection_utility:
+
+The utility loads a validation library for the selected sensor model. Each model implements the same interface with its own parameter checks.
+
+Architecture overview
+---------------------
+
+The utility has these components:
+
+1. **Core Interface** (``ISensorIntrospectionImpl.h``) - Defines the common interface that all sensor introspection implementations must follow
+2. **Type Definitions** (``SensorIntrospectionTypes.h``) - Defines the data structures used by the API
+3. **Utility Class** (``SensorIntrospectionUtil.h/cpp``) - Main class that handles dynamic loading and parameter caching
+4. **Implementation Libraries** - Separate shared object files for each sensor type
+5. **Factory Functions** - C-style functions exported by each implementation library
+6. **Python Bindings** - Python bindings over the native utility
+
+How dynamic loading works
+-------------------------
+
+Library discovery
+~~~~~~~~~~~~~~~~~
+
+When ``SensorIntrospectionUtil::init()`` is called, it:
+
+- Constructs the library path based on the model name and vendor
+- Or uses a custom path if provided
+- Loads the shared library using platform-specific APIs (``dlopen`` on Linux, ``LoadLibrary`` on Windows)
+
+Symbol resolution
+~~~~~~~~~~~~~~~~~
+
+The utility resolves the ``createSensorIntrospectionImpl()`` factory from the loaded library:
+
+.. code-block:: cpp
+
+    extern "C" SENSOR_INTROSPECTION_API omni::sensors::ISensorIntrospectionImpl* createSensorIntrospectionImpl();
+
+Implementation creation
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The utility calls the factory to create the model validation instance.
+``SensorIntrospectionUtil::init()`` returns library-loading, missing-factory, or implementation-creation errors before
+version resolution. After successful creation, it calls the implementation's ``init()`` to resolve
+``modelInfo.version`` in place; that call returns ``nullptr`` when accepted or a version-rejection reason.
+
+Parameter validation
+~~~~~~~~~~~~~~~~~~~~
+
+The implementation's ``validateParams()`` method is called with the provided parameters. It returns ``nullptr`` if valid, or an error string if validation fails.
+
+Data structures
+---------------
+
+ModelInfo
+~~~~~~~~~
+
+``ModelInfo`` selects the model library and requests a schema/model version:
+
+.. code-block:: cpp
+
+    struct ModelInfo
+    {
+        const char* modelName;      // Name of the sensor model (e.g., "lidar.core")
+        const char* modelVendor;    // Vendor of the model (e.g., "nv")
+        const char* marketName;     // Market name of the model; not read by the utility
+        SensorVersion version;      // Schema/model request, resolved in place on acceptance
+        bool allowDeprecated;
+    };
+
+Parameters
+~~~~~~~~~~
+
+``Parameters`` supplies parallel arrays of names, types, vector lengths and values:
+
+.. code-block:: cpp
+
+    struct Parameters
+    {
+        uint32_t numParams;                    // Number of parameters
+        const char** paramNames;               // Array of parameter names
+        SensorIntrospectionParamType* dataTypes;     // Array of parameter data types
+        uint32_t* paramVectorLengths;          // Array of vector lengths
+        const void** paramValues;              // Array of parameter values
+    };
+
+AOVInfo
+~~~~~~~
+
+Contains information about an Arbitrary Output Variable:
+
+.. code-block:: cpp
+
+    struct AOVInfo
+    {
+        const char* aovName;        // Name of the AOV
+        const void* aovBuffer;      // Buffer containing AOV data
+    };
+
+Usage examples
+--------------
+
+C++ usage
+~~~~~~~~~
+
+.. code-block:: cpp
+
+    #include "SensorIntrospectionUtil.h"
+
+    omni::sensors::SensorIntrospectionUtil introspection;
+
+    // Initialize with model information
+    // Note: Use lowercase names for introspection implementation library discovery
+    omni::sensors::ModelInfo modelInfo{};
+    modelInfo.modelName = "lidar.core"; // Lowercase for library discovery
+    modelInfo.modelVendor = "nv";
+    modelInfo.version = { 1u, 0u };     // Schema 1, model 0
+    modelInfo.allowDeprecated = false;
+    if (const char* error = introspection.init(modelInfo)) {
+        std::cout << "Initialization failed: " << error << std::endl;
+        return;
+    }
+
+    // Prepare parameters -- this is an incomplete set just for demonstration
+    const char* paramNames[] = {"omni:sensor:Core:numberOfEmitters", "omni:sensor:Core:nearRangeM"};
+    omni::sensors::SensorIntrospectionParamType dataTypes[] = {
+        omni::sensors::SensorIntrospectionParamType::INT,
+        omni::sensors::SensorIntrospectionParamType::FLOAT
+    };
+    uint32_t paramVectorLengths[] = {1, 1};
+    uint32_t numEmitters = 100U;
+    float nearRangeM = 0.5f;
+    const void* paramValues[] = {&numEmitters, &nearRangeM};
+
+    omni::sensors::Parameters params = {
+        2,              // numParams
+        paramNames,     // paramNames
+        dataTypes,      // dataTypes
+        paramVectorLengths, // paramVectorLengths
+        paramValues     // paramValues
+    };
+
+    // Validate parameters
+    const char* error = introspection.validateParams(params);
+
+    if (error == nullptr) {
+        auto validatedParams = introspection.getValidatedParams();
+        // Use validated parameters...
+    } else {
+        std::cout << "Validation failed: " << error << std::endl;
+    }
+
+USD file validation
+~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: cpp
+
+    // Validate parameters from a USD file
+    const char* error = introspection.validateParams("/path/to/sensor.usda", "/sensor_prim");
+    if (error == nullptr) {
+        std::cout << "USD validation successful" << std::endl;
+    } else {
+        std::cout << "USD validation failed: " << error << std::endl;
+    }
+
+AOV validation
+~~~~~~~~~~~~~~
+
+.. code-block:: cpp
+
+    void validateSensorAOV(omni::sensors::SensorIntrospectionUtil& introspection, const void* aovBuffer)
+    {
+        // First the parameters needed for AOV validation have to be cached and validated
+        const char* error = introspection.validateParams("/path/to/sensor.usda", "/sensor_prim");
+        if (error != nullptr) {
+            std::cout << "Parameter validation failed: " << error << std::endl;
+            return;
+        }
+
+        // Validate AOV (Arbitrary Output Variable)
+        // aovBuffer must point to a populated GenericModelOutput with valid backing arrays.
+        omni::sensors::AOVInfo aovInfo = {
+            "GenericModelOutput", // aovName
+            aovBuffer              // aovBuffer
+        };
+
+        const char* aovError = introspection.validateAOV(aovInfo);
+        // LiDAR currently returns a non-null empty string on successful AOV validation.
+        if (aovError == nullptr || *aovError == '\0') {
+            std::cout << "AOV validation successful" << std::endl;
+        } else {
+            std::cout << "AOV validation failed: " << aovError << std::endl;
+        }
+    }
+
+Python usage
+~~~~~~~~~~~~
+
+.. code-block:: python
+
+    import sensor_introspection as sc
+
+    # Create a sensor introspection
+    introspection = sc.SensorIntrospectionUtil()
+
+    # Initialize with lidar.core model
+    # Note: Use lowercase names for introspection implementation library discovery
+    model_info = sc.ModelInfo()
+    model_info.modelName = "lidar.core"
+    model_info.modelVendor = "nv"
+    model_info.schemaVersion = 1
+    model_info.modelVersion = 0  # Schema 1, model 0
+    model_info.allowDeprecated = False
+    introspection.init(model_info)  # Raises RuntimeError on loading or version-resolution failure.
+
+    # USDA path and to be checked prim
+    usda_path = "path/to/usda.usda"
+    prim_path = "/prim_path"
+    # Validate the parameters
+    error = introspection.validateParams(usda_path, prim_path)
+    if error is None:
+        print("LidarCore parameters valid")
+        validated_params = introspection.getValidatedParams()
+        print("Validated parameters:", validated_params)
+    else:
+        print(f"Validation failed: {error}")
+
+For native C++ callers, an accepted soft-deprecated request returns ``nullptr``, writes a warning to stdout
+during resolution, and leaves ``modelInfo.version`` set to the concrete accepted version. The C/Python API
+resolves a local copy of ``ModelInfo``.
+
+Library naming convention
+-------------------------
+
+The default path is derived from ``ModelInfo::modelName`` and ``ModelInfo::modelVendor``:
+
+- **Linux**: ``librtx.sensors.{modelName}.{modelVendor}.ispect.impl.so``
+- **Windows**: ``rtx.sensors.{modelName}.{modelVendor}.ispect.impl.dll``
+
+Examples:
+
+- ``librtx.sensors.lidar.core.nv.ispect.impl.so`` (Lidar generic core model)
+- ``librtx.sensors.radar.dmatapprox.nv.ispect.impl.so`` (Radar generic wpmDmat model)
+- ``librtx.sensors.acoustic.nv.ispect.impl.so`` (Acoustic generic wpm model)
+- ``librtx.sensors.generic.wpm.nv.ispect.impl.so`` (Generic wpm model)
+
+Error handling
+--------------
+
+Initialization and validation report these errors and warnings:
+
+- Missing libraries (returns an initialization error)
+- A missing ``createSensorIntrospectionImpl`` symbol (unloads the loaded library and returns an initialization error)
+- Failed implementation creation (returns an initialization error)
+- Unsupported or denied soft-deprecated version requests (returns a version diagnostic)
+- Accepted soft-deprecated version requests (writes a warning to stdout and continues)
+- Parameter and AOV validation failures (returns descriptive error strings)
+
+Platform loader paths
+---------------------
+
+- **Linux**: Uses ``dlopen``, ``dlsym``, ``dlclose``
+- **Windows**: Uses ``LoadLibrary``, ``GetProcAddress``, ``FreeLibrary``
+- **macOS and other non-Windows platforms**: Use the ``dlopen``, ``dlsym``, and ``dlclose`` branch and ``.so`` filename convention; this describes the source path, not an official support guarantee
+
+Current implementations
+-----------------------
+
+- **rtx.sensors.lidar.core.nv.ispect.impl**: Lidar generic core model validation
+- **rtx.sensors.lidar.wpm.nv.ispect.impl**: Lidar generic wpm model validation
+- **rtx.sensors.radar.dmatapprox.nv.ispect.impl**: Radar generic wpmDmat model validation
+- **rtx.sensors.acoustic.nv.ispect.impl**: Acoustic generic wpm model validation
+- **rtx.sensors.generic.wpm.nv.ispect.impl**: Generic wpm model controls and capture schedule validation; flattened pattern arrays and mapping compatibility are checked when rendering accepts the complete configuration
+- **rtx.sensors.dummy.nv.ispect.impl**: Versioning test and demonstration introspection impl

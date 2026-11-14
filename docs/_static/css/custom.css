@@ -104,3 +104,8 @@ html[data-theme="dark"] .example-prompt {
 .aov-table .aov-description p:last-child {
     margin-bottom: 0;
 }
+
+/* Apply the theme's dark-light image opt-out site-wide: preserve rendered colors. */
+html[data-theme="dark"] img:not(.only-dark, .dark-light) {
+    filter: none;
+}

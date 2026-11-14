@@ -21,13 +21,13 @@
 //                not the number of valid points.
 //   Counts       one number for the whole sweep: how many entries of
 //                Coordinates were filled. Every other entry is untouched, so
-//                this is the bound on the loop below and nothing else.
+//                this is the bound on the loop below.
 //
 // One thread per output column. Each thread owns one column exclusively: it
 // counts the returns falling in its own distance bin and then writes its whole
 // column, background included. That costs a pass over the points per column,
 // where a production histogram would have every point atomically bump a shared
-// bin. The trade buys three things worth having in an example: no atomics, no
+// bin. In return: no atomics, no
 // dependence on the output arriving cleared, and a result that does not depend
 // on the order threads happen to run in.
 

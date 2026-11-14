@@ -1,0 +1,52 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    # Reuse only the existing cube mesh, not its cameras or render products.
+    # Vertices span [-50, 50]; inner X/Z walls are at +/-11 m, Y at +/-12 m.
+    # Unequal spans keep diagonal lidar rays away from shared wall edges.
+    def Mesh "PositiveX" (
+        prepend references = @../../../tests/docs/data/cube.usd@</World/Cube>
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double3 xformOp:translate = (12, 0, 0)
+        double3 xformOp:scale = (0.02, 0.6, 0.6)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        rel material:binding = </World/Steel>
+    }
+    def Mesh "NegativeX" (prepend references = </World/PositiveX>)
+    {
+        double3 xformOp:translate = (-12, 0, 0)
+    }
+    def Mesh "PositiveY" (prepend references = </World/PositiveX>)
+    {
+        double3 xformOp:translate = (0, 13, 0)
+        double3 xformOp:scale = (0.6, 0.02, 0.6)
+    }
+    def Mesh "NegativeY" (prepend references = </World/PositiveY>)
+    {
+        double3 xformOp:translate = (0, -13, 0)
+    }
+    def Mesh "PositiveZ" (prepend references = </World/PositiveX>)
+    {
+        double3 xformOp:translate = (0, 0, 12)
+        double3 xformOp:scale = (0.6, 0.6, 0.02)
+    }
+    def Mesh "NegativeZ" (prepend references = </World/PositiveZ>)
+    {
+        double3 xformOp:translate = (0, 0, -12)
+    }
+    def Material "Steel"
+    {
+        token omni:simready:nonvisual:base = "steel"
+        token omni:simready:nonvisual:coating = "none"
+        token[] omni:simready:nonvisual:attributes = ["none"]
+    }
+}

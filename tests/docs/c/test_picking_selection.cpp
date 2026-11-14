@@ -33,7 +33,6 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <set>
 #include <string>
 #include <string_view>
@@ -119,8 +118,8 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
     }
 
     ovrtx_render_var_output_handle_t pick_handle = find_output(outputs, OVRTX_RENDER_VAR_PICK_HIT);
-    EXPECT_NE(pick_handle, OVRTX_INVALID_HANDLE);
-    if (pick_handle == OVRTX_INVALID_HANDLE) {
+    EXPECT_NE(pick_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
+    if (pick_handle == OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
         return pick_result;
     }
 
@@ -208,22 +207,24 @@ PickResult docs_collect_pick_result(ovrtx_renderer_t* renderer, ovrtx_step_resul
         return pick_result;
     }
 
-    const auto* prim_paths = static_cast<const ovx_primpath_t*>(prim_path_tensor->data);
+    const auto* prim_path_ids_raw = reinterpret_cast<const uint64_t*>(
+        static_cast<const uint8_t*>(prim_path_tensor->data) + prim_path_tensor->byte_offset);
     const auto* object_types = static_cast<const uint32_t*>(object_type_tensor->data);
     const auto* geometry_instance_ids = static_cast<const uint64_t*>(geometry_instance_id_tensor->data);
     const auto* world_positions = static_cast<const double*>(world_position_tensor->data);
     const auto* world_normals = static_cast<const float*>(world_normal_tensor->data);
     std::vector<ovx_primpath_t> prim_path_ids;
     for (uint32_t i = 0; i < hit_count; ++i) {
-        EXPECT_NE(prim_paths[i], 0u);
+        const ovx_primpath_t prim_path{ prim_path_ids_raw[i] };
+        EXPECT_NE(prim_path, OVX_INVALID_PRIMPATH);
         EXPECT_TRUE(std::isfinite(world_positions[i * 3 + 0]));
         EXPECT_TRUE(std::isfinite(world_positions[i * 3 + 1]));
         EXPECT_TRUE(std::isfinite(world_positions[i * 3 + 2]));
         EXPECT_TRUE(std::isfinite(world_normals[i * 3 + 0]));
         EXPECT_TRUE(std::isfinite(world_normals[i * 3 + 1]));
         EXPECT_TRUE(std::isfinite(world_normals[i * 3 + 2]));
-        if (std::find(prim_path_ids.begin(), prim_path_ids.end(), prim_paths[i]) == prim_path_ids.end()) {
-            prim_path_ids.push_back(prim_paths[i]);
+        if (std::find(prim_path_ids.begin(), prim_path_ids.end(), prim_path) == prim_path_ids.end()) {
+            prim_path_ids.push_back(prim_path);
         }
     }
 
@@ -270,8 +271,8 @@ std::vector<uint8_t> docs_map_ldr_pixels(ovrtx_renderer_t* renderer, ovrtx_step_
     }
 
     ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
-    EXPECT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
-    if (ldr_handle == OVRTX_INVALID_HANDLE) {
+    EXPECT_NE(ldr_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
+    if (ldr_handle == OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
         ovrtx_destroy_results(renderer, step_handle);
         return {};
     }

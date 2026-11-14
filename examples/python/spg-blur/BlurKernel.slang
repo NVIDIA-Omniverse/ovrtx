@@ -8,7 +8,7 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// The Slang half of the separable blur. Both entry points live here, and the
+// The Slang version of the separable blur. Both entry points live here, and the
 // tap loop they share lives in BlurTaps.slang beside this file.
 
 import BlurTaps;

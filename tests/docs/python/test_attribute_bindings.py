@@ -55,7 +55,8 @@ def _read_xform(stage, paths, query, ordinal):
     attribute = paths.intern_token("omni:xform")
     with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
         group = read.fetch_next()
-        values = np.from_dlpack(group.dlpack(0)).copy().reshape(1, 4, 4)
+        column = group.columns[0]
+        values = np.from_dlpack(column.dlpack(0)).copy().reshape(1, 4, 4)
         stage.release_group(group)
     return values
 
@@ -145,7 +146,8 @@ def test_bind_array_attribute(stage):
 
         with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
             group = read.fetch_next()
-            values = np.from_dlpack(group.dlpack(0)).copy()
+            column = group.columns[0]
+            values = np.from_dlpack(column.dlpack(0)).copy()
             stage.release_group(group)
         np.testing.assert_allclose(values, points)
         query.release().wait()
@@ -277,7 +279,9 @@ def test_write_token_array_attribute(stage):
 
         # [snippet:doc-write-token-array]
         attribute = paths.intern_token("omni:docTokens")
-        token_ids = np.array([paths.intern_token("sensor"), paths.intern_token("validated")], dtype=np.uint64)
+        token_ids = np.array(
+            [paths.intern_token("sensor").raw_id, paths.intern_token("validated").raw_id], dtype=np.uint64,
+        )
         stage.write_attribute(
             query,
             attribute,
@@ -291,9 +295,11 @@ def test_write_token_array_attribute(stage):
 
         with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
             group = read.fetch_next()
-            assert group.is_array
-            assert group.tensor(0).dtype.lanes == 1
-            assert group.attribute == attribute
+            assert group.column_count == 1
+            column = group.columns[0]
+            assert column.is_array
+            assert column.tensor(0).dtype.lanes == 1
+            assert column.attribute == attribute
             stage.release_group(group)
         query.release().wait()
         paths.destroy_path_list(path_list)

@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: reading-attributes
 description: >
   Reading scalar or array attributes from prims into CPU or GPU tensors. Use when user
   asks to read an attribute value, fetch mesh data (points, faceVertexCounts, etc.),
   inspect a render setting, or sample transforms.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -71,15 +64,15 @@ This skill has no scripts.
 
 ## Overview
 
-`stage.read_attributes` reads one or more requested attribute columns through an ovstage query. Fetch each result group, consume its DLPack tensors, then release the group and read handle.
+`stage.read_attributes` reads one or more requested attributes through an ovstage query. Each fetched read group owns a shared logical prim-row layout and one or more attribute columns. Consume each column's DLPack tensors, then release the group and read handle.
 
-Use `ovstage.OrdinalRange.latest(ordinal)` to read a snapshot at a sealed ordinal. It returns `OUT_OF_RANGE` if a queried path of a requested attribute changed after that ordinal; use `(1 << 64) - 1` as the ordinal to read current values instead.
+Use `ovstage.OrdinalRange.latest(ordinal)` to read a snapshot at a sealed ordinal. It returns `OUT_OF_RANGE` if a queried path of a requested attribute changed after that ordinal; use `ovstage.ORDINAL_MAX` as the ordinal to read current values instead.
 
 For mapping (zero-copy writes into ovstage buffers), see the `mapping-attributes` skill.
 
 ## USD Type Lookup
 
-Use this table to answer "how do I read USD type X?" Ovstage uses `stage.read_attributes` for both scalar and array-valued columns; inspect each group's `is_array` flag. Deprecated C bindings set `binding.binding_desc.attribute_type.is_array = true` for array reads. Read results in both languages use scalar lanes and trailing component dimensions; C binding types still use `DLDataType::lanes` to describe storage width.
+Use this table to answer "how do I read USD type X?" Ovstage uses `stage.read_attributes` for both scalar and array-valued columns; inspect each returned column's `is_array` flag. Deprecated C bindings set `binding.binding_desc.attribute_type.is_array = true` for array reads. Read results in both languages use scalar lanes and trailing component dimensions; C binding types still use `DLDataType::lanes` to describe storage width.
 
 | USD type(s) | Python read result | C binding dtype | Notes |
 |---|---|---|---|
@@ -97,16 +90,23 @@ Use this table to answer "how do I read USD type X?" Ovstage uses `stage.read_at
 | `matrix2d`, `matrix3d`, `matrix4d`, `frame4d` and arrays | `np.float64`, matrix roles use square trailing dimensions; untyped tuples use flat component dimensions | `{kDLFloat, 64, 4/9/16}` | Matrix4d reads as `(N, 4, 4)` when the matrix role is known. |
 | `extent`, `_worldExtent` | `np.float64`, shape `(N, 6)` | `{kDLFloat, 64, 6}` | `extent` is local-space; `_worldExtent` is world-space. |
 | `string` | `uint8` byte array, decode as UTF-8 | `{kDLUInt, 8, 1}` with `is_array=true` | Scalar USD strings are represented as byte arrays. This is not `string[]`; string arrays are not supported. Use `token[]` for string-like arrays. |
-| `token` / `token[]` | raw `uint64` token IDs | `{kDLUInt, 64, 1}` | Resolve token IDs with `ovstage.PathDictionary.token_to_string()`. |
-| `asset` | `uint64` token id pairs with `AttributeSemantic.ASSET_PATH_ID` | `{kDLUInt, 64, 2}` with `is_array=false` | One `(authored, resolved)` pair per prim. Resolve each id with `ovstage.PathDictionary.token_to_string()`. Token id 0 is the empty token, so a resolved id of 0 means the path resolved to nothing. |
-| `relationship` | raw `uint64` path IDs | path IDs / path-list semantics | Resolve path IDs with `ovstage.PathDictionary.path_to_string()`. Use relationship-specific skills for schema-specific behavior. |
+| `token` / `token[]` | raw `uint64` token IDs | `{kDLUInt, 64, 1}` | Wrap each ID in `ovstage.Token(id)` before calling `paths.token_to_string()`. |
+| `asset` | `uint64` token id pairs with `AttributeSemantic.ASSET_PATH_ID` | `{kDLUInt, 64, 2}` with `is_array=false` | One `(authored, resolved)` pair per prim. Resolve each ID with `paths.token_to_string(ovstage.Token(id))`. Token id 0 is the empty token, so a resolved id of 0 means the path resolved to nothing. |
+| `relationship` | raw `uint64` path IDs | path IDs / path-list semantics | Resolve path IDs with `paths.path_to_string(ovstage.PrimPath(id))`. Use relationship-specific skills for schema-specific behavior. |
 | `timecode` / `timecode[]` | unsupported | unsupported | |
 
 ## Python
 
+A Python `ReadGroup` exposes the shared prim rows through `prim_count` and
+`prim_index(i)`, and its `columns` tuple contains the attributes aligned to
+those rows. Each `ReadColumn` exposes its own `attribute`, `is_array`, and
+`semantic` metadata plus tensor/data-row access through `tensor()`, `array()`,
+`dlpack()`, and `data_row_index()`. Keep the group alive while using any column
+or borrowed view.
+
 ### Scalar read
 
-Returns a `ManagedDLTensor` with shape `(N,)` for N input prims. Convert with `np.from_dlpack()` for a zero-copy numpy view.
+For a single-attribute read, select the group's sole `ReadColumn`. Its `dlpack(0)` method returns a `ManagedDLTensor`; convert it with `np.from_dlpack()` for a zero-copy NumPy view. Use `column.data_row_index(i)` when mapping logical group row `i` to the column's physical data row.
 
 > **Source:** `tests/docs/python/test_attribute_read.py` snippet `doc-read-attribute-scalar`
 
@@ -172,13 +172,13 @@ its result group.
 
 ### Array read
 
-Under ovstage, array-vs-scalar kind is not part of the read call — the read handle returns `group.is_array` reflecting the column's declared kind. Under the deprecated `ovrtx_read_attribute` compat shim, set `binding.binding_desc.attribute_type.is_array = true` explicitly (defaulted to `false` by `ovrtx_make_binding_desc`).
+Under ovstage, array-vs-scalar kind is not part of the read call — each returned `ovstage_read_column_t::is_array` reflects that column's declared kind. Under the deprecated `ovrtx_read_attribute` compat shim, set `binding.binding_desc.attribute_type.is_array = true` explicitly (defaulted to `false` by `ovrtx_make_binding_desc`).
 
 > **Source:** `tests/docs/c/test_attribute_read.cpp` snippet `doc-read-array-attribute-c`
 
 ### Supported authored attribute read snippets in C
 
-The snippets below are ovstage-native: `ovstage_read_attributes` against a `DocsQueryAndToken` (single-prim query + interned attribute token), one `ovstage_fetch_read_next` per matched group, `ovstage_release_group` per group, then `ovstage_release_read`. Each snippet asserts `group.data.tensor_count > 0` before dereferencing `group.data.tensors[0]`.
+The snippets below are ovstage-native: `ovstage_read_attributes` against a `DocsQueryAndToken` (single-prim query + interned attribute token), one capacity-one `ovstage_fetch_read_next` per matched group, `ovstage_release_groups` per group, then `ovstage_release_read`. Each single-attribute snippet selects the group's sole column and asserts `column.data.tensor_count > 0` before dereferencing `column.data.tensors[0]`.
 
 C raw snippets:
 
@@ -207,15 +207,18 @@ C token snippets include path-dictionary resolution because the C API exposes `o
 | Python (ovstage) | C (ovstage) | C (deprecated ovrtx compat) |
 |---|---|---|
 | `stage.read_attributes(query, attrs, ordinal_range)` | `ovstage_read_attributes(stage, query, tokens, count, range, &read_handle)` | `ovrtx_read_attribute(renderer, &binding, &read_dest, &read_handle)` + fetch/release |
-| `read.fetch_next()` / `stage.release_group(group)` | `ovstage_fetch_read_next(stage, read_handle, timeout, &group)` / `ovstage_release_group(stage, &group)` | `ovrtx_fetch_read_result(...)` / `ovrtx_release_read_result(...)` |
+| `read.fetch_next()` / `stage.release_group(group)` | `ovstage_fetch_read_next(stage, read_handle, timeout, &group, 1, &count)` / `ovstage_release_groups(stage, &group, 1)` | `ovrtx_fetch_read_result(...)` / `ovrtx_release_read_result(...)` |
 | `ovstage.OrdinalRange.latest(ordinal)` | `ovstage_ordinal_range_t range{}; range.end_ordinal = ordinal;` | stream-ordered compatibility read |
 
-Ovstage C result layout (`ovstage_read_group_t`):
-- `.is_array` — array vs scalar kind, matches the write-side declaration.
-- `.data.tensors` / `.data.tensor_count` — DLTensor array. `tensor_count==1` under the packed-uniform layout every snippet uses; always assert `tensor_count > 0` before dereferencing `tensors[0]`.
-- Each returned read or mapped `DLTensor` has `dtype.lanes=1`, a leading data-row or array-element axis, and trailing component axes: matrix4d → `[N,4,4]`, point3f → `[N,3]`. Strides count scalar elements. Binding declarations and canonical write inputs retain the lane-based storage width.
-- `.prims.list` / `.prims.count` / `.prims.offset` / `.prims.index_map` — enumerate the matched prims via the group's prim list; index_map applies gather/reorder semantics.
-- `.attribute` — the token that identifies which of the caller's requested attributes this group corresponds to. Route multi-attribute reads (e.g. `doc-extent-world-extent-c`) by comparing to the interned tokens. One token can yield more than one group: when the queried prims use the name for several column types and no ovstage write has given the name an identity, each prim is served with the type of its own column, so the groups differ in `dtype` and `is_array`. Read the shape off each group rather than off the first one. Such a name cannot be served to a GPU destination, so a device read returns no group for it and serves the rest of the read normally (ovstage >= 0.2).
+Ovstage C result layout:
+- `ovstage_read_group_t::prims` defines the group's logical prim rows. `.list`, `.count`, `.offset`, and `.index_map` enumerate the matched prims; the prim index map applies gather/reorder semantics.
+- `ovstage_read_group_t::columns` / `.column_count` is the ordered array of attributes present for those rows. Logical row `i` names the same prim in every column, but each column resolves its own physical value row through its `data` mapping.
+- Each `ovstage_read_column_t` carries `.attribute`, `.is_array`, `.semantic`, `.data`, `.meta`, `.ordinal`, and `.is_delete`. Attribute identity, array-vs-scalar kind, authored semantic, values, and attribute metadata are exposed through the column rather than the group.
+- `column.data.tensors` / `column.data.tensor_count` is the column's DLTensor array. `tensor_count==1` under the packed-uniform layout every snippet uses; always assert `tensor_count > 0` before dereferencing `tensors[0]`.
+- Each returned read or mapped `DLTensor` has `dtype.lanes=1`, a leading data-row or array-element axis, and trailing component axes: matrix4d uses `[N,4,4]`, point3f uses `[N,3]`. Strides count scalar elements. Binding declarations and canonical write inputs retain the lane-based storage width. For logical group row `i`, test `column.data.mask` when present, then select physical row `column.data.index_map[i]` when present or row `i` otherwise.
+- Route multi-attribute reads (for example, `doc-extent-world-extent-c`) by iterating `group.columns` and comparing each `column.attribute` to the interned tokens. One token can yield more than one column across groups: when the queried prims use the name for several column types and no ovstage write has given the name an identity, each prim is served with the type of its own column, so the groups differ in `dtype` and `is_array`. Read the shape from each column rather than from the first one. Such a name cannot be served to a GPU destination, so a device read returns no column for it and serves the rest of the read normally (ovstage >= 0.2).
+- An attribute absent from every logical row is omitted. Partial presence is represented by that column's data mapping or by a separate group, so callers must accept valid single-column groups. Different groups have no ordering or partition guarantee.
+- The group owns all borrowed prim, column, tensor, mapping, and metadata views. Keep it alive while consuming any column and call `ovstage_release_groups` once those views are no longer used.
 
 Deprecated C compat result layout (`ovrtx_read_output_t`):
 - Fixed-size reads: `buffer_count == 1`, single tensor with leading shape `[prim_count]` and type-aware trailing axes.
@@ -224,11 +227,11 @@ Deprecated C compat result layout (`ovrtx_read_output_t`):
 
 ## Troubleshooting
 
-- **Matrix shape needs type information.** OVStage read groups expose their semantic; OVRTX compatibility reads inspect the Fabric matrix role. An untyped 16-component tuple reads as `[N,16]`, not `[N,4,4]`. Shape-based matrix4d writes retain a matrix role on newly created attributes.
+- **Matrix shape needs type information.** Typed matrix4d values read as `[N,4,4]`; an untyped 16-component tuple reads as `[N,16]`. Use the authored semantic when interpreting OVStage results. When creating a matrix attribute through OVStage with a shape-based write, set `semantic=AttributeSemantic.MATRIX` in Python or `OVSTAGE_SEMANTIC_MATRIX` in C; shape alone does not assign the matrix semantic.
 - **Generic authored USD attributes require opt-in population.** Root-layer `customLayerData.populateAllAuthoredAttributes = true` asks the runtime to populate authored attributes beyond the normal schema set. Use it only when needed: populating everything can dramatically increase memory usage on assets with many unused properties. See `loading-usd` for the layer metadata tradeoff.
 - **Schema-owned attributes fix the element type.** `omni:rtx:rtpt:maxBounces` is stored as `uint32` even if you wrote it as `int32`. When allocating a `dest` tensor, match the runtime's dtype (`np.uint32`) — not what you wrote.
 - **Release fetched ovstage groups explicitly.** Call `stage.release_group(group)` after consuming or copying each group, and release manually managed read/query handles.
-- **Ovstage reads carry array-vs-scalar kind in the returned group, not the request.** Check `group.is_array` after `ovstage_fetch_read_next` — the read call itself takes no `is_array` parameter. The deprecated `ovrtx_read_attribute` compat shim still requires `binding.binding_desc.attribute_type.is_array = true` on the binding (defaulted to `false` by `ovrtx_make_binding_desc`).
+- **Ovstage reads carry array-vs-scalar kind in each returned column, not the request.** Check `column.is_array` after `ovstage_fetch_read_next` — the read call itself takes no `is_array` parameter. The deprecated `ovrtx_read_attribute` compat shim still requires `binding.binding_desc.attribute_type.is_array = true` on the binding (defaulted to `false` by `ovrtx_make_binding_desc`).
 - **Ovstage queries own their prim-list storage; ovrtx compat bindings borrow.** `ovstage_query_from_path_list` retains a reference to the passed `ovx_primpath_list_t` until `ovstage_release_query` fires — the caller then calls `path_dictionary_release_path_list_reference`. The deprecated `ovrtx_make_binding_desc` stores the `ovx_string_t*` prim path array you pass without copying; keep it alive until the read has been enqueued, waited, fetched, and released.
 - **Unsupported authored types are tested as absent.** `tests/docs/data/all-attributes.usda` deliberately authors `string[]`, `asset[]`, custom relationships, `timecode`, and `timecode[]`; the all-attributes tests assert they are not populated by the current runtime.
 

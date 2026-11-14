@@ -84,6 +84,8 @@ def test_add_render_config_layer(renderer, stage, output_dir):
     ordinal = 1
 
     # [snippet:doc-add-render-config-layer]
+    import ovstage
+
     ovstage.population.open_usd_from_string(stage, f'''
     #usda 1.0
     (

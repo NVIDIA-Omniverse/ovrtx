@@ -308,9 +308,11 @@ def _read_values(stage, paths, query, case: AttributeCase, ordinal: int) -> np.n
         group = read.fetch_next()
         assert group is not None, f"{case.name} was not populated on {WORLD}"
         try:
-            assert group.attribute == attribute
-            assert group.is_array == case.is_array, f"is_array {group.is_array} != {case.is_array}"
-            return np.from_dlpack(group.dlpack(0)).copy()
+            assert group.column_count == 1
+            column = group.columns[0]
+            assert column.attribute == attribute
+            assert column.is_array == case.is_array, f"is_array {column.is_array} != {case.is_array}"
+            return np.from_dlpack(column.dlpack(0)).copy()
         finally:
             stage.release_group(group)
 
@@ -348,18 +350,18 @@ def _read_token_strings(stage, paths, query, case: AttributeCase, ordinal: int) 
     values = _read_values(stage, paths, query, case, ordinal)
     expected_shape = (len(case.initial),) if case.is_array else (1,)
     assert values.shape == expected_shape, f"token read shape {values.shape} != {expected_shape}"
-    return [paths.token_to_string(int(value)) for value in values.reshape(-1)]
+    return [paths.token_to_string(ovstage.Token(value)) for value in values.reshape(-1)]
 
 
 def _read_asset_path_id(stage, paths, query, case: AttributeCase, ordinal: int) -> str:
     values = _read_values(stage, paths, query, case, ordinal)
     assert values.shape == (1, 2), f"asset read shape {values.shape} != (1, 2)"
     assert int(values[0, 1]) == 0, f"asset second lane {int(values[0, 1])} != 0"
-    return paths.token_to_string(int(values[0, 0]))
+    return paths.token_to_string(ovstage.Token(values[0, 0]))
 
 
 def _asset_tensor(paths, value: str) -> np.ndarray:
-    return np.array([[paths.intern_token(value), 0]], dtype=np.uint64)
+    return np.array([[paths.intern_token(value).raw_id, 0]], dtype=np.uint64)
 
 
 def _string_bytes(value: str) -> np.ndarray:
@@ -394,7 +396,7 @@ def _check_case(stage, paths, query, case: AttributeCase, ordinal: int) -> None:
             query,
             paths.intern_token(case.name),
             ordinal=ordinal,
-            tensors=np.array([paths.intern_token(case.updated)], dtype=np.uint64),
+            tensors=np.array([paths.intern_token(case.updated).raw_id], dtype=np.uint64),
             is_array=False,
             semantic=ovstage.AttributeSemantic.TOKEN_ID,
         ).wait()
@@ -406,7 +408,7 @@ def _check_case(stage, paths, query, case: AttributeCase, ordinal: int) -> None:
             query,
             paths.intern_token(case.name),
             ordinal=ordinal,
-            tensors=np.array([paths.intern_token(value) for value in case.updated], dtype=np.uint64),
+            tensors=np.array([paths.intern_token(value).raw_id for value in case.updated], dtype=np.uint64),
             is_array=True,
             semantic=ovstage.AttributeSemantic.TOKEN_ID,
         ).wait()
@@ -524,7 +526,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    int_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    int_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-int]
                 assert int_values.shape == (1,)
@@ -552,7 +555,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    float_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    float_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-float]
                 assert float_values.shape == (1,)
@@ -580,7 +584,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    point3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    point3f_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-point3f]
                 assert point3f_values.shape == (1, 3)
@@ -610,7 +615,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    point3f_array_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    point3f_array_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-point3f-array]
                 assert point3f_array_values.shape == (2, 3)
@@ -649,7 +655,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    normal3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    normal3f_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-normal3f]
                 assert normal3f_values.shape == (1, 3)
@@ -677,7 +684,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    vector3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    vector3f_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-vector3f]
                 assert vector3f_values.shape == (1, 3)
@@ -705,7 +713,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    color3f_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    color3f_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-color3f]
                 assert color3f_values.shape == (1, 3)
@@ -733,7 +742,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    matrix4d_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    matrix4d_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-matrix4d]
                 assert matrix4d_values.shape == (1, 4, 4)
@@ -765,7 +775,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    quatf_values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    quatf_values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 # [/snippet:doc-read-usd-quatf]
                 assert quatf_values.shape == (1, 4)
@@ -793,7 +804,8 @@ def test_raw_attribute_read_write_snippets(stage):
                     group = read.fetch_next()
                     if group is None:
                         raise RuntimeError("No matching attribute was returned")
-                    string_bytes = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    string_bytes = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                 string_value = bytes(string_bytes.tolist()).decode("utf-8")
                 # [/snippet:doc-read-usd-string]
@@ -829,13 +841,13 @@ def test_raw_attribute_read_write_snippets(stage):
 
                 token_case = CASE_BY_NAME["test:token"]
                 token_ids = _read_values(stage, paths, query, token_case, ordinal)
-                token_value = paths.token_to_string(int(token_ids[0]))
+                token_value = paths.token_to_string(ovstage.Token(token_ids[0]))
                 assert token_value == "initialToken"
 
                 ordinal += 1
                 # [snippet:doc-write-usd-token]
                 token_attribute = paths.intern_token("test:token")
-                updated_token = np.array([paths.intern_token("updatedToken")], dtype=np.uint64)
+                updated_token = np.array([paths.intern_token("updatedToken").raw_id], dtype=np.uint64)
                 stage.write_attribute(
                     query,
                     token_attribute,
@@ -850,14 +862,14 @@ def test_raw_attribute_read_write_snippets(stage):
 
                 token_array_case = CASE_BY_NAME["test:tokenArray"]
                 token_array_ids = _read_values(stage, paths, query, token_array_case, ordinal)
-                token_array_values = [paths.token_to_string(int(token_id)) for token_id in token_array_ids]
+                token_array_values = [paths.token_to_string(ovstage.Token(token_id)) for token_id in token_array_ids]
                 assert token_array_values == ["initialTokenA", "initialTokenB"]
 
                 ordinal += 1
                 # [snippet:doc-write-usd-token-array]
                 token_array_attribute = paths.intern_token("test:tokenArray")
                 updated_tokens = np.array(
-                    [paths.intern_token("updatedTokenA"), paths.intern_token("updatedTokenB")],
+                    [paths.intern_token("updatedTokenA").raw_id, paths.intern_token("updatedTokenB").raw_id],
                     dtype=np.uint64,
                 )
                 stage.write_attribute(
@@ -877,7 +889,7 @@ def test_raw_attribute_read_write_snippets(stage):
 
                 asset_case = CASE_BY_NAME["test:asset"]
                 asset_values = _read_values(stage, paths, query, asset_case, ordinal)
-                asset_value = paths.token_to_string(int(asset_values[0, 0]))
+                asset_value = paths.token_to_string(ovstage.Token(asset_values[0, 0]))
                 assert asset_value == "initial_asset.usd"
 
                 ordinal += 1
@@ -908,7 +920,8 @@ def test_ovstage_bool_read_write_snippets(stage):
             # [snippet:doc-read-usd-bool]
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(1)) as read:
                 group = read.fetch_next()
-                bool_values = np.from_dlpack(group.dlpack(0)).copy()
+                column = group.columns[0]
+                bool_values = np.from_dlpack(column.dlpack(0)).copy()
                 stage.release_group(group)
             # [/snippet:doc-read-usd-bool]
 
@@ -925,7 +938,8 @@ def test_ovstage_bool_read_write_snippets(stage):
 
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
                 group = read.fetch_next()
-                updated = np.from_dlpack(group.dlpack(0)).copy()
+                column = group.columns[0]
+                updated = np.from_dlpack(column.dlpack(0)).copy()
                 stage.release_group(group)
         paths.destroy_path_list(path_list)
 
@@ -950,7 +964,8 @@ def test_extent_and_world_extent_are_readable(stage):
             ) as read:
                 values = {}
                 for group in read.groups():
-                    values[group.attribute] = np.from_dlpack(group.dlpack(0)).copy()
+                    for column in group.columns:
+                        values[column.attribute] = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
             local_extent = values[local_attribute]
             world_extent = values[world_attribute]

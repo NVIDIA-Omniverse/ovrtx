@@ -65,6 +65,14 @@ Build and Run
 
          ./build/lidar-composite-tensor path/to/lidar_example.usda
 
+      The build also copies the alternative scene ``lidar_example_panels.usda``,
+      the same lidar among a glass pane, a silver panel and concrete walls,
+      beside the executable:
+
+      .. code-block:: bash
+
+         ./build/lidar-composite-tensor build/lidar_example_panels.usda
+
    .. tab-item:: Windows
 
       **Prerequisites**

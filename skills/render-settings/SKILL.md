@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: render-settings
 description: >
   Writing render settings to control rendering behavior. Use when user asks to change
   render settings, set max bounces, configure path tracing, change render quality,
   enable DLSS frame generation, or modify RTX settings on a RenderProduct.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -109,13 +102,13 @@ DLSS Frame Generation inserts interpolated frames between rendered ones. It is o
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `omni:rtx:dlss:frameGeneration` | `bool` | `false` | Enable frame generation |
-| `omni:rtx:dlss:frameGenerationInterpolatedFrameCount` | `int` | `0` | Interpolated frames per rendered frame; `0` lets the renderer pick. Clamped to the hardware maximum (1 on Ada, 3 on Blackwell) |
+| `omni:rtx:dlss:frameGenerationInterpolatedFrameCount` | `int` | `0` | Interpolated frames per rendered frame, clamped to the hardware maximum (1 on Ada, 3 on Blackwell). `0` or unset means 1, so request `3` to get the hardware maximum |
 
 Enabling frame generation changes the shape of the step results: one step returns `output_frame_count == N + 1` output frames instead of 1, ordered with the interpolated frames first and the real rendered frame last. Each frame exposes the same single color render var, and only the last frame carries a meaningful accumulation status. Consumers that assume `output_frames[0]` is the frame to display or inspect need to be updated before turning this on.
 
 The renderer declines frame generation without failing the step, in which case a step keeps returning a single frame. It requires an Ada or newer GPU that drives the display, the `RealTimePathTracing` render mode, `LdrColor` or `HdrColor` as the only render outputs, and a render resolution of at least 126 pixels per side.
 
-## Real-Time Path-Tracing Settings (`rtpt:`)
+## Real-Time Path Tracing Settings (`rtpt:`)
 
 ### Sampling and Caching
 
@@ -134,7 +127,6 @@ The renderer declines frame generation without failing the step, in which case a
 | `omni:rtx:rtpt:maxVolumeBounces` | `uint` | `3` |
 | `omni:rtx:pt:fractionalCutoutOpacity` | `bool` | `true` |
 | `omni:rtx:rtpt:maxRoughness` | `float` | `0.3` |
-| `omni:rtx:rt:reflections:roughnessCacheThreshold` | `float` | `0.3` |
 | `omni:rtx:rtpt:translucency:virtualMotion:enabled` | `bool` | `true` |
 
 ### Firefly Filter
@@ -186,7 +178,6 @@ The renderer declines frame generation without failing the step, in which case a
 | `omni:rtx:pt:radianceCache:enabled` | `bool` | `true` |
 | `omni:rtx:pt:lightCache:enabled` | `bool` | `true` |
 | `omni:rtx:pt:ris:meshLights` | `bool` | `false` |
-| `omni:rtx:pathtracing:rayguide:cached:enabled` | `bool` | `false` |
 
 ### Firefly Filter
 
@@ -217,8 +208,10 @@ change after initialization, including after destroying all renderer instances.
 | `omni:rtx:pathtracing:spectral:enabled` | `bool` | `false` |
 | `omni:rtx:pathtracing:spectral:wavelengthMin` | `float` | `10.0` |
 | `omni:rtx:pathtracing:spectral:wavelengthMax` | `float` | `10000.0` |
-| `omni:rtx:renderingColorSpace` | `string` | `"lin_rec709_scene"` |
+| `renderingColorSpace` | `uniform token` | `"lin_rec709_scene"` |
 | `omni:rtx:pathtracing:spectral:responseCurve` | `uint` | `0` |
+
+`renderingColorSpace` is an attribute of the RenderSettings prim, not the RenderProduct, and has no `omni:rtx:` prefix.
 
 ### Non-Uniform Volumes
 
@@ -240,6 +233,8 @@ change after initialization, including after destroying all renderer instances.
 | `omni:rtx:pt:mgpu:compressAlbedo` | `bool` | `true` |
 | `omni:rtx:pt:mgpu:compressNormals` | `bool` | `true` |
 | `omni:rtx:multiThreading:enabled` | `bool` | `true` |
+
+`omni:rtx:pt:multigpu:enabled` is read from the RenderSettings prim, not the RenderProduct.
 
 ### Global Volumetric Effects
 
@@ -316,7 +311,7 @@ Author `int omni:rtx:minimal:dlss:mode` on the RenderProduct: `0` disables DLSS,
 or `rtxaa` (native-resolution DLAA). Both attributes belong to
 `OmniRtxSettingsMinimalAPI_1`, with defaults of `0` and `auto`, respectively.
 These mode-selection controls are separate from the
-post-processing DLSS execution mode and the Path-Tracing pixel filter.
+post-processing DLSS execution mode and the Path Tracing pixel filter.
 Gaussian splats additionally require Minimal shading
 mode `3` and DLSS-RR for denoising.
 
@@ -337,10 +332,10 @@ DLSS temporal history across render steps:
 
 ## Troubleshooting
 
-- Render settings are attributes on the **RenderProduct** prim, not on a separate RenderSettings prim. Write them to the same prim path you pass to `step()` (e.g., `/Render/Camera`).
+- Render settings are attributes on the **RenderProduct** prim; write them to the same prim path you pass to `step()` (e.g., `/Render/Camera`). The exceptions in this skill are the global settings `renderingColorSpace` and `omni:rtx:pt:multigpu:enabled`, which are read from the stage's RenderSettings prim (see Spectral Rendering and Multi-GPU).
 - The dtype must match the schema type exactly. Most integer settings above are `uint`, so write `np.uint32` -- `omni:rtx:rtpt:maxBounces` is `uint32`, not `int32` or `int64`. Settings typed `token` (such as `omni:rtx:rendermode` and `omni:rtx:pt:pixelFilter:filter`) are written as interned token IDs, not integers; see `writing-attributes` for the full USD-type-to-dtype table.
 - After changing a setting, call `reset()` and run warm-up frames before capturing output. The renderer needs time to reconverge.
-- Settings use the `omni:rtx:` namespace prefix, with subsystem prefixes like `rtpt:` (real-time path tracing), `post:` (post-processing), etc.
+- Settings use the `omni:rtx:` namespace prefix (`renderingColorSpace`, a UsdRender attribute, has none), with subsystem prefixes like `rtpt:` (real-time path tracing), `post:` (post-processing), etc.
 
 ## References
 
@@ -361,3 +356,9 @@ driver; it does not establish runtime behavior or driver support.
 > **Source (USDA):** `tests/docs/usd/data/dlss_nr.usda` snippet `doc-dlss-nr-render-product`
 >
 > **Source (USD Python):** `tests/docs/usd/test_dlss_nr.py` snippet `doc-dlss-nr-render-product-python`
+
+## ParticleField authoring
+
+> **Source:** `tests/docs/usd/test_gaussian_splats_usda.py` snippet `doc-gaussian-non-stochastic-python`
+
+See `docs/geometry/gaussian_splats.rst` for mode restrictions and material behavior.

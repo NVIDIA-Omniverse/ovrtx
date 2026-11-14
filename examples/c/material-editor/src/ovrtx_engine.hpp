@@ -16,7 +16,7 @@
 #include <string>
 #include <cstdint>
 
-struct ovrtx_renderer_t;
+#include <ovrtx/ovrtx_types.h>
 
 /// Encapsulates the ovrtx renderer lifecycle: initialization, USD loading,
 /// stepping/rendering, material binding, and attribute writing.
@@ -75,15 +75,15 @@ private slots:
 
 private:
     /// Run a single step+wait cycle.  Returns the step result handle,
-    /// or 0 on failure.
-    uint64_t stepOnce();
+    /// or a zero handle on failure.
+    ovrtx_step_result_handle_t stepOnce();
 
     /// Map the LdrColor output from a step result, emit frameReady, then
     /// unmap and destroy the result.
-    void mapAndEmit(uint64_t step_handle);
+    void mapAndEmit(ovrtx_step_result_handle_t step_handle);
 
     /// Destroy a step result without mapping.
-    void destroyStep(uint64_t step_handle);
+    void destroyStep(ovrtx_step_result_handle_t step_handle);
 
     ovrtx_renderer_t *renderer_ = nullptr;
     std::string render_product_path_ = "/Render/Camera";

@@ -36,12 +36,10 @@ Running
 
 .. code-block:: bash
 
-   uv run main.py
+   uv run main.py                                    # CUDA
+   uv run main.py --scene pipeline_scene_slang.usda  # Slang
 
-The first step compiles both CUDA kernels with NVRTC. A successful run writes
-``_output/input.png`` and ``_output/inverted_grayscale.png``.
-
-The intermediate grayscale image is never published, so the run recomputes it from the input with
-the kernel's own weights; inverting that at full strength is exactly ``255 - grey``. Grey but not
-inverted means the second node did not run, and inverted but still coloured means the first did
-not. See :doc:`../spg/overview` for the chaining and intermediate-AOV patterns.
+The first step compiles both kernels. A successful run writes
+``_output/input.png`` and ``_output/inverted_grayscale.png``, the input turned grey by the first
+node and inverted by the second. See :doc:`../spg/do/chaining` for the chaining and intermediate-AOV
+patterns.

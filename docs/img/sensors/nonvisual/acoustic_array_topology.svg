@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="552" viewBox="0 0 1180 552" role="img" aria-labelledby="title desc">
+<title id="title">Mounts, receiver groups and firing sequences of an acoustic array</title>
+<desc id="desc">Two mounts m001 and m002 placed in the sensor frame, two receiver groups as sets of mount indices, a firing sequence as four parallel arrays with one column per event, and the signal ways the two events write.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-313131-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#313131"/></marker><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker><marker id="arrow-952fc6-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#952FC6"/></marker></defs>
+<rect width="1180" height="552" fill="#fff"/>
+<text x="30" y="36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Sensor mounts</text>
+<text x="30" y="54" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">placed in the sensor's own frame</text>
+<line x1="150" y1="290" x2="389" y2="290" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="150" y1="290" x2="150" y2="123" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="150" y1="290" x2="68.92" y2="231.44" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<circle cx="150" cy="290" r="3.5" fill="#313131"/>
+<text x="142" y="304" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">origin</text>
+<text x="400" y="306" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="end">x forward: the firing axis (prim's local -Z)</text>
+<text x="158" y="100" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">z up (prim's local +Y)</text>
+<text x="140" y="196" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="end">y left</text>
+<text x="140" y="213" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="end">(prim's local -X)</text>
+<circle cx="262" cy="250" r="9" fill="#313131"/>
+<circle cx="262" cy="250" r="3.6" fill="#fff"/>
+<line x1="273" y1="250" x2="292" y2="250" stroke="#313131" stroke-width="2" marker-end="url(#arrow-313131-2)"/>
+<text x="262" y="196" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">m001 (index 0)</text>
+<text x="262" y="213" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">position [x, y, z] m</text>
+<text x="262" y="229" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">rotation [roll, pitch, yaw] deg</text>
+<circle cx="345" cy="332" r="9" fill="#313131"/>
+<circle cx="345" cy="332" r="3.6" fill="#fff"/>
+<line x1="356" y1="332" x2="375" y2="332" stroke="#313131" stroke-width="2" marker-end="url(#arrow-313131-2)"/>
+<text x="345" y="361" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">m002 (index 1)</text>
+<text x="345" y="378" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">position [x, y, z] m</text>
+<text x="345" y="394" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">rotation [roll, pitch, yaw] deg</text>
+<text x="452" y="36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Receiver groups</text>
+<text x="452" y="54" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">receiverIndices: sets of mount indices</text>
+<rect x="452" y="92" width="200" height="52" rx="6" fill="#F2F2F2"/>
+<text x="552" y="123.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle">g001 = [0, 1]</text>
+<text x="552" y="160" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">m001 and m002 listen together</text>
+<rect x="452" y="186" width="200" height="52" rx="6" fill="#F2F2F2"/>
+<text x="552" y="217.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle">g002 = [0, 1]</text>
+<text x="552" y="254" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">both listen again, on another channel id</text>
+<text x="700" y="36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Firing sequence seq001</text>
+<text x="700" y="54" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">four parallel arrays, one entry per event</text>
+<text x="883" y="97" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" text-anchor="middle" font-weight="bold">event 0</text>
+<text x="961" y="97" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#952FC6" text-anchor="middle" font-weight="bold">event 1</text>
+<text x="835" y="129.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="end">eventTimeNs</text>
+<rect x="848" y="108" width="70" height="34" rx="6" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="883" y="129.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">0</text>
+<rect x="926" y="108" width="70" height="34" rx="6" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="961" y="129.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">5000</text>
+<text x="835" y="171.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="end">txSensorId</text>
+<rect x="848" y="150" width="70" height="34" rx="6" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="883" y="171.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">0</text>
+<rect x="926" y="150" width="70" height="34" rx="6" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="961" y="171.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">1</text>
+<text x="835" y="213.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="end">rxGroupId</text>
+<rect x="848" y="192" width="70" height="34" rx="6" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="883" y="213.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">0</text>
+<rect x="926" y="192" width="70" height="34" rx="6" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="961" y="213.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">1</text>
+<text x="835" y="255.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="end">channel</text>
+<rect x="848" y="234" width="70" height="34" rx="6" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="883" y="255.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">0</text>
+<rect x="926" y="234" width="70" height="34" rx="6" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="961" y="255.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" text-anchor="middle">1</text>
+<path d="M1004,108 L1012,108 L1012,268 L1004,268 M1012,188 L1020,188" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="1024" y="185" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">column i</text>
+<text x="1024" y="202" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">is one event</text>
+<text x="30" y="414" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">Signal ways of one frame</text>
+<line x1="30" y1="436" x2="46" y2="436" stroke="#0074DF" stroke-width="2"/>
+<text x="53" y="440.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">event 0: mount 0 fires into g001 = [0, 1], channel id 0</text>
+<line x1="30" y1="456" x2="46" y2="456" stroke="#952FC6" stroke-width="2"/>
+<text x="53" y="460.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">event 1: mount 1 fires into g002 = [0, 1], channel id 1</text>
+<rect x="400" y="418" width="185" height="52" rx="6" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<text x="492.5" y="448.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">receiver 0, channel id 0</text>
+<rect x="593" y="418" width="185" height="52" rx="6" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<text x="685.5" y="448.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">receiver 1, channel id 0</text>
+<rect x="786" y="418" width="185" height="52" rx="6" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<text x="878.5" y="448.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">receiver 0, channel id 1</text>
+<rect x="979" y="418" width="185" height="52" rx="6" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<text x="1071.5" y="448.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle" font-weight="bold">receiver 1, channel id 1</text>
+<path d="M883,270 C883,326.7 492.5,348.3 492.5,405" fill="none" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<path d="M883,270 C883,326.7 685.5,348.3 685.5,405" fill="none" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<path d="M961,270 C961,326.7 878.5,348.3 878.5,405" fill="none" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<path d="M961,270 C961,326.7 1071.5,348.3 1071.5,405" fill="none" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<text x="30" y="528" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">numSignalWays = mounts × distinct channel ids = 2 × 2 = 4, and both events together fill all four</text>
+</svg>

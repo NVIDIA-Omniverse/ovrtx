@@ -1,13 +1,6 @@
 <!--
-SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-
-NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-property and proprietary rights in and to this material, related
-documentation and any modifications thereto. Any use, reproduction,
-disclosure or distribution of this material and related documentation
-without an express license agreement from NVIDIA CORPORATION or
-its affiliates is strictly prohibited.
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 -->
 # ovrtx Skills Directory
 
@@ -32,7 +25,7 @@ skills/
 name: skill-name
 description: >
   What this skill covers. Use when user asks to [trigger phrases].
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -198,6 +191,10 @@ data-contract changes that affect attached applications.
 For existing ovrtx 0.5 projects, use [update-0-5-to-0-6](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-5-to-0-6/SKILL.md) for
 logging, animation clocks, OVStage 0.3 source/data contracts, sensor outputs,
 and SPG Lua migration. Renderer-setting migrations are outside its scope.
+
+For existing ovrtx 0.6 projects, use [update-0-6-to-0-7](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-6-to-0-7/SKILL.md) for
+typed handles, native dependencies, output decoding, camera authoring, compression,
+SPG, and frame-limit migration.
 
 ## Adding a New Skill
 

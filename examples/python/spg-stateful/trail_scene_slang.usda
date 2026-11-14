@@ -10,7 +10,7 @@
 # its affiliates is strictly prohibited.
 #
 # Slang variant of trail_scene.usda. The rendered world is referenced from that
-# scene so this file shows only what differs between the two backends: the
+# scene; the render graph below differs only in the
 # shader definition it instantiates.
 (
     defaultPrim = "World"

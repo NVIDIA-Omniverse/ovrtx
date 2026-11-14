@@ -16,7 +16,7 @@
 -- inputs["X"].isComposite to tell the two apart, then take a channel out of
 -- .tensors by name. Each one is an ordinary resource descriptor.
 --
--- The discovery surface is identical to the CUDA script. The only difference is
+-- The discovery surface is identical to the CUDA script. The main difference is
 -- the binder: slang.StructuredBuffer where cuda.array wraps a raw device
 -- pointer.
 local WIDTH, HEIGHT = 512, 256
@@ -36,7 +36,7 @@ function rangeHistogram(inputs, outputs)
     -- Nmax, the capacity Coordinates is allocated for. Counts says how many of
     -- those entries the sweep actually filled, but a launch script sees
     -- descriptors rather than data, so it cannot read that number. Counts is
-    -- bound for the shader instead and the bound is applied there.
+    -- bound for the shader instead, which applies the limit.
     local maxPoints = coordinates.shape[2]
 
     -- The sensor publishes scalars alongside the channels. maxPoints is the same
@@ -52,7 +52,7 @@ function rangeHistogram(inputs, outputs)
     -- [snippet:histogram-slang-binding]
     outputs["Histogram"] = slang.image(WIDTH, HEIGHT, slang.uchar4)
 
-    return slang.dispatch({
+    return slang.compute({
         bind = {
             slang.ParameterBlock(
                 slang.int(maxPoints),               -- -> int   maxPoints

@@ -106,6 +106,17 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_enable_crash_reporter(bool
 }
 
 /**
+ * Enable or disable graphics API debug validation when creating shared graphics devices.
+ * Omit this entry to preserve GPU Foundation's default.
+ * Additional renderers reuse the existing validation mode; conflicting requests warn and
+ * continue with that mode. See @ref OVRTX_CONFIG_ENABLE_DEBUG_VALIDATION for lifetime rules.
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_debug_validation(bool enabled)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_DEBUG_VALIDATION, enabled);
+}
+
+/**
  * Configure synchronous stream execution.
  *
  * When enabled, operations that are normally enqueued for stream-ordered execution will block
@@ -134,6 +145,19 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_enable_profiling(bool enab
 static inline ovrtx_config_entry_t ovrtx_config_entry_read_gpu_transforms(bool read_gpu_transforms)
 {
     return ovrtx_config_entry_bool(OVRTX_CONFIG_READ_GPU_TRANSFORMS, read_gpu_transforms);
+}
+
+/**
+ * Enable the history presentation of an attached history-capable ovstage.
+ *
+ * When enabled, ovrtx_step_with_stage() at an ordinal below the write floor renders the retained
+ * values of the renderable history-enabled pairs and restores the live values afterwards. When
+ * disabled (the default), the renderer makes no history calls, and such a step fails with a reason
+ * that names OVRTX_CONFIG_ENABLE_HISTORY_PRESENTATION. Pass to ovrtx_create_renderer().
+ */
+static inline ovrtx_config_entry_t ovrtx_config_entry_enable_history_presentation(bool enable_history_presentation)
+{
+    return ovrtx_config_entry_bool(OVRTX_CONFIG_ENABLE_HISTORY_PRESENTATION, enable_history_presentation);
 }
 
 /**
@@ -384,11 +408,14 @@ static inline ovrtx_config_entry_t ovrtx_config_entry_selection_outline_enabled(
 }
 
 /**
- * Configure the selection outline width in pixels.
+ * Configure the default selection outline width in pixels.
  *
- * Init-time only; changing requires renderer recreation. Valid range is 0..15
- * (the underlying RTX outline pipeline cap). Out-of-range values are clamped
- * by the renderer.
+ * Applies to every selection group that has no per-group width of its own.
+ *
+ * Init-time only; changing this default requires renderer recreation. Valid
+ * range is 0..15 (the underlying RTX outline pipeline cap), where 0 draws no
+ * outline ring. Out-of-range values are clamped by the renderer. Per-group
+ * overrides are applied at runtime via @ref ovrtx_set_selection_group_styles.
  */
 static inline ovrtx_config_entry_t ovrtx_config_entry_selection_outline_width(int width)
 {

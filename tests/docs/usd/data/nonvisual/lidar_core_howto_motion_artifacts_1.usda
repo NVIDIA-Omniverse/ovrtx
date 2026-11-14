@@ -1,0 +1,14 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-howto-motion-artifacts-1]
+#usda 1.0
+
+def OmniLidar "Lidar" (
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    token omni:sensor:Core:outputMotionCompensationState = "NONCOMPENSATED"
+}
+# [/snippet:doc-nonvisual-lidar-core-howto-motion-artifacts-1]

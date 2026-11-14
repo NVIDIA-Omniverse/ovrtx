@@ -41,14 +41,14 @@
 def Xform "World"
 {
     def "warehouse" (
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Environments/Simple_Warehouse/warehouse.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Environments/Simple_Warehouse/warehouse.usd@
     )
     {
     }
 
     def "GR1T2_fourier_hand_6dof" (
-        delete payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/FourierIntelligence/GR-1/GR1T2_fourier_hand_6dof/GR3T2_fourier_hand_6dof.usd@
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/FourierIntelligence/GR-1/GR1T2_fourier_hand_6dof/GR1T2_fourier_hand_6dof.usd@
+        delete payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/FourierIntelligence/GR-1/GR1T2_fourier_hand_6dof/GR3T2_fourier_hand_6dof.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/FourierIntelligence/GR-1/GR1T2_fourier_hand_6dof/GR1T2_fourier_hand_6dof.usd@
     )
     {
         quatd xformOp:orient = (0.8526401643540923, 0, 0, -0.5224985647159488)
@@ -99,7 +99,7 @@ def Xform "World"
     }
 
     def "spot" (
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/BostonDynamics/spot/spot.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/BostonDynamics/spot/spot.usd@
     )
     {
         quatd xformOp:orient = (0.8910065241883679, 0, 0, 0.45399049973954675)
@@ -109,7 +109,7 @@ def Xform "World"
     }
 
     def "forklift_c" (
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/IsaacSim/ForkliftC/forklift_c.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/IsaacSim/ForkliftC/forklift_c.usd@
     )
     {
         quatd xformOp:orient = (0.4646441375204056, 0, 0, -0.8854975016723189)
@@ -130,7 +130,7 @@ def Xform "World"
     }
 
     def "forklift_b" (
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/IsaacSim/ForkliftB/forklift_b.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/IsaacSim/ForkliftB/forklift_b.usd@
     )
     {
         float3 xformOp:rotateXYZ = (0, 0, 6.6992216)
@@ -140,7 +140,7 @@ def Xform "World"
     }
 
     def "carter_v1" (
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Carter/carter_v1.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Carter/carter_v1.usd@
     )
     {
         quatd xformOp:orient = (0.9383206006309662, 0, 0, 0.34576646805545325)
@@ -150,7 +150,7 @@ def Xform "World"
     }
 
     def "jetbot" (
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Jetbot/jetbot.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Jetbot/jetbot.usd@
     )
     {
         float3 xformOp:rotateXYZ = (0, 0, -35.98492)
@@ -160,7 +160,7 @@ def Xform "World"
     }
 
     def "kaya" (
-        prepend payload = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Kaya/kaya.usd@
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Kaya/kaya.usd@
     )
     {
         double3 xformOp:rotateXYZ = (0, 0, 25.698814613470546)

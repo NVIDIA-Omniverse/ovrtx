@@ -1,0 +1,21 @@
+#usda 1.0
+
+# [snippet:doc-radar-second-scan]
+def Xform "World"
+{
+    def OmniRadar "generic_radar" (
+        # The model schema includes s001; the second entry adds s002.
+        prepend apiSchemas = [
+            "OmniSensorGenericRadarWpmDmatAPI",
+            "OmniSensorGenericRadarWpmDmatScanCfgAPI:s002",
+        ]
+    )
+    {
+        float omni:sensor:WpmDmat:scan:s001:maxRangeM = 50
+        float omni:sensor:WpmDmat:scan:s001:raysPerDeg = 10.0
+
+        float omni:sensor:WpmDmat:scan:s002:maxRangeM = 300
+        float omni:sensor:WpmDmat:scan:s002:raysPerDeg = 8.0
+    }
+}
+# [/snippet:doc-radar-second-scan]

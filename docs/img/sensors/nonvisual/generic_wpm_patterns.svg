@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1140" viewBox="0 0 1000 1140" role="img" aria-labelledby="title desc">
+<title id="title">Generic wpm model trace definition</title>
+<desc id="desc">Global propagation settings sit above four connected panels. At upper left, activeTxPatternIndex selects transmitter pattern 0, containing Tx 0 and Tx 1. Its shared rayPatternIndices entry selects ray pattern 1, a three-ray Gaussian bundle at upper right. Its shared mappingTargetRxGroups entry selects group 0 in mapping page 0 at lower right; activeMappingPageIndex selects that page. Group 0 contains the ordered receiver indices 2, 0. Separate purple arrows connect entry 2 to the Rx 2 cell and entry 0 to the Rx 0 cell in receiver pattern 0 at lower left, selected independently by activeRxPatternIndex. Unselected pattern rows and stacked mapping pages remain visible. Green, blue, purple and orange outlines mark the selected Tx, ray, Rx and mapping data. The illustrated map connection is one of nton, 1to1 with bloom, and map.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-76b900-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#76B900"/></marker><marker id="arrow-952fc6-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#952FC6"/></marker><marker id="arrow-ef9100-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#EF9100"/></marker></defs>
+<rect width="1000" height="1140" fill="#fff"/>
+<text x="24" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="23" fill="#313131" font-weight="bold">One trace definition connects the stored patterns</text>
+<rect x="24" y="60" width="952" height="78" rx="6" fill="#F2F2F2"/>
+<text x="42" y="88" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#313131" font-weight="bold">Global propagation settings</text>
+<text x="42" y="118" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="17" fill="#313131">waveType · wavelengthNm · maxBounces · maxHitDistanceM</text>
+<rect x="24" y="166" width="430" height="380" rx="6" fill="#F2F2F2"/>
+<rect x="552" y="166" width="424" height="380" rx="6" fill="#F2F2F2"/>
+<rect x="24" y="617" width="430" height="430" rx="6" fill="#F2F2F2"/>
+<rect x="552" y="617" width="424" height="430" rx="6" fill="#F2F2F2"/>
+<text x="42" y="195" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="21" fill="#313131" font-weight="bold">Transmitter patterns</text>
+<text x="42" y="224" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Free / Grid</text>
+<text x="42" y="253" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="16" fill="#313131">activeTxPatternIndex = 0</text>
+<line x1="58" y1="263" x2="58" y2="269" stroke="#76B900" stroke-width="2" marker-end="url(#arrow-76b900-2)"/>
+<rect x="40" y="282" width="398" height="164" rx="6" fill="#fff" stroke="#76B900" stroke-width="3"/>
+<text x="56" y="312" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" font-weight="bold">0 · Free</text>
+<rect x="212" y="290" width="54" height="36" rx="2" fill="#fff" stroke="#76B900" stroke-width="1"/>
+<text x="239" y="313.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Tx 0</text>
+<rect x="272" y="290" width="54" height="36" rx="2" fill="#fff" stroke="#76B900" stroke-width="1"/>
+<text x="299" y="313.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Tx 1</text>
+<text x="56" y="348" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Each Tx: pose + firing offset</text>
+<text x="56" y="375" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" font-weight="bold">Shared by this Tx pattern:</text>
+<text x="56" y="402" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="16" fill="#313131">tx:rayPatternIndices[0] = 1</text>
+<text x="56" y="429" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="16" fill="#313131">tx:mappingTargetRxGroups[0] = 0</text>
+<rect x="40" y="464" width="398" height="50" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="56" y="495" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131">1 · Grid</text>
+<rect x="212" y="471" width="54" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="239" y="494.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Tx 0</text>
+<rect x="272" y="471" width="54" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="299" y="494.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Tx 1</text>
+<rect x="332" y="471" width="54" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="359" y="494.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Tx 2</text>
+<text x="42" y="535" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Tx = transmitter; each cell is an element</text>
+<text x="570" y="195" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="21" fill="#313131" font-weight="bold">Ray patterns</text>
+<text x="570" y="224" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Free / Grid / Gaussian</text>
+<rect x="568" y="260" width="392" height="50" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="584" y="291" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131">0 · Free</text>
+<rect x="728" y="267" width="70" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="763" y="290.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Ray 0</text>
+<rect x="804" y="267" width="70" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="839" y="290.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Ray 1</text>
+<rect x="568" y="330" width="392" height="116" rx="6" fill="#fff" stroke="#0074DF" stroke-width="3"/>
+<text x="584" y="358" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" font-weight="bold">1 · Gaussian</text>
+<rect x="584" y="377" width="78" height="36" rx="2" fill="#fff" stroke="#0074DF" stroke-width="1"/>
+<text x="623" y="400.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Ray 0</text>
+<rect x="668" y="377" width="78" height="36" rx="2" fill="#fff" stroke="#0074DF" stroke-width="1"/>
+<text x="707" y="400.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Ray 1</text>
+<rect x="752" y="377" width="78" height="36" rx="2" fill="#fff" stroke="#0074DF" stroke-width="1"/>
+<text x="791" y="400.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Ray 2</text>
+<text x="584" y="435" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Whole bundle reused at every selected Tx</text>
+<rect x="568" y="464" width="392" height="50" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="584" y="495" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131">2 · Grid</text>
+<rect x="728" y="471" width="68" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="762" y="494.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Ray 0</text>
+<rect x="802" y="471" width="68" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="836" y="494.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Ray 1</text>
+<rect x="876" y="471" width="68" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="910" y="494.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">…</text>
+<text x="570" y="535" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Each ray: origin, direction, firing offset</text>
+<text x="42" y="646" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="21" fill="#313131" font-weight="bold">Receiver patterns</text>
+<text x="42" y="675" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Free / Grid</text>
+<text x="42" y="704" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="16" fill="#313131">activeRxPatternIndex = 0</text>
+<line x1="58" y1="714" x2="58" y2="717" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<rect x="40" y="730" width="398" height="64" rx="6" fill="#fff" stroke="#952FC6" stroke-width="3"/>
+<text x="56" y="768" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" font-weight="bold">0 · Free</text>
+<rect x="212" y="744" width="54" height="36" rx="2" fill="#fff" stroke="#952FC6" stroke-width="1"/>
+<text x="239" y="767.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Rx 0</text>
+<rect x="272" y="744" width="54" height="36" rx="2" fill="#fff" stroke="#952FC6" stroke-width="1"/>
+<text x="299" y="767.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Rx 1</text>
+<rect x="332" y="744" width="54" height="36" rx="2" fill="#fff" stroke="#952FC6" stroke-width="1"/>
+<text x="359" y="767.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Rx 2</text>
+<rect x="40" y="930" width="398" height="50" rx="6" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="56" y="961" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131">1 · Grid</text>
+<rect x="212" y="937" width="54" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="239" y="960.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Rx 0</text>
+<rect x="272" y="937" width="54" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="299" y="960.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">Rx 1</text>
+<rect x="332" y="937" width="54" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="359" y="960.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">…</text>
+<text x="42" y="1015" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Each Rx: position + orientation</text>
+<text x="570" y="646" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="21" fill="#313131" font-weight="bold">Receiver mappings · map</text>
+<text x="570" y="675" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="16" fill="#313131">activeMappingPageIndex = 0</text>
+<rect x="588" y="698" width="376" height="278" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="578" y="708" width="376" height="278" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="568" y="718" width="376" height="278" rx="2" fill="#fff" stroke="#EF9100" stroke-width="2"/>
+<text x="584" y="746" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" font-weight="bold">Page 0</text>
+<rect x="584" y="765" width="344" height="51" rx="6" fill="#fff" stroke="#EF9100" stroke-width="3"/>
+<text x="600" y="797" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131" font-weight="bold">Group 0</text>
+<rect x="722" y="773" width="48" height="36" rx="2" fill="#fff" stroke="#EF9100" stroke-width="1"/>
+<text x="746" y="796.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">2</text>
+<rect x="776" y="773" width="48" height="36" rx="2" fill="#fff" stroke="#EF9100" stroke-width="1"/>
+<text x="800" y="796.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">0</text>
+<text x="600" y="962" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Group 1</text>
+<rect x="722" y="938" width="48" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="746" y="961.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">1</text>
+<rect x="776" y="938" width="48" height="36" rx="2" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="800" y="961.76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" text-anchor="middle">2</text>
+<text x="570" y="1030" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Entries index the active Rx pattern</text>
+<line x1="438" y1="402" x2="528" y2="402" stroke="#0074DF" stroke-width="2"/>
+<line x1="528" y1="402" x2="528" y2="354" stroke="#0074DF" stroke-width="2"/>
+<line x1="528" y1="354" x2="555" y2="354" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="438" y1="429" x2="502" y2="429" stroke="#EF9100" stroke-width="2"/>
+<line x1="502" y1="429" x2="502" y2="790" stroke="#EF9100" stroke-width="2"/>
+<line x1="502" y1="790" x2="571" y2="790" stroke="#EF9100" stroke-width="2" marker-end="url(#arrow-ef9100-2)"/>
+<line x1="746" y1="809" x2="746" y2="846" stroke="#952FC6" stroke-width="2"/>
+<line x1="746" y1="846" x2="359" y2="846" stroke="#952FC6" stroke-width="2"/>
+<line x1="359" y1="846" x2="359" y2="792" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<line x1="800" y1="809" x2="800" y2="904" stroke="#952FC6" stroke-width="2"/>
+<line x1="800" y1="904" x2="239" y2="904" stroke="#952FC6" stroke-width="2"/>
+<line x1="239" y1="904" x2="239" y2="792" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<text x="42" y="827" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131" font-weight="bold">Receiver lookup</text>
+<text x="24" y="1069" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="18" fill="#313131" font-weight="bold">Receiver connections: nton · 1to1 + bloom · map</text>
+<text x="24" y="1096" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">map: the selected page holds ordered groups of active-Rx indices.</text>
+<text x="24" y="1122" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Outlined rows are selected; pattern cells are elements, group cells are receiver indices.</text>
+</svg>

@@ -30,6 +30,7 @@ def test_mesh_light_sampling_converges_receiver_illumination(tmp_path):
             "16",
         ],
         check=True,
+        timeout=300,
     )
 
     with Image.open(output) as image:

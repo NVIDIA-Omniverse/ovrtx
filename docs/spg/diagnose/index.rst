@@ -24,7 +24,7 @@ What to check when a graph does not behave, and what SPG cannot be asked to do.
    * - :doc:`symptoms`
      - Start here. What you observed, what causes it, and what to change.
    * - :doc:`limitations`
-     - The boundaries that are not bugs, so you stop looking for a way around them.
+     - What SPG does not do today.
 
 .. toctree::
    :hidden:

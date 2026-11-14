@@ -1,5 +1,14 @@
 .. SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 .. SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+..
+.. NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+.. property and proprietary rights in and to this material, related
+.. documentation and any modifications thereto. Any use, reproduction,
+.. disclosure or distribution of this material and related documentation
+.. without an express license agreement from NVIDIA CORPORATION or
+.. its affiliates is strictly prohibited.
+
+.. _sensors-cameras-render-modes-spectral-rendering:
 
 Spectral Rendering
 ==================
@@ -13,7 +22,7 @@ an RGB image according to the response of the camera. This produces much more
 accurate simulation of color, particularly in the presence of high-frequency
 illuminant spectra.
 
-In the current version, there is no way to specify spectral material response:
+You cannot specify spectral material response:
 all material colors are uplifted from RGB to the spectral domain during rendering.
 
 Enable Spectral PathTracing
@@ -22,7 +31,7 @@ Enable Spectral PathTracing
 Spectral rendering is **off by default**. Enable spectral support when creating
 the **first renderer in a process**, then
 explicitly author spectral tracing on its ``PathTracing`` RenderProduct, as
-shown below. The startup option prepares the spectral material backend and
+shown below. The startup option initializes spectral rendering and
 physical light spectra. It also sets the spectral-enabled default to true;
 the examples author that choice explicitly on the RenderProduct.
 
@@ -32,6 +41,7 @@ The following example snippets configure the renderer before loading a scene.
 .. tab-set::
 
    .. tab-item:: Python
+      :sync: python
 
       .. literalinclude:: ../../../../examples/python/spectral-rendering/main.py
          :language: python
@@ -40,6 +50,7 @@ The following example snippets configure the renderer before loading a scene.
          :dedent:
 
    .. tab-item:: C
+      :sync: c
 
       .. literalinclude:: ../../../../examples/c/spectral-rendering/main.cpp
          :language: cpp
@@ -55,7 +66,7 @@ The following example snippets configure the renderer before loading a scene.
    spectral RenderProducts in the same scene: physical light spectra are prepared
    for the scene as a whole.
 
-Spectral tracing is supported in PathTracing. Real-Time Path-Tracing and Minimal do not
+Spectral tracing is supported in PathTracing. Real-Time Path Tracing and Minimal do not
 use it. A spectral RenderProduct attribute alone does not initialize spectral
 support.
 
@@ -65,18 +76,21 @@ Authoring A Physical Illuminant
 Apply ``PhysicalLightIlluminantAPI`` to the light. The following snippets select
 a 3000 K blackbody illuminant and enable visible-spectrum PathTracing for an existing
 camera at ``/World/Camera``. Add resolution and output RenderVars as described in
-:doc:`../../configuration`.
+:doc:`../../common/output_configuration`.
 
 .. tab-set::
 
    .. tab-item:: USDA
+      :sync: usda
 
       .. literalinclude:: ../../../../tests/docs/usd/data/spectral_rendering.usda
          :language: usda
          :start-after: # [snippet:doc-spectral-authoring]
          :end-before: # [/snippet:doc-spectral-authoring]
+         :prepend: #usda 1.0
 
-   .. tab-item:: Python (usd-core)
+   .. tab-item:: USD Python
+      :sync: python
 
       .. literalinclude:: ../../../../tests/docs/usd/test_spectral_rendering.py
          :language: python
@@ -115,10 +129,12 @@ For comparisons at equal luminous power, also apply ``PhotometricAreaLightAPI``
 and set ``photometric:power``. This normalizes each spectrum to the requested
 lumens. See :doc:`../../../lights/physical_lighting` for units and other light types.
 
+.. _sensors-cameras-render-modes-spectral-rendering-controls:
+
 Spectral Controls
 -----------------
 
-Author these custom attributes on the RenderProduct. They currently have no
+Author these custom attributes on the RenderProduct. They have no
 applied settings schema; the values below are base renderer defaults rather
 than USD schema fallbacks. The startup option changes the enabled default to
 true.
@@ -135,8 +151,18 @@ true.
 
 The wavelength limits are clipped to the available response curve. The built-in
 CIE response covers approximately 360–830 nm; the broad default limits do not
-imply an infrared response. Keep the lower limit below the upper limit.
+imply an infrared response. With custom camera responsivity, the camera curves bound the available
+wavelength range instead. Keep the lower limit below the upper limit.
 The examples use 360–830 nm and the default CIE 1931 observer.
+
+The stage's ``renderingColorSpace`` sets the color space used for RGB-to-spectrum
+conversion and the rendered result. It also determines the white point of the
+``white`` illuminant. Author it on the RenderSettings prim; see
+:ref:`sensors-common-output-configuration-global-settings`.
+Spectral rendering recognizes ``lin_rec709_scene``, ``lin_ap1_scene``,
+``lin_ap0_scene``, ``lin_p3d65_scene``, ``lin_rec2020_scene``,
+``lin_adobergb_scene`` and ``lin_ciexyzd65_scene``. Other values use
+``lin_rec709_scene``.
 
 The output is still a color image, not a spectral cube. Read
 :ref:`HdrColor <camera-output-tables>` for numerical comparisons before tone
@@ -156,6 +182,7 @@ set to 10,000. Adaptive sampling and radiance caching are disabled. Only the
 illuminant and transport selection change.
 
 .. figure:: ../../../img/spectral-white.avif
+   :width: 100%
    :alt: White illumination rendered with RGB on the left and spectral PathTracing on the right
 
    *White illumination uses the rendering color space white point (D65 in this case).
@@ -168,10 +195,13 @@ These spiky spectra make the differences between RGB and spectral transport
 easier to see.
 
 .. figure:: ../../../img/spectral-discharge.avif
+   :width: 100%
    :alt: Low-pressure sodium and mercury-vapor illumination, each rendered with RGB and spectral PathTracing
 
    *Low-pressure sodium above, mercury vapor below. RGB is on the left;
    spectral PathTracing is on the right. Compare the chart patches and colored reflections.*
+
+.. _sensors-cameras-render-modes-spectral-rendering-responsivity:
 
 Camera Responsivity Comparison
 ------------------------------
@@ -195,17 +225,23 @@ Provide a responsivity curve for each of the camera's red, green, and blue
 sensor responses using ``physical:responsivity:r``, ``physical:responsivity:g``,
 and ``physical:responsivity:b``. Each curve needs at least two
 (wavelength in nanometers, response) pairs, ordered by increasing wavelength.
+Use the same uniformly spaced wavelength grid for all three channels. The
+renderer resamples curves when their counts or starting wavelengths differ,
+or when their sample spacing is nonuniform; a resampled channel is zero
+outside its supplied range. The combined curve range bounds the simulated
+wavelengths.
+
 The renderer converts these three sensor responses into the output color space
 to produce a color image.
 
-When ``cameraToXYZ`` is zero (its schema default), RTX fits a matrix
+When ``cameraToXYZ`` is zero (its schema default), ovrtx fits a matrix
 from the supplied curves and 190 reference reflectances under 6504 K CIE daylight.
 The fit preserves the daylight whitepoint and is cached until the curves change.
 It does not depend on scene lights or ``colorTemperature``. The schema's default
 CIE XYZ curves reproduce identity within numerical precision. Responses with
 insufficient independent channels cannot be fitted and retain identity.
 
-White balance is separate from calibration. RTX integrates the selected illuminant
+White balance is separate from calibration. ovrtx integrates the selected illuminant
 against the camera responsivities, then applies diagonal gains in sensor-channel
 space before camera-to-XYZ and rendering-color-space conversion. The selected
 white maps to equal output RGB values while preserving its CIE Y luminance.
@@ -222,6 +258,7 @@ Both have 81 samples from 380–780 nm at 5 nm spacing. The baseline camera has 
 responsivity API and uses the renderer's default CIE 1931 observer.
 
 .. figure:: ../../../img/spectral-camera-responsivity.avif
+   :width: 100%
    :alt: D65 daylight and sodium rendered with CIE 1931, Canon EOS 5D, and Sony alpha 7 IV spectral responses
 
    *D65 daylight above, sodium below. Columns show CIE 1931, Canon EOS 5D, and
@@ -232,8 +269,8 @@ responsivity API and uses the renderer's default CIE 1931 observer.
 Run the comparison from the :doc:`../../../examples/python_spectral_rendering`
 or :doc:`../../../examples/c_spectral_rendering` example.
 
-Further Reading
----------------
+Related
+-------
 
 - :doc:`../../../examples/python_spectral_rendering`
 - :doc:`../../../examples/c_spectral_rendering`

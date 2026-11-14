@@ -32,8 +32,6 @@ time you ask it for a value. Refer to :ref:`spg-rtx-prim-tables`.
     local world = camera.world_matrix           -- 16 numbers, row-major
     local focalLength = camera["focalLength"]   -- any attribute of the prim, by name
 
-Nothing here names a camera. Point the product at another one and the script reads that.
-
 How It Works
 ------------
 
@@ -149,8 +147,8 @@ Author it as a ``token``.
 **A transform is** ``nil``. The prim is not placed in the scene, as RenderProducts and RenderVars
 are not. Refer to :ref:`spg-rtx-transforms`.
 
-**The node failed on an assignment.** Prim tables are read-only views of the scene. Keep the
-value in a local variable instead.
+**The node's graph stopped on an assignment.** Prim tables are read-only views of the scene. Keep
+the value in a local variable instead.
 
 **A lookup returned** ``nil``. The log says why: a wrong argument, a relative path that cannot be
 resolved, or no prim at that path.

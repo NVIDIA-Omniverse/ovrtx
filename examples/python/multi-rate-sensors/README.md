@@ -153,6 +153,6 @@ unfinished exposure. It does not provide a partially rendered image. Ignore
 these repeated images; use `partialOutputs=false` to receive only newly completed
 images.
 
-See [Multi-rate Sensor Simulation](../../../docs/sensors/multi_rate.rst) for the
+See [Multi-rate Sensor Simulation](../../../docs/sensors/common/multi_rate.rst) for the
 shared timing model, and [the example page](../../../docs/examples/python_multi_rate_sensors.rst)
 for the complete walkthrough.

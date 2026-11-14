@@ -1,0 +1,33 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-gaussian]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_depth.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        token[] omni:sensor:GenericWpm:ray:patternTypes = ["gaussian"]
+        # Clear the inherited Free family when replacing its ray bundle.
+        uint[] omni:sensor:GenericWpm:freePatterns:ray:numElementsPerPattern = []
+        float3[] omni:sensor:GenericWpm:freePatterns:ray:positions = []
+        float4[] omni:sensor:GenericWpm:freePatterns:ray:orientations = []
+        uint[] omni:sensor:GenericWpm:gaussianPatterns:ray:numElements = [9]
+        uint[] omni:sensor:GenericWpm:gaussianPatterns:ray:seeds = [7]
+        float[] omni:sensor:GenericWpm:gaussianPatterns:ray:stdDevsHorizontal = [1]
+        float[] omni:sensor:GenericWpm:gaussianPatterns:ray:stdDevsVertical = [0.5]
+        float3[] omni:sensor:GenericWpm:gaussianPatterns:ray:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:gaussianPatterns:ray:orientations = [(0, 0, 0, 1)]
+        # Uniform firing offset from each transmitter, not propagation time.
+        uint[] omni:sensor:GenericWpm:gaussianPatterns:ray:globalTimeOffsetsNs = [0]
+    }
+}
+# [/snippet:doc-generic-wpm-gaussian]

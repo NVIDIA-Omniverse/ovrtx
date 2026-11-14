@@ -98,7 +98,7 @@ if (wait_population(stage, populate) ||
 ovx_string_t product_path = {"/Render/Camera", strlen("/Render/Camera")};
 ovrtx_render_product_set_t render_products{&product_path, 1};
 // PathTracing completes its samples within a single step.
-ovrtx_step_result_handle_t final_handle = OVRTX_INVALID_HANDLE;
+ovrtx_step_result_handle_t final_handle = OVRTX_INVALID_STEP_RESULT_HANDLE;
 auto enqueue = ovrtx_step_with_stage(
     renderer, render_products, 1.0 / 60.0, ordinal, &final_handle);
 ovrtx_op_wait_result_t wait_result{};
@@ -126,7 +126,7 @@ auto output_handle = find_ldr_color(outputs);
 ovrtx_map_output_description_t map_desc{};
 map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
 ovrtx_render_var_output_t output{};
-if (output_handle == OVRTX_INVALID_HANDLE ||
+if (output_handle == OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE ||
     failed(ovrtx_map_render_var_output(renderer,
                                        output_handle,
                                        &map_desc,

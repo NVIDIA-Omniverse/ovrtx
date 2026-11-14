@@ -64,7 +64,18 @@ templates_path = ["_templates"]
 # README.md is contributor-facing build instructions, not published documentation.
 # Without this exclusion Sphinx renders it as an orphan page (in no toctree) that is
 # still served on the public site.
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "README.md"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "README.md",
+    # Notes beside the generated sensor figures, not a page.
+    "img/**/*.md",
+    # Drafted and held back until the model has an ovrtx output.
+    "sensors/nonvisual/idealized_depth/**",
+    # Held back until model versioning is activated.
+    "sensors/cameras/versioning.rst",
+]
 
 # Suppress warnings for known issues
 suppress_warnings = [

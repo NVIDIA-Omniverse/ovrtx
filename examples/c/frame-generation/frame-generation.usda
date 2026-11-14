@@ -1,0 +1,78 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Xform "Ground" (
+        prepend references = @../../../tests/docs/data/ground.usd@
+    )
+    {
+        double3 xformOp:scale = (8, 1, 8)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+    }
+
+    def Xform "Logo"
+    {
+        def Xform "Model" (
+            prepend references = @../../../tests/docs/data/logo.usd@
+        )
+        {
+            float3 xformOp:rotateXYZ = (269.91177, -111.88313, -359.9052)
+            double3 xformOp:scale = (25, 25, 25)
+            double3 xformOp:translate = (0, 8.57, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+            over "logo"
+            {
+                over "logo"
+                {
+                    # Linearized sRGB NVIDIA green (#76B900).
+                    color3f[] primvars:displayColor = [(0.1811642, 0.4851499, 0)]
+
+                    # Smooth the shared low-poly logo for clean environment highlights.
+                    custom bool refinementEnableOverride = true
+                    custom int refinementLevel = 1
+                    uniform token subdivisionScheme = "catmullClark"
+                }
+            }
+        }
+    }
+
+    def Camera "Camera"
+    {
+        float2 clippingRange = (1, 100000)
+        float focalLength = 45
+        float3 xformOp:rotateXYZ = (-25, 0, 0)
+        double3 xformOp:translate = (0, 145, 290)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def DomeLight "Environment"
+    {
+        float inputs:intensity = 600
+        asset inputs:texture:file = @../../../tests/docs/data/studio.exr@
+        token inputs:texture:format = "latlong"
+    }
+}
+
+def Scope "Render"
+{
+    def RenderVar "LdrColor"
+    {
+        string sourceName = "LdrColor"
+    }
+
+    def RenderProduct "Camera"
+    {
+        rel camera = </World/Camera>
+        bool omni:rtx:dlss:frameGeneration = true
+        int omni:rtx:dlss:frameGenerationInterpolatedFrameCount = 0
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        rel orderedVars = </Render/LdrColor>
+        int2 resolution = (1280, 720)
+    }
+}

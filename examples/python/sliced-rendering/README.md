@@ -2,7 +2,9 @@
 
 Demonstrates rendering a full image as four successive crops using OpenUSD's `dataWindowNDC` RenderProduct attribute.
 
-The example renders the top-left, top-right, bottom-left, and bottom-right 512x512 regions of a 1024x1024 RenderProduct. Each region receives 10 warmup frames before its captured frame. The example then stitches the four captured outputs into one 1024x1024 RGBA image.
+The example renders the top-left, top-right, bottom-left, and bottom-right 512x512 regions of a 1024x1024 RenderProduct. Each region uses PathTracing at 64 samples per pixel, with zero client warmup frames. The example waits for each crop to converge, then stitches the four captured outputs into one 1024x1024 RGBA image.
+
+No quality attribute is authored; streaming wait uses the renderer defaults.
 
 ## Prerequisites
 

@@ -1,0 +1,35 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-acoustic-wpm-howto-array-topology-1]
+#usda 1.0
+
+def OmniAcoustic "acoustic_array" (
+    prepend apiSchemas = [
+        "OmniSensorGenericAcousticWpmAPI",
+        "OmniSensorWpmAcousticSensorMountAPI:m002",
+        "OmniSensorWpmAcousticRxGroupAPI:g002"
+    ]
+)
+{
+    # m001 is applied by the main schema; this overrides its defaults
+    float3 omni:sensor:WpmAcoustic:sensorMount:m001:position = (4.0, 0.5, 0.5)
+    float3 omni:sensor:WpmAcoustic:sensorMount:m001:rotation = (0.0, -1.0, 0.0)
+
+    # m002 exists because it was prepended above
+    float3 omni:sensor:WpmAcoustic:sensorMount:m002:position = (4.0, -0.5, 0.5)
+    float3 omni:sensor:WpmAcoustic:sensorMount:m002:rotation = (0.0, -1.0, 0.0)
+
+    # both groups listen with both mounts
+    uint[] omni:sensor:WpmAcoustic:rxGroup:g001:receiverIndices = [0, 1]
+    uint[] omni:sensor:WpmAcoustic:rxGroup:g002:receiverIndices = [0, 1]
+
+    # one cycle of two events: m001 fires at 0 into g001 on channel 0,
+    # m002 fires 5 µs later into g002 on channel 1
+    float[] omni:sensor:WpmAcoustic:firingSeq:seq001:eventTimeNs = [0.0, 5000.0]
+    uint[] omni:sensor:WpmAcoustic:firingSeq:seq001:txSensorId = [0, 1]
+    uint[] omni:sensor:WpmAcoustic:firingSeq:seq001:rxGroupId = [0, 1]
+    uint[] omni:sensor:WpmAcoustic:firingSeq:seq001:channel = [0, 1]
+}
+# [/snippet:doc-nonvisual-acoustic-wpm-howto-array-topology-1]

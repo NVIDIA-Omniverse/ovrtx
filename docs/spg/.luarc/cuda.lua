@@ -16,7 +16,7 @@
 ---@class SpgDtype
 ---@field code integer  DataType enum value
 ---@field bits integer  Bits per lane (8, 16, 32, 64)
----@field lanes integer Number of lanes (1 = scalar, 2-4 = vector, 9/16 = matrix)
+---@field lanes integer Number of lanes (1 = scalar, 2-4 = vector, 4/9/16 = matrix)
 ---@field name string   Human-readable name
 ---@operator call(any): SpgArgWrapper  Wrap a value for kernel args (e.g., `cuda.int(42)`)
 
@@ -63,11 +63,12 @@
 ---@field half4 SpgDtype     Half x4 (16-bit float, 4 lanes) — HDR image format
 ---@field int64 SpgDtype     Int64 (64-bit, 1 lane)
 ---@field uint64 SpgDtype    Unsigned int64 (64-bit, 1 lane)
----@field stateful SpgStateful  Marker: keep an output's memory across frames
+---@field stateful SpgStateful  Marker: keep an output's resource across frames
 cuda = {}
 
 --- Create a 2D output image descriptor. Shape is stored as [height, width] (tensor convention).
---- Pass `cuda.stateful` to keep the resource across frames.
+--- Assigned to `outputs[name]` it describes an output; assigned to `self.memory[name]` it describes
+--- memory of the node, kept across frames. Pass `cuda.stateful` to keep an output's resource across frames.
 ---@param width integer   Image width in pixels
 ---@param height integer  Image height in pixels
 ---@param dtype SpgDtype  Pixel data type (e.g., `cuda.uchar4`)
@@ -76,7 +77,8 @@ cuda = {}
 function cuda.image(width, height, dtype, flag) end
 
 --- Create an output tensor descriptor from a shape table.
---- Pass `cuda.stateful` to keep the resource across frames.
+--- Assigned to `outputs[name]` it describes an output; assigned to `self.memory[name]` it describes
+--- memory of the node, kept across frames. Pass `cuda.stateful` to keep an output's resource across frames.
 ---@param shape integer[]  Dimensions (e.g., `{height, width}` for 2D)
 ---@param dtype SpgDtype   Element data type
 ---@param flag? SpgStateful Pass `cuda.stateful` for a persistent output
@@ -84,13 +86,15 @@ function cuda.image(width, height, dtype, flag) end
 function cuda.empty(shape, dtype, flag) end
 
 --- Define the CUDA kernel launch configuration.
---- `block` and `grid` are optional: left out, they are derived from the first output's shape.
+--- `block` and `grid` are optional: left out, the block comes from the `blockDimX`, `blockDimY`
+--- and `blockDimZ` value-inputs when any is present, and both are otherwise derived from the
+--- first output's shape.
 ---@param config { args: SpgArgWrapper[], block?: integer[], grid?: integer[], sharedMemSize?: integer }
 ---@return SpgKernelConfig
 function cuda.kernel(config) end
 
---- Wrap an input resource as a CUDA texture object for read access.
----@param input SpgResourceDesc  Input resource descriptor (from `inputs["name"]`)
+--- Wrap an input or output resource as a CUDA texture object for read access.
+---@param input SpgResourceDesc  Resource descriptor (from `inputs["name"]` or `outputs["name"]`)
 ---@return SpgArgWrapper
 function cuda.TextureObject(input) end
 

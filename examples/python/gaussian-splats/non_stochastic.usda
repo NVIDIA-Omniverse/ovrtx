@@ -1,0 +1,18 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    subLayers = [@gaussian_splats.usda@]
+)
+
+# [snippet:doc-gaussian-non-stochastic]
+over "Render" {
+    over "Camera" {
+        rel camera = </World/Camera_close>
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:rtpt:gaussian:nonStochastic:enabled = true
+        # Adaptive disocclusion sampling would force stochastic rendering.
+        bool omni:rtx:rtpt:adaptiveSampling:disocclusion:enabled = false
+    }
+}
+# [/snippet:doc-gaussian-non-stochastic]

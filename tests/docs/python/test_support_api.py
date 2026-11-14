@@ -20,6 +20,8 @@ TEST_BASE_PATH = str((Path(__file__).parent / "../data/ovrtx-test-base.usda").re
 def test_rolling_shutter_renderer_config():
     """Create a renderer with automatic motion-BVH support for rolling shutter."""
     # [snippet:doc-create-rolling-shutter-renderer]
+    import ovrtx
+
     config = ovrtx.RendererConfig(motion_bvh=ovrtx.MotionBvh.AUTO)
     renderer = ovrtx.Renderer(config)
     # [/snippet:doc-create-rolling-shutter-renderer]
@@ -60,7 +62,8 @@ def test_managed_dl_tensor_helpers(stage):
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
                 group = read.fetch_next()
                 # [snippet:doc-managed-dltensor-helpers]
-                tensor = group.dlpack(0)
+                column = group.columns[0]
+                tensor = column.dlpack(0)
                 values = tensor.numpy().copy()
                 device_type, device_id = tensor.__dlpack_device__()
                 # [/snippet:doc-managed-dltensor-helpers]

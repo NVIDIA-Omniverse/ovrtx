@@ -45,7 +45,7 @@ The launch model is the one you already use. Only the names change.
       :sync: slang
 
       Threads in a group is ``numthreads``, declared in the shader. Number of groups is ``grid``, a
-      key on the table ``slang.dispatch`` returns, and it counts groups, not threads.
+      key on the table passed to ``slang.compute``, and it counts groups, not threads.
 
       A 1024 x 1024 output, one thread per pixel:
 
@@ -58,7 +58,7 @@ The launch model is the one you already use. Only the names change.
       .. code-block:: lua
 
           -- in the launch script
-          return slang.dispatch({
+          return slang.compute({
               bind = { --[[ the bound resources ]] },
               grid = { 64, 64, 1 },    -- 64 x 64 x 1 groups
           })
@@ -75,8 +75,9 @@ How It Works
       gives one thread per element, which is the mapping an image-shaped kernel wants.
 
       **What it derives.** The block is 16 x 16 x 1, or 256 x 1 x 1 when the resource it derived
-      from has rank 1 or 0. The grid is that resource's shape divided by the block and rounded up,
-      reading ``shape[0]`` as height, ``shape[1]`` as width and ``shape[2]`` as depth.
+      from has rank 1 or 0. The grid is that resource's shape divided by the block and rounded up.
+      A rank-1 shape is ``{width}``, a rank-2 shape ``{height, width}`` and a rank-3 shape
+      ``{height, width, depth}``.
 
       **State them when the iteration domain is not the output.** A kernel whose threads walk a
       buffer, or that runs one thread per column rather than one per pixel, has to say so. Sizing
@@ -86,11 +87,16 @@ How It Works
       **A short table is fine.** ``cuda.kernel`` takes fewer than three components and fills the
       rest with 1, so ``block = { 16, 16 }`` is a 2D block and ``block = { 256 }`` is a 1D one.
 
+      Without a ``block`` override, value inputs ``blockDimX``, ``blockDimY`` and ``blockDimZ``
+      can state the block dimensions. If any is present, each missing axis defaults to 1, so
+      ``blockDimX = 256`` gives ``(256, 1, 1)``. If none is present, SPG uses its shape-derived
+      defaults. An explicit launch ``block`` takes precedence over these inputs.
+
       ``sharedMemSize`` **is dynamic shared memory in bytes**, the third argument of an ordinary
       CUDA launch.
 
       The :doc:`blur example <../../examples/python_spg_blur>` runs both cases side by side. Its
-      horizontal pass takes one thread per output pixel and states nothing:
+      horizontal pass takes one thread per output pixel and states neither key:
 
       .. filtered-literalinclude:: ../../../examples/python/spg-blur/BlurKernel.cu.lua
          :language: lua
@@ -110,19 +116,15 @@ How It Works
          :emphasize-lines: 22-23
          :caption: ``BlurKernel.cu.lua``, from the runnable :doc:`blur example <../../examples/python_spg_blur>`
 
-      A pre-compiled ``.ptx``, ``.cubin`` or ``.fatbin`` changes nothing here, because launch
-      geometry lives in the launch script and is never read from the artifact.
-
    .. tab-item:: Slang
       :sync: slang
 
       **The shader owns the group size.** ``[numthreads(x, y, z)]`` is where it is declared, and
-      SPG reads it back by reflection. A shader that declares one needs nothing in the launch
-      script, and SPG divides the output's shape by it to size the grid.
+      SPG reads it back by reflection and divides the output's shape by it to size the grid.
 
       ``InvertKernel.slang``, in the runnable
       :doc:`pipeline example <../../examples/python_spg_pipeline>`, declares
-      ``[numthreads(32, 32, 1)]``, and its launch script says nothing about the group size.
+      ``[numthreads(32, 32, 1)]``, and its launch script leaves the group size to the shader.
 
       ``numthreads`` **tells SPG the group size the shader was compiled with**, so it can divide
       the output's shape into groups. It is for a shader that cannot describe itself, which means
@@ -140,8 +142,8 @@ How It Works
       the real size. The disagreement is logged at INFO level, which the renderer does not print
       at its default log level.
 
-      **Both keys need exactly three components.** ``slang.dispatch`` rejects a ``numthreads`` or a
-      ``grid`` that is not a 3-element table, and reports it rather than guessing. Write the
+      **Both keys need exactly three components.** ``slang.compute`` rejects a ``numthreads`` or a
+      ``grid`` that is not a 3-element table. Write the
       trailing ``1`` for a 2D or 1D launch.
 
       **The grid is optional.** Without it SPG divides the output's shape by the group size,
@@ -162,10 +164,10 @@ How It Works
 
       .. _spg-slang-no-group-size:
 
-      **With a group size from neither place, the node does not run.** A ``.spv`` whose launch
+      **With a group size from neither place, the node's graph stops.** A ``.spv`` whose launch
       script states neither ``numthreads`` nor ``grid`` leaves nothing to derive a grid from. SPG
-      reports which of the two to supply and skips the node, so it publishes nothing rather than
-      covering part of the output.
+      reports which of the two to supply and stops the node's graph, so it publishes nothing rather
+      than covering part of the output.
 
       **A ray-generation node states neither.** Its grid is the output AOV's shape, one ray per
       element, and there is no thread group to size. Refer to :doc:`raygen`.
@@ -180,8 +182,8 @@ casual look at the picture.
 
 A node that can be made the identity gives the same proof without a special kernel. The
 :doc:`blur example <../../examples/python_spg_blur>` sets its radius to zero, which makes both
-passes copy their input, and prints ``pixels differing from the input: 0``. One unreached column
-would show up in that count.
+passes copy their input, and saves that frame's input and output, which match pixel for pixel.
+One unreached column would show up as a difference.
 
 When It Goes Wrong
 ------------------
@@ -202,9 +204,9 @@ When It Goes Wrong
 
       - A band or corner of the output is unwritten: an explicit ``grid`` is too small, or the
         shader's ``[numthreads]`` is not what the grid was sized against.
-      - The node does not load: ``numthreads`` or ``grid`` is not a 3-element table. The message
+      - The node's graph stops: ``numthreads`` or ``grid`` is not a 3-element table. The message
         names which.
-      - The node publishes nothing and the log names ``numthreads``: a ``.spv`` with no group size
+      - The node's graph stops and the log names ``numthreads``: a ``.spv`` with no group size
         from either place. Refer to
         :ref:`with a group size from neither place <spg-slang-no-group-size>`.
       - The log reports that the script and the shader disagree: the shader's size was used. Bring

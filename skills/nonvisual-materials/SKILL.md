@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: nonvisual-materials
 description: >
   Authoring non-visual material labels for sensor simulation. Use when user asks to
   assign lidar/radar/acoustic material semantics, choose nonvisual base materials,
   coatings, or attributes, debug material IDs, or bind sensor-facing USD materials.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -70,7 +63,7 @@ This skill has no scripts.
 
 ## Overview
 
-Non-visual material labels let lidar, radar, and acoustic sensors map USD materials to sensor-return behavior. A visual shader is optional; the sensor semantics come from custom material attributes that encode a base material, coating, and optional attributes into a material ID.
+Non-visual material labels let lidar, radar, and acoustic sensors map USD materials to sensor-return behavior. The semantics come from custom material attributes that encode a base material, coating, and optional attributes into one 16-bit material ID: base in bits 0-7, coating in bits 8-10, attribute flags in bits 11-15. No surface shader is needed: a bound `Material` carrying at least one of the non-visual attributes resolves on a fresh load with nothing connected to its surface output -- see Troubleshooting.
 
 ## USDA Pattern
 
@@ -93,12 +86,10 @@ Use these exact base material strings.
 | Category | Materials |
 |---|---|
 | Default | `none` (0) |
-| Metals | `aluminum` (1), `steel` (2), `oxidized_steel` (3), `iron` (4), `oxidized_iron` (5), `silver` (6), `brass` (7), `bronze` (8), `oxidized_Bronze_Patina` (9), `tin` (10) |
+| Metals | `aluminum` (1), `steel` (2), `oxidized_steel` (3), `iron` (4), `oxidized_iron` (5), `silver` (6), `brass` (7), `bronze` (8), `oxidized_bronze_patina` (9), `tin` (10) |
 | Polymers | `plastic` (11), `fiberglass` (12), `carbon_fiber` (13), `vinyl` (14), `plexiglass` (15), `pvc` (16), `nylon` (17), `polyester` (18) |
 | Glass | `clear_glass` (19), `frosted_glass` (20), `one_way_mirror` (21), `mirror` (22), `ceramic_glass` (23) |
 | Other | `asphalt` (24), `concrete` (25), `leaf_grass` (26), `dead_leaf_grass` (27), `rubber` (28), `wood` (29), `bark` (30), `cardboard` (31), `paper` (32), `fabric` (33), `skin` (34), `fur_hair` (35), `leather` (36), `marble` (37), `brick` (38), `stone` (39), `gravel` (40), `dirt` (41), `mud` (42), `water` (43), `salt_water` (44), `snow` (45), `ice` (46), `calibration_lambertian` (47) |
-
-`none` and `calibration_lambertian` map to `DefaultMaterial` behavior. Other base materials default to `CompositeMaterial` behavior.
 
 ## Coatings
 
@@ -123,19 +114,17 @@ Attributes are encoded as a bit field, so multiple attributes can be combined wh
 | `visually_transparent` | 8 | Material is visually transparent. |
 | `TDB` | 16 | Reserved for future use; do not select for authored content. |
 
-## Behavior Types
-
-The material system can map material IDs to these BSDF behavior types: `Constant`, `DefaultMaterial`, `CoreMaterial`, `AcousticMaterial`, `CompositeMaterial`, `RetroReflectiveMaterial`, and `ValidationMaterial`.
-
-Use behavior remapping settings only when a sensor model needs a non-default BSDF behavior for a material ID.
+The `Index` column above is the **bit value** that lands in bits 11-15 -- what to compare against after masking. The SimReady table numbers the attributes from 1 instead, and an attribute with SimReady index `n` sets bit `n - 1` of the field; both get called "the index", so SimReady index 3 is `single_sided`, whose bit value is 4. The reserved rows are placeholders: `TBD` and `TDB` are not authorable tokens.
 
 ## Troubleshooting
 
 - Non-visual labels belong on the bound `Material`, not directly on the mesh.
 - If every object behaves like the same material, check that the bound material authors the `omni:simready:nonvisual` attributes with the expected token and token-array types.
-- Preserve coating and attribute flags unless you intentionally want base-material-only behavior. `/app/sensors/nv/materials/preserveMaterialFlags=0xff` keeps all flags.
-- `paint` and `calibration_lambertian` can use visual diffuse color information only when the sensor modality requests reflectance information.
-- Material remapping settings are per modality, such as `/app/sensors/nv/lidar/matNameToIdMapOverrides` and `/app/sensors/nv/radar/matBehaviorToIdOverrides`.
+- The Lidar generic core model, the Radar generic wpmDmat model and the Acoustic generic wpm model answer from the labels alone: a texture or a tint on the visual shader changes nothing in their returns. Only the Lidar generic wpm model can consult the visual material as well -- its diffuse reflectance, roughness and shading normal -- and only when the per-sensor `omni:sensor:LidarWpm:useVisualMaterialInputs` is `true` (`false` by default); no other switch selects visual-material use for that model.
+- A non-visual material does not need a surface shader. A `Material` that geometry binds and that carries at least one of the three non-visual attributes resolves to its encoded ID with nothing connected to its surface output, on a fresh load as well as in the session that authored it, and adding, changing or removing any of those attributes on a loaded stage takes effect without saving or reopening it. A material that also drives visual rendering still needs its visual shader network for that purpose; if it already has one, leave it alone.
+- Base and coating tokens are matched exactly, so a misspelling or a wrong case contributes `0` rather than raising an error.
+- Base ID `0` is a real catalog entry, not a diagnostic. An unmatched token, an absent base attribute and a deliberate `none` all produce `0`, and the number will not say which happened.
+- Reading the ID back: request `MaterialId` on the lidar `PointCloud` RenderVar; the Lidar generic core model writes it for every valid return whenever the RenderVar names it, and no attribute switches it on or off. The Lidar generic wpm model publishes the same channel with the same encoding. Neither the radar nor the acoustic model publishes a `MaterialId` channel -- radar's `PointCloud` and acoustic's `SignalWays` have none -- so a radar or acoustic output offers no way back to the material ID.
 
 ## Related Skills
 
@@ -146,3 +135,12 @@ Use behavior remapping settings only when a sensor model needs a non-default BSD
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+Product documentation owns the detail this skill only summarizes:
+
+- [Non-Visual Sensor Materials](https://nvidia-omniverse.github.io/ovrtx/materials/nonvisual_sensor_materials.html) -- the two material systems, the three `omni:simready:nonvisual` attributes and their authoring rules, where the labels live, what each model reads from them, and diagnosing a label that is not taking effect; the label tables themselves are in the SimReady specification it links.
+- [Lidar generic core model outputs](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/lidar_core/outputs.html) -- the `MaterialId` channel, its element type and shape, the bit layout with a worked decode, and which models report a material id.
+- [Sensor Outputs](https://nvidia-omniverse.github.io/ovrtx/sensors/common/sensor_outputs.html) -- mapping a `PointCloud` output and reading its tensors and params by name.
+- [Troubleshooting](https://nvidia-omniverse.github.io/ovrtx/sensors/troubleshooting/symptoms.html) -- symptoms of a material that is not answering as authored.
+
+The label vocabulary itself is defined by the [SimReady non-visual material specification](https://nvidia.github.io/simready-foundation/latest/capabilities/nonvisual_sensors/nonvisual_materials/capability-nonvisual_materials.html).

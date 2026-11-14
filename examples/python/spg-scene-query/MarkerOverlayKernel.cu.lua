@@ -9,11 +9,6 @@
 -- its affiliates is strictly prohibited.
 
 -- Launch script for MarkerOverlayKernel.cu.
---
--- Everything the kernel needs about the scene is read here through the scene query API and
--- handed in as kernel arguments: the camera the product is bound to, its lens values and world
--- transform, and the world position of every marker the settings prim lists. No camera and no
--- marker is named in this file; the scene decides all of them.
 
 -- Read everything the kernel needs about the scene and return it: the camera as a prim table,
 -- its lens values and world transform, the crosshair size, and one flat list of marker

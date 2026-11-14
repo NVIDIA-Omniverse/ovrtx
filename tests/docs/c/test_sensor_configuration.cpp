@@ -49,9 +49,9 @@ TEST_F(MultiRateSensorConfigurationTest, MultiRateSensorsKeepEveryProductActive)
     if (HasFatalFailure()) return;
 
     ovstage_ordinal_t ordinal = 1;
+    // No Camera schema declares this attribute. Set it through ovstage before
+    // the first step, then publish the write ordinal.
     // [snippet:doc-multi-rate-partial-outputs-c]
-    // The pinned ovrtx 0.5 camera schemas lack this attribute. Set it through
-    // ovstage before the first step, then publish the write ordinal.
     ++ordinal;
     auto* dictionary = ovstage_get_path_dictionary(stage_);
     const ovx_string_t sensor_paths[] = {
@@ -78,7 +78,7 @@ TEST_F(MultiRateSensorConfigurationTest, MultiRateSensorsKeepEveryProductActive)
     data.tensors = &tensor;
     data.tensor_count = 1;
     data.is_array = false;
-    const ovx_string_or_token_t attribute{
+    const ovx_token_or_string_t attribute{
         0, ovx_str("omni:sensor:Core:partialOutputs")
     };
     const auto write = ovstage_write_attribute(
@@ -113,7 +113,7 @@ TEST_F(MultiRateSensorConfigurationTest, MultiRateSensorsKeepEveryProductActive)
         ovrtx_render_product_set_t products{};
         products.render_products = paths;
         products.num_render_products = 4;
-        ovrtx_step_result_handle_t step_handle = OVRTX_INVALID_HANDLE;
+        ovrtx_step_result_handle_t step_handle{};
         const auto operation = ovrtx_step_with_stage(
             renderer_, products, 1.0 / 40.0, ordinal, &step_handle);
         ASSERT_API_SUCCESS(operation.status);
@@ -210,7 +210,7 @@ def "Render" {
     render_products.render_products = rp_paths;
     render_products.num_render_products = 2;
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
         renderer_, render_products, 1.0 / 60.0, ordinal, &step_handle);
     // [/snippet:doc-step-multiple-render-products-c]
@@ -237,7 +237,7 @@ def "Render" {
     for (size_t i = 0; i < outputs.output_count; ++i) {
         ovrtx_render_var_output_handle_t ldr_handle =
             find_product_output(outputs.outputs[i], "/Render/Vars/LdrColor");
-        if (ldr_handle != OVRTX_INVALID_HANDLE) {
+        if (ldr_handle != OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
             ovrtx_render_var_output_t ldr_output = {};
             ovrtx_result_t map_result = ovrtx_map_render_var_output(
                 renderer_, ldr_handle, &map_desc, ovrtx_timeout_infinite, &ldr_output);
@@ -295,7 +295,7 @@ def "Render" {
     render_products.render_products = &rp_path;
     render_products.num_render_products = 1;
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
         renderer_, render_products, 1.0 / 60.0, /*ordinal=*/1, &step_handle);
     ASSERT_API_SUCCESS(enqueue_result.status);
@@ -308,7 +308,7 @@ def "Render" {
     EXPECT_GE(outputs.output_count, 1u);
 
     ovrtx_render_var_output_handle_t ldr_handle = find_output(outputs, "/Render/Camera/LdrColor");
-    if (ldr_handle != OVRTX_INVALID_HANDLE) {
+    if (ldr_handle != OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
         ovrtx_map_output_description_t md = {};
         md.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
         ovrtx_render_var_output_t ldr_output = {};

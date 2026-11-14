@@ -9,9 +9,8 @@
 -- its affiliates is strictly prohibited.
 
 -- [snippet:motion-launch]
--- Two resource-inputs, bound the same way. Nothing here says one of them is a
--- past frame: that is settled in the scene, by the RenderVar each is connected
--- to.
+-- Two resource-inputs, bound the same way. Which one is the past frame is
+-- settled in the scene, by the RenderVar each is connected to.
 function motion(inputs, outputs)
     assert(inputs["Current"].rank == 2, "Current must be a 2D image")
     assert(inputs["Previous"].rank == 2, "Previous must be a 2D image")

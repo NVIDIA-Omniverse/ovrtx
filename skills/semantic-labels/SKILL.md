@@ -1,20 +1,13 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: semantic-labels
 description: >
   Assigning USD SemanticsAPI class and label metadata for semantic segmentation and
   ground-truth annotation outputs. Use when user asks to label objects, assign semantic
   class/label metadata, configure semantic segmentation labels, or author SemanticsAPI
   overrides.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -93,6 +86,15 @@ Use the same inline-root sublayer pattern as the loading skill: build the USDA s
 
 `SemanticIdMap` maps renderer semantic IDs to semantic strings such as `class: logo;`. `SemanticSegmentation` is an image whose pixel values are those renderer semantic IDs.
 
+In SDKs with the named SDG output contract, read `SemanticIdMap` through `id`
+(`uint32[N,4]`), `label_offsets` (`uint64[N+1]`), and `label_data` (`uint8[B]`),
+not a packed byte record. Preserve all four ID words and producer row indices,
+including sparse empty rows. The delta maps use the same layout. See
+[SDG output decoding](../../docs/sensors/cameras/decoding_outputs.rst#identifier-maps-and-deltas)
+and the target SDK's [changelog](../../CHANGELOG.md) for the applicable contract.
+
+> **Source (Python):** `tests/docs/python/test_camera_aovs.py` snippet `doc-sd-identifiers-python`
+> **Source (C):** `tests/docs/c/test_camera_aovs.cpp` snippet `doc-sd-identifiers-c`
 > **Source:** `tests/docs/python/test_semantic_labels.py` snippet `doc-interpret-semantic-segmentation-python`
 
 ## C

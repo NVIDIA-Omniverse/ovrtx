@@ -8,7 +8,7 @@ This example renders three cameras from the same viewpoint: the left orange
 cube, the right blue torus, and both objects. All three views share the ground
 and studio environment.
 
-.. figure:: ../img/camera-scene-partitions.png
+.. figure:: ../img/sensors/common/camera-scene-partitions.avif
    :alt: Three cameras rendering the left cube, right torus, and both objects
    :align: center
 
@@ -25,9 +25,13 @@ The left and right cameras select ``left`` and ``right`` with
 ``omni:scenePartition``. The third camera has no partition selector.
 The scene enables ``omni:rtx:scenePartitioning:showAllPartitionsByDefault`` on
 ``/Render/OmniverseGlobalRenderSettings`` so that camera sees both objects.
-Each RenderProduct sets
+Each RenderProduct also sets
 ``omni:rtx:scenePartitioning:excludeBackgroundDomeLightInPartition`` to
-``false`` to retain the shared studio lighting.
+``false``. The studio dome light is unpartitioned and neither partition has a
+dome light of its own, so every view is lit by the studio light whichever
+value that attribute has; see
+:ref:`sensors-cameras-scene-partitions-lighting` for how dome lights
+reach a partition.
 
 The snippet below shows how the example loads the authored scene, renders the
 left-only, right-only, and combined RenderProducts together, and maps each

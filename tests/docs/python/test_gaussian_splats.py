@@ -30,9 +30,11 @@ def test_gaussian_example_changes_render(mode, shading, visible, steps, output_d
         (folder / f"{name}.png").unlink(missing_ok=True)
         (folder / f"{name}.log").unlink(missing_ok=True)
     configured = folder / "configured.usda"
+    # Mode 2 leaves splats unshaded (black), so remove the dome that Minimal shows behind them.
+    dome = "" if visible else 'over "World" {\n over "Dome" (active = false) {\n }\n }\n'
     configured.write_text('#usda 1.0\n(subLayers = [@' + (example / 'gaussian_splats.usda').as_posix() + '@])\n'
-                          'over "Render" {\n over "Camera" {\n int omni:rtx:minimal:mode = ' + str(shading) + '\n }\n }\n',
-                          encoding="utf-8")
+                          'over "Render" {\n over "Camera" {\n int omni:rtx:minimal:mode = ' + str(shading) + '\n }\n }\n'
+                          + dome, encoding="utf-8")
     hidden = folder / "hidden.usda"
     hidden.write_text('#usda 1.0\n(subLayers = [@' + configured.as_posix() + '@])\n'
                       'over "World" {\n over "Splats" {\n token visibility = "invisible"\n }\n }\n',

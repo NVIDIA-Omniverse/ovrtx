@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: picking-selection
 description: >
   Viewport picking, marquee selection, pick-hit decoding, pickability, and selection
   outline drawing. Use when implementing click picking, drag selection, printing picked
   prim names, or highlighting selected prims.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -105,9 +98,11 @@ outlined, and write group `0` to clear an outline. Pass
 `selection_outline_enabled=False` at renderer creation to disable the global pass.
 
 Selection styling has two layers:
-- Global renderer-creation state controls outline width and fill mode.
-- Runtime per-group state controls outline and fill colors. Prims opt into a
-  style by passing that group's id to `Renderer.set_selection_outline_group()` /
+- Global renderer-creation state controls the default outline width and fill mode.
+- Runtime per-group state controls outline color, fill color, and outline width.
+  Omitting per-group width leaves that group's width unchanged, so it keeps the
+  default. Prims opt into a style by passing
+  that group's id to `Renderer.set_selection_outline_group()` /
   `ovrtx_set_selection_outline_group()`.
 
 Fill colors are visible only when the renderer is created with a fill mode that
@@ -138,6 +133,9 @@ uses per-group fill color, such as `GROUP_FILL_COLOR` /
 
 ### Decode the pick-hit buffer
 
+Wrap numeric `primPath` tensor elements as `ovrtx.PrimPath` handles before passing them to
+path resolution, selection, or pickability APIs. Those APIs reject bare integers and other handle kinds.
+
 > **Source:** `tests/docs/python/test_picking_selection.py` snippet `doc-read-pick-hit-buffer-python`
 
 ### Resolve picked prim names
@@ -165,19 +163,23 @@ the numeric path ids.
 > **Source:** `tests/docs/python/test_picking_selection.py` snippet `doc-create-styled-selection-renderer-python`
 
 Configure global style state at renderer creation:
-- `selection_outline_width` controls outline thickness in pixels (`0..15`).
+- `selection_outline_width` is the default outline thickness in pixels (`0..15`,
+  where `0` draws no outline).
 - `selection_fill_mode` controls whether selected prim interiors are filled and
   which color source they use.
 
-Changing these global settings requires recreating the renderer.
+Changing these global settings requires recreating the renderer. Per-group
+`SelectionGroupStyle.outline_width` overrides the default thickness at runtime.
 
 ### Set per-group selection styles
 
 > **Source:** `tests/docs/python/test_picking_selection.py` snippet `doc-set-selection-group-styles-python`
 
-Use `Renderer.set_selection_group_styles()` to assign outline and fill RGBA
-colors to group ids. The operation is stream-ordered and affects subsequent
-steps. Later writes to the same group id win.
+Use `Renderer.set_selection_group_styles()` to assign outline color, fill color,
+and outline width to group ids. Omitting `outline_width` leaves that group's
+width unchanged, so it keeps the default.
+The operation is stream-ordered and affects subsequent steps. Later writes to
+the same group id win.
 
 ### Assign styled groups to prims
 
@@ -199,6 +201,12 @@ group each prim uses. This is the per-prim part of selection styling.
 ### Decode the pick-hit buffer
 
 > **Source:** `tests/docs/c/test_picking_selection.cpp` snippet `doc-read-pick-hit-buffer-c`
+
+The CPU `primPath` column is backed by contiguous `uint64_t` IDs, matching its
+DLPack dtype. Apply the tensor byte offset and read through `const uint64_t*`
+in C/C++, then construct each handle with `ovx_primpath_t{ids[i]}`. Keep handles
+typed outside this tensor boundary; an array of single-field handle structs
+is not a `uint64_t` array for C++ pointer arithmetic.
 
 ### Resolve picked prim names
 
@@ -226,17 +234,20 @@ an `ovx_primpath_t` into a UTF-8 path.
 > **Source:** `tests/docs/c/test_picking_selection.cpp` snippet `doc-create-styled-selection-renderer-c`
 
 Configure global style state at renderer creation with
-`ovrtx_config_entry_selection_outline_width()` and
+`ovrtx_config_entry_selection_outline_width()` (default thickness) and
 `ovrtx_config_entry_selection_fill_mode()`. Changing these global settings
-requires recreating the renderer.
+requires recreating the renderer. Per-group `outline_width` on
+`ovrtx_selection_group_style_t` overrides the default thickness at runtime.
 
 ### Set per-group selection styles
 
 > **Source:** `tests/docs/c/test_picking_selection.cpp` snippet `doc-set-selection-group-styles-c`
 
-Use `ovrtx_set_selection_group_styles()` to assign outline and fill RGBA colors
-to group ids. The operation is stream-ordered and affects subsequent steps.
-Later writes to the same group id win.
+Use `ovrtx_set_selection_group_styles()` to assign outline color, fill color,
+and outline width to group ids. Omitting `outline_width` leaves that group's
+width unchanged, so it keeps the default.
+The operation is stream-ordered and affects subsequent steps. Later writes to
+the same group id win.
 
 ### Assign styled groups to prims
 

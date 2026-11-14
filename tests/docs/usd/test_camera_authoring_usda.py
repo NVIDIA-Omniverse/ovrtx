@@ -58,7 +58,16 @@ def test_conftest_imports_from_shallow_public_layout(monkeypatch, tmp_path):
     # operating systems without writing outside the test's workspace.
     public_path = Path(Path.cwd().anchor) / "conftest.py"
     packaged_root = tmp_path / "sdk/bin/usd_plugins"
-    for schema in ("omni_lens_distortion", "omni_light_shaping", "physical_lighting", "omni_dome_light", "rtx_settings"):
+    for schema in (
+        "omni_runtime_texture",
+        "omni_lens_distortion",
+        "omni_light_shaping",
+        "physical_lighting",
+        "omni_dome_light",
+        "omni_playback",
+        "rtx_settings",
+        "usd_particle_field",
+    ):
         plugin_dir = packaged_root / schema
         plugin_dir.mkdir(parents=True)
         (plugin_dir / "plugInfo.json").write_text('{"Plugins": []}', encoding="utf-8")

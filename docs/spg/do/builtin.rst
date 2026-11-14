@@ -39,7 +39,7 @@ How It Works
 
 The scene adds ``LdrColor`` to itself with the built-in Add node, doubling brightness with
 saturating arithmetic, then halves the resolution with the built-in Scale node. Highlighted:
-the two lines that name each one. Everything else is the ordinary wiring of any graph.
+the two lines that name each one.
 
 .. literalinclude:: ../../../examples/python/spg-builtin-nodes/stdlib_scene.usda
    :language: usda
@@ -52,7 +52,7 @@ the two lines that name each one. Everything else is the ordinary wiring of any 
   SPG node ID, not a source asset. ``info:id`` names the built-in node
   (``"spg:rtx.spg.stdlib/Add"``, ``"spg:rtx.spg.stdlib/Scale"``). The ``spg:`` prefix scopes
   SPG node IDs away from MaterialX and UsdPreview shader IDs.
-- No GPU source file, launch script, or external shader definition is needed. The entire
+- No external shader definition is needed either. The entire
   graph is defined inline in the scene file.
 - Shader-to-shader chaining works the same way as for nodes you write yourself:
   ``ScaleNode.inputs:Input`` connects directly to ``AddNode.outputs:Result``.
@@ -62,10 +62,9 @@ the two lines that name each one. Everything else is the ordinary wiring of any 
   (``Downscaled``). The intermediate brightened result from AddNode is internal
   to the chain.
 
-**A built-in is the whole node, not a starting point.** You get it by name and you get its
-behaviour as it is: no GPU source to edit, no launch script to adjust, and no way to change what it
+**A built-in is used as it is.** You get it by name, with no way to change what it
 does beyond the value-inputs it declares. The moment you need something it does not do, you are
-writing a node, and the two cannot be mixed within one shader. What the built-ins are is
+writing a node, and the two cannot be mixed within one shader. The built-ins are listed in
 :doc:`../ref/builtin_catalogue`.
 
 Verify It Worked
@@ -75,10 +74,9 @@ Compare both the dimensions and the values against the input. Add and Scale toge
 brightness with saturating arithmetic and halve each dimension, so the output is exactly half the
 input's width and height, and a pixel at value ``v`` comes back at ``min(2v, 255)``. A value that
 did not double means Add never ran; a size that did not halve means Scale never ran. Both
-operations are exact in integers, so the
-:doc:`built-in nodes example <../../examples/python_spg_builtin_nodes>` rebuilds them on the host
-and compares with no tolerance, printing
-``largest difference from the host-computed result: 0``.
+operations are exact in integers, so the output of the
+:doc:`built-in nodes example <../../examples/python_spg_builtin_nodes>` rebuilt on the host from
+its input matches with no tolerance.
 
 When It Goes Wrong
 ------------------

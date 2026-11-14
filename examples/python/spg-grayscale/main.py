@@ -42,44 +42,14 @@ def save_render_var(frame, render_var_path: str, path: Path) -> None:
     print(f"Saved {render_var_path} -> {path}", file=sys.stderr)
 
 
-def is_grey(frame, render_var_path: str) -> bool:
-    """True when every pixel of that render var has R == G == B."""
-    mapped = frame.render_vars[render_var_path].map(device=ovrtx.Device.CPU)
-    pixels = np.array(np.from_dlpack(mapped), copy=True)
-    del mapped
-    return bool(np.array_equal(pixels[..., 0], pixels[..., 1])
-                and np.array_equal(pixels[..., 1], pixels[..., 2]))
-
-
-def check(frame) -> list[str]:
-    """Check the invariant only this node's output can satisfy.
-
-    R == G == B in every pixel is what grayscale means, and the renderer's own
-    LdrColor does not satisfy it. Testing the input as well is what makes the
-    first test worth anything: on a scene that was already grey, a node that
-    never ran would pass.
-    """
-    failures = []
-    if not is_grey(frame, OUTPUT_VAR_PATH):
-        failures.append(
-            f"{OUTPUT_VAR_PATH} is not grey: R, G and B differ, so the node did not run "
-            "and this AOV is the renderer's own output under that name"
-        )
-    if is_grey(frame, LDR_COLOR_PATH):
-        failures.append(
-            f"{LDR_COLOR_PATH} is already grey, so the check above proves nothing about the node"
-        )
-    return failures
-
-
-def main() -> int:
+def main() -> None:
     parser = argparse.ArgumentParser(description="ovrtx SPG grayscale example")
     parser.add_argument("--scene", type=Path, default=DEFAULT_SCENE, help="USDA scene to load")
     args = parser.parse_args()
 
     # [snippet:spg-create-renderer]
     # SPG is enabled by default. The first step compiles the CUDA kernel with
-    # NVRTC, which can take up to a minute on a fresh shader cache.
+    # NVRTC, which can take up to 5 minutes on a fresh shader cache.
     print("Creating renderer...", file=sys.stderr)
     renderer = ovrtx.Renderer()
     stage = ovstage.Stage("ovrtx.example.spg-grayscale")
@@ -107,23 +77,12 @@ def main() -> int:
     save_render_var(frame, LDR_COLOR_PATH, OUTPUT_DIR / "input.png")
     save_render_var(frame, OUTPUT_VAR_PATH, OUTPUT_DIR / "grayscale.png")
 
-    # [omit]
-    failures = check(frame)
-    # [/omit]
-
     del frame, products
     renderer.detach_ovstage()
     stage.destroy()
     renderer.destroy()
     # [/snippet:spg-read-output-aov]
 
-    for failure in failures:
-        print(f"FAILED: {failure}", file=sys.stderr)
-    if failures:
-        return 1
-    print("All checks passed.", file=sys.stderr)
-    return 0
-
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

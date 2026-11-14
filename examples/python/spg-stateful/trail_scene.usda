@@ -9,9 +9,8 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 #
-# One glowing ball in front of a flat backdrop. Nothing else: no floor, no
-# reflections, no second object, so nothing in the scene can be mistaken for the
-# effect. main.py drives the ball around a circle, and the SPG node feeds its own
+# One glowing ball in front of a flat backdrop.
+# main.py drives the ball around a circle, and the SPG node feeds its own
 # previous output back in so the ball drags a fading comet tail behind it.
 (
     defaultPrim = "World"
@@ -22,8 +21,7 @@
 def Xform "World"
 {
     # Emissive, well above 1.0, so the ball carries real dynamic range in
-    # HdrColor and its tail stays visible for many frames as it decays. It does
-    # not illuminate anything; only the dome light does.
+    # HdrColor and its tail stays visible for many frames as it decays.
     def Material "GlowMaterial"
     {
         token outputs:surface.connect = </World/GlowMaterial/Shader.outputs:surface>
@@ -71,8 +69,7 @@ def Xform "World"
         token inputs:texture:format = "latlong"
     }
 
-    # A single flat backdrop, large enough to fill the frame. It is the only
-    # thing in the scene besides the ball, so nothing competes with the tail.
+    # A single flat backdrop, large enough to fill the frame.
     def Mesh "Backdrop" (
         prepend apiSchemas = ["MaterialBindingAPI"]
     )
@@ -102,10 +99,7 @@ def Xform "World"
 }
 
 # The node reads HdrColor rather than LdrColor because the feedback runs on
-# linear radiance, where multiplying by a constant is an honest fade. It
-# publishes both images it produces, so the pair can be compared without any
-# other processing in between. History is not listed here: a stateful output is
-# the node's own scratch space and needs no RenderVar.
+# linear radiance, where multiplying by a constant is an honest fade.
 # [snippet:render-graph]
 def Scope "Render"
 {

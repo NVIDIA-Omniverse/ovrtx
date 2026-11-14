@@ -12,8 +12,8 @@
 // points are extern "C" so NVRTC resolves them by the subIdentifier authored in
 // USD; two Shader prims point at this one source and name a different one.
 //
-// The tap weights are not computed here. They depend only on the radius, so the
-// launch script builds them once and hands them over as a device buffer.
+// The tap weights depend only on the radius, so the launch script builds them
+// once per radius and hands them over as a device buffer.
 
 // [snippet:blur-tap]
 // One row of taps, walked in the direction (dx, dy). Coordinates are clamped to

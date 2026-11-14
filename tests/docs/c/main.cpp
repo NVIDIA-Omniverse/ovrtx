@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
     std::clog.flush();
     std::fflush(nullptr);
 #if defined(_WIN32)
-    // std::_Exit still reaches ExitProcess on Windows; static Carbonite hooks
+    // std::_Exit still reaches ExitProcess on Windows; ovrtx's static runtime hooks
     // that path and can crash during late plugin teardown after GTest is done.
     TerminateProcess(GetCurrentProcess(), static_cast<UINT>(result));
 #endif

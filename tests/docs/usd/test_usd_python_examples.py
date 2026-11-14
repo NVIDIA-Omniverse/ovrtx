@@ -15,6 +15,101 @@ import pytest
 from pxr import Ar, Gf, Sdf, Usd, UsdGeom, UsdLux, UsdRender, UsdShade
 
 
+def _author_video_texture_material(stage):
+    # [snippet:doc-video-texture-material-python]
+    material = UsdShade.Material.Define(stage, "/World/Looks/VideoMaterial")
+    shader = UsdShade.Shader.Define(stage, "/World/Looks/VideoMaterial/Shader")
+    prim = shader.GetPrim()
+
+    prim.CreateAttribute(
+        "info:implementationSource", Sdf.ValueTypeNames.Token
+    ).Set("sourceAsset")
+    prim.CreateAttribute(
+        "info:mdl:sourceAsset", Sdf.ValueTypeNames.Asset
+    ).Set(Sdf.AssetPath("OmniPBR.mdl"))
+    prim.CreateAttribute(
+        "info:mdl:sourceAsset:subIdentifier", Sdf.ValueTypeNames.Token
+    ).Set("OmniPBR")
+
+    texture = prim.CreateAttribute(
+        "inputs:diffuse_texture", Sdf.ValueTypeNames.Asset
+    )
+    texture.Set(Sdf.AssetPath("./video_texture_h265.mp4"))
+    texture.SetMetadata("colorSpace", "sRGB")
+    prim.CreateAttribute(
+        "inputs:diffuse_color_constant", Sdf.ValueTypeNames.Color3f
+    ).Set(Gf.Vec3f(1.0, 1.0, 1.0))
+    prim.CreateAttribute(
+        "inputs:reflection_roughness_constant", Sdf.ValueTypeNames.Float
+    ).Set(0.4)
+    prim.ApplyAPI("OmniPlaybackAPI", "inputs:diffuse_texture")
+
+    prefix = "inputs:omni:playback:inputs:diffuse_texture"
+    prim.GetAttribute(f"{prefix}:rate").Set(1.0)
+    prim.GetAttribute(f"{prefix}:sourceStart").Set(0.0)
+    prim.GetAttribute(f"{prefix}:sourceEnd").Set(3.9)
+    prim.GetAttribute(f"{prefix}:playbackStart").Set(Sdf.TimeCode(0))
+    prim.GetAttribute(f"{prefix}:before").Set("hold")
+    prim.GetAttribute(f"{prefix}:after").Set("hold")
+
+    shader_output = shader.CreateOutput("out", Sdf.ValueTypeNames.Token)
+    material.CreateSurfaceOutput().ConnectToSource(shader_output)
+    # [/snippet:doc-video-texture-material-python]
+
+    return shader
+
+
+def test_video_texture_material():
+    stage = Usd.Stage.CreateInMemory()
+    shader = _author_video_texture_material(stage)
+    prim = shader.GetPrim()
+
+    assert prim.HasAPI("OmniPlaybackAPI", "inputs:diffuse_texture")
+    assert prim.GetAttribute("inputs:diffuse_texture").Get() == Sdf.AssetPath(
+        "./video_texture_h265.mp4"
+    )
+    assert prim.GetAttribute("inputs:diffuse_texture").GetMetadata("colorSpace") == "sRGB"
+    assert prim.GetAttribute(
+        "inputs:omni:playback:inputs:diffuse_texture:sourceEnd"
+    ).Get() == 3.9
+
+
+def _author_video_texture_screen(stage):
+    # [snippet:doc-video-texture-binding-python]
+    screen = UsdGeom.Mesh.Define(stage, "/World/Screen")
+    screen.CreateFaceVertexCountsAttr([4])
+    screen.CreateFaceVertexIndicesAttr([0, 1, 2, 3])
+    screen.CreatePointsAttr([
+        (-1.777778, -1, 0),
+        (1.777778, -1, 0),
+        (1.777778, 1, 0),
+        (-1.777778, 1, 0),
+    ])
+    screen.CreateSubdivisionSchemeAttr("none")
+
+    texcoords = UsdGeom.PrimvarsAPI(screen).CreatePrimvar(
+        "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.faceVarying
+    )
+    texcoords.Set([(0, 0), (1, 0), (1, 1), (0, 1)])
+
+    material = UsdShade.Material.Get(stage, "/World/Looks/VideoMaterial")
+    UsdShade.MaterialBindingAPI.Apply(screen.GetPrim()).Bind(material)
+    # [/snippet:doc-video-texture-binding-python]
+
+    return screen
+
+
+def test_video_texture_binding():
+    stage = Usd.Stage.CreateInMemory()
+    _author_video_texture_material(stage)
+    screen = _author_video_texture_screen(stage)
+
+    binding = UsdShade.MaterialBindingAPI(screen.GetPrim()).GetDirectBindingRel()
+    assert binding.GetTargets() == [Sdf.Path("/World/Looks/VideoMaterial")]
+    assert screen.GetFaceVertexCountsAttr().Get() == [4]
+    assert UsdGeom.PrimvarsAPI(screen).GetPrimvar("st").GetInterpolation() == "faceVarying"
+
+
 def test_mesh_lights():
     stage = Usd.Stage.CreateInMemory()
 
@@ -551,11 +646,75 @@ def test_plugin_physical_light_authoring_matches_usda():
     assert not expected_illuminant.HasAuthoredValueOpinion()
 
 
+def _author_video_texture_blocking_product(stage):
+    # [snippet:doc-video-texture-blocking-python]
+    render_product = UsdRender.Product.Define(stage, "/Render/Camera")
+    render_product.GetPrim().CreateAttribute(
+        "omni:rtx:videostreamer:blocking", Sdf.ValueTypeNames.Bool
+    ).Set(True)
+    # [/snippet:doc-video-texture-blocking-python]
+
+    return render_product
+
+
+def test_video_texture_blocking_product():
+    stage = Usd.Stage.CreateInMemory()
+    render_product = _author_video_texture_blocking_product(stage)
+
+    blocking = render_product.GetPrim().GetAttribute(
+        "omni:rtx:videostreamer:blocking"
+    )
+    assert blocking.GetTypeName() == Sdf.ValueTypeNames.Bool
+    assert blocking.Get() is True
+
+
+def test_frame_generation_render_product():
+    """Build the frame_generation.rst RenderProduct using the USD Python API."""
+    stage = Usd.Stage.CreateInMemory()
+
+    # [snippet:doc-frame-generation-render-product-python]
+    stage.DefinePrim("/Render", "Scope")
+    camera_product = UsdRender.Product.Define(stage, "/Render/Camera")
+    camera_product.GetResolutionAttr().Set(Gf.Vec2i(640, 480))
+    camera_product.GetCameraRel().SetTargets(["/World/Camera"])
+
+    ldr_var = UsdRender.Var.Define(stage, "/Render/Camera/LdrColor")
+    ldr_var.GetSourceNameAttr().Set("LdrColor")
+    camera_product.GetOrderedVarsRel().SetTargets([ldr_var.GetPath()])
+
+    product_prim = camera_product.GetPrim()
+    product_prim.CreateAttribute(
+        "omni:rtx:rendermode", Sdf.ValueTypeNames.Token
+    ).Set("RealTimePathTracing")
+    product_prim.CreateAttribute(
+        "omni:rtx:dlss:frameGeneration", Sdf.ValueTypeNames.Bool
+    ).Set(True)
+    product_prim.CreateAttribute(
+        "omni:rtx:dlss:frameGenerationInterpolatedFrameCount",
+        Sdf.ValueTypeNames.Int,
+    ).Set(3)
+    # [/snippet:doc-frame-generation-render-product-python]
+
+    assert camera_product.GetOrderedVarsRel().GetTargets() == [
+        Sdf.Path("/Render/Camera/LdrColor")
+    ]
+    assert product_prim.GetAttribute("omni:rtx:rendermode").Get() == "RealTimePathTracing"
+    assert product_prim.GetAttribute("omni:rtx:dlss:frameGeneration").Get() is True
+    assert (
+        product_prim.GetAttribute(
+            "omni:rtx:dlss:frameGenerationInterpolatedFrameCount"
+        ).Get()
+        == 3
+    )
+
+
 def test_camera_sensor_render_product():
     """Build the camera_sensors.rst RenderProduct using the USD Python API."""
     stage = Usd.Stage.CreateInMemory()
 
     # [snippet:doc-camera-sensor-render-product-python]
+    from pxr import Gf, UsdRender
+
     render_scope = stage.DefinePrim("/Render")
     camera_product = UsdRender.Product.Define(stage, "/Render/Camera")
     camera_product.GetResolutionAttr().Set(Gf.Vec2i(1920, 1080))
@@ -581,11 +740,68 @@ def test_camera_sensor_render_product():
     assert camera_product.GetCameraRel().GetTargets() == [Sdf.Path("/World/Camera")]
 
 
+def test_camera_core_versioning():
+    """Author the versioning.rst schema and model version using the USD Python API."""
+    stage = Usd.Stage.CreateInMemory()
+
+    # [snippet:doc-camera-core-versioning-python]
+    from pxr import Sdf, UsdGeom
+
+    camera = UsdGeom.Camera.Define(stage, "/World/Camera")
+    prim = camera.GetPrim()
+
+    # Applying the API schema by class name is what selects the schema version.
+    applied_schemas = Sdf.TokenListOp()
+    applied_schemas.prependedItems = ["OmniSensorGenericCameraCoreAPI"]
+    prim.SetMetadata("apiSchemas", applied_schemas)
+
+    prim.CreateAttribute("omni:sensor:modelVersion", Sdf.ValueTypeNames.String).Set("0")
+    # [/snippet:doc-camera-core-versioning-python]
+
+    # Verify. GetAppliedSchemas() stays empty because usd-core alone has no
+    # omni_sensors schema registry, so read the authored list op instead.
+    assert prim.IsValid()
+    composed = prim.GetMetadata("apiSchemas").GetAddedOrExplicitItems()
+    assert list(composed) == ["OmniSensorGenericCameraCoreAPI"]
+    assert prim.GetAttribute("omni:sensor:modelVersion").Get() == "0"
+
+
+def test_depth_sensor_versioning():
+    """Author the versioning.rst depth sensor schema and model version using the USD Python API."""
+    stage = Usd.Stage.CreateInMemory()
+
+    # [snippet:doc-depth-sensor-versioning-python]
+    from pxr import Sdf, UsdGeom
+
+    camera = UsdGeom.Camera.Define(stage, "/World/Camera")
+    prim = camera.GetPrim()
+
+    # The depth sensor API applies to the Camera prim, not to the RenderProduct.
+    applied_schemas = Sdf.TokenListOp()
+    applied_schemas.prependedItems = ["OmniSensorGenericDepthSensorSingleViewAPI"]
+    prim.SetMetadata("apiSchemas", applied_schemas)
+
+    prim.CreateAttribute("omni:sensor:modelVersion", Sdf.ValueTypeNames.String).Set("0")
+
+    prim.CreateAttribute("omni:sensor:depthSensor:baselineMM", Sdf.ValueTypeNames.Float).Set(55.0)
+    # [/snippet:doc-depth-sensor-versioning-python]
+
+    # Verify. GetAppliedSchemas() stays empty because usd-core alone has no
+    # omni_sensors schema registry, so read the authored list op instead.
+    assert prim.IsValid()
+    composed = prim.GetMetadata("apiSchemas").GetAddedOrExplicitItems()
+    assert list(composed) == ["OmniSensorGenericDepthSensorSingleViewAPI"]
+    assert prim.GetAttribute("omni:sensor:modelVersion").Get() == "0"
+    assert prim.GetAttribute("omni:sensor:depthSensor:baselineMM").Get() == 55.0
+
+
 def test_minimal_render_product():
     """Build the sensor_configuration.rst minimal RenderProduct using the USD Python API."""
     stage = Usd.Stage.CreateInMemory()
 
     # [snippet:doc-minimal-render-product-python]
+    from pxr import Gf, UsdRender
+
     render_scope = stage.DefinePrim("/Render")
     camera_product = UsdRender.Product.Define(stage, "/Render/Camera")
     camera_product.GetResolutionAttr().Set(Gf.Vec2i(1920, 1080))
@@ -608,6 +824,8 @@ def test_multi_render_product_shared_vars():
     stage = Usd.Stage.CreateInMemory()
 
     # [snippet:doc-multi-render-product-shared-vars-python]
+    from pxr import UsdRender
+
     render_scope = stage.DefinePrim("/Render")
 
     front_product = UsdRender.Product.Define(stage, "/Render/FrontCamera")
@@ -633,6 +851,8 @@ def test_multi_render_product_shared_vars():
 
 def _author_lpe_render_vars(stage):
     # [snippet:doc-lpe-render-vars-python]
+    from pxr import Sdf, UsdRender
+
     render_product = UsdRender.Product.Define(stage, "/Render/Camera")
     render_product.GetPrim().ApplyAPI("OmniRtxSettingsPtAdvancedAPI_1")
     render_product.GetCameraRel().SetTargets(["/World/Camera"])
@@ -730,6 +950,8 @@ def test_example_lpe_render_vars():
 
 def _author_camera_attributes(stage):
     # [snippet:doc-camera-attributes-python]
+    from pxr import Gf, UsdGeom
+
     UsdGeom.SetStageMetersPerUnit(stage, 1.0)
     camera = UsdGeom.Camera.Define(stage, "/Camera")
     camera.CreateProjectionAttr(UsdGeom.Tokens.perspective)
@@ -764,6 +986,8 @@ def test_camera_attributes():
 
 def _author_camera_lens_calibration(stage):
     # [snippet:doc-camera-lens-calibration-python]
+    from pxr import Gf, UsdGeom
+
     prim = UsdGeom.Camera.Define(stage, "/Camera").GetPrim()
     prim.ApplyAPI("OmniLensDistortionOpenCvPinholeAPI")
     prim.GetAttribute("omni:lensdistortion:model").Set("opencvPinhole")
@@ -794,6 +1018,8 @@ def test_camera_lens_calibration():
 
 def _author_camera_rolling_shutter(stage):
     # [snippet:doc-camera-rolling-shutter-python]
+    from pxr import Gf, UsdGeom
+
     prim = UsdGeom.Camera.Define(stage, "/Camera").GetPrim()
     prim.ApplyAPI("OmniRtxRollingShutterAPI")
     prim.GetAttribute("omni:rtx:rollingShutter:scanOrder").Set("topToBottom")
@@ -814,6 +1040,8 @@ def test_camera_rolling_shutter():
 
 def _author_camera_scene_partitions(stage):
     # [snippet:doc-camera-scene-partitions-python]
+    from pxr import Gf, Sdf, UsdGeom, UsdLux
+
     UsdGeom.Xform.Define(stage, "/World")
 
     left = UsdGeom.Xform.Define(stage, "/World/Left")
@@ -884,6 +1112,8 @@ def test_camera_scene_partitions():
 def test_multi_rate_lidar_authoring():
     stage = Usd.Stage.CreateInMemory()
     # [snippet:doc-multi-rate-lidar-python]
+    from pxr import Gf, Sdf, UsdGeom
+
     lidar = stage.DefinePrim("/World/Lidar40", "OmniLidar")
     lidar.SetMetadata("apiSchemas", Sdf.TokenListOp.Create(prependedItems=["OmniSensorGenericLidarCoreAPI"]))
     # Rational Hz: numerator / denominator. Each scan takes one 1/40-second step.
@@ -911,6 +1141,8 @@ def test_multi_rate_lidar_authoring():
 def test_multi_rate_camera_authoring():
     stage = Usd.Stage.CreateInMemory()
     # [snippet:doc-multi-rate-camera-python]
+    from pxr import Gf, Sdf, UsdGeom
+
     camera = UsdGeom.Camera.Define(stage, "/World/Camera20")
     sensor = camera.GetPrim()
     sensor.SetMetadata(
@@ -933,3 +1165,716 @@ def test_multi_rate_camera_authoring():
         equivalent = sensor.GetAttribute(attribute.GetName())
         assert equivalent.GetTypeName() == attribute.GetTypeName()
         assert equivalent.Get() == attribute.Get()
+
+
+def test_lidar_motion_compensation_state():
+    """Author the Motion Artifacts how-to's compensation-state default."""
+    stage = Usd.Stage.CreateInMemory()
+
+    # [snippet:doc-lidar-motion-compensation-python]
+    lidar = stage.DefinePrim("/World/Lidar", "OmniLidar")
+    lidar.SetMetadata(
+        "apiSchemas",
+        Sdf.TokenListOp.Create(prependedItems=["OmniSensorGenericLidarCoreAPI"]),
+    )
+    # NONCOMPENSATED is the default; COMPENSATED removes the sensor's own motion.
+    lidar.CreateAttribute(
+        "omni:sensor:Core:outputMotionCompensationState", Sdf.ValueTypeNames.Token
+    ).Set("NONCOMPENSATED")
+    # [/snippet:doc-lidar-motion-compensation-python]
+
+    assert lidar.GetTypeName() == "OmniLidar"
+    assert "OmniSensorGenericLidarCoreAPI" in lidar.GetMetadata(
+        "apiSchemas"
+    ).GetAddedOrExplicitItems()
+    state = lidar.GetAttribute("omni:sensor:Core:outputMotionCompensationState")
+    assert state.GetTypeName() == Sdf.ValueTypeNames.Token
+    assert state.Get() == "NONCOMPENSATED"
+
+
+def test_camera_core_request():
+    """Build the Camera generic core model's smallest complete request with the USD Python API."""
+    stage = Usd.Stage.CreateInMemory()
+
+    # [snippet:doc-camera-core-request-python]
+    from pxr import Gf, UsdGeom, UsdRender
+
+    camera = UsdGeom.Camera.Define(stage, "/SensorCamera")
+    camera.GetPrim().AddAppliedSchema("OmniSensorGenericCameraCoreAPI")
+
+    stage.DefinePrim("/Render", "Scope")
+    product = UsdRender.Product.Define(stage, "/Render/SensorCamera")
+    product.GetResolutionAttr().Set(Gf.Vec2i(1920, 1080))
+    product.GetCameraRel().SetTargets(["/SensorCamera"])
+
+    # The input AOV and the full-pipeline terminal: both are required.
+    hdr_var = UsdRender.Var.Define(stage, "/Render/SensorCamera/HdrColor")
+    hdr_var.GetSourceNameAttr().Set("HdrColor")
+    post_isp_var = UsdRender.Var.Define(stage, "/Render/SensorCamera/OmniCameraSensorPostIsp")
+    post_isp_var.GetSourceNameAttr().Set("OmniCameraSensorPostIsp")
+
+    product.GetOrderedVarsRel().SetTargets([
+        "/Render/SensorCamera/HdrColor",
+        "/Render/SensorCamera/OmniCameraSensorPostIsp",
+    ])
+    # [/snippet:doc-camera-core-request-python]
+
+    expected = Usd.Stage.Open(str(Path(__file__).parent / "data/camera_core_request.usda"))
+    expected_camera = expected.GetPrimAtPath("/SensorCamera")
+    assert "OmniSensorGenericCameraCoreAPI" in camera.GetPrim().GetPrimTypeInfo().GetAppliedAPISchemas()
+    assert camera.GetPrim().GetMetadata("apiSchemas") == expected_camera.GetMetadata("apiSchemas")
+    expected_product = UsdRender.Product(expected.GetPrimAtPath("/Render/SensorCamera"))
+    assert product.GetResolutionAttr().Get() == expected_product.GetResolutionAttr().Get() == Gf.Vec2i(1920, 1080)
+    assert product.GetCameraRel().GetTargets() == expected_product.GetCameraRel().GetTargets()
+    assert product.GetOrderedVarsRel().GetTargets() == expected_product.GetOrderedVarsRel().GetTargets()
+    assert len(product.GetOrderedVarsRel().GetTargets()) == 2
+    for target in product.GetOrderedVarsRel().GetTargets():
+        assert UsdRender.Var(stage.GetPrimAtPath(target)).GetSourceNameAttr().Get() == target.name
+        assert UsdRender.Var(expected.GetPrimAtPath(target)).GetSourceNameAttr().Get() == target.name
+
+
+def test_depth_sensor_render_product():
+    """Build the Camera single-view stereo depth model's camera and product with the USD Python API."""
+    stage = Usd.Stage.CreateInMemory()
+
+    # [snippet:doc-depth-sensor-render-product-python]
+    from pxr import Gf, Sdf, UsdGeom, UsdRender
+
+    stage.DefinePrim("/World", "Xform")
+    camera = UsdGeom.Camera.Define(stage, "/World/Camera").GetPrim()
+    camera.AddAppliedSchema("OmniSensorGenericDepthSensorSingleViewAPI")
+    for name, value in {
+        "baselineMM": 55.0,
+        "focalLengthPixel": 897.0,
+        "sensorSizePixel": 1280.0,
+        "maxDisparityPixel": 110.0,
+        "minDistance": 0.5,
+    }.items():
+        camera.CreateAttribute(
+            f"omni:sensor:depthSensor:{name}", Sdf.ValueTypeNames.Float, custom=False
+        ).Set(value)
+
+    stage.DefinePrim("/Render", "Scope")
+    product = UsdRender.Product.Define(stage, "/Render/CameraDepthSingleView")
+    prim = product.GetPrim()
+    product.GetCameraRel().SetTargets([camera.GetPath()])
+    product.GetResolutionAttr().Set(Gf.Vec2i(1280, 720))
+
+    # The three camera outputs the model reads, then the five it writes.
+    names = [
+        "LdrColor",
+        "DistanceToImagePlaneSD",
+        "Camera3dPositionSD",
+        "DepthSensorImager",
+        "DepthSensorDistance",
+        "DepthSensorPointCloudPosition",
+        "DepthSensorPointCloudColor",
+        "DepthSensorOutputVisualization",
+    ]
+    for name in names:
+        render_var = UsdRender.Var.Define(stage, f"/Render/CameraDepthSingleView/{name}")
+        render_var.GetSourceNameAttr().Set(name)
+    product.GetOrderedVarsRel().SetTargets(
+        [f"/Render/CameraDepthSingleView/{name}" for name in names]
+    )
+    # [/snippet:doc-depth-sensor-render-product-python]
+
+    expected = Usd.Stage.Open(str(Path(__file__).parent / "data/depth_sensor_render_product.usda"))
+    expected_camera = expected.GetPrimAtPath("/World/Camera")
+    assert "OmniSensorGenericDepthSensorSingleViewAPI" in camera.GetPrimTypeInfo().GetAppliedAPISchemas()
+    assert camera.GetMetadata("apiSchemas") == expected_camera.GetMetadata("apiSchemas")
+    expected_prim = expected.GetPrimAtPath("/Render/CameraDepthSingleView")
+    assert prim.GetMetadata("apiSchemas") == expected_prim.GetMetadata("apiSchemas")
+    expected_names = {attribute.GetName() for attribute in expected_camera.GetAuthoredAttributes()}
+    assert {attribute.GetName() for attribute in camera.GetAuthoredAttributes()} == expected_names
+    for attribute in expected_camera.GetAuthoredAttributes():
+        equivalent = camera.GetAttribute(attribute.GetName())
+        assert equivalent.GetTypeName() == attribute.GetTypeName()
+        assert equivalent.Get() == attribute.Get()
+        assert equivalent.IsCustom() == attribute.IsCustom()
+    for name in ("camera", "orderedVars"):
+        assert prim.GetRelationship(name).GetTargets() == expected_prim.GetRelationship(name).GetTargets()
+    targets = product.GetOrderedVarsRel().GetTargets()
+    assert len(targets) == 8
+    for target in targets:
+        assert stage.GetPrimAtPath(target).GetAttribute("sourceName").Get() == target.name
+
+
+def _author_lidar_wpm_rotary(stage):
+    # [snippet:doc-lidar-wpm-firing-pattern-rotary-python]
+    from pxr import Gf, Sdf, UsdGeom, UsdRender
+
+    UsdGeom.SetStageMetersPerUnit(stage, 1.0)
+    UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+    stage.SetTimeCodesPerSecond(10)
+    UsdGeom.Xform.Define(stage, "/Sensor")
+    lidar = stage.DefinePrim("/Sensor/Lidar", "OmniLidar")
+    lidar.AddAppliedSchema("OmniSensorGenericLidarWpmAPI")
+    UsdGeom.Imageable(lidar).CreateVisibilityAttr(UsdGeom.Tokens.invisible)
+    lidar.CreateAttribute("omni:sensor:frameRate", Sdf.ValueTypeNames.Double2, custom=False).Set(Gf.Vec2d(10, 1))
+    lidar.CreateAttribute("omni:sensor:LidarWpm:scanType", Sdf.ValueTypeNames.Token, custom=False).Set("rotary")
+    lidar.CreateAttribute("omni:sensor:LidarWpm:rotPatternFiringResDeg", Sdf.ValueTypeNames.Float, custom=False).Set(1)
+    lidar.CreateAttribute("omni:sensor:LidarWpm:maxReturns", Sdf.ValueTypeNames.UInt, custom=False).Set(2)
+
+    # The main schema brings the first pattern instance, p001: author only its arrays.
+    pattern = "omni:sensor:LidarWpm:firingPattern:p001"
+    lidar.CreateAttribute(f"{pattern}:azimuthDeg", Sdf.ValueTypeNames.FloatArray, custom=False).Set([0, 0])
+    lidar.CreateAttribute(f"{pattern}:elevationDeg", Sdf.ValueTypeNames.FloatArray, custom=False).Set([-1, 1])
+    lidar.CreateAttribute(f"{pattern}:fireTimeNs", Sdf.ValueTypeNames.UIntArray, custom=False).Set([0, 1000])
+    lidar.CreateAttribute(f"{pattern}:channelId", Sdf.ValueTypeNames.UIntArray, custom=False).Set([1, 2])
+    lidar.CreateAttribute(f"{pattern}:rangeId", Sdf.ValueTypeNames.UIntArray, custom=False).Set([])
+
+    stage.DefinePrim("/Sensor/Outputs", "Scope")
+    product = UsdRender.Product.Define(stage, "/Sensor/Outputs/Product")
+    product.GetCameraRel().SetTargets(["/Sensor/Lidar"])
+    product.GetOrderedVarsRel().SetTargets(["/Sensor/Outputs/PointCloud"])
+    point_cloud = UsdRender.Var.Define(stage, "/Sensor/Outputs/PointCloud")
+    point_cloud.GetSourceNameAttr().Set("PointCloud")
+    # An empty channel list requests every channel the model produces.
+    point_cloud.GetPrim().CreateAttribute("channels", Sdf.ValueTypeNames.TokenArray, custom=False).Set([])
+    # [/snippet:doc-lidar-wpm-firing-pattern-rotary-python]
+    return lidar
+
+
+def _author_lidar_wpm_solid_state(stage):
+    # [snippet:doc-lidar-wpm-firing-pattern-solid-state-python]
+    from pxr import Gf, Sdf, UsdGeom, UsdRender
+
+    UsdGeom.SetStageMetersPerUnit(stage, 1.0)
+    UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+    stage.SetTimeCodesPerSecond(10)
+    UsdGeom.Xform.Define(stage, "/Sensor")
+    lidar = stage.DefinePrim("/Sensor/Lidar", "OmniLidar")
+    lidar.AddAppliedSchema("OmniSensorGenericLidarWpmAPI")
+    # The second pattern is a second instance of the multiple-apply schema.
+    lidar.AddAppliedSchema("OmniSensorGenericLidarWpmFiringPatternAPI:p002")
+    UsdGeom.Imageable(lidar).CreateVisibilityAttr(UsdGeom.Tokens.invisible)
+    lidar.CreateAttribute("omni:sensor:frameRate", Sdf.ValueTypeNames.Double2, custom=False).Set(Gf.Vec2d(10, 1))
+    lidar.CreateAttribute("omni:sensor:LidarWpm:scanType", Sdf.ValueTypeNames.Token, custom=False).Set("solidState")
+    lidar.CreateAttribute("omni:sensor:LidarWpm:firingPatternDwellTicks", Sdf.ValueTypeNames.UInt, custom=False).Set(2)
+    lidar.CreateAttribute("omni:sensor:LidarWpm:maxReturns", Sdf.ValueTypeNames.UInt, custom=False).Set(2)
+
+    first = "omni:sensor:LidarWpm:firingPattern:p001"
+    lidar.CreateAttribute(f"{first}:azimuthDeg", Sdf.ValueTypeNames.FloatArray, custom=False).Set([-1, 1])
+    lidar.CreateAttribute(f"{first}:elevationDeg", Sdf.ValueTypeNames.FloatArray, custom=False).Set([0, 0])
+    lidar.CreateAttribute(f"{first}:fireTimeNs", Sdf.ValueTypeNames.UIntArray, custom=False).Set([0, 1000])
+    lidar.CreateAttribute(f"{first}:channelId", Sdf.ValueTypeNames.UIntArray, custom=False).Set([1, 2])
+    lidar.CreateAttribute(f"{first}:rangeId", Sdf.ValueTypeNames.UIntArray, custom=False).Set([])
+
+    second = "omni:sensor:LidarWpm:firingPattern:p002"
+    lidar.CreateAttribute(f"{second}:azimuthDeg", Sdf.ValueTypeNames.FloatArray, custom=False).Set([0])
+    lidar.CreateAttribute(f"{second}:elevationDeg", Sdf.ValueTypeNames.FloatArray, custom=False).Set([0])
+    lidar.CreateAttribute(f"{second}:fireTimeNs", Sdf.ValueTypeNames.UIntArray, custom=False).Set([0])
+    lidar.CreateAttribute(f"{second}:channelId", Sdf.ValueTypeNames.UIntArray, custom=False).Set([2])
+    lidar.CreateAttribute(f"{second}:rangeId", Sdf.ValueTypeNames.UIntArray, custom=False).Set([])
+
+    stage.DefinePrim("/Sensor/Outputs", "Scope")
+    product = UsdRender.Product.Define(stage, "/Sensor/Outputs/Product")
+    product.GetCameraRel().SetTargets(["/Sensor/Lidar"])
+    product.GetOrderedVarsRel().SetTargets(["/Sensor/Outputs/PointCloud"])
+    point_cloud = UsdRender.Var.Define(stage, "/Sensor/Outputs/PointCloud")
+    point_cloud.GetSourceNameAttr().Set("PointCloud")
+    point_cloud.GetPrim().CreateAttribute("channels", Sdf.ValueTypeNames.TokenArray, custom=False).Set(
+        ["Coordinates", "Intensity", "TimeOffsetNs", "Flags", "ChannelId", "FiringPatternIndex"]
+    )
+    # [/snippet:doc-lidar-wpm-firing-pattern-solid-state-python]
+    return lidar
+
+
+def _lidar_wpm_pattern(lidar, instance):
+    """Return one firing pattern's five arrays as lists, checking their types and row counts."""
+    prefix = f"omni:sensor:LidarWpm:firingPattern:{instance}"
+    arrays = {}
+    for name, type_name in (
+        ("azimuthDeg", Sdf.ValueTypeNames.FloatArray),
+        ("elevationDeg", Sdf.ValueTypeNames.FloatArray),
+        ("fireTimeNs", Sdf.ValueTypeNames.UIntArray),
+        ("channelId", Sdf.ValueTypeNames.UIntArray),
+        ("rangeId", Sdf.ValueTypeNames.UIntArray),
+    ):
+        attribute = lidar.GetAttribute(f"{prefix}:{name}")
+        assert attribute.GetTypeName() == type_name
+        assert not attribute.IsCustom()
+        arrays[name] = list(attribute.Get())
+    # The four required arrays share one row count; rangeId may stay empty.
+    rows = {len(arrays[name]) for name in ("azimuthDeg", "elevationDeg", "fireTimeNs", "channelId")}
+    assert len(rows) == 1
+    return arrays
+
+
+def _lidar_wpm_point_cloud_channels(stage):
+    """Check the lidar's RenderProduct wiring and return the requested channel list."""
+    product = UsdRender.Product(stage.GetPrimAtPath("/Sensor/Outputs/Product"))
+    assert product.GetCameraRel().GetTargets() == [Sdf.Path("/Sensor/Lidar")]
+    assert product.GetOrderedVarsRel().GetTargets() == [Sdf.Path("/Sensor/Outputs/PointCloud")]
+    point_cloud = stage.GetPrimAtPath("/Sensor/Outputs/PointCloud")
+    assert point_cloud.GetAttribute("sourceName").Get() == "PointCloud"
+    return list(point_cloud.GetAttribute("channels").Get())
+
+
+def _assert_lidar_wpm_matches_usda(stage, usda_name):
+    """Compare the authored stage with the USDA tab of the firing-pattern how-to."""
+    expected = Usd.Stage.Open(str(Path(__file__).parent / "data" / usda_name))
+    assert UsdGeom.GetStageMetersPerUnit(stage) == UsdGeom.GetStageMetersPerUnit(expected)
+    assert UsdGeom.GetStageUpAxis(stage) == UsdGeom.GetStageUpAxis(expected)
+    assert stage.GetTimeCodesPerSecond() == expected.GetTimeCodesPerSecond()
+    for path in ("/Sensor", "/Sensor/Lidar", "/Sensor/Outputs", "/Sensor/Outputs/Product", "/Sensor/Outputs/PointCloud"):
+        prim, expected_prim = stage.GetPrimAtPath(path), expected.GetPrimAtPath(path)
+        assert prim.GetTypeName() == expected_prim.GetTypeName(), path
+        assert prim.GetMetadata("apiSchemas") == expected_prim.GetMetadata("apiSchemas"), path
+        expected_attributes = {attribute.GetName(): attribute for attribute in expected_prim.GetAuthoredAttributes()}
+        assert {attribute.GetName() for attribute in prim.GetAuthoredAttributes()} == set(expected_attributes), path
+        for name, attribute in expected_attributes.items():
+            equivalent = prim.GetAttribute(name)
+            assert equivalent.GetTypeName() == attribute.GetTypeName(), name
+            assert equivalent.Get() == attribute.Get(), name
+            assert equivalent.IsCustom() == attribute.IsCustom(), name
+        for relationship in expected_prim.GetAuthoredRelationships():
+            assert prim.GetRelationship(relationship.GetName()).GetTargets() == relationship.GetTargets(), path
+
+
+def test_lidar_wpm_firing_pattern_rotary():
+    """Author the firing-pattern how-to's rotary example: one pattern, applied once per degree."""
+    stage = Usd.Stage.CreateInMemory()
+    lidar = _author_lidar_wpm_rotary(stage)
+
+    assert lidar.GetTypeName() == "OmniLidar"
+    assert list(lidar.GetPrimTypeInfo().GetAppliedAPISchemas()) == ["OmniSensorGenericLidarWpmAPI"]
+    assert lidar.GetAttribute("visibility").Get() == UsdGeom.Tokens.invisible
+    assert lidar.GetAttribute("omni:sensor:frameRate").Get() == Gf.Vec2d(10, 1)
+    assert lidar.GetAttribute("omni:sensor:LidarWpm:scanType").Get() == "rotary"
+    resolution = lidar.GetAttribute("omni:sensor:LidarWpm:rotPatternFiringResDeg")
+    assert resolution.GetTypeName() == Sdf.ValueTypeNames.Float
+    assert resolution.Get() == 1.0
+    max_returns = lidar.GetAttribute("omni:sensor:LidarWpm:maxReturns")
+    assert max_returns.GetTypeName() == Sdf.ValueTypeNames.UInt
+    assert max_returns.Get() == 2
+    # Schema attributes exist unauthored once the schema is registered, so check the authored opinion.
+    assert not lidar.GetAttribute("omni:sensor:LidarWpm:firingPatternDwellTicks").IsAuthored()
+    assert _lidar_wpm_pattern(lidar, "p001") == {
+        "azimuthDeg": [0, 0],
+        "elevationDeg": [-1, 1],
+        "fireTimeNs": [0, 1000],
+        "channelId": [1, 2],
+        "rangeId": [],
+    }
+    assert not lidar.GetAttribute("omni:sensor:LidarWpm:firingPattern:p002:azimuthDeg").IsAuthored()
+    for attribute in lidar.GetAuthoredAttributes():
+        assert not attribute.IsCustom(), attribute.GetName()
+    assert _lidar_wpm_point_cloud_channels(stage) == []
+    _assert_lidar_wpm_matches_usda(stage, "lidar_wpm_firing_pattern_rotary.usda")
+
+
+def test_lidar_wpm_firing_pattern_solid_state():
+    """Author the firing-pattern how-to's solid-state example: two patterns, each held for two scans."""
+    stage = Usd.Stage.CreateInMemory()
+    lidar = _author_lidar_wpm_solid_state(stage)
+
+    assert lidar.GetTypeName() == "OmniLidar"
+    assert list(lidar.GetPrimTypeInfo().GetAppliedAPISchemas()) == [
+        "OmniSensorGenericLidarWpmAPI",
+        "OmniSensorGenericLidarWpmFiringPatternAPI:p002",
+    ]
+    assert lidar.GetAttribute("omni:sensor:LidarWpm:scanType").Get() == "solidState"
+    dwell = lidar.GetAttribute("omni:sensor:LidarWpm:firingPatternDwellTicks")
+    assert dwell.GetTypeName() == Sdf.ValueTypeNames.UInt
+    assert dwell.Get() == 2
+    assert lidar.GetAttribute("omni:sensor:LidarWpm:maxReturns").Get() == 2
+    assert not lidar.GetAttribute("omni:sensor:LidarWpm:rotPatternFiringResDeg").IsAuthored()
+    assert _lidar_wpm_pattern(lidar, "p001") == {
+        "azimuthDeg": [-1, 1],
+        "elevationDeg": [0, 0],
+        "fireTimeNs": [0, 1000],
+        "channelId": [1, 2],
+        "rangeId": [],
+    }
+    # The two patterns need not have the same row count.
+    assert _lidar_wpm_pattern(lidar, "p002") == {
+        "azimuthDeg": [0],
+        "elevationDeg": [0],
+        "fireTimeNs": [0],
+        "channelId": [2],
+        "rangeId": [],
+    }
+    assert _lidar_wpm_point_cloud_channels(stage) == [
+        "Coordinates",
+        "Intensity",
+        "TimeOffsetNs",
+        "Flags",
+        "ChannelId",
+        "FiringPatternIndex",
+    ]
+    _assert_lidar_wpm_matches_usda(stage, "lidar_wpm_firing_pattern_solid_state.usda")
+
+
+def _author_radar_second_scan(stage):
+    # [snippet:doc-radar-second-scan-python]
+    from pxr import Sdf
+
+    radar = stage.DefinePrim("/World/generic_radar", "OmniRadar")
+    # The model schema includes scan s001; add s002 explicitly.
+    radar.AddAppliedSchema("OmniSensorGenericRadarWpmDmatAPI")
+    radar.AddAppliedSchema("OmniSensorGenericRadarWpmDmatScanCfgAPI:s002")
+
+    radar.CreateAttribute("omni:sensor:WpmDmat:scan:s001:maxRangeM", Sdf.ValueTypeNames.Float, custom=False).Set(50)
+    radar.CreateAttribute("omni:sensor:WpmDmat:scan:s001:raysPerDeg", Sdf.ValueTypeNames.Float, custom=False).Set(10.0)
+
+    radar.CreateAttribute("omni:sensor:WpmDmat:scan:s002:maxRangeM", Sdf.ValueTypeNames.Float, custom=False).Set(300)
+    radar.CreateAttribute("omni:sensor:WpmDmat:scan:s002:raysPerDeg", Sdf.ValueTypeNames.Float, custom=False).Set(8.0)
+    # [/snippet:doc-radar-second-scan-python]
+    return radar
+
+
+def test_radar_second_scan():
+    """Author the scan-configurations how-to's two-scan radar: s001 comes with the main schema."""
+    stage = Usd.Stage.CreateInMemory()
+    radar = _author_radar_second_scan(stage)
+
+    assert radar.GetTypeName() == "OmniRadar"
+    assert list(radar.GetPrimTypeInfo().GetAppliedAPISchemas()) == [
+        "OmniSensorGenericRadarWpmDmatAPI",
+        "OmniSensorGenericRadarWpmDmatScanCfgAPI:s002",
+    ]
+    expected = {
+        "omni:sensor:WpmDmat:scan:s001:maxRangeM": 50.0,
+        "omni:sensor:WpmDmat:scan:s001:raysPerDeg": 10.0,
+        "omni:sensor:WpmDmat:scan:s002:maxRangeM": 300.0,
+        "omni:sensor:WpmDmat:scan:s002:raysPerDeg": 8.0,
+    }
+    for name, value in expected.items():
+        attribute = radar.GetAttribute(name)
+        assert attribute.GetTypeName() == Sdf.ValueTypeNames.Float
+        assert attribute.Get() == value
+        assert not attribute.IsCustom()
+    assert {attribute.GetName() for attribute in radar.GetAuthoredAttributes()} == set(expected)
+
+
+@pytest.mark.parametrize("source", ["usda", "python"])
+def test_sensor_configuration_minimal(source):
+    stage = Usd.Stage.CreateInMemory()
+    # [snippet:doc-sensor-config-minimal-python]
+    from pxr import Gf, Sdf
+
+    lidar = stage.DefinePrim("/Lidar", "OmniLidar")
+    # Author the API schema name without requiring its generated Python bindings.
+    lidar.SetMetadata("apiSchemas", Sdf.TokenListOp.Create(
+        prependedItems=["OmniSensorGenericLidarCoreAPI"]
+    ))
+    # Capture at 10 Hz; other parameters use schema defaults.
+    lidar.CreateAttribute(
+        "omni:sensor:frameRate", Sdf.ValueTypeNames.Double2, custom=False
+    ).Set(Gf.Vec2d(10, 1))
+    # [/snippet:doc-sensor-config-minimal-python]
+    if source == "usda":
+        stage = Usd.Stage.Open(str(Path(__file__).parent / "data/sensor_configuration_minimal.usda"))
+    lidar = stage.GetPrimAtPath("/Lidar")
+    assert lidar.GetTypeName() == "OmniLidar"
+    assert "OmniSensorGenericLidarCoreAPI" in lidar.GetMetadata("apiSchemas").GetAddedOrExplicitItems()
+    assert lidar.GetAttribute("omni:sensor:frameRate").Get() == Gf.Vec2d(10, 1)
+    # Model identity is deliberately left to the schema, not duplicated here.
+    assert not stage.GetRootLayer().GetAttributeAtPath("/Lidar.omni:sensor:modelName")
+
+
+@pytest.mark.parametrize("source", ["usda", "python"])
+def test_sensor_configuration_override(source, tmp_path):
+    shutil.copy(Path(__file__).parent / "data/sensor_configuration_minimal.usda", tmp_path)
+    stage = Usd.Stage.CreateNew(str(tmp_path / "override.usda"))
+    # [snippet:doc-sensor-config-override-python]
+    from pxr import Gf, Sdf
+
+    # Resolve the sublayer relative to this stage's root layer.
+    stage.GetRootLayer().subLayerPaths.append("sensor_configuration_minimal.usda")
+    lidar = stage.OverridePrim("/Lidar")
+    # These root-layer opinions take precedence over the sublayer.
+    lidar.CreateAttribute(
+        "omni:sensor:frameRate", Sdf.ValueTypeNames.Double2, custom=False
+    ).Set(Gf.Vec2d(20, 1))
+    lidar.CreateAttribute(
+        "omni:sensor:marketName", Sdf.ValueTypeNames.String, custom=False
+    ).Set("Example device")
+    # [/snippet:doc-sensor-config-override-python]
+    if source == "usda":
+        stage = Usd.Stage.Open(str(Path(__file__).parent / "data/sensor_configuration_override.usda"))
+    lidar = stage.GetPrimAtPath("/Lidar")
+    assert lidar.GetTypeName() == "OmniLidar"
+    assert "OmniSensorGenericLidarCoreAPI" in lidar.GetMetadata("apiSchemas").GetAddedOrExplicitItems()
+    assert lidar.GetAttribute("omni:sensor:frameRate").Get() == Gf.Vec2d(20, 1)
+    assert lidar.GetAttribute("omni:sensor:marketName").Get() == "Example device"
+    assert stage.GetRootLayer().GetPrimAtPath("/Lidar").specifier == Sdf.SpecifierOver
+    # Removing the stronger opinion exposes the unchanged 10 Hz base value.
+    lidar.GetAttribute("omni:sensor:frameRate").Clear()
+    assert lidar.GetAttribute("omni:sensor:frameRate").Get() == Gf.Vec2d(10, 1)
+
+
+@pytest.mark.parametrize("source", ["usda", "python"])
+def test_sensor_configuration_orientation(source):
+    stage = Usd.Stage.CreateInMemory()
+    # [snippet:doc-sensor-config-orientation-python]
+    from pxr import Gf, Sdf, UsdGeom
+
+    UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+    lidar = stage.DefinePrim("/Lidar", "OmniLidar")
+    lidar.SetMetadata("apiSchemas", Sdf.TokenListOp.Create(
+        prependedItems=["OmniSensorGenericLidarCoreAPI"]
+    ))
+    # AddRotateXYZOp also authors xformOpOrder so the rotation is applied.
+    xform = UsdGeom.Xformable(lidar)
+    xform.AddRotateXYZOp().Set(Gf.Vec3f(90, 0, -90))
+    # [/snippet:doc-sensor-config-orientation-python]
+    if source == "usda":
+        stage = Usd.Stage.Open(str(Path(__file__).parent / "data/sensor_configuration_orientation.usda"))
+    assert UsdGeom.GetStageUpAxis(stage) == UsdGeom.Tokens.z
+    transform = UsdGeom.Xformable(stage.GetPrimAtPath("/Lidar")).GetLocalTransformation()
+    assert Gf.IsClose(transform.TransformDir(Gf.Vec3d(0, 0, -1)), Gf.Vec3d(1, 0, 0), 1e-6)
+    assert Gf.IsClose(transform.TransformDir(Gf.Vec3d(0, 1, 0)), Gf.Vec3d(0, 0, 1), 1e-6)
+
+
+@pytest.mark.parametrize("source", ["usda", "python"])
+def test_output_configuration_channels(source):
+    stage = Usd.Stage.CreateInMemory()
+    # [snippet:doc-output-lidar-channels-python]
+    from pxr import Sdf, UsdRender
+
+    # Keep the output definition separate so other products can share it.
+    product = UsdRender.Product.Define(stage, "/World/Render/Products/LidarProduct")
+    product.GetCameraRel().SetTargets(["/World/Lidar"])
+    output = UsdRender.Var.Define(stage, "/World/Render/Vars/PointCloud")
+    output.GetSourceNameAttr().Set("PointCloud")
+    # channels must be token[], not string[].
+    output.GetPrim().CreateAttribute(
+        "channels", Sdf.ValueTypeNames.TokenArray, custom=False
+    ).Set(["Coordinates", "Intensity", "Counts", "TimeOffsetNs"])
+    product.GetOrderedVarsRel().SetTargets([output.GetPath()])
+    # [/snippet:doc-output-lidar-channels-python]
+    if source == "usda":
+        # Parse the displayed fragment in its original /World scope, without assets.
+        text = (Path(__file__).parents[3] / "examples/python/lidar/lidar_example.usda").read_text()
+        body = text.split("# [snippet:configure-lidar-pointcloud-output]", 1)[1].split(
+            "# [/snippet:configure-lidar-pointcloud-output]", 1)[0]
+        stage = Usd.Stage.CreateInMemory()
+        assert stage.GetRootLayer().ImportFromString('#usda 1.0\ndef "World" {\n' + body + '\n}')
+    product = UsdRender.Product(stage.GetPrimAtPath("/World/Render/Products/LidarProduct"))
+    assert product.GetCameraRel().GetTargets() == [Sdf.Path("/World/Lidar")]
+    paths = product.GetOrderedVarsRel().GetTargets()
+    assert paths == [Sdf.Path("/World/Render/Vars/PointCloud")]
+    output = UsdRender.Var(stage.GetPrimAtPath(paths[0]))
+    assert output.GetSourceNameAttr().Get() == "PointCloud"
+    channels = output.GetPrim().GetAttribute("channels")
+    assert channels.GetTypeName() == Sdf.ValueTypeNames.TokenArray
+    assert list(channels.Get()) == ["Coordinates", "Intensity", "Counts", "TimeOffsetNs"]
+
+
+@pytest.mark.parametrize("source", ["usda", "python"])
+def test_output_configuration_inline_camera(source, tmp_path):
+    (tmp_path / "usd/data").mkdir(parents=True)
+    (tmp_path / "data").mkdir()
+    base = tmp_path / "data/ovrtx-test-base.usda"
+    base.write_text('#usda 1.0\ndef Xform "ExistingScene" {}\n')
+    root_path = tmp_path / "usd/data/root.usda"
+    stage = Usd.Stage.CreateNew(str(root_path))
+    # [snippet:doc-output-inline-camera-python]
+    from pxr import Sdf, UsdGeom, UsdRender
+
+    # The existing scene is weaker than the new root-layer configuration.
+    stage.GetRootLayer().subLayerPaths.append("../../data/ovrtx-test-base.usda")
+    camera = UsdGeom.Camera.Define(stage, "/DocsCamera")
+    camera.GetPrim().SetMetadata("apiSchemas", Sdf.TokenListOp.Create(
+        prependedItems=["OmniSensorGenericCameraCoreAPI"]
+    ))
+    product = UsdRender.Product.Define(stage, "/Render/DocsCamera")
+    product.GetCameraRel().SetTargets([camera.GetPath()])
+    output = UsdRender.Var.Define(stage, "/Render/DocsCamera/LdrColor")
+    output.GetSourceNameAttr().Set("LdrColor")
+    product.GetOrderedVarsRel().SetTargets([output.GetPath()])
+    # [/snippet:doc-output-inline-camera-python]
+    if source == "usda":
+        fixture = tmp_path / "usd/data/fixture.usda"
+        shutil.copy(Path(__file__).parent / "data/inline_sublayers_camera_renderproduct.usda", fixture)
+        stage = Usd.Stage.Open(str(fixture))
+    assert stage.GetPrimAtPath("/ExistingScene")
+    camera = stage.GetPrimAtPath("/DocsCamera")
+    assert camera.GetTypeName() == "Camera"
+    assert "OmniSensorGenericCameraCoreAPI" in camera.GetMetadata("apiSchemas").GetAddedOrExplicitItems()
+    product = UsdRender.Product(stage.GetPrimAtPath("/Render/DocsCamera"))
+    assert product.GetCameraRel().GetTargets() == [camera.GetPath()]
+    paths = product.GetOrderedVarsRel().GetTargets()
+    assert paths == [Sdf.Path("/Render/DocsCamera/LdrColor")]
+    assert UsdRender.Var(stage.GetPrimAtPath(paths[0])).GetSourceNameAttr().Get() == "LdrColor"
+    assert stage.GetRootLayer().subLayerPaths == ["../../data/ovrtx-test-base.usda"]
+
+
+@pytest.mark.parametrize("source", ["usda", "python"])
+def test_output_configuration_device_pinning(source):
+    stage = Usd.Stage.CreateInMemory()
+    # [snippet:doc-output-device-pinning-python]
+    from pxr import Gf, Sdf, UsdRender
+
+    product = UsdRender.Product.Define(stage, "/Render/Camera")
+    product.GetCameraRel().SetTargets(["/World/Camera"])
+    # Indices refer to GPUs visible after CUDA_VISIBLE_DEVICES remapping.
+    product.GetPrim().CreateAttribute(
+        "deviceIds", Sdf.ValueTypeNames.UIntArray, custom=False
+    ).Set([0])
+    product.GetResolutionAttr().Set(Gf.Vec2i(640, 320))
+    output = UsdRender.Var.Define(stage, "/Render/Camera/LdrColor")
+    output.GetSourceNameAttr().Set("LdrColor")
+    product.GetOrderedVarsRel().SetTargets([output.GetPath()])
+    # [/snippet:doc-output-device-pinning-python]
+    if source == "usda":
+        text = (Path(__file__).parents[1] / "data/ovrtx-test-picking-selection.usda").read_text()
+        body = text.split("# [snippet:doc-pin-render-product-to-gpu-0-usda]", 1)[1].split(
+            "# [/snippet:doc-pin-render-product-to-gpu-0-usda]", 1)[0]
+        stage = Usd.Stage.CreateInMemory()
+        assert stage.GetRootLayer().ImportFromString('#usda 1.0\ndef "Render" {\n' + body + '\n}')
+    product = UsdRender.Product(stage.GetPrimAtPath("/Render/Camera"))
+    device_ids = product.GetPrim().GetAttribute("deviceIds")
+    assert device_ids.GetTypeName() == Sdf.ValueTypeNames.UIntArray
+    assert list(device_ids.Get()) == [0]
+    assert product.GetResolutionAttr().Get() == Gf.Vec2i(640, 320)
+    assert product.GetCameraRel().GetTargets() == [Sdf.Path("/World/Camera")]
+    paths = product.GetOrderedVarsRel().GetTargets()
+    assert paths == [Sdf.Path("/Render/Camera/LdrColor")]
+    assert UsdRender.Var(stage.GetPrimAtPath(paths[0])).GetSourceNameAttr().Get() == "LdrColor"
+
+
+def test_nonvisual_materials_match_radar_examples():
+    """Keep the Python material labels equivalent to both runnable radar scenes."""
+    stage = Usd.Stage.CreateInMemory()
+
+    # [snippet:doc-nonvisual-materials-python]
+    from pxr import Sdf, UsdGeom, UsdShade
+
+    UsdGeom.Xform.Define(stage, "/World/Materials")
+    for name, base in (("Asphalt", "asphalt"), ("Steel", "steel"), ("Concrete", "concrete")):
+        material = UsdShade.Material.Define(stage, f"/World/Materials/{name}")
+        prim = material.GetPrim()
+        # Labels describe the surface for sensing; no visual shader is needed.
+        prim.CreateAttribute("omni:simready:nonvisual:base", Sdf.ValueTypeNames.Token).Set(base)
+        prim.CreateAttribute("omni:simready:nonvisual:coating", Sdf.ValueTypeNames.Token).Set("none")
+        # Use a token array even when there are no additional surface flags.
+        prim.CreateAttribute("omni:simready:nonvisual:attributes", Sdf.ValueTypeNames.TokenArray).Set(["none"])
+    # [/snippet:doc-nonvisual-materials-python]
+
+    public_root = Path(__file__).resolve().parents[3]
+    expected = (
+        ("Asphalt", "asphalt", "GroundPlane"),
+        ("Steel", "steel", "RightSteelCube"),
+        ("Concrete", "concrete", "LeftConcreteCube"),
+    )
+    for language in ("python", "c"):
+        reference = Usd.Stage.Open(str(public_root / "examples" / language / "radar" / "radar_example.usda"))
+        assert reference
+        for name, base, geometry in expected:
+            path = f"/World/Materials/{name}"
+            authored = UsdShade.Material(stage.GetPrimAtPath(path))
+            original = UsdShade.Material(reference.GetPrimAtPath(path))
+            assert authored and original
+            for suffix, value_type, value in (
+                ("base", Sdf.ValueTypeNames.Token, base),
+                ("coating", Sdf.ValueTypeNames.Token, "none"),
+                ("attributes", Sdf.ValueTypeNames.TokenArray, ["none"]),
+            ):
+                for material in (authored, original):
+                    attr = material.GetPrim().GetAttribute(f"omni:simready:nonvisual:{suffix}")
+                    assert attr.GetTypeName() == value_type
+                    result = attr.Get()
+                    assert (list(result) if suffix == "attributes" else result) == value
+                    assert not attr.GetTimeSamples()
+            assert not authored.GetSurfaceOutput().HasConnectedSource()
+            assert not original.GetSurfaceOutput().HasConnectedSource()
+            bound, _ = UsdShade.MaterialBindingAPI(reference.GetPrimAtPath(f"/World/{geometry}")).ComputeBoundMaterial()
+            assert bound.GetPath() == original.GetPath()
+
+
+def test_path_tracing_render_product_authoring():
+    """Compare the two displayed authoring forms without loading remote scene assets."""
+    import ast
+    import textwrap
+
+    stage = Usd.Stage.CreateInMemory()
+    UsdGeom.Camera.Define(stage, "/World/Camera")
+
+    # [snippet:doc-path-tracing-render-product-python]
+    from pxr import Gf, Sdf, UsdRender
+
+    stage.DefinePrim("/Render", "Scope")
+    product = UsdRender.Product.Define(stage, "/Render/Camera")
+    product.CreateResolutionAttr().Set(Gf.Vec2i(640, 480))
+    product.CreateCameraRel().SetTargets(["/World/Camera"])
+    # Select the render mode on this product, independently of other products.
+    product.GetPrim().CreateAttribute(
+        "omni:rtx:rendermode", Sdf.ValueTypeNames.Token
+    ).Set("PathTracing")
+    # Request the tone-mapped color image.
+    color = UsdRender.Var.Define(stage, "/Render/Camera/LdrColor")
+    color.CreateSourceNameAttr().Set("LdrColor")
+    product.CreateOrderedVarsRel().SetTargets([color.GetPath()])
+    # [/snippet:doc-path-tracing-render-product-python]
+
+    # Read the canonical USDA constant without importing ovrtx or its GPU test.
+    source = Path(__file__).resolve().parents[1] / "python" / "test_render_modes.py"
+    tree = ast.parse(source.read_text())
+    usda = next(
+        ast.literal_eval(node.value)
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "USDA" for target in node.targets)
+    )
+    snippet = usda.split("# [snippet:doc-path-tracing-render-product]", 1)[1].split(
+        "# [/snippet:doc-path-tracing-render-product]", 1
+    )[0]
+    # Match filtered-literalinclude: omit the GPU test's deliberately noisy settings.
+    before, omitted = snippet.split("# [omit]", 1)
+    _, after = omitted.split("# [/omit]", 1)
+    reference = Usd.Stage.CreateInMemory()
+    assert reference.GetRootLayer().ImportFromString("#usda 1.0\n" + textwrap.dedent(before + after))
+    UsdGeom.Camera.Define(reference, "/World/Camera")
+    for candidate in (stage, reference):
+        configured = UsdRender.Product(candidate.GetPrimAtPath("/Render/Camera"))
+        assert configured
+        assert tuple(configured.GetResolutionAttr().Get()) == (640, 480)
+        camera_targets = configured.GetCameraRel().GetTargets()
+        assert camera_targets == [Sdf.Path("/World/Camera")]
+        assert candidate.GetPrimAtPath(camera_targets[0]).IsA(UsdGeom.Camera)
+        mode = configured.GetPrim().GetAttribute("omni:rtx:rendermode")
+        assert mode.GetTypeName() == Sdf.ValueTypeNames.Token
+        assert mode.Get() == "PathTracing"
+        var_targets = configured.GetOrderedVarsRel().GetTargets()
+        assert var_targets == [Sdf.Path("/Render/Camera/LdrColor")]
+        color = UsdRender.Var(candidate.GetPrimAtPath(var_targets[0]))
+        assert color and color.GetSourceNameAttr().Get() == "LdrColor"
+
+
+@pytest.mark.parametrize("source", ["usda", "python"])
+def test_lidar_wpm_output_request(source):
+    stage = Usd.Stage.CreateInMemory()
+    # [snippet:doc-lidar-wpm-output-request-python]
+    from pxr import Sdf, UsdRender
+
+    product = UsdRender.Product.Define(stage, "/LidarProduct")
+    # Target the existing WPM lidar prim.
+    product.GetCameraRel().SetTargets(["/Lidar"])
+    point_cloud = UsdRender.Var.Define(stage, "/PointCloud")
+    point_cloud.GetSourceNameAttr().Set("PointCloud")
+    # Select channels; Flags and Counts are included automatically.
+    point_cloud.GetPrim().CreateAttribute(
+        "channels", Sdf.ValueTypeNames.TokenArray, custom=False
+    ).Set(["Coordinates", "Intensity", "TimeOffsetNs"])
+    product.GetOrderedVarsRel().SetTargets([point_cloud.GetPath()])
+    # [/snippet:doc-lidar-wpm-output-request-python]
+    if source == "usda":
+        stage = Usd.Stage.Open(str(Path(__file__).parent / "data/lidar_wpm_output_request.usda"))
+    # Supply the documented prerequisite separately from the output definition.
+    lidar = stage.DefinePrim("/Lidar", "OmniLidar")
+    lidar.AddAppliedSchema("OmniSensorGenericLidarWpmAPI")
+    product = UsdRender.Product(stage.GetPrimAtPath("/LidarProduct"))
+    assert product
+    assert product.GetCameraRel().GetTargets() == [lidar.GetPath()]
+    targets = product.GetOrderedVarsRel().GetTargets()
+    assert targets == [Sdf.Path("/PointCloud")]
+    output = UsdRender.Var(stage.GetPrimAtPath(targets[0]))
+    assert output
+    assert output.GetSourceNameAttr().Get() == "PointCloud"
+    channels = output.GetPrim().GetAttribute("channels")
+    assert channels.GetTypeName() == Sdf.ValueTypeNames.TokenArray
+    assert list(channels.Get()) == ["Coordinates", "Intensity", "TimeOffsetNs"]

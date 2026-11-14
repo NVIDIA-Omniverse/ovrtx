@@ -1,0 +1,17 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-howto-field-of-view-1]
+#usda 1.0
+
+def OmniLidar "generic_lidar" (
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    float omni:sensor:Core:nearRangeM = 0.3
+    float omni:sensor:Core:farRangeM = 200
+    float omni:sensor:Core:validStartAzimuthDeg = 0
+    float omni:sensor:Core:validEndAzimuthDeg = 360
+}
+# [/snippet:doc-nonvisual-lidar-core-howto-field-of-view-1]

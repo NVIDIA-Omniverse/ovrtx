@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1178" height="435" viewBox="0 0 1178 435" role="img" aria-labelledby="title desc">
+<title id="title">One UsdShade material, two systems</title>
+<desc id="desc">One UsdShade material serves two systems. Geometry binds it through material:binding; the visual shader network feeds visual rendering, and the three omni:simready:nonvisual attributes feed the lidar, radar and acoustic models.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker><marker id="arrow-952fc6-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#952FC6"/></marker><marker id="arrow-ef9100-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#EF9100"/></marker></defs>
+<rect width="1178" height="435" fill="#fff"/>
+<rect x="32" y="164" width="110" height="64" rx="6" fill="#F2F2F2"/>
+<text x="87" y="190.6" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">Mesh</text>
+<text x="87" y="208.6" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">geometry prim</text>
+<line x1="148" y1="196" x2="261" y2="196" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="210" y="186" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">material:binding</text>
+<rect x="278" y="40" width="396" height="312" rx="8" fill="#fff" stroke="#757575" stroke-width="2"/>
+<text x="476" y="66" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" text-anchor="middle" font-weight="bold">UsdShade Material prim</text>
+<rect x="292" y="84" width="368" height="112" rx="6" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<text x="476" y="110" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#952FC6" text-anchor="middle" font-weight="bold">SimReady non-visual labels</text>
+<text x="304" y="136" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">omni:simready:nonvisual:base</text>
+<text x="648" y="136" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#757575" text-anchor="end">token</text>
+<text x="304" y="160" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">omni:simready:nonvisual:coating</text>
+<text x="648" y="160" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#757575" text-anchor="end">token</text>
+<text x="304" y="184" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">omni:simready:nonvisual:attributes</text>
+<text x="648" y="184" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#757575" text-anchor="end">token[]</text>
+<rect x="292" y="246" width="368" height="92" rx="6" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<text x="476" y="272" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#0074DF" text-anchor="middle" font-weight="bold">Visual shader network</text>
+<rect x="304" y="286" width="344" height="36" rx="6" fill="#fff"/>
+<text x="476" y="308.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">surface shader, textures, parameters</text>
+<rect x="896" y="121" width="250" height="126" rx="6" fill="#fff" stroke="#952FC6" stroke-width="2"/>
+<text x="910" y="145" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#952FC6" font-weight="bold">Non-visual sensing</text>
+<text x="910" y="163" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#9A9A9A">reads the labels, not the shader</text>
+<text x="910" y="181" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">Lidar generic core model</text>
+<text x="910" y="199" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">Lidar generic wpm model</text>
+<text x="910" y="217" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">Radar generic wpmDmat model</text>
+<text x="910" y="235" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">Acoustic generic wpm model</text>
+<rect x="896" y="273" width="250" height="90" rx="6" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="910" y="297" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#0074DF" font-weight="bold">Visual rendering</text>
+<text x="910" y="315" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#9A9A9A">reads the shader network</text>
+<text x="910" y="333" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">cameras</text>
+<text x="910" y="351" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">Visual Sensors</text>
+<line x1="680" y1="140" x2="879" y2="140" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<line x1="680" y1="292" x2="879" y2="292" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<path d="M680,258 L698,258 L698,194.32 L879,194.32" fill="none" stroke="#EF9100" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round" marker-end="url(#arrow-ef9100-2)"/>
+<text x="884" y="222.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#EF9100" text-anchor="end">optional, off by default:</text>
+<text x="884" y="240.32" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#EF9100" text-anchor="end">useVisualMaterialInputs</text>
+<line x1="278" y1="395" x2="294" y2="395" stroke="#952FC6" stroke-width="2"/>
+<text x="301" y="399.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">non-visual path</text>
+<line x1="415.99" y1="395" x2="431.99" y2="395" stroke="#0074DF" stroke-width="2"/>
+<text x="438.99" y="399.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">visual path</text>
+<line x1="527.09" y1="395" x2="543.09" y2="395" stroke="#EF9100" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="550.09" y="399.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">optional: the Lidar generic wpm model may also read the visual material</text>
+</svg>

@@ -36,7 +36,7 @@ def Xform "World"
 
     # A post marking where the sensor stands. It sits inside the sweep's blind
     # zone: the steepest beam leaves at -15 degrees elevation, so from 1 m up it
-    # is already 0.89 m above the ground at this post's radius, and the post
+    # is already 0.91 m above the ground at this post's radius, and the post
     # stops at 0.7 m. The lidar therefore cannot see it, and the histogram is the
     # same with it as without. Widening or raising it would break that.
     def Material "MarkerMaterial"
@@ -110,8 +110,7 @@ def Xform "World"
     # A view camera for the reference image, placed to the side of the sensor's
     # forward axis rather than along it, so the post and the two boxes are
     # spread across the frame instead of overlapping. It is used only by the
-    # SceneView render product; the lidar is the camera for the product that
-    # matters.
+    # SceneView render product.
     def Camera "ViewCamera"
     {
         float2 clippingRange = (0.1, 10000)
@@ -141,12 +140,12 @@ def Xform "World"
 
 }
 
-# The PointCloud RenderVar is the composite. `channels` decides which channels it
-# carries, and those are exactly the names the launch script finds in .tensors:
-# ask for one here and it appears, leave it out and it does not. Counts is
-# requested because the shader needs it to know how much of the other channels
-# is real. Intensity is requested too, to show that asking for a channel is what
-# makes it appear; main.py reads it from the host even though the node does not.
+# The PointCloud RenderVar is the composite. `channels` lists the channels it asks
+# for, and each one the lidar supports is a name the launch script finds in
+# .tensors. The lidar adds Counts and Flags of its own; Counts is listed anyway,
+# because the shader needs it to know how much of the other channels is real.
+# Intensity and TimeOffsetNs are requested too, to show that asking for a channel is what
+# makes it appear; the host can read them even though the node does not.
 #
 # Histogram is an ordinary single-resource AOV, so a node can turn a composite
 # into something a normal image consumer can read.

@@ -9,8 +9,8 @@
 -- its affiliates is strictly prohibited.
 
 -- Companion launch script for the SPG raygen Cornell-box showcase. The output shape drives the ray
--- dispatch, so an NxN image casts one primary ray per pixel. Only the scene and its camera transform are
--- bound -- both implicit from the node's RenderProduct; the shader needs nothing else.
+-- dispatch, so an NxN image casts one primary ray per pixel. The scene and its camera transform
+-- come implicitly from the node's RenderProduct.
 
 -- [snippet:raygen-launch]
 function rayGenCornellBox(inputs, outputs)

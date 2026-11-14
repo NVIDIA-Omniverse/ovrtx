@@ -10,9 +10,10 @@
 
 """Render four image slices in succession and stitch them into one image.
 
-The scene uses a 1024x1024 RenderProduct. The example renders its top-left,
-top-right, bottom-left, and bottom-right 512x512 crops by updating OpenUSD's
-``dataWindowNDC`` attribute, then assembles them into the full image.
+The scene uses a 1024x1024 PathTracing RenderProduct at 64 samples per pixel.
+The example renders its top-left, top-right, bottom-left, and bottom-right
+512x512 crops by updating OpenUSD's ``dataWindowNDC`` attribute, waits for each
+crop to converge, then assembles them into the full image.
 
 Usage:
     uv run main.py              # Display the stitched render
@@ -35,7 +36,7 @@ TEST_BASE_LIGHT = TEST_DATA_DIR / "ovrtx-test-base-light.usda"
 
 FULL_RESOLUTION = (1024, 1024)
 SLICE_RESOLUTION = (512, 512)
-WARMUP_FRAMES = 10
+WARMUP_FRAMES = 0
 LDR_COLOR_PATH = "/Render/Camera/LdrColor"
 SLICES = (
     # LdrColor rows follow dataWindowNDC's bottom-up Y order.
@@ -68,6 +69,9 @@ def Scope "Render"
         rel camera = </World/Camera>
         int2 resolution = ({FULL_RESOLUTION[0]}, {FULL_RESOLUTION[1]})
         float4 dataWindowNDC = (0.0, 0.0, 1.0, 1.0)
+        token omni:rtx:rendermode = "PathTracing"
+        uint omni:rtx:pt:samplesPerPixel = 64
+        int omni:rtx:pt:samplesPerIteration = 32
         rel orderedVars = <LdrColor>
 
         def RenderVar "LdrColor" {{
@@ -79,13 +83,19 @@ def Scope "Render"
 
 
 def render_slice(renderer: ovrtx.Renderer, ordinal: int) -> np.ndarray:
-    """Render and copy one cropped LdrColor output into independent storage."""
-    products = renderer.step(
-        render_products={"/Render/Camera"},
-        delta_time=1.0 / 60,
-        ordinal=ordinal,
-    )
-    frame = products["/Render/Camera"].frames[-1]
+    """Converge one crop to its sample limit and copy its LdrColor output."""
+    # Crop changes reset accumulation; initial quality does not rerun for every crop.
+    while True:
+        products = renderer.step(
+            render_products={"/Render/Camera"},
+            delta_time=1.0 / 60,
+            ordinal=ordinal,
+        )
+        frame = products["/Render/Camera"].frames[-1]
+        if frame.converged:
+            break
+
+    print(f"Crop converged (progression={frame.progression}).", file=sys.stderr)
     var = frame.render_vars[LDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
     view = np.from_dlpack(var)
     pixels = view.copy()

@@ -17,8 +17,7 @@ Every function and constant a ``.slang.lua`` launch script can use. For what a l
 is and when it runs, refer to :doc:`lua_contract`.
 
 Accepted source assets: ``.slang``, compiled on load, ``.slang-module``, pre-compiled Slang
-IR, and ``.spv``, SPIR-V and compute only. Extensions are matched case-insensitively. That is
-the complete list.
+IR, and ``.spv``, SPIR-V and compute only. Extensions are matched case-insensitively.
 
 Slang nodes require the renderer to be running on Vulkan, the ovrtx default on Linux and
 Windows.
@@ -41,11 +40,16 @@ CUDA: ``image`` is texture-backed, ``empty`` is buffer-backed.
      - The same, with the shape as a table: ``{width}``, ``{height, width}`` or ``{height, width, depth}``. This is how a texture of one or three dimensions is asked for. A texture has one, two or three dimensions and no more.
    * - ``slang.empty(shape, dtype)``
      - A buffer-backed output of arbitrary shape.
-   * - ``slang.zeros(shape, dtype)``, ``slang.ones(shape, dtype)``, ``slang.full(shape, value, dtype)``
-     - A buffer filled with zeros, ones, or a stated value.
 
-``slang.image`` and ``slang.empty`` take an optional trailing ``slang.stateful``, which marks
-the output persistent so SPG hands the same resource back next frame instead of a fresh one:
+The same functions describe the node's **memory**: storage only the node reads and writes,
+kept across frames for as long as the node lives. A memory is stated on ``self.memory`` under
+its name instead of on ``outputs``, and passed to the kernel with the same wrappers as an
+output, as in the snippet below. Refer to
+:doc:`../do/state`.
+
+``slang.image`` and ``slang.empty`` also take an optional trailing ``slang.stateful``, which marks
+an output persistent so SPG hands the same resource back next frame instead of a fresh one:
+state the scene reads as well.
 
 .. filtered-literalinclude:: ../../../examples/python/spg-stateful/TrailKernel.slang.lua
    :language: lua
@@ -78,7 +82,7 @@ Each binder is named after the Slang type it binds to, and behaves like it.
    * - ``slang.Buffer(input)``
      - A read-only typed buffer, ``Buffer<T>``.
    * - ``slang.RWBuffer(output)``
-     - A buffer-backed output as a typed buffer, ``RWBuffer<T>``. This is what creates one.
+     - A buffer-backed output, created as a typed buffer, ``RWBuffer<T>``. Only a buffer created this way can be read with ``slang.Buffer``.
 
 The binders check what they are given, in Lua, before anything reaches the GPU, and the
 message names the port: the **rank** must match the type, the **direction** must match, the
@@ -99,11 +103,19 @@ Grouping and Data
    * - ``slang.bind(resources)``, ``slang.bind(resources, space)``
      - Group bound resources into one descriptor set. Slots are positions in the group, counting
        from zero; ``space`` states the descriptor space. Passed in the array part of the
-       ``slang.dispatch`` table rather than in ``bind``. Compute stages only: the ray-tracing
+       ``slang.compute`` table rather than in ``bind``. Compute stages only: the ray-tracing
        calls read the flat ``bind`` list and reject a group. Refer to
        :doc:`../do/descriptor_sets`.
    * - ``slang.array(luaTable, dtype)``
-     - Upload a Lua table of numbers to a GPU buffer. Wrap it in a buffer binder to bind it.
+     - Upload a Lua table of numbers to a GPU buffer. Wrap it in a buffer binder to bind it. An empty table binds a placeholder the shader must not read.
+   * - ``slang.zeros(shape, dtype)``, ``slang.ones(shape, dtype)``, ``slang.full(shape, value, dtype)``
+     - A GPU buffer of that shape filled with zeros, ones, or a stated value. Wrap it in a buffer binder to bind it, as the result of ``slang.array`` is.
+   * - ``slang.array(value, dtype, { offset, strides })``
+     - An array inside a parameter block, ``offset`` bytes into it, with ``strides`` giving the
+       bytes from one index to the next at each level, padding included. A shader without
+       reflection needs both; where the shader reports them, it uses its own and warns when stated
+       ones differ. An empty array writes nothing; its bytes stay zero. Refer to
+       :ref:`Stating the Layout <spg-do-layout>`.
    * - ``slang.array(resource)``
      - Reference a buffer-backed resource that already exists, such as a composite channel.
    * - ``slang.array(assetInput, dtype)``
@@ -115,7 +127,7 @@ Grouping and Data
 What a Launch Script Returns
 ----------------------------
 
-A launch script returns one of three calls, and which one it returns decides the shader stage.
+A launch script returns one of the calls below, and the call it returns decides the shader stage.
 
 .. list-table::
    :header-rows: 1
@@ -123,8 +135,12 @@ A launch script returns one of three calls, and which one it returns decides the
 
    * - Function
      - Description
-   * - ``slang.dispatch(table)``
+   * - ``slang.compute(table)``
      - A compute launch. The fields are below.
+   * - ``slang.dispatch(table)``
+     - Deprecated: the same call as ``slang.compute``, under a second name. It takes the same
+       fields and returns the same launch, and logs a warning once per node. Call
+       ``slang.compute`` instead.
    * - ``slang.rayQuery(table)``
      - A ray-generation launch that traces inline, with no shader binding table and so no miss or
        hit entry points. Takes ``bind`` only: there is no ``numthreads``, and the ray grid is the
@@ -133,8 +149,8 @@ A launch script returns one of three calls, and which one it returns decides the
      - A ray-generation launch that drives a full ray-tracing pipeline with a shader binding
        table, so shading happens in separate entry points. Takes the extra fields below.
 
-``slang.dispatch`` fields
-~~~~~~~~~~~~~~~~~~~~~~~~~
+``slang.compute`` fields
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -153,9 +169,7 @@ A launch script returns one of three calls, and which one it returns decides the
    * - ``grid``
      - Number of thread groups as ``{ x, y, z }``. Optional; derived from the first output's shape
        and the thread-group size when omitted. With a thread-group size from neither the shader nor
-       ``numthreads``, there is nothing to derive from and the node does not run.
-   * - ``stage``
-     - Shader stage. Optional; ``"compute"`` when omitted.
+       ``numthreads``, there is nothing to derive from and the node's graph stops.
 
 Set ``grid`` explicitly whenever the iteration domain is the data rather than the image. The
 derived grid follows the output shape, which is wrong for a shader whose threads each walk a
@@ -177,8 +191,7 @@ ray-generation entry point.
      - Array of miss entry-point names, as strings.
    * - ``hit``
      - Array of hit groups, each a table defining ``closesthit`` and optionally ``anyhit``, both
-       entry-point names. **Exactly one hit group is supported**; more is rejected, because the
-       dispatch uses a zero-stride hit-group table and every scene hit invokes group 0.
+       entry-point names. **Exactly one hit group is supported**; more is rejected.
    * - ``payloadSize``
      - Size of the ``TraceRay`` payload in bytes. A whole number from 0 to 65535.
    * - ``attributeSize``
@@ -208,8 +221,10 @@ Cached Computation
    * - Function
      - Description
    * - ``slang.static(fn, ...)``
-     - Call ``fn(...)`` once and cache the result, keyed on the arguments. Later calls with the
-       same arguments reuse it; a changed argument runs ``fn`` again. Refer to
+     - Call ``fn(...)`` once and cache the result. Later calls with the same arguments reuse it; a
+       changed argument runs ``fn`` again, and its result replaces the cached one. An error from
+       ``fn`` propagates and fails the launch; the failed call stores no result. A function
+       written inline in the launch function is the same function on every launch. Refer to
        :doc:`../do/caching`.
 
 Matrix Storage Order
@@ -222,15 +237,17 @@ Matrix Storage Order
    * - Constant
      - Description
    * - ``slang.row_major``, ``slang.column_major``
-     - How a matrix is stored in a parameter block, given as the ``order`` of a stated layout. A
-       matrix needs its order as well as its offset. Refer to
+     - Deprecated: the ``order`` of a matrix layout stated as ``{ offset, order, stride }``, which
+       logs a warning. State ``strides`` instead. Refer to
        :ref:`Stating the Layout <spg-do-layout>`.
 
 dtype Constants
 ---------------
 
 Every constant is also callable as a constructor, so ``slang.float(inputs["strength"])`` wraps a
-value for a parameter block and ``slang.float3(x, y, z)`` builds one from components.
+value for a parameter block and ``slang.float3(x, y, z)`` builds one from components. A
+constructor holds one value of its type: given an input that holds more elements, it fails the
+launch, and the array goes in with ``slang.array`` instead.
 
 .. list-table::
    :header-rows: 1
@@ -243,7 +260,7 @@ value for a parameter block and ``slang.float3(x, y, z)`` builds one from compon
    * - ``slang.bool``
      - 8-bit boolean
      - ``slang.bool2``, ``slang.bool3``, ``slang.bool4``
-     -
+     - In a parameter block each component is packed as a four-byte shader ``bool``.
    * - ``slang.char``, ``slang.uchar``
      - 8-bit signed, unsigned
      - ``slang.char2``, ``slang.char3``, ``slang.char4``, ``slang.uchar2``, ``slang.uchar3``,
@@ -279,8 +296,9 @@ value for a parameter block and ``slang.float3(x, y, z)`` builds one from compon
        Write the node in CUDA when it needs 64-bit integers.
 
 Square matrices are ``slang.float2x2``, ``slang.float3x3``, ``slang.float4x4`` and the ``double``
-forms ``slang.double2x2``, ``slang.double3x3``, ``slang.double4x4``. A matrix in a parameter block
-needs its storage order as well as its offset; refer to :ref:`Stating the Layout <spg-do-layout>`.
+forms ``slang.double2x2``, ``slang.double3x3``, ``slang.double4x4``. A matrix in the parameter block
+of a shader without reflection needs its offset and strides; refer to
+:ref:`Stating the Layout <spg-do-layout>`.
 
 Quaternions are ``slang.quatf``, ``slang.quatd`` and ``slang.quath``, four components of the
 matching float width.

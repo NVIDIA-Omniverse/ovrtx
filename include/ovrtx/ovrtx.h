@@ -23,6 +23,7 @@
 #endif
 
 #include "ovrtx_types.h"
+#include "ovrtx_data_provider.h"
 
 /* Opaque forward declarations for ovstage interop parameters. Full definitions
  * live in <ovstage/ovstage_api/ovstage_api_types.h> (included transitively
@@ -30,7 +31,16 @@
  * headers can coexist in the same translation unit in either include order. */
 #ifndef OVSTAGE_ORDINAL_T_DECLARED
 #define OVSTAGE_ORDINAL_T_DECLARED
-typedef uint64_t ovstage_ordinal_t;
+typedef int64_t ovstage_ordinal_t;
+#endif
+
+/** Smallest representable ordinal; the initial sealed empty floor, not writable. */
+#ifndef OVSTAGE_ORDINAL_MIN
+#define OVSTAGE_ORDINAL_MIN ((ovstage_ordinal_t)INT64_MIN)
+#endif
+/** Largest representable ordinal; also the current-value read end. */
+#ifndef OVSTAGE_ORDINAL_MAX
+#define OVSTAGE_ORDINAL_MAX ((ovstage_ordinal_t)INT64_MAX)
 #endif
 #ifndef OVSTAGE_INSTANCE_T_DECLARED
 #define OVSTAGE_INSTANCE_T_DECLARED
@@ -147,8 +157,8 @@ extern "C"
      *   populate. Never loads ovstage itself.
      * - Calling this after USD has already been loaded has no retroactive effect on the
      *   plugin-path keys, which were bound at load.
-     * - This function does not allocate the ovrtx system, start Carbonite, load renderer
-     *   plugins, or apply general Carb settings; it only adjusts process-global
+     * - This function does not allocate the ovrtx system, start the ovrtx runtime, load
+     *   renderer plugins, or apply renderer settings; it only adjusts process-global
      *   environment used by USD discovery and USD-facing MDL/MaterialX setup.
      *
      * @return Always **OVRTX_API_SUCCESS**. This API does not surface failure through
@@ -223,6 +233,61 @@ extern "C"
                                       size_t out_paths_capacity);
 
     /**
+     * Programmatically opts out of the OVRTX library startup reporting functionality for this process.
+     *
+     * OVRTX sends one anonymous report that the library was initialized, from a background thread,
+     * the first time OVRTX initializes successfully in a process: when ovrtx_initialize() succeeds, or
+     * when ovrtx_create_renderer() initializes it implicitly. It reports at most once per process:
+     * creating more renderers, or shutting OVRTX down completely and initializing it again, does not
+     * report again. This call disables the report, and to take effect it must be called BEFORE the
+     * ovrtx_initialize() (or implicitly initializing ovrtx_create_renderer()) that first initializes
+     * OVRTX. Called afterwards it cannot take the report back, because this process has already used
+     * up its one reporting opportunity; at best it
+     * abandons a report that has not gone out yet, since the reporter waits briefly before assembling
+     * anything. The opt-out lasts for the rest of the process, across ovrtx_shutdown() and
+     * ovrtx_initialize() cycles. It does not load the OVRTX runtime or initialize anything; it can be
+     * called before ovrtx_initialize().
+     *
+     * Note that if the `NVIDIA_OMNIVERSE_PRODUCT_TELEMETRY_DISABLED` environment variable is defined and
+     * set to `1` for this process, this call will be unnecessary. The environment variable based
+     * opt-out will always override the programmatic opt-out for the process: once observed it stays in
+     * effect for the lifetime of the process, and no OVRTX call can clear it. When used, this
+     * environment variable is expected to be defined for the process at launch time. Defining it
+     * programmatically with a call such as `setenv()` is strongly discouraged since that can lead to a
+     * race condition crash on Linux due to a known bug in the environment variable functions in glibc
+     * in versions earlier than 2.41.
+     *
+     * Other Omniverse libraries in the same process, such as OVXR, send their own reports and have their
+     * own opt-out functions; this call affects only OVRTX. `NVIDIA_OMNIVERSE_PRODUCT_TELEMETRY_DISABLED=1`
+     * covers all of them.
+     *
+     * The startup event parameters contain the OVRTX library name and version. The surrounding request
+     * also includes a UTC timestamp, the library build variant (`clientVariant`: `"Release"`, or
+     * `"iBeta"` for a debug library), and fixed protocol and placeholder fields. See TELEMETRY.md for
+     * the full request fields.
+     *
+     * The message is sent as plain-text JSON over an HTTP connection, with no encryption or obfuscation
+     * of the body or the headers, and nothing is written to disk.
+     *
+     * Note that this startup report will *never* contain any of the following information:
+     *   * a user name, user ID, email address, real name, or geographical location.
+     *   * any information about the process including process ID, host app name, module names, etc.
+     *   * any personal information about a user.
+     *   * any intellectual property information related to the host app or its developer.
+     *   * any kind of session identifier or even an anonymous user ID.
+     *
+     * The final ovrtx_shutdown() tears the reporter down and joins its worker thread, so it can block
+     * there. Ordinarily that is a join on a thread that finished long ago. The one case that is not
+     * bounded is a shutdown that lands while the worker sits in the platform DNS resolver, which takes
+     * no timeout and cannot be cancelled; against a black-holing DNS server that can be tens of seconds.
+     * An application that needs a hard bound on its own shutdown should opt out, which avoids the worker
+     * thread entirely.
+     *
+     * Threading: safe to call from any thread without synchronization, with or without a live renderer.
+     */
+    void ovrtx_library_telemetry_opt_out(void);
+
+    /**
      * Initialize the ovrtx loader or increase its ref count.
      *
      * It is allowed to call this function multiple times and for each successful call a
@@ -244,11 +309,108 @@ extern "C"
     /**
      * Shuts down the ovrtx system or decreases it's ref count. One call per call to ovrtx_initialize() is required.
      * Note that any render instances that have not been destroyed will keep the system alive until they are destroyed.
+     *
+     * A host that exits without shutting down keeps its exit code and gets stdout/stderr flushed, but the process ends
+     * in an exit handler that the ovrtx runtime installs (_exit() on Linux, TerminateProcess() on Windows), which
+     * skips some exit handlers, static destructors and stream flushes. See "Process Exit" in the Application Flow
+     * documentation.
      * @return
      * - **OVRTX_API_SUCCESS** if the system was released successfully (though might still be loaded),
      * - **OVRTX_API_ERROR** if the system shutdown failed or was not initialized.
      */
     ovrtx_result_t ovrtx_shutdown();
+
+    /**
+     * Register one provider instance for process-wide resource resolution.
+     * @ingroup ovrtx_data_provider
+     *
+     * Call after ovrtx_initialize() and before submitting references that should use this
+     * provider. No renderer instance is required. Descriptor strings and the instance pair
+     * are copied; the application retains the immutable vtable, callback code and context
+     * until successful removal or completed shutdown. Registration does not take ownership
+     * of application storage. Failed registration retains nothing and leaves routes unchanged.
+     * Namespace keys must be unique among live registrations. Matching explicit schemes
+     * precede catch-alls; priority orders each group, with registration order breaking ties.
+     * Application routes precede eligible built-in providers. Only root NOT_HANDLED reroutes.
+     * Registration changes routing for future resolutions without changing existing pins.
+     * Do not race shutdown or invoke lifecycle operations from provider operation callbacks.
+     * Clears the calling thread's last error; failures set ovrtx_get_last_error(). Copy that
+     * diagnostic before the next OVRTX API call on the same thread. Asynchronous provider
+     * failures instead use their completion status/error; accessor methods return status directly.
+     *
+     * @param desc Non-NULL registration metadata with current size/version and valid callback capabilities.
+     * Borrowed for this call; namespace/scheme strings are copied.
+     * @param provider Non-NULL implementation pair with a non-NULL ABI-valid vtable. The context may be NULL.
+     * @param[out] out_provider Non-NULL destination, set to a nonzero ID on success and zero on failure.
+     * @return
+     * - **OVRTX_DATA_OK** if registration succeeded.
+     * - **OVRTX_DATA_INVALID_ARGUMENT** for null arguments, invalid sizes/versions, duplicate/invalid namespace,
+     *   invalid URI scheme/capabilities, or missing required callbacks/pairs.
+     * - **OVRTX_DATA_INVALID_STATE** when the system/service is unavailable or draining.
+     */
+    ovrtx_data_status_t ovrtx_register_data_provider(const ovrtx_data_provider_desc_t* desc,
+                                                     const ovrtx_data_provider_t* provider,
+                                                     ovrtx_data_provider_id_t* out_provider);
+
+    /**
+     * Remove an idle provider registration atomically without waiting for dependents.
+     * @ingroup ovrtx_data_provider
+     *
+     * Retire consumers, requests, pins, maps and accessors first. BUSY leaves registration
+     * and routing unchanged; release dependents and retry. On OK, no provider callback/state
+     * remains borrowed by this registration, and the application may release its table,
+     * context and code unless another registration uses them. Provider-owned background work
+     * (including monitoring) must also be quiesced before destroying its state/code; unregister
+     * accounts for runtime-held dependencies, not arbitrary application threads. The ID becomes invalid.
+     * Removing one provider does not invalidate pins belonging to another provider.
+     * Do not race shutdown or call from provider operation callbacks. Clears the calling
+     * thread's last error and sets a diagnostic on failure; copy it before the next API call.
+     *
+     * @param provider Nonzero live registration ID returned by ovrtx_register_data_provider().
+     * @return
+     * - **OVRTX_DATA_OK** if removed; ownership of application storage is unchanged.
+     * - **OVRTX_DATA_BUSY** while outstanding references or operations retain this provider.
+     * - **OVRTX_DATA_INVALID_ARGUMENT** for zero, unknown, already-removed or non-removable IDs.
+     * - **OVRTX_DATA_INVALID_STATE** when the system/service is unavailable.
+     */
+    ovrtx_data_status_t ovrtx_unregister_data_provider(ovrtx_data_provider_id_t provider);
+
+    /** Notify consumers of a batch of changed canonical resource identifiers.
+     * @ingroup ovrtx_data_provider
+     * Publish all replacement revisions before calling, outside provider locks;
+     * callbacks may enqueue reads/reloads. The batch is delivered together, but
+     * does not establish an atomic snapshot across resources. Existing immutable
+     * pins/leases remain valid and unchanged. Currently only MDL subscribes;
+     * textures, SPG, IndeX and NuRec do not automatically reload from this event.
+     * Subscribers are called synchronously on this calling thread; callbacks from concurrent
+     * notifications may run on different threads. Return waits for notification callbacks,
+     * but not for asynchronous reloads or compilation. Do not call recursively from a change
+     * callback. No subscriber registration is forwarded to the provider; pin_flags express
+     * per-pin tracking interest. Notifications may also be published without interested pins.
+     * A tracked resource deletion is a change: publish the identifier and let a fresh pin
+     * report NOT_FOUND. Tracking never authorizes changing bytes of an existing pin.
+     *
+     * @param provider Live provider registration that owns the identifiers.
+     * @param identifiers Array of nonempty canonical identifiers returned by this
+     * provider, with no embedded NUL. The array and strings are borrowed for this
+     * call only. Duplicates are coalesced; an outer package identifier covers its
+     * members only for well-formed USDZ bracket paths (including nested packages).
+     * Other brackets in opaque identifiers do not imply containment. An inner package
+     * identifier includes its enclosing closing brackets. Delivery order is unspecified.
+     * @param identifier_count Number of array entries. Zero is a no-op for a live
+     * provider and permits a null array; it does not mean all resources changed.
+     * @return OVRTX_DATA_OK if accepted (even with no listeners),
+     * OVRTX_DATA_INVALID_ARGUMENT for an invalid/removed provider or malformed
+     * batch, or OVRTX_DATA_INVALID_STATE when the service is unavailable. The whole
+     * batch is validated before delivery; malformed input delivers no events.
+     * No notification is required when the logical resource never changes. Providers reporting
+     * change_tracking_enabled must deliver changes for the interested pin lifetime. Not callable from a
+     * provider operation callback, or concurrently with ovrtx shutdown.
+     */
+    ovrtx_data_status_t ovrtx_data_notify_changed(ovrtx_data_provider_id_t provider,
+                                                const ovx_string_t* identifiers,
+                                                uint64_t identifier_count);
+
 
     /**
      * Create a new renderer instance. System initialization is done automatically if
@@ -318,9 +480,15 @@ extern "C"
      *
      * Attaching rebuilds the renderer's internal render state on the calling
      * thread, so wait for previously enqueued operations with ovrtx_wait_op()
-     * before calling it. Note that an ovrtx_wait_op() timeout does not cancel
+     * before calling it; a step whose result ovrtx_fetch_results() has returned
+     * counts as completed, together with the operations enqueued before it.
+     * Note that an ovrtx_wait_op() timeout does not cancel
      * an operation: it keeps running, so a timed-out wait does not make it safe
-     * to attach or detach.
+     * to attach or detach. Attach and detach reject pending operations without
+     * changing the renderer; wait for completion before retrying.
+     * Callers must serialize attach and detach against each other and against
+     * calls that enqueue operations on the same renderer. The pending-operation
+     * check does not prevent another thread from enqueueing new work.
      *
      * OVRTX validates the ovstage runtime version during attachment. An
      * incompatible version returns OVRTX_API_ERROR without attaching; the
@@ -332,8 +500,11 @@ extern "C"
      * @return
      * - **OVRTX_API_SUCCESS** if the renderer was attached successfully,
      * - **OVRTX_API_ERROR** if the renderer is already attached, the stage is
-     *   already attached to another ovrtx renderer, the stage is invalid, or
-     *   the attach failed. On failure the renderer is left unchanged.
+     *   already attached to another ovrtx renderer, operations are pending, the
+     *   stage is invalid, or the attach failed. Rejection because operations
+     *   are pending leaves the renderer unchanged. If attachment begins and
+     *   then fails, internal state may have changed; do not use the renderer
+     *   except to destroy it.
      */
     ovrtx_result_t ovrtx_attach_ovstage(ovrtx_renderer_t* renderer,
                                          ovstage_instance_t* stage);
@@ -348,16 +519,19 @@ extern "C"
      * initialized stage.
      *
      * This tears down internal render state, so the in-flight operation rules
-     * described on ovrtx_attach_ovstage() apply here too. On failure teardown
-     * may be partial; do not use the renderer except to destroy it. The renderer
-     * retains any stage state still needed for safe destruction, so the caller
+     * described on ovrtx_attach_ovstage() apply here too. Rejection because
+     * operations are pending leaves the attachment and render state unchanged;
+     * the renderer remains usable and detach may be retried after completion.
+     * If teardown itself fails, it may be partial; do not use the renderer
+     * except to destroy it. The renderer retains any stage state still needed
+     * for safe destruction, so the caller
      * may release its own stage handle before or after destroying the renderer.
      *
      * @param renderer Renderer instance previously passed to ovrtx_attach_ovstage().
      * @return
      * - **OVRTX_API_SUCCESS** if the renderer was detached successfully,
-     * - **OVRTX_API_ERROR** if the renderer is not currently attached or the
-     *   detach failed.
+     * - **OVRTX_API_ERROR** if the renderer is not currently attached, operations
+     *   are pending, or the detach failed.
      */
     ovrtx_result_t ovrtx_detach_ovstage(ovrtx_renderer_t* renderer);
 
@@ -477,7 +651,7 @@ extern "C"
      * All prims added to the stage during the add operation will be removed.
      * @param instance Renderer instance
      * @param add_usd_handle Handle obtained from ovrtx_add_usd_reference_from_file() or
-     *                       ovrtx_add_usd_reference_from_string(). @ref OVRTX_INVALID_HANDLE is
+     *                       ovrtx_add_usd_reference_from_string(). @ref OVRTX_INVALID_USD_HANDLE is
      *                       rejected immediately with @ref OVRTX_API_ERROR, an invalid operation
      *                       index, and details from @ref ovrtx_get_last_error().
      * @return
@@ -559,7 +733,7 @@ extern "C"
      *                    of attribute data encoding as well as the layout of prims. The binding
      *                    can be generated in place or a persistent handle can be provided to manually
      *                    manage the lifetime. A @ref ovrtx_binding_desc_or_handle_t::binding_handle
-     *                    equal to @ref OVRTX_INVALID_HANDLE selects the inline
+     *                    equal to @ref OVRTX_INVALID_ATTRIBUTE_BINDING_HANDLE selects the inline
      *                    @ref ovrtx_binding_desc_or_handle_t::binding_desc and is valid.
      * @param data_array Source data to write. Based on the input_access this source is used during the execution of the write operation,
      *                    not during the enqueue. So it is important that the data source remains valid
@@ -591,7 +765,7 @@ extern "C"
      *                    the layout of the data to write. The binding
      *                    can be generated in place or a persistent handle can be provided to manually
      *                    manage the lifetime. A @ref ovrtx_binding_desc_or_handle_t::binding_handle
-     *                    equal to @ref OVRTX_INVALID_HANDLE selects the inline
+     *                    equal to @ref OVRTX_INVALID_ATTRIBUTE_BINDING_HANDLE selects the inline
      *                    @ref ovrtx_binding_desc_or_handle_t::binding_desc and is valid.
      * @param mapping_desc Description of the mapping to use
      * @param out_attribute_mapping [out] Handle to the attribute mapping
@@ -616,7 +790,7 @@ extern "C"
      * the cuda synchronization event is signaled for GPU data.
      * @param instance Renderer instance
      * @param map_handle Handle to the attribute mapping to unmap.
-     *                   @ref OVRTX_INVALID_HANDLE is rejected immediately with
+     *                   @ref OVRTX_INVALID_MAP_HANDLE is rejected immediately with
      *                   @ref OVRTX_API_ERROR, an invalid operation index, and details
      *                   from @ref ovrtx_get_last_error().
      * @param cuda_sync optional cuda synchronization to wait for before the mapped memory is accessed during the
@@ -657,7 +831,7 @@ extern "C"
      *
      * @param instance Renderer instance
      * @param binding_handle Handle to the attribute binding to destroy. In asynchronous mode,
-     *                       @ref OVRTX_INVALID_HANDLE is enqueued and reported as an operation
+     *                       @ref OVRTX_INVALID_ATTRIBUTE_BINDING_HANDLE is enqueued and reported as an operation
      *                       execution error by @ref ovrtx_wait_op(); retrieve details with
      *                       @ref ovrtx_get_last_op_error(). In synchronous mode it returns
      *                       @ref OVRTX_API_ERROR with details from @ref ovrtx_get_last_error();
@@ -696,7 +870,7 @@ extern "C"
      * @param instance Renderer instance
      * @param binding_handle_or_desc Binding identifying prims and attribute to read. A
      *                               @ref ovrtx_binding_desc_or_handle_t::binding_handle equal
-     *                               to @ref OVRTX_INVALID_HANDLE selects the inline
+     *                               to @ref OVRTX_INVALID_ATTRIBUTE_BINDING_HANDLE selects the inline
      *                               @ref ovrtx_binding_desc_or_handle_t::binding_desc and is valid.
      * @param read_dest Optional destination tensor for scalar reads (NULL = allocate internally).
      *                  Must be NULL for array attributes. GPU tensors (kDLCUDA) are supported.
@@ -729,7 +903,7 @@ extern "C"
      *
      * @param instance Renderer instance
      * @param read_handle Handle obtained from @ref ovrtx_read_attribute().
-     *                    @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                    @ref OVRTX_INVALID_READ_HANDLE is rejected with @ref OVRTX_API_ERROR
      *                    and details from @ref ovrtx_get_last_error().
      * @param timeout Timeout for the operation
      * @param[out] out_read_output Read data
@@ -738,7 +912,8 @@ extern "C"
      * - **OVRTX_API_ERROR** if the fetch failed,
      * - **OVRTX_API_TIMEOUT** if the result could not be obtained within the timeout.
      */
-    OVRTX_DEPRECATED("Fetch read results on an ovstage instance via ovstage_fetch_read_next; release each group with ovstage_release_group.")
+    OVRTX_DEPRECATED(
+        "Fetch read results on an ovstage instance via ovstage_fetch_read_next; release each group with ovstage_release_groups.")
     ovrtx_result_t ovrtx_fetch_read_result(ovrtx_renderer_t* instance,
                                            ovrtx_read_handle_t read_handle,
                                            ovrtx_timeout_t timeout,
@@ -754,7 +929,7 @@ extern "C"
      *
      * @param instance Renderer instance
      * @param read_handle Handle from @ref ovrtx_read_attribute().
-     *                    @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                    @ref OVRTX_INVALID_READ_HANDLE is rejected with @ref OVRTX_API_ERROR
      *                    and details from @ref ovrtx_get_last_error().
      * @param before_destroy_cuda_sync Optional CUDA synchronization to wait for before
      *                                  freeing GPU resources (zero-initialized = no sync)
@@ -762,7 +937,8 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the result was released successfully,
      * - **OVRTX_API_ERROR** if the release failed.
      */
-    OVRTX_DEPRECATED("Release read resources on an ovstage instance via ovstage_release_read; also call ovstage_release_group for any groups previously fetched with ovstage_fetch_read_next.")
+    OVRTX_DEPRECATED(
+        "Release read resources on an ovstage instance via ovstage_release_read; also call ovstage_release_groups for any groups previously fetched with ovstage_fetch_read_next.")
     ovrtx_result_t ovrtx_release_read_result(ovrtx_renderer_t* instance,
                                              ovrtx_read_handle_t read_handle,
                                              ovrtx_cuda_sync_t before_destroy_cuda_sync);
@@ -807,7 +983,7 @@ extern "C"
      *
      * @param instance Renderer instance
      * @param query_handle Handle obtained from @ref ovrtx_query_prims().
-     *                     @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                     @ref OVRTX_INVALID_QUERY_HANDLE is rejected with @ref OVRTX_API_ERROR
      *                     and details from @ref ovrtx_get_last_error().
      * @param timeout Timeout for the operation
      * @param[out] out_result Query result containing prim groups
@@ -833,7 +1009,7 @@ extern "C"
      *
      * @param instance Renderer instance
      * @param query_handle Handle obtained from @ref ovrtx_query_prims().
-     *                     @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                     @ref OVRTX_INVALID_QUERY_HANDLE is rejected with @ref OVRTX_API_ERROR
      *                     and details from @ref ovrtx_get_last_error().
      * @return
      * - **OVRTX_API_SUCCESS** if the results were released successfully,
@@ -903,6 +1079,20 @@ extern "C"
      * that has not been committed yet (i.e. ordinal > the attached stage's write
      * floor) is rejected.
      *
+     * A default stage, an instance of "history_latest", keeps history off. It
+     * holds the latest value of every cell and renders it for every committed
+     * ordinal. A history-capable stage is an instance of "history_selective",
+     * created with that name in the `implementation` member of
+     * ovstage_instance_desc_t. History is on for the (prim, attribute) pairs
+     * selected with ovstage_enable_history(). When the renderer was created
+     * with OVRTX_CONFIG_ENABLE_HISTORY_PRESENTATION, such a stage renders the
+     * retained values of the selected pairs at an `ordinal` below its write
+     * floor. It returns to the live values afterwards. Without that key the renderer
+     * makes no history calls, and a step at an ordinal below the write floor of
+     * a history-capable stage fails with a reason that names the key. Unselected
+     * pairs render at their latest values. The step fails with the reason when
+     * the stage cannot present the ordinal.
+     *
      * @param instance Renderer instance (must be attached to an ovstage).
      * @param render_products Render products to simulate during this step.
      * @param delta_time Finite, non-negative time step within the supported simulation time range.
@@ -912,7 +1102,9 @@ extern "C"
      * - **OVRTX_API_SUCCESS** if the step was enqueued successfully,
      * - **OVRTX_API_ERROR** if the renderer is not attached, the ordinal is not
      *   committed, the enqueue failed, or @p render_products is malformed: a null
-     *   array with a non-zero count, or any entry with a null `ptr`.
+     *   array with a non-zero count, or any entry with a null `ptr`. The step
+     *   operation itself fails, with the reason in ovrtx_get_last_op_error(), when a
+     *   history-capable stage cannot present the requested ordinal.
      */
     ovrtx_enqueue_result_t ovrtx_step_with_stage(
         ovrtx_renderer_t* instance,
@@ -1013,7 +1205,7 @@ extern "C"
                                                       const bool* pickable);
 
     /**
-     * Set per-group visual styling (outline color and fill color) for one or more selection groups.
+     * Set per-group visual styling (outline color, fill color, and outline width) for one or more selection groups.
      *
      * Group ids are uint8 (0..255) and match the per-prim group id passed to
      * @ref ovrtx_set_selection_outline_group.
@@ -1023,8 +1215,10 @@ extern "C"
      * after this op completes. If multiple writes target the same group id (in this call or across
      * calls), the last writer wins.
      *
-     * Global state (outline thickness, fill mode) is configured via @ref OVRTX_CONFIG_SELECTION_OUTLINE_WIDTH
-     * and @ref OVRTX_CONFIG_SELECTION_FILL_MODE at renderer creation time.
+     * Fill mode and the default outline width are configured via @ref OVRTX_CONFIG_SELECTION_FILL_MODE
+     * and @ref OVRTX_CONFIG_SELECTION_OUTLINE_WIDTH at renderer creation time. Per-group width
+     * override and omit-means-unchanged semantics are on
+     * @ref ovrtx_selection_group_style_t::outline_width.
      *
      * Outline dashing is **not supported** by the underlying renderer.
      *
@@ -1055,6 +1249,51 @@ extern "C"
                                     double time);
 
     /**
+     * Enqueue an operation that discards the temporal rendering history of RenderProducts.
+     *
+     * The clear applies to the first frame each RenderProduct produces after this operation, and stays pending
+     * until that frame is produced. For a split exposure it applies from the next exposure's first split. Unlike
+     * @ref ovrtx_reset, it keeps the sensor schedule, frame numbers and the simulation time. It also resets
+     * sensor-model state such as lidar and radar random sequences.
+     *
+     * The cleared frame renders once: it does not wait for streaming and adds no initial quality frames, while
+     * @c omni:rtx:quality:minSpp still applies. Pass @ref OVRTX_CLEAR_HISTORY_FLAG_FIRST_FRAME_QUALITY to render it
+     * like the RenderProduct's first frame instead, or @p quality to choose the streaming wait and quality explicitly.
+     * Frame 0 and the first frame of a RenderProduct that started paused by @c omni:sensor:frameLimit keep their
+     * first-frame quality.
+     * A RenderProduct resuming after frames dropped by @c omni:sensor:frameLimit keeps its history and its camera's
+     * previous pose, but instance transforms from before the pause are not necessarily retained. Clear it before the
+     * step that resumes it when prims moved during the pause, or to start that frame afresh; otherwise motion vectors
+     * and temporal reprojection of the moved prims can be wrong on that frame.
+     *
+     * Clears that have not been applied yet merge: flags combine, a streaming wait and the highest quality win,
+     * and tile lists are unioned. Clearing a whole RenderProduct also clears its tiles.
+     *
+     * With @p tiles, only those tiles of a single tiled RenderProduct are cleared, which drops DLSS and DLSS-RR
+     * history for them. They apply to the next completed exposure, on its final split, which DLSS runs on. That render
+     * drops them if it resets the RenderProduct's whole history. Flags and @p quality apply to that exposure as for a
+     * whole clear, but its streaming wait and quality frames render every tile, and only the listed tiles are reset,
+     * after the wait. A wait the exposure needs anyway, or another exposure's wait after a stage change, still resets
+     * its whole history.
+     * Tile indices outside the RenderProduct's tiles are ignored with a warning. They supersede the deprecated
+     * @c omni:rtx:viewTile:renderHistoryReset attributes.
+     *
+     * @param instance Renderer instance
+     * @param render_products RenderProducts to clear. An empty set clears every RenderProduct of the next step.
+     * @param flags Bitwise OR of OVRTX_CLEAR_HISTORY_FLAG_* values, or 0.
+     * @param quality Optional quality override for the cleared frame, or NULL.
+     * @param tiles Optional tiles to clear, or NULL for whole RenderProducts. Requires exactly one RenderProduct.
+     * @return
+     * - **OVRTX_API_SUCCESS** if the clear was enqueued successfully,
+     * - **OVRTX_API_ERROR** if the arguments are invalid. RenderProducts that are not stepped yet are not an error.
+     */
+    ovrtx_enqueue_result_t ovrtx_clear_history(ovrtx_renderer_t* instance,
+                                               ovrtx_render_product_set_t render_products,
+                                               uint32_t flags,
+                                               const ovrtx_render_quality_t* quality,
+                                               const ovrtx_tile_list_t* tiles);
+
+    /**
      * Query the results of a prior enqueued step operation.
      * This operation is synchronous and will block until the results are available or the timeout
      * has passed. By passing 0 as the timeout this operation becomes a non-blocking poll operation
@@ -1063,6 +1302,13 @@ extern "C"
      * asynchronous ovrtx_step() operation within the stream, so it is not possible to ensure this
      * operations returns the results immediately by waiting for a stream synchronization event
      * signaled after the ovrtx_step() operation.
+     * Conversely, once this function has returned the step's result, with OVRTX_API_SUCCESS or with
+     * OVRTX_API_ERROR and status OVRTX_EVENT_FAILURE for a failed step, the step operation and every
+     * operation enqueued before it have completed and left the operation stream, as after
+     * ovrtx_wait_op() on the step's op_index, so they no longer count as pending for
+     * ovrtx_attach_ovstage() and ovrtx_detach_ovstage(). This covers neither operations enqueued
+     * after the step nor the errors of the operations enqueued before it, which only
+     * ovrtx_wait_op() reports, and OVRTX_API_TIMEOUT implies nothing about the operation.
      * The result of this operation contains information about what results each render product has produced.
      * Each render product can have produced 0-n frames of output for m render vars.
      * This operation doesn't return the actual output data, but rather a handle to the output data which can then
@@ -1070,7 +1316,7 @@ extern "C"
      * All strings and pointers inside the result are valid until the result is destroyed by ovrtx_destroy_results().
      * @param instance Renderer instance
      * @param result_handle Handle to the step result to query.
-     *                      @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                      @ref OVRTX_INVALID_STEP_RESULT_HANDLE is rejected with @ref OVRTX_API_ERROR
      *                      and details from @ref ovrtx_get_last_error().
      * @param timeout Timeout for the operation.
      *                Passing 0 will make the operation non-blocking and return immediately with the current status of the operation.
@@ -1111,7 +1357,7 @@ extern "C"
      *   their shape encodes scalar vs. array (e.g. `{1}` for scalar, `{N}` for array).
      * @param instance Renderer instance
      * @param output_handle Handle to the output to map.
-     *                      @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                      @ref OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE is rejected with @ref OVRTX_API_ERROR
      *                      and details from @ref ovrtx_get_last_error().
      * @param map_output_desc Description of the output to map
      * @param timeout Timeout for the operation.
@@ -1135,7 +1381,7 @@ extern "C"
      * this lifetime is independent of ovrtx_destroy_results().
      * It is safe to call unmap on a map_handle that was produced from a step result that has been destroyed by destroy_results.
      * @param instance Renderer instance.
-     * @param map_handle Handle to the map to unmap. @ref OVRTX_INVALID_HANDLE is rejected
+     * @param map_handle Handle to the map to unmap. @ref OVRTX_INVALID_RENDER_VAR_OUTPUT_MAP_HANDLE is rejected
      *                   with @ref OVRTX_API_ERROR and details from
      *                   @ref ovrtx_get_last_error().
      * @param before_destroy_cuda_sync CUDA synchronization to wait for before the mapped memory is destroyed.
@@ -1150,9 +1396,11 @@ extern "C"
     /**
      * Releases all resources associated with the result of a sensor simulation step, with the exception of resources provided by calls to
      * ovrtx_map_render_var_output(). Those are only released through ovrtx_unmap_render_var_output().
+     * Destroying a result does not wait for its step operation; unless ovrtx_fetch_results() has returned
+     * the result, wait with ovrtx_wait_op() before ovrtx_attach_ovstage() or ovrtx_detach_ovstage().
      * @param instance Renderer instance
      * @param result_handle Handle to the step result to destroy.
-     *                      @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *                      @ref OVRTX_INVALID_STEP_RESULT_HANDLE is rejected with @ref OVRTX_API_ERROR
      *                      and details from @ref ovrtx_get_last_error().
      * @return
      * - **OVRTX_API_SUCCESS** if the step result was destroyed successfully,
@@ -1179,7 +1427,7 @@ extern "C"
      * transient thread-local data and are invalidated by the next call to ovrtx_wait_op() on the
      * same thread. Consume/copy them before the next wait call.
      * @param instance Renderer instance
-     * @param op_id Non-zero operation id to wait for. @ref OVRTX_INVALID_HANDLE is rejected
+     * @param op_id Non-zero operation id to wait for. @ref OVRTX_INVALID_OP_ID is rejected
      *              with @ref OVRTX_API_ERROR and details from @ref ovrtx_get_last_error().
      * @param time_out Timeout for the operation
      * @param out_wait_result [out] Wait result information (error op ids and lowest pending op id)
@@ -1214,7 +1462,7 @@ extern "C"
      *
      * @param instance Renderer instance
      * @param op_id Operation ID to query (from ovrtx_enqueue_result_t.op_index).
-     *              @ref OVRTX_INVALID_HANDLE is rejected with @ref OVRTX_API_ERROR
+     *              @ref OVRTX_INVALID_OP_ID is rejected with @ref OVRTX_API_ERROR
      *              and details from @ref ovrtx_get_last_error().
      * @param out_status [out] Status information for the operation
      * @return OVRTX_API_SUCCESS if status was retrieved successfully,
@@ -1261,6 +1509,158 @@ extern "C"
 
     /** @} */ // end of ovrtx_extension
 
+    /** @defgroup ovrtx_profiling Performance profiling
+     *  @{
+     */
+
+    /** Predefined metric UID for default-render-target frames per second. */
+#define OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_FPS 1ull
+
+    /** Predefined metric UID for render-thread work time in milliseconds. */
+#define OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_RENDER_THREAD_TIME 3ull
+
+    /** Optional file-capture configuration. Strings are copied before start returns. */
+    typedef struct ovrtx_profiling_config_t
+    {
+        /** Existing writable directory. {NULL, 0} uses the persistent user directory. */
+        ovx_string_t output_path;
+        /** Basename without an extension. {NULL, 0} generates a timestamp-based name.
+         * Existing recordings are not overwritten; collisions add a timestamp suffix.
+         */
+        ovx_string_t file_name;
+    } ovrtx_profiling_config_t;
+
+    /** Start process-wide CPU/GPU/RTX profiling, with optional file capture.
+     * Call after creating a renderer. config may be NULL; either string may be {NULL, 0}.
+     * NULL config or both string pointers NULL disables file output.
+     * Providing either string pointer enables file capture; an empty provided
+     * string selects the default directory/name. Strings are UTF-8 views. When saving,
+     * the output directory must already exist and be writable.
+     * An already active profiling session is not replaced. Serialize capture-control calls
+     * with renderer teardown; rendering may continue concurrently.
+     * @param[in] config Optional output path/name configuration. NULL starts live-only profiling.
+     * @return OVRTX_API_SUCCESS or OVRTX_API_ERROR; see ovrtx_get_last_error().
+     */
+    ovrtx_result_t ovrtx_start_profiling(const ovrtx_profiling_config_t* config);
+
+    /** Stop profiling and flush and close any file capture. May block on output work.
+     * Call before destroying the last renderer. Stopping when no capture is active succeeds.
+     * @return OVRTX_API_SUCCESS or OVRTX_API_ERROR; see ovrtx_get_last_error().
+     */
+    ovrtx_result_t ovrtx_stop_profiling(void);
+
+    /** @brief Inject a scalar value without execution attribution.
+     * The sample's execution ID is zero. This does not create a metric or start profiling.
+     * @param[in] metric_uid OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_FPS or
+     *     OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_RENDER_THREAD_TIME.
+     * @param[in] value Frames per second for FPS, or elapsed milliseconds for Render Thread.
+     */
+    void ovrtx_add_performance_metric_value(uint64_t metric_uid, double value);
+
+    /** @brief Inject a scalar value attributed to the calling CPU thread.
+     * This does not create a metric or start profiling.
+     * @param[in] metric_uid OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_FPS or
+     *     OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_RENDER_THREAD_TIME.
+     * @param[in] value Frames per second for FPS, or elapsed milliseconds for Render Thread.
+     */
+    void ovrtx_add_performance_metric_value_with_thread_execution_id(uint64_t metric_uid, double value);
+
+    /** @brief Inject a scalar value with an explicitly supplied execution identity.
+     * The sample carries the supplied identity.
+     * @param[in] metric_uid OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_FPS or
+     *     OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_RENDER_THREAD_TIME.
+     * @param[in] value Frames per second for FPS, or elapsed milliseconds for Render Thread.
+     * @param[in] execution_id Caller-defined identity. Zero means unspecified.
+     */
+    void ovrtx_add_performance_metric_value_with_custom_execution_id(
+        uint64_t metric_uid, double value, uint32_t execution_id);
+
+    /** One sampled scalar value. Time is in nanoseconds since profiling started. */
+    typedef struct ovrtx_performance_value_t
+    {
+        uint64_t timestamp_ns; /**< Sample timestamp in nanoseconds since profiling started; duration samples use their start time. */
+        double value; /**< Sampled value in the corresponding metric's units. */
+        uint64_t parent_uid; /**< Parent metric for this sample's invocation; zero means root or unspecified. */
+        uint32_t execution_id; /**< CPU-thread or RTX-GPU identity; zero means unspecified. */
+    } ovrtx_performance_value_t;
+
+    /** Public metric information and its newly collected values.
+     * Aggregate statistics cover the active profiling session, not only this update.
+     * RTX stages are grouped under GPU/render-graph and viewport hierarchies.
+     * RTX Memory categories are Geometry, Textures, Volumes, Gaussians, SPG,
+     * Output Buffers and Internal, with Geometry subcategories where available.
+     * Memory values use MiB; GPU, host and virtual-reservation scopes are separate.
+     * Tracked host allocations are not process physical memory. Do not add inclusive
+     * parents to their children, or reservations to allocations. Grouped RTX durations
+     * can combine separate intervals and do not represent contiguous GPU occupancy.
+     */
+    typedef struct ovrtx_performance_metric_t
+    {
+        uint64_t uid; /**< Metric identity within the current profiling session; do not reuse across restarts. */
+        uint64_t parent_uid; /**< Default hierarchy parent, or zero for a root; each value carries its invocation parent. */
+        ovx_string_t name; /**< Borrowed UTF-8 display name. */
+        ovx_string_t units; /**< Borrowed UTF-8 unit label; duration values normally use milliseconds. */
+        ovx_string_t info; /**< Borrowed UTF-8 description of the measurement. */
+        ovx_string_t group_name; /**< Borrowed UTF-8 category name. */
+        const ovrtx_performance_value_t* values; /**< Borrowed sample span; read only value_count entries. */
+        size_t value_count; /**< Number of samples in values; may be zero when this metric has no new sample. */
+        double average; /**< Session-wide running average, in units; best-effort during concurrent injection. */
+        double minimum; /**< Session-wide running minimum, in units; best-effort during concurrent injection. */
+        double maximum; /**< Session-wide running maximum, in units; best-effort during concurrent injection. */
+    } ovrtx_performance_metric_t;
+
+    /** Owned update batch. Initialize to zero before its first use.
+     * Strings and arrays remain valid until this container is updated or released.
+     * Do not copy ownership or use the same container concurrently. Release before
+     * destroying the last renderer; serialize reads with capture restart/teardown.
+     */
+    typedef struct ovrtx_performance_data_update_t
+    {
+        uint64_t collection_time_ns; /**< Collection time in nanoseconds since profiling started; not a sample-time boundary. */
+        const ovrtx_performance_metric_t* metrics; /**< Borrowed metric array owned by this batch; read only metric_count entries. */
+        size_t metric_count; /**< Number of entries in metrics. */
+        ovx_string_t json; /**< Borrowed UTF-8 JSON from the JSON getter; empty after the structured getter. */
+        void* handle; /**< Opaque owner managed by the update/release functions. Do not copy, replace or free it directly. */
+    } ovrtx_performance_data_update_t;
+
+    /** Collect one batch of public metrics without interrupting rendering.
+     * Initialize the output container to zero, then retain and reuse it between calls.
+     * The first call returns retained history; later calls return newly available samples.
+     * Independent containers have independent progress, reset automatically after profiling restarts.
+     * Within each metric, samples follow collection order across batches, not timestamp order.
+     * Sample timestamps can precede an earlier returned sample or a previous collection time.
+     * collection_time_ns is informational, not a cursor or a bound on sample timestamps.
+     * Structured and JSON getters share progress.
+     * Prefer copying every 500 ms-1 s (1-2 Hz), or 200-250 ms (4-5 Hz) for live UI.
+     * At no more than 120 samples/s per metric, a 4 s interval accumulates 480 samples
+     * and fits retained history if bursts, scheduling and copying stay within its margin.
+     * Longer intervals make larger, slower batches; cost grows with metric/sample count.
+     * Copying does not change sampling cadence, recover overwritten history or guarantee
+     * a complete snapshot during concurrent updates.
+     * The output container can be reused. Copy metric and sample data before updating or releasing it.
+     * @param[in,out] out_data Non-null, initially zeroed container. Its previous borrowed views are invalidated.
+     * @return OVRTX_API_SUCCESS or OVRTX_API_ERROR; see ovrtx_get_last_error().
+     */
+    ovrtx_result_t ovrtx_get_performance_data_update(ovrtx_performance_data_update_t* out_data);
+
+    /** Collect the same public update as UTF-8 JSON in out_data->json.
+     * JSON contains collection_time_ns and a metrics array. Each metric has uid,
+     * parent_uid, name, units, info, group_name and values (timestamp_ns, value, parent_uid, execution_id).
+     * Ownership, retained progress and polling guidance are identical to ovrtx_get_performance_data_update.
+     * @param[in,out] out_data Non-null, initially zeroed or previously returned container; json is a borrowed view.
+     * @return OVRTX_API_SUCCESS or OVRTX_API_ERROR; see ovrtx_get_last_error().
+     */
+    ovrtx_result_t ovrtx_get_performance_data_update_as_json(ovrtx_performance_data_update_t* out_data);
+
+    /** @brief Release a batch and zero its container, invalidating every borrowed string and sample span.
+     * Release before renderer teardown. Releasing an empty initialized container succeeds.
+     * @param[in,out] data Non-null container initialized to zero or returned by an update function.
+     * @return OVRTX_API_SUCCESS, or OVRTX_API_ERROR for an invalid argument; see ovrtx_get_last_error().
+     */
+    ovrtx_result_t ovrtx_release_performance_data_update(ovrtx_performance_data_update_t* data);
+
+    /** @} */ // end of ovrtx_profiling
+
     /** @defgroup ovrtx_error Error handling
     *  @{
     */
@@ -1274,7 +1674,7 @@ extern "C"
     /**
      * Returns the error string for the provided operation id from the last call to ovrtx_wait_op
      * on the calling thread. The string is valid until the next call to ovrtx_wait_op on the same
-     * thread. This is a lookup-only identifier: @ref OVRTX_INVALID_HANDLE and any operation id
+     * thread. This is a lookup-only identifier: @ref OVRTX_INVALID_OP_ID and any operation id
      * not present in the last wait result return an empty string rather than an API error.
      * @param op_id Operation id to get the error string for
      */

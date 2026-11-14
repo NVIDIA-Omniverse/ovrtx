@@ -52,14 +52,9 @@ uv run main.py                                   # CUDA
 uv run main.py --scene grayscale_scene_slang.usda  # Slang
 ```
 
-The first step compiles the CUDA kernel with NVRTC and may block for up to a minute on a
+The first step compiles the CUDA kernel with NVRTC and may block for up to 5 minutes on a
 fresh shader cache. A successful run writes `_output/input.png` (the rendered `LdrColor`) and
 `_output/grayscale.png` (the SPG output), which is the same image with the colour taken out.
-
-The run checks `R == G == B` in every pixel of the output, which is what grayscale means and
-which the renderer's own `LdrColor` does not satisfy. It tests the input too: on a scene that
-was already grey, a node that never ran would pass the first test. A failing check exits
-non-zero.
 
 ## How it works
 

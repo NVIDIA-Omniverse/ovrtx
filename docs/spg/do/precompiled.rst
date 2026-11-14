@@ -58,8 +58,8 @@ What the Artifact Is
    .. tab-item:: CUDA
       :sync: cuda
 
-      A ``.ptx``, ``.cubin`` or ``.fatbin`` is handed to the CUDA driver as it is, and NVRTC is
-      not involved. ``.ptx`` is portable and JIT-compiled by the driver for the target
+      A ``.ptx``, ``.cubin`` or ``.fatbin`` is handed to the CUDA driver as it is.
+      ``.ptx`` is portable and JIT-compiled by the driver for the target
       architecture, ``.cubin`` targets one architecture and skips that JIT, and ``.fatbin``
       carries several architectures in one file.
 
@@ -77,8 +77,6 @@ What the Artifact Is
    .. tab-item:: Slang
       :sync: slang
 
-      The two forms are not interchangeable.
-
       ``.slang-module`` holds Slang IR, which is target-agnostic: it is lowered to whichever
       graphics backend is active when the shader is linked, so one artifact serves any of them. It
       carries its entry point and its binding layout, so the node binds as a source node does.
@@ -87,13 +85,25 @@ What the Artifact Is
       read:
 
       - **Everything reflection would have supplied has to be stated instead**, which makes
-        :doc:`descriptor_sets` a prerequisite for this form rather than optional reading.
+        :doc:`descriptor_sets` a prerequisite for this form.
         :ref:`What reflection fills in <spg-do-reflection>` lists the items one by one.
-      - **Compute only.** A ray-tracing pipeline is assembled from shader-database handles, which
-        byte code has none of, so those stages take ``.slang`` source or a ``.slang-module``.
+      - **Compute only.** A ray-generation node takes ``.slang`` source or a ``.slang-module``.
         Refer to :doc:`raygen`.
-      - **The entry point comes from the binary**, not from ``subIdentifier``, because the
-        compiler names it independently: ``slangc`` emits ``main`` whatever ``-entry`` says.
+      - **The entry point is the compute entry point the binary exports as** ``main``. The
+        graphics backend runs a SPIR-V binary from its entry point named ``main``, so the function
+        to run has to be compiled so that it is exported under that name. The function itself may
+        have any name, and ``subIdentifier`` still names the launch script's function. ``slangc``
+        exports the entry point it compiles as ``main``:
+
+        .. code-block:: bash
+
+            slangc MyKernel.slang -target spirv -entry myKernel -stage compute -o MyKernel.spv
+
+        The binary's other entry points play no part, in whatever order they are exported, and
+        none of them can be run by naming it. A binary with no compute entry point named ``main``
+        fails to load, and the message names the compute entry points it exports. A
+        ``.slang-module`` differs here: it is linked when the node loads, so the node runs the
+        function ``subIdentifier`` names.
 
       **A shader can be split across files.** ``import MyHelpers;`` resolves to
       ``MyHelpers.slang`` beside the shader. A symbol is visible to the importing shader only if it
@@ -128,7 +138,9 @@ When It Goes Wrong
 ------------------
 
 - The entry point is not found: for CUDA the symbol has to be unmangled, so compile it as
-  ``extern "C"``.
+  ``extern "C"``. For a ``.spv``, the message lists the compute entry points the binary exports;
+  compile the function to run so that it is exported as ``main``, as
+  ``slangc -entry <function> -stage compute`` does.
 - A ``.spv`` on a ray-generation stage is rejected. Refer to :doc:`raygen`.
 - An import does not resolve, on Slang: the module does not sit beside the shader, or its file
   name does not match the imported name.

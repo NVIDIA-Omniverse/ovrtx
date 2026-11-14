@@ -11,13 +11,15 @@ Python: Sliced Rendering
 ========================
 
 Renders one 1024×1024 RenderProduct as four successive 512×512
-``dataWindowNDC`` crops. The example warms up each crop for 10 frames, captures
-the next ``LdrColor`` output, and stitches the TL, TR, BL, and BR tiles into one
-RGBA image.
+``dataWindowNDC`` crops using PathTracing at 64 samples per pixel. The example
+uses zero client warmup frames, waits for each crop to converge, and stitches
+the ``LdrColor`` outputs from the TL, TR, BL, and BR tiles into one RGBA image.
+
+No quality attribute is authored; streaming wait uses the renderer defaults.
 
 .. pull-quote::
 
-   *“Render one image as four successive dataWindowNDC crops, warm up each crop, and stitch the captured TL, TR, BL, and BR tiles into a full-resolution image.”*
+   *“Render one image as four successive dataWindowNDC crops without client warmup frames, and stitch the captured TL, TR, BL, and BR tiles into a full-resolution image.”*
 
 .. image:: ../../img/example-sliced-rendering.png
    :alt: Full image stitched from four rendered crops
@@ -47,3 +49,10 @@ Running
    uv run main.py
 
 Pass ``--png`` to save ``_output/render.png`` instead of displaying the image.
+
+.. note::
+
+   This example uses Path Tracing. When using this technique with Real-Time
+   Path Tracing, changing ``dataWindowNDC`` clears temporal history. Render
+   additional warm-up frames for each crop after the first before using its
+   result.

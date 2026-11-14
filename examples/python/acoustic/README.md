@@ -37,15 +37,16 @@ which is the role `Counts` plays for a point cloud: `frameId`, `numSignalWays`,
 The executable maps the output to CPU, reshapes the per-sample channels to one
 row per signal way, converts the strongest sample to a range, and prints the
 median peak range and amplitude. Channel types and the full parameter contract
-are documented in `docs/sensors/acoustic.rst`.
+are documented in `docs/sensors/nonvisual/acoustic_wpm/outputs.rst`.
 
 ## Reading a Range
 
-An envelope is uniformly sampled at `sampleDurationUs`, so a sample's index is
-its round-trip echo time in units of that duration:
+In basic mode, bin `index` covers round-trip times from
+`(index + 1) * sampleDuration` up to `(index + 2) * sampleDuration`.
+The example plots the lower range bound of each bin:
 
 ```text
-range = index * sampleDuration * speed_of_sound / 2
+range = (index + 1) * sampleDuration * speed_of_sound / 2
 ```
 
 The example reads the sample duration from the published parameter rather than
@@ -97,10 +98,7 @@ You can also pass a custom path:
 uv run main.py --no-rr --log /tmp/acoustic_example.log
 ```
 
-Amplitude carries detector noise and varies slightly between runs, but the range
-locates the wall the scene places at 3.0 m:
-
-```text
-Loading acoustic scene from .../acoustic_example.usda...
-signal ways=1, responding=1, median peak range=3.022 m, median peak amplitude=4593
-```
+The log reports the number of signal ways and responding ways, the median peak
+range and the median peak amplitude. Amplitudes vary with detector noise. Peak
+ranges are envelope-bin lower bounds, not exact target distances; see the range
+conversion above.

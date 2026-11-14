@@ -174,6 +174,7 @@ def test_projector_light_calibration_example(tmp_path):
             "16",
         ],
         check=True,
+        timeout=300,
     )
 
     assert (tmp_path / "projector-opencv-direction.exr").is_file()

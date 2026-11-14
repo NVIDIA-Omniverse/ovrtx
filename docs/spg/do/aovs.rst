@@ -36,14 +36,12 @@ produces:
 How It Works
 ------------
 
-Ordered as the decision, then each option, then what constrains them.
-
 **A node output ends up in one of three states, and you choose which.** It stays inside the
 graph, consumed by another node and readable by nothing else. It is published under a new name, so
 the host and other products can read it. Or it is published under a name the renderer already
 produces, so existing consumers pick it up without knowing SPG is involved. The first costs nothing
-and hides the result. The third changes what everything downstream sees, which is either the whole
-point or an accident, depending on whether you meant it. An output in none of the three is
+and hides the result. The third changes what everything downstream sees.
+An output in none of the three is
 consumed by nothing and published as nothing, and the node never runs.
 
 **Publishing a new AOV** needs both parts: a ``sourceName``, which registers the name, and the
@@ -59,8 +57,16 @@ the connection that fills it, and the ``orderedVars`` entry that puts it in the 
    :emphasize-lines: 7, 17-18
    :caption: ``grayscale_scene.usda``, from the runnable :doc:`grayscale example <../../examples/python_spg_grayscale>`
 
-**Overwriting an existing AOV** is the same wiring with the renderer's own name. Consumers
-downstream need to know nothing about SPG; they read the name they always read. The producing node
+**Read it back like a built-in AOV.** The example saves its input and its output with the same call:
+
+.. filtered-literalinclude:: ../../../examples/python/spg-grayscale/main.py
+   :language: python
+   :start-after: # [snippet:spg-read-output-aov]
+   :end-before: # [/snippet:spg-read-output-aov]
+   :omit-markers:
+   :caption: ``main.py``, from the runnable :doc:`grayscale example <../../examples/python_spg_grayscale>`
+
+**Overwriting an existing AOV** is the same wiring with the renderer's own name. The producing node
 may sit in the same product or in another one:
 
 .. image:: ../../img/spg/aovs-overwrite-across-products.svg
@@ -78,19 +84,10 @@ graph's result, and one may be the source for the other's.
 .. _spg-aov-collision:
 
 **Names collide silently.** If a ``sourceName`` matches an AOV the renderer already produces
-and you did not intend to overwrite it, the built-in output shadows the node's. Give it a name
+and you did not intend to overwrite it, the node's output replaces the renderer's. Give it a name
 of its own.
 
 **One output, one RenderVar.** A node output can be bound to a single RenderVar at a time.
-
-**Reading back is not SPG-specific.** A published AOV is mapped exactly like a built-in one:
-
-.. filtered-literalinclude:: ../../../examples/python/spg-grayscale/main.py
-   :language: python
-   :start-after: # [snippet:spg-read-output-aov]
-   :end-before: # [/snippet:spg-read-output-aov]
-   :omit-markers:
-   :caption: ``main.py``, from the runnable :doc:`grayscale example <../../examples/python_spg_grayscale>`
 
 Verify It Worked
 ----------------
@@ -98,10 +95,8 @@ Verify It Worked
 Read the published AOV back and check an invariant only your node can produce. For a grayscale
 node that is ``R == G == B`` in every pixel, which the renderer's own ``LdrColor`` will not
 satisfy. An AOV that is present but fails the invariant means you are reading the built-in output
-under that name rather than yours.
-
-The :doc:`grayscale example <../../examples/python_spg_grayscale>` checks exactly that, and tests
-the input as well, so a node that never ran cannot pass on a scene that was already grey.
+under that name rather than yours. Check the input as well: on a scene that is already grey,
+the invariant holds even if the node never ran.
 
 When It Goes Wrong
 ------------------

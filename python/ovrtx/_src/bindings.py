@@ -14,6 +14,32 @@ from enum import IntEnum, IntFlag
 from pathlib import Path
 from typing import Any, Iterable, List, Optional
 
+from ..handles import INVALID_ATTRIBUTE_BINDING_HANDLE as OVRTX_INVALID_ATTRIBUTE_BINDING_HANDLE
+from ..handles import INVALID_DATA_PROVIDER_ID as OVRTX_INVALID_DATA_PROVIDER_ID
+from ..handles import INVALID_EVENT_HANDLE as OVRTX_INVALID_EVENT_HANDLE
+from ..handles import INVALID_MAP_HANDLE as OVRTX_INVALID_MAP_HANDLE
+from ..handles import INVALID_OP_ID as OVRTX_INVALID_OP_ID
+from ..handles import INVALID_QUERY_HANDLE as OVRTX_INVALID_QUERY_HANDLE
+from ..handles import INVALID_READ_HANDLE as OVRTX_INVALID_READ_HANDLE
+from ..handles import INVALID_RENDER_VAR_OUTPUT_HANDLE as OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE
+from ..handles import INVALID_RENDER_VAR_OUTPUT_MAP_HANDLE as OVRTX_INVALID_RENDER_VAR_OUTPUT_MAP_HANDLE
+from ..handles import INVALID_STEP_RESULT_HANDLE as OVRTX_INVALID_STEP_RESULT_HANDLE
+from ..handles import INVALID_USD_HANDLE as OVRTX_INVALID_USD_HANDLE
+from ..handles import AttributeBindingHandle as ovrtx_attribute_binding_handle_t
+from ..handles import DataArrayLeaseId as ovrtx_data_array_lease_id_t
+from ..handles import DataProviderId as ovrtx_data_provider_id_t
+from ..handles import EventHandle as ovrtx_event_handle_t
+from ..handles import MapHandle as ovrtx_map_handle_t
+from ..handles import OpId as ovrtx_op_id_t
+from ..handles import PrimPath as ovx_primpath_t
+from ..handles import PrimPathList as ovx_primpath_list_t
+from ..handles import QueryHandle as ovrtx_query_handle_t
+from ..handles import ReadHandle as ovrtx_read_handle_t
+from ..handles import RenderVarOutputHandle as ovrtx_render_var_output_handle_t
+from ..handles import RenderVarOutputMapHandle as ovrtx_render_var_output_map_handle_t
+from ..handles import StepResultHandle as ovrtx_step_result_handle_t
+from ..handles import Token as ovx_token_t
+from ..handles import UsdHandle as ovrtx_usd_handle_t
 from .dlpack import DLDataType, DLTensor
 
 
@@ -198,6 +224,8 @@ class ConfigBoolKey(IntEnum):
     ENABLE_SPECTRAL_RENDERING = 14
     ENABLE_CRASH_REPORTER = 15
     ENABLE_GLOBAL_CACHE_ROOT = 16
+    ENABLE_DEBUG_VALIDATION = 17
+    ENABLE_HISTORY_PRESENTATION = 18
 
 
 # ovrtx_config_string_t
@@ -261,16 +289,16 @@ class SelectionFillMode(IntEnum):
 class MotionBvh(IntEnum):
     """Motion BVH (ray-traced motion) mode for sensor pipelines.
 
-    Set at renderer creation via :attr:`RendererConfig.motion_bvh` (maps to
+    Set independently per renderer via :attr:`RendererConfig.motion_bvh` (maps to
     ``OVRTX_CONFIG_MOTION_BVH``); changing it requires recreating the renderer.
     """
 
     DISABLE = 0
-    """Motion BVH off (default when unset)."""
+    """Motion BVH off (the default global policy)."""
     ENABLE = 1
     """Motion BVH enabled from renderer creation."""
     AUTO = 2
-    """Motion BVH enabled at runtime when a non-visual sensor is rendered."""
+    """Motion BVH enabled at runtime when a sensor or motion-sensitive camera requires it."""
 
 
 # ovrtx_texture_streaming_mode_t
@@ -318,6 +346,8 @@ class _AttachMode(IntEnum):
     """The renderer renders directly from ovstage's committed scene state (default)."""
     REPLICATE = 1
     """The renderer maintains an internal runtime stage copy populated from committed ovstage state."""
+    MULTIBUFFER = 2
+    """The renderer clones committed ovstage state at attach, then pulls updates into multi-buffered copies."""
 
 
 class ovrtx_config_key_type_t(ctypes.c_int):
@@ -446,13 +476,19 @@ class ovrtx_renderer_t(ctypes.Structure):
 
 # Opaque ovstage types used only at the OVRTX C ABI boundary.
 ovstage_instance_p = ctypes.c_void_p
-ovstage_ordinal_t = ctypes.c_uint64
+ovstage_ordinal_t = ctypes.c_int64
+OVSTAGE_ORDINAL_MIN = -(1 << 63)
+OVSTAGE_ORDINAL_MAX = (1 << 63) - 1
 
 
 # OVRTX API Status Constants
 OVRTX_API_SUCCESS: int = 0
 OVRTX_API_ERROR: int = 1
 OVRTX_API_TIMEOUT: int = 2
+
+# Predefined performance metric UIDs from ovrtx.h.
+OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_FPS = 1
+OVRTX_PERFORMANCE_PREDEFINED_METRIC_UID_RENDER_THREAD_TIME = 3
 
 
 class ovrtx_api_status_t(ctypes.c_int32):
@@ -483,12 +519,6 @@ class ovrtx_timeout_t(ctypes.Structure):
 
 
 OVRTX_TIMEOUT_INFINITE = ovrtx_timeout_t(time_out_ns=0xFFFFFFFFFFFFFFFF)
-
-
-class ovrtx_op_id_t(ctypes.c_uint64):
-    """ovrtx_op_id_t binding class for operation IDs"""
-
-    pass
 
 
 class ovrtx_op_wait_result_t(ctypes.Structure):
@@ -527,12 +557,6 @@ class ovrtx_op_status_t(ctypes.Structure):
     ]
 
 
-class ovrtx_usd_handle_t(ctypes.c_uint64):
-    """ovrtx_usd_handle_t binding class for USD file handles"""
-
-    pass
-
-
 class ovrtx_enqueue_result_t(ctypes.Structure):
     """Result from an asynchronous API call.
 
@@ -553,6 +577,28 @@ class ovrtx_render_product_set_t(ctypes.Structure):
     _fields_ = [
         ("render_products", ctypes.POINTER(ovx_string_t)),
         ("num_render_products", ctypes.c_size_t),
+    ]
+
+
+# ovrtx_clear_history flags
+OVRTX_CLEAR_HISTORY_FLAG_FIRST_FRAME_QUALITY = 1 << 0
+
+
+class ovrtx_tile_list_t(ctypes.Structure):
+    """ovrtx_tile_list_t binding class"""
+
+    _fields_ = [
+        ("tile_indices", ctypes.POINTER(ctypes.c_uint32)),
+        ("num_tiles", ctypes.c_size_t),
+    ]
+
+
+class ovrtx_render_quality_t(ctypes.Structure):
+    """ovrtx_render_quality_t binding class"""
+
+    _fields_ = [
+        ("wait_for_streaming", ctypes.c_bool),
+        ("quality", ctypes.c_int32),
     ]
 
 
@@ -584,22 +630,18 @@ class ovrtx_pick_query_desc_t(ctypes.Structure):
 
 
 class ovrtx_selection_group_style_t(ctypes.Structure):
-    """Per-group selection-outline / fill colors. RGBA components in [0, 1].
+    """Per-group selection-outline style. RGBA components in [0, 1].
 
     Pairs with :func:`ovrtx_set_selection_group_styles` (group_id is supplied
-    in a parallel uint8 array).
+    in a parallel uint8 array). See :class:`~ovrtx.SelectionGroupStyle` for
+    ``outline_width`` omit-means-unchanged semantics.
     """
 
     _fields_ = [
         ("outline_color", ctypes.c_float * 4),
         ("fill_color", ctypes.c_float * 4),
+        ("outline_width", ctypes.c_float),
     ]
-
-
-class ovrtx_step_result_handle_t(ctypes.c_uint64):
-    """ovrtx_step_result_handle_t binding class for step result handles"""
-
-    pass
 
 
 # ovrtx_event_status_t
@@ -631,11 +673,6 @@ class Device(IntEnum):
     CUDA_ARRAY = 3
 
 
-# Simple type alias - render variable output handles are just uint64 values
-# We don't derive from ctypes types to avoid instance creation issues
-ovrtx_render_var_output_handle_t = ctypes.c_uint64
-
-
 # Render output description structures
 class ovrtx_render_product_render_var_output_t(ctypes.Structure):
     """Single render variable output."""
@@ -644,7 +681,9 @@ class ovrtx_render_product_render_var_output_t(ctypes.Structure):
         ("render_var_path", ovx_string_t),
         ("source_name", ovx_string_t),
         ("source_type", ovx_string_t),
-        ("output_handle", ctypes.c_uint64),  # Plain c_uint64, not type alias
+        ("output_handle", ovrtx_render_var_output_handle_t),
+        ("status", ctypes.c_int),  # ovrtx_event_status_t
+        ("error_message", ovx_string_t),
     ]
 
 
@@ -704,7 +743,8 @@ class ovrtx_cuda_sync_t(ctypes.Structure):
     Matches ovrtx_cuda_sync_t from ovrtx_types.h.
 
     Fields:
-        stream: CUDA stream to synchronize to. 0 = no sync, 1 = default stream, >1 = specific stream
+        stream: Input: stream to synchronize to (0 = none, 1 = default, >1 = specific).
+            Mapped render-var output: optional borrowed producer stream; see MappedRenderVar.producer_stream.
         wait_event: Event to wait on before operation (0 = none)
     """
 
@@ -724,10 +764,6 @@ class ovrtx_output_buffer_t(ctypes.Structure):
         ("dl", DLTensor),  # DLPack tensor
         ("cuda_sync", ovrtx_cuda_sync_t),  # CUDA sync info (stream + event)
     ]
-
-
-# Type alias for map handles (uint64)
-ovrtx_render_var_output_map_handle_t = ctypes.c_uint64
 
 
 class ovrtx_map_output_description_t(ctypes.Structure):
@@ -784,7 +820,7 @@ class ovrtx_render_var_output_t(ctypes.Structure):
     _fields_ = [
         ("status", ctypes.c_int),  # ovrtx_event_status_t
         ("error_message", ovx_string_t),
-        ("map_handle", ctypes.c_uint64),  # ovrtx_render_var_output_map_handle_t
+        ("map_handle", ovrtx_render_var_output_map_handle_t),
         ("cuda_sync", ovrtx_cuda_sync_t),  # ONE shared sync, covers all tensors
         ("name", ovx_string_t),  # Full USD RenderVar prim path
         ("type", ovx_string_t),  # Semantic type identifier
@@ -891,15 +927,13 @@ class ovrtx_data_access_t(ctypes.c_int):
 
 
 # Type aliases
-ovrtx_attribute_binding_handle_t = ctypes.c_uint64
-ovrtx_map_handle_t = ctypes.c_uint64
 
 
-class ovx_string_or_token_t(ctypes.Structure):
-    """String or token union for attribute names."""
+class ovx_token_or_string_t(ctypes.Structure):
+    """Use string when its pointer is non-null; otherwise use token, including ID 0."""
 
     _fields_ = [
-        ("token", ctypes.c_uint64),  # ovx_token_t
+        ("token", ovx_token_t),  # ovx_token_t
         ("string", ovx_string_t),
     ]
 
@@ -928,8 +962,8 @@ class ovrtx_binding_desc_t(ctypes.Structure):
 
     _fields_ = [
         ("prim_list", ovrtx_prim_list_t),
-        ("prims_list_handle", ctypes.c_uint64),  # ovx_primpath_list_t
-        ("attribute_name", ovx_string_or_token_t),
+        ("prims_list_handle", ovx_primpath_list_t),  # ovx_primpath_list_t
+        ("attribute_name", ovx_token_or_string_t),
         ("attribute_type", ovrtx_attribute_type_t),
         ("prim_mode", ovrtx_binding_prim_mode_t),
         ("flags", ovrtx_binding_flag_t),
@@ -990,10 +1024,6 @@ class ovrtx_attribute_mapping_t(ctypes.Structure):
 # Stage query and attribute read structures
 # ============================================================================
 
-# Type aliases for query/read handles
-ovrtx_query_handle_t = ctypes.c_uint64
-ovrtx_read_handle_t = ctypes.c_uint64
-
 
 class FilterKind(IntEnum):
     """Kind of prim filter criterion for query_prims.
@@ -1018,7 +1048,7 @@ class ovrtx_filter_t(ctypes.Structure):
 
     _fields_ = [
         ("kind", ovrtx_filter_kind_t),
-        ("name", ovx_string_or_token_t),
+        ("name", ovx_token_or_string_t),
     ]
 
 
@@ -1046,7 +1076,7 @@ class ovrtx_attribute_filter_t(ctypes.Structure):
 
     _fields_ = [
         ("mode", ovrtx_attribute_filter_mode_t),
-        ("attribute_names", ctypes.POINTER(ovx_string_or_token_t)),
+        ("attribute_names", ctypes.POINTER(ovx_token_or_string_t)),
         ("attribute_name_count", ctypes.c_size_t),
     ]
 
@@ -1069,7 +1099,7 @@ class ovrtx_attribute_desc_t(ctypes.Structure):
     """Attribute descriptor returned in query results."""
 
     _fields_ = [
-        ("name", ctypes.c_uint64),  # ovx_token_t
+        ("name", ovx_token_t),  # ovx_token_t
         ("type", ovrtx_attribute_type_t),
     ]
 
@@ -1079,7 +1109,7 @@ class ovrtx_query_prim_group_t(ctypes.Structure):
 
     _fields_ = [
         ("prim_count", ctypes.c_size_t),
-        ("prim_list_handle", ctypes.c_uint64),  # ovx_primpath_list_t
+        ("prim_list_handle", ovx_primpath_list_t),  # ovx_primpath_list_t
         ("attributes", ctypes.POINTER(ovrtx_attribute_desc_t)),
         ("attribute_count", ctypes.c_size_t),
     ]
@@ -1119,9 +1149,9 @@ class ovx_api_result_t(ctypes.Structure):
 
 
 _PD_CTX = ctypes.c_void_p
-_TOKEN = ctypes.c_uint64
-_PRIMPATH = ctypes.c_uint64
-_PATHLIST = ctypes.c_uint64
+_TOKEN = ovx_token_t
+_PRIMPATH = ovx_primpath_t
+_PATHLIST = ovx_primpath_list_t
 
 # Function pointer types for path_dictionary_vtable_t, matching path_dictionary.h
 _FN_create_tokens_from_strings = ctypes.CFUNCTYPE(
@@ -1202,38 +1232,49 @@ class path_dictionary_instance_t(ctypes.Structure):
         ("context", ctypes.c_void_p),
     ]
 
-    def token_to_string(self, token: int) -> str:
+    def token_to_string(self, token: ovx_token_t) -> str:
         """Resolve a single token handle to a string."""
-        t = _TOKEN(token)
+        t = _TOKEN._require(token)
         out = ovx_string_t()
         self.vtable.contents.get_strings_from_tokens(self.context, ctypes.byref(t), 1, ctypes.byref(out))
         return str(out) if out.ptr else ""
 
-    def prim_path_to_string(self, prim_path: int) -> str:
-        """Resolve a single prim path handle to a string like '/World/Cube'."""
-        p = _PRIMPATH(prim_path)
-        token_buf = (_TOKEN * 64)()
-        tokens_out = ctypes.POINTER(_TOKEN)()
-        num_tokens = ctypes.c_size_t(0)
-        num_processed = ctypes.c_size_t(0)
-        self.vtable.contents.get_tokens_from_paths(
-            self.context,
-            ctypes.byref(p),
-            1,
-            token_buf,
-            64,
-            ctypes.byref(tokens_out),
-            ctypes.byref(num_tokens),
-            ctypes.byref(num_processed),
-        )
-        if num_processed.value == 0 or num_tokens.value == 0:
-            return ""
-        parts = []
-        for i in range(num_tokens.value):
-            parts.append("/" + self.token_to_string(tokens_out[i]))
-        return "".join(parts)
+    def prim_path_to_string(self, prim_path: ovx_primpath_t) -> str:
+        """Resolve a single prim path handle to a string like '/World/Cube'.
 
-    def get_path_list_paths(self, path_list_handle: int) -> list[str]:
+        Raise RuntimeError on decomposition failure or depth beyond 65536 tokens.
+        """
+        p = _PRIMPATH._require(prim_path)
+        buffer_size = 64
+        # Match OVStage's safety ceiling to bound retries if the dictionary makes no progress.
+        max_buffer_size = 1 << 16
+        while True:
+            token_buf = (_TOKEN * buffer_size)()
+            tokens_out = ctypes.POINTER(_TOKEN)()
+            num_tokens = ctypes.c_size_t(0)
+            num_processed = ctypes.c_size_t(0)
+            result = self.vtable.contents.get_tokens_from_paths(
+                self.context,
+                ctypes.byref(p),
+                1,
+                token_buf,
+                buffer_size,
+                ctypes.byref(tokens_out),
+                ctypes.byref(num_tokens),
+                ctypes.byref(num_processed),
+            )
+            if result.status != 0:
+                message = str(result.error)
+                self.vtable.contents.release_error(self.context, result.error)
+                raise RuntimeError(f"Failed to decode prim path {prim_path}: {message}")
+            if num_processed.value != 0:
+                return "".join("/" + self.token_to_string(tokens_out[i]) for i in range(num_tokens.value))
+            # Insufficient capacity leaves this path unprocessed, not decoded to zero tokens.
+            if buffer_size >= max_buffer_size:
+                raise RuntimeError(f"Prim path token depth exceeds decompose ceiling of {max_buffer_size}")
+            buffer_size *= 2
+
+    def get_path_list_paths(self, path_list_handle: ovx_primpath_list_t) -> list[str]:
         """Resolve all prim paths in a path list handle to strings."""
         num = ctypes.c_size_t(0)
         self.vtable.contents.get_num_paths_from_path_list(self.context, path_list_handle, ctypes.byref(num))
@@ -1245,6 +1286,94 @@ class path_dictionary_instance_t(ctypes.Structure):
             self.context, path_list_handle, 0, num.value, paths, ctypes.byref(retrieved)
         )
         return [self.prim_path_to_string(paths[i]) for i in range(retrieved.value)]
+
+
+class ovrtx_profiling_config_t(ctypes.Structure):
+    """Optional output directory and recording basename for file capture.
+
+    With both strings absent, profiling does not save files. Strings need only
+    remain valid until the start call returns.
+
+    Attributes:
+        output_path: UTF-8 view of an existing writable directory. If absent,
+            file capture uses the persistent user directory.
+        file_name: UTF-8 basename without an extension. If absent, file capture
+            uses a timestamp-based name. Existing recordings are not overwritten;
+            name collisions add a timestamp suffix.
+    """
+
+    _fields_ = [("output_path", ovx_string_t), ("file_name", ovx_string_t)]
+
+
+class ovrtx_performance_value_t(ctypes.Structure):
+    """One public scalar sample.
+
+    Attributes:
+        timestamp_ns: Sample time in nanoseconds since profiling started.
+            Duration samples use their start time.
+        value: Sampled value in the corresponding metric's units.
+        parent_uid: Parent metric for this invocation; zero means root or unspecified.
+        execution_id: CPU-thread or RTX-GPU identity; zero means unspecified.
+    """
+
+    _fields_ = [("timestamp_ns", ctypes.c_uint64), ("value", ctypes.c_double), ("parent_uid", ctypes.c_uint64), ("execution_id", ctypes.c_uint32)]
+
+
+class ovrtx_performance_metric_t(ctypes.Structure):
+    """Public metric description and newly collected samples.
+
+    Strings and sample arrays remain valid until the batch is updated or released.
+    Aggregate statistics cover the active profiling session, not only this update.
+
+    Attributes:
+        uid: Metric identity within this profiling session; do not reuse across restarts.
+        parent_uid: Default hierarchy parent, or zero for a root. Each sample carries
+            its invocation's parent separately.
+        name: Borrowed UTF-8 display name.
+        units: Borrowed UTF-8 unit label; durations normally use milliseconds.
+        info: Borrowed UTF-8 description of the measurement.
+        group_name: Borrowed UTF-8 category name.
+        values: Borrowed sample array; read only value_count entries.
+        value_count: Number of samples in values; zero means no new sample for this metric.
+        average: Session-wide running average in the metric's units; best-effort during concurrent injection.
+        minimum: Session-wide running minimum in the metric's units; best-effort during concurrent injection.
+        maximum: Session-wide running maximum in the metric's units; best-effort during concurrent injection.
+    """
+
+    _fields_ = [
+        ("uid", ctypes.c_uint64),
+        ("parent_uid", ctypes.c_uint64),
+        ("name", ovx_string_t),
+        ("units", ovx_string_t),
+        ("info", ovx_string_t),
+        ("group_name", ovx_string_t),
+        ("values", ctypes.POINTER(ovrtx_performance_value_t)),
+        ("value_count", ctypes.c_size_t),
+        ("average", ctypes.c_double),
+        ("minimum", ctypes.c_double),
+        ("maximum", ctypes.c_double),
+    ]
+
+
+class ovrtx_performance_data_update_t(ctypes.Structure):
+    """Zero-initialized batch retained between public metric updates and explicitly released.
+
+    Attributes:
+        collection_time_ns: Collection time in nanoseconds since profiling started;
+            not a sample-time boundary.
+        metrics: Borrowed metric array; read only metric_count entries, or use the getter's detached Python result.
+        metric_count: Number of entries in metrics.
+        json: Borrowed UTF-8 JSON view, empty after a structured update and invalidated by the next update or release.
+        handle: Opaque owner; never copy, modify or release it separately.
+    """
+
+    _fields_ = [
+        ("collection_time_ns", ctypes.c_uint64),
+        ("metrics", ctypes.POINTER(ovrtx_performance_metric_t)),
+        ("metric_count", ctypes.c_size_t),
+        ("json", ovx_string_t),
+        ("handle", ctypes.c_void_p),
+    ]
 
 
 class Bindings:
@@ -1275,6 +1404,66 @@ class Bindings:
     def build_info(self) -> BuildInfo:
         """Complete build identity embedded in the OVRTX loader library."""
         return self._build_info
+
+    def start_profiling(self, output_path: Optional[str], file_name: Optional[str]) -> ovrtx_result_t:
+        if output_path is None and file_name is None:
+            return self._lib.ovrtx_start_profiling(None)
+        path_string = ovx_string_t(output_path)
+        name_string = ovx_string_t(file_name)
+        config = ovrtx_profiling_config_t(path_string, name_string)
+        return self._lib.ovrtx_start_profiling(ctypes.byref(config))
+
+    def stop_profiling(self) -> ovrtx_result_t:
+        return self._lib.ovrtx_stop_profiling()
+
+    def add_performance_metric_value(self, metric_uid: int, value: float) -> None:
+        self._lib.ovrtx_add_performance_metric_value(metric_uid, value)
+
+    def add_performance_metric_value_with_thread_execution_id(self, metric_uid: int, value: float) -> None:
+        self._lib.ovrtx_add_performance_metric_value_with_thread_execution_id(metric_uid, value)
+
+    def add_performance_metric_value_with_custom_execution_id(self, metric_uid: int, value: float, execution_id: int) -> None:
+        self._lib.ovrtx_add_performance_metric_value_with_custom_execution_id(metric_uid, value, execution_id)
+
+    def get_performance_data_update(
+        self, data: ovrtx_performance_data_update_t, as_json: bool = False,
+    ) -> tuple[int, list[dict] | str]:
+        """Advance the caller's batch and detach its output; the caller retains and releases its native owner."""
+        if as_json:
+            result = self._lib.ovrtx_get_performance_data_update_as_json(ctypes.byref(data))
+        else:
+            result = self._lib.ovrtx_get_performance_data_update(ctypes.byref(data))
+        if result.status != OVRTX_API_SUCCESS:
+            raise RuntimeError(self.get_last_error() or "Failed to collect public performance data")
+        return self._copy_performance_data_update(data, as_json)
+
+    @staticmethod
+    def _copy_performance_data_update(data: ovrtx_performance_data_update_t, as_json: bool) -> tuple[int, list[dict] | str]:
+        """Detach borrowed views before a subsequent update or release invalidates them."""
+        if as_json:
+            return data.collection_time_ns, str(data.json)
+        metrics = []
+        for index in range(data.metric_count):
+            metric = data.metrics[index]
+            metrics.append({
+                "uid": metric.uid, "parent_uid": metric.parent_uid,
+                "name": str(metric.name), "units": str(metric.units),
+                "info": str(metric.info), "group_name": str(metric.group_name),
+                "average": metric.average,
+                "minimum": metric.minimum, "maximum": metric.maximum,
+                "values": [
+                    {"timestamp_ns": metric.values[i].timestamp_ns, "value": metric.values[i].value,
+                     "parent_uid": metric.values[i].parent_uid, "execution_id": metric.values[i].execution_id}
+                    for i in range(metric.value_count)
+                ],
+            })
+        return data.collection_time_ns, metrics
+
+    def release_performance_data_update(self, data: ovrtx_performance_data_update_t) -> None:
+        """Release a retained stateful batch before the renderer is destroyed."""
+        result = self._lib.ovrtx_release_performance_data_update(ctypes.byref(data))
+        if result.status != OVRTX_API_SUCCESS:
+            raise RuntimeError(self.get_last_error() or "Failed to release public performance data")
 
     def create_renderer(self, config: ovrtx_config_t) -> tuple[ovrtx_result_t, Any]:
         """Create a new renderer instance.
@@ -1378,6 +1567,7 @@ class Bindings:
         Returns:
             Error message string, or empty string if no error.
         """
+        op_id = ovrtx_op_id_t._require(op_id, "op_id")
         error = self._lib.ovrtx_get_last_op_error(op_id)
         return str(error) if error.ptr else ""
 
@@ -1394,12 +1584,14 @@ class Bindings:
         Returns:
             Tuple of (result, wait_result).
         """
+        op_id = ovrtx_op_id_t._require(op_id, "op_id")
         c_wait_result = ovrtx_op_wait_result_t()
         result = self._lib.ovrtx_wait_op(renderer_handle, op_id, timeout, ctypes.byref(c_wait_result))
         return result, c_wait_result
 
     def query_op_status(self, renderer_handle: Any, op_id: ovrtx_op_id_t) -> tuple[ovrtx_result_t, ovrtx_op_status_t]:
         """Query progress of an operation. Must be paired with release_op_status."""
+        op_id = ovrtx_op_id_t._require(op_id, "op_id")
         c_status = ovrtx_op_status_t()
         result = self._lib.ovrtx_query_op_status(renderer_handle, op_id, ctypes.byref(c_status))
         return result, c_status
@@ -1498,6 +1690,7 @@ class Bindings:
         Returns:
             Enqueue result with operation status and op_index.
         """
+        usd_handle = ovrtx_usd_handle_t._require(usd_handle, "usd_handle")
         return self._lib.ovrtx_remove_usd(renderer_handle, usd_handle)
 
     def update_stage_from_usd_time(self, renderer_handle: Any, usd_time: float) -> ovrtx_enqueue_result_t:
@@ -1540,7 +1733,7 @@ class Bindings:
         """
         step_result_handle = ovrtx_step_result_handle_t()
         result = self._lib.ovrtx_step(renderer_handle, render_product_set, delta_time, ctypes.byref(step_result_handle))
-        handle = step_result_handle if step_result_handle.value else None
+        handle = step_result_handle if step_result_handle != OVRTX_INVALID_STEP_RESULT_HANDLE else None
         return result, handle
 
     def step_with_stage(
@@ -1579,7 +1772,7 @@ class Bindings:
             ovstage_ordinal_t(ordinal),
             ctypes.byref(step_result_handle),
         )
-        handle = step_result_handle if step_result_handle.value else None
+        handle = step_result_handle if step_result_handle != OVRTX_INVALID_STEP_RESULT_HANDLE else None
         return result, handle
 
     def enqueue_pick_query(self, renderer_handle: Any, desc: ovrtx_pick_query_desc_t) -> ovrtx_enqueue_result_t:
@@ -1660,6 +1853,7 @@ class Bindings:
         Returns:
             Tuple of (result, outputs)
         """
+        step_result_handle = ovrtx_step_result_handle_t._require(step_result_handle, "step_result_handle")
         outputs = ovrtx_render_product_set_outputs_t()
         result = self._lib.ovrtx_fetch_results(renderer, step_result_handle, timeout, ctypes.byref(outputs))
         return result, outputs
@@ -1678,6 +1872,7 @@ class Bindings:
         Returns:
             Result status
         """
+        step_result_handle = ovrtx_step_result_handle_t._require(step_result_handle, "step_result_handle")
         return self._lib.ovrtx_destroy_results(renderer, step_result_handle)
 
     def map_render_var_output(
@@ -1687,6 +1882,7 @@ class Bindings:
         map_output_description: Any,
         timeout: ovrtx_timeout_t,
     ) -> tuple[ovrtx_result_t, ovrtx_render_var_output_t]:
+        output_handle = ovrtx_render_var_output_handle_t._require(output_handle, "output_handle")
         rendered_output = ovrtx_render_var_output_t()
         result = self._lib.ovrtx_map_render_var_output(
             renderer,
@@ -1714,6 +1910,7 @@ class Bindings:
         Returns:
             Result status (ovrtx_result_t)
         """
+        map_handle = ovrtx_render_var_output_map_handle_t._require(map_handle, "map_handle")
         sync = before_destroy_cuda_sync if before_destroy_cuda_sync is not None else ovrtx_cuda_sync_t()
         return self._lib.ovrtx_unmap_render_var_output(renderer, map_handle, sync)
 
@@ -1735,6 +1932,8 @@ class Bindings:
         Returns:
             Enqueue result with operation ID
         """
+        if not isinstance(binding_handle_or_desc, ovrtx_binding_desc_or_handle_t):
+            raise TypeError("binding_handle_or_desc must be ovrtx_binding_desc_or_handle_t")
         return self._lib.ovrtx_write_attribute(
             renderer, ctypes.byref(binding_handle_or_desc), ctypes.byref(data_array), data_access
         )
@@ -1771,6 +1970,7 @@ class Bindings:
         Returns:
             Enqueue result with operation ID
         """
+        binding_handle = ovrtx_attribute_binding_handle_t._require(binding_handle, "binding_handle")
         return self._lib.ovrtx_destroy_attribute_binding(renderer, binding_handle)
 
     def map_attribute(
@@ -1789,6 +1989,8 @@ class Bindings:
         Returns:
             Tuple of (result, attribute_mapping). Mapping contains map_handle and DLTensor.
         """
+        if not isinstance(binding_handle_or_desc, ovrtx_binding_desc_or_handle_t):
+            raise TypeError("binding_handle_or_desc must be ovrtx_binding_desc_or_handle_t")
         mapping = ovrtx_attribute_mapping_t()
         result = self._lib.ovrtx_map_attribute(
             renderer, ctypes.byref(binding_handle_or_desc), mapping_desc, ctypes.byref(mapping)
@@ -1811,6 +2013,7 @@ class Bindings:
         Returns:
             Enqueue result with operation ID
         """
+        map_handle = ovrtx_map_handle_t._require(map_handle, "map_handle")
         return self._lib.ovrtx_unmap_attribute(renderer, map_handle, cuda_sync)
 
     def query_prims(
@@ -1848,6 +2051,7 @@ class Bindings:
         Returns:
             Tuple of (result, query_result).
         """
+        query_handle = ovrtx_query_handle_t._require(query_handle, "query_handle")
         query_result = ovrtx_query_result_t()
         result = self._lib.ovrtx_fetch_query_results(renderer, query_handle, timeout, ctypes.byref(query_result))
         return result, query_result
@@ -1866,6 +2070,7 @@ class Bindings:
         Returns:
             Result status.
         """
+        query_handle = ovrtx_query_handle_t._require(query_handle, "query_handle")
         return self._lib.ovrtx_release_query_results(renderer, query_handle)
 
     def get_path_dictionary(
@@ -1900,6 +2105,8 @@ class Bindings:
         Returns:
             Tuple of (enqueue_result, read_handle). Handle is None if enqueue failed.
         """
+        if not isinstance(binding_handle_or_desc, ovrtx_binding_desc_or_handle_t):
+            raise TypeError("binding_handle_or_desc must be ovrtx_binding_desc_or_handle_t")
         read_handle = ovrtx_read_handle_t()
         dest_ptr = ctypes.byref(read_dest) if read_dest is not None else None
         result = self._lib.ovrtx_read_attribute(
@@ -1924,6 +2131,7 @@ class Bindings:
         Returns:
             Tuple of (result, read_output).
         """
+        read_handle = ovrtx_read_handle_t._require(read_handle, "read_handle")
         read_output = ovrtx_read_output_t()
         result = self._lib.ovrtx_fetch_read_result(renderer, read_handle, timeout, ctypes.byref(read_output))
         return result, read_output
@@ -1946,6 +2154,7 @@ class Bindings:
         Returns:
             Result status.
         """
+        read_handle = ovrtx_read_handle_t._require(read_handle, "read_handle")
         sync = before_destroy_cuda_sync if before_destroy_cuda_sync is not None else ovrtx_cuda_sync_t()
         return self._lib.ovrtx_release_read_result(renderer, read_handle, sync)
 
@@ -1960,6 +2169,34 @@ class Bindings:
             Enqueue result with operation status and op_index.
         """
         return self._lib.ovrtx_reset(renderer_handle, time)
+
+    def clear_history(
+        self,
+        renderer_handle: Any,
+        render_product_set: ovrtx_render_product_set_t,
+        flags: int,
+        quality: Optional[ovrtx_render_quality_t],
+        tiles: Optional[ovrtx_tile_list_t],
+    ) -> ovrtx_enqueue_result_t:
+        """Discard the temporal rendering history of render products or their tiles.
+
+        Args:
+            renderer_handle: Renderer handle from create_renderer.
+            render_product_set: Render products to clear; empty clears every render product of the next step.
+            flags: Bitwise OR of OVRTX_CLEAR_HISTORY_FLAG_* values.
+            quality: Optional quality override for the cleared frame.
+            tiles: Optional tiles of a single render product to clear.
+
+        Returns:
+            Enqueue result with operation status and op_index.
+        """
+        return self._lib.ovrtx_clear_history(
+            renderer_handle,
+            render_product_set,
+            flags,
+            ctypes.byref(quality) if quality is not None else None,
+            ctypes.byref(tiles) if tiles is not None else None,
+        )
 
 
 OVRTX_LIBRARY_PATH_HINT: Optional[str] = None
@@ -2027,6 +2264,12 @@ def ovrtx_loader_candidate_dirs() -> List[Path]:
     return candidates
 
 
+def _call_telemetry_opt_out(lib: ctypes.CDLL) -> None:
+    lib.ovrtx_library_telemetry_opt_out.argtypes = []
+    lib.ovrtx_library_telemetry_opt_out.restype = None
+    lib.ovrtx_library_telemetry_opt_out()
+
+
 class _LibraryLoader:
     """Internal class to lazily load a singleton ovrtx library and create bindings for it."""
 
@@ -2035,6 +2278,9 @@ class _LibraryLoader:
         self._lib_version: Optional[tuple] = None
         self._lib_build_info: Optional[BuildInfo] = None
         self._process_cleanup_started: bool = False
+        # Set by library_telemetry_opt_out(). create_bindings() reapplies it, because
+        # OVRTX_LIBRARY_PATH_HINT may have changed and selected a different library.
+        self._telemetry_opted_out: bool = False
         self._lib_search_paths: List[Path] = _resolve_existing_dirs(ovrtx_loader_candidate_dirs())
         self._dll_dir_cookies: List[object] = []
 
@@ -2052,14 +2298,15 @@ class _LibraryLoader:
                 except Exception as e:
                     print(f"Warning: Exception while closing ovrtx DLPack: {e}", file=sys.stderr)
 
-                # Private compatibility hook for the static OVRTX loader. This
-                # symbol is intentionally absent from the public C header.
-                shutdown = getattr(self._lib, "ovrtx_shutdown_process", self._lib.ovrtx_shutdown)
-                result = shutdown()
+                result = self._lib.ovrtx_shutdown()
                 if result.status != OVRTX_API_SUCCESS:
                     error = self._lib.ovrtx_get_last_error()
                     error_msg = str(error) if error.ptr else "Unknown error"
                     print(f"Warning: Failed to shutdown ovrtx library: {error_msg}", file=sys.stderr)
+                else:
+                    from ..data_provider import _release_provider_registrations
+
+                    _release_provider_registrations(self._lib)
             except Exception as e:
                 # During shutdown, modules may be partially torn down
                 print(f"Warning: Exception during ovrtx library cleanup: {e}", file=sys.stderr)
@@ -2085,6 +2332,8 @@ class _LibraryLoader:
             try:
                 library_path_hint = [Path(OVRTX_LIBRARY_PATH_HINT)] if OVRTX_LIBRARY_PATH_HINT else None
                 lib = self._load_library(library_path_hint)
+                if self._telemetry_opted_out:
+                    _call_telemetry_opt_out(lib)
 
                 # Version check: call ovrtx_get_version() before anything else (it works pre-initialize).
                 self._lib_version = _read_version(lib)
@@ -2105,6 +2354,24 @@ class _LibraryLoader:
                 # Configure function signatures
                 lib.ovrtx_query_extension.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_void_p)]
                 lib.ovrtx_query_extension.restype = ovrtx_result_t
+                lib.ovrtx_start_profiling.argtypes = [ctypes.POINTER(ovrtx_profiling_config_t)]
+                lib.ovrtx_start_profiling.restype = ovrtx_result_t
+                lib.ovrtx_stop_profiling.argtypes = []
+                lib.ovrtx_stop_profiling.restype = ovrtx_result_t
+                lib.ovrtx_add_performance_metric_value.argtypes = [ctypes.c_uint64, ctypes.c_double]
+                lib.ovrtx_add_performance_metric_value.restype = None
+                lib.ovrtx_add_performance_metric_value_with_thread_execution_id.argtypes = [ctypes.c_uint64, ctypes.c_double]
+                lib.ovrtx_add_performance_metric_value_with_thread_execution_id.restype = None
+                lib.ovrtx_add_performance_metric_value_with_custom_execution_id.argtypes = [ctypes.c_uint64, ctypes.c_double, ctypes.c_uint32]
+                lib.ovrtx_add_performance_metric_value_with_custom_execution_id.restype = None
+                lib.ovrtx_get_performance_data_update.argtypes = [
+                    ctypes.POINTER(ovrtx_performance_data_update_t)
+                ]
+                lib.ovrtx_get_performance_data_update.restype = ovrtx_result_t
+                lib.ovrtx_get_performance_data_update_as_json.argtypes = lib.ovrtx_get_performance_data_update.argtypes
+                lib.ovrtx_get_performance_data_update_as_json.restype = ovrtx_result_t
+                lib.ovrtx_release_performance_data_update.argtypes = [ctypes.POINTER(ovrtx_performance_data_update_t)]
+                lib.ovrtx_release_performance_data_update.restype = ovrtx_result_t
 
                 lib.ovrtx_initialize.argtypes = [ctypes.POINTER(ovrtx_config_t)]
                 lib.ovrtx_initialize.restype = ovrtx_result_t
@@ -2112,9 +2379,9 @@ class _LibraryLoader:
                 lib.ovrtx_shutdown.argtypes = []
                 lib.ovrtx_shutdown.restype = ovrtx_result_t
 
-                if hasattr(lib, "ovrtx_shutdown_process"):
-                    lib.ovrtx_shutdown_process.argtypes = []
-                    lib.ovrtx_shutdown_process.restype = ovrtx_result_t
+                from .provider_bindings import configure_provider_functions
+
+                configure_provider_functions(lib)
 
                 lib.ovrtx_create_renderer.argtypes = [
                     ctypes.POINTER(ovrtx_config_t),
@@ -2175,6 +2442,15 @@ class _LibraryLoader:
 
                 lib.ovrtx_reset.argtypes = [ctypes.POINTER(ovrtx_renderer_t), ctypes.c_double]
                 lib.ovrtx_reset.restype = ovrtx_enqueue_result_t
+
+                lib.ovrtx_clear_history.argtypes = [
+                    ctypes.POINTER(ovrtx_renderer_t),
+                    ovrtx_render_product_set_t,
+                    ctypes.c_uint32,
+                    ctypes.POINTER(ovrtx_render_quality_t),
+                    ctypes.POINTER(ovrtx_tile_list_t),
+                ]
+                lib.ovrtx_clear_history.restype = ovrtx_enqueue_result_t
 
                 lib.ovrtx_open_usd_from_file.argtypes = [
                     ctypes.POINTER(ovrtx_renderer_t),
@@ -2386,7 +2662,7 @@ class _LibraryLoader:
 
                 lib.ovrtx_map_render_var_output.argtypes = [
                     ctypes.POINTER(ovrtx_renderer_t),
-                    ctypes.c_uint64,  # ovrtx_render_var_output_handle_t
+                    ovrtx_render_var_output_handle_t,
                     ctypes.c_void_p,  # ovrtx_map_output_description_t* (specifies CPU or CUDA mapping)
                     ovrtx_timeout_t,  # timeout
                     ctypes.POINTER(ovrtx_render_var_output_t),  # out_render_var_output
@@ -2395,7 +2671,7 @@ class _LibraryLoader:
 
                 lib.ovrtx_unmap_render_var_output.argtypes = [
                     ctypes.POINTER(ovrtx_renderer_t),
-                    ctypes.c_uint64,  # ovrtx_render_var_output_map_handle_t
+                    ovrtx_render_var_output_map_handle_t,
                     ovrtx_cuda_sync_t,  # before_destroy_cuda_sync
                 ]
                 lib.ovrtx_unmap_render_var_output.restype = ovrtx_result_t
@@ -2518,6 +2794,20 @@ class _LibraryLoader:
             error_msg = str(error) if error.ptr else "Unknown error"
             raise RuntimeError(f"Failed to register ovrtx USD schema/plugin paths: {error_msg}")
 
+    def library_telemetry_opt_out(self) -> None:
+        """Call ovrtx_library_telemetry_opt_out() without calling ovrtx_initialize().
+
+        Reuses the library a Renderer already loaded, otherwise loads the loader DLL the way
+        ``register_schema_paths`` does. The opt-out is process-global state in that DLL, and
+        ctypes never unloads a library, so a later ``create_bindings`` load of the same library still
+        sees it; ``create_bindings`` also reapplies it in case ``OVRTX_LIBRARY_PATH_HINT`` changed.
+        """
+        self._telemetry_opted_out = True
+        lib = self._lib
+        if lib is None:
+            lib = self._load_library([Path(OVRTX_LIBRARY_PATH_HINT)] if OVRTX_LIBRARY_PATH_HINT else None)
+        _call_telemetry_opt_out(lib)
+
     def get_build_info(self) -> BuildInfo:
         """Read build identity from the initialized OVRTX loader library."""
         if self._lib_build_info is not None:
@@ -2559,3 +2849,21 @@ def get_build_info() -> BuildInfo:
     initialization.
     """
     return _ovrtx_loader.get_build_info()
+
+
+def library_telemetry_opt_out() -> None:
+    """Opt this process out of OVRTX's anonymous library-startup report.
+
+    OVRTX sends one report, from a background thread, when the first :class:`ovrtx.Renderer` in the
+    process is created. Call this before creating that renderer; the opt-out then lasts for the rest of
+    the process. It loads the OVRTX loader library, raising ``RuntimeError`` if it cannot be found, but
+    does not initialize OVRTX. Setting ``NVIDIA_OMNIVERSE_PRODUCT_TELEMETRY_DISABLED=1`` before the process starts opts out
+    without loading anything, and also covers other Omniverse libraries such as OVXR, which report
+    separately. See TELEMETRY.md for what the report contains.
+
+    While the report is enabled, the OVRTX shutdown that runs at interpreter exit joins the reporter's
+    worker thread. If that thread is inside a DNS lookup that neither answers nor fails, interpreter exit
+    waits for the platform resolver to time out, which can take tens of seconds. Opting out avoids the
+    worker thread and that wait.
+    """
+    _ovrtx_loader.library_telemetry_opt_out()

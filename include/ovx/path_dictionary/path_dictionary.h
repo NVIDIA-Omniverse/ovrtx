@@ -84,6 +84,9 @@
  * -----------------
  * `OVX_INVALID_TOKEN`, `OVX_INVALID_PRIMPATH`, `OVX_INVALID_PRIMPATH_LIST`
  * are never produced on success by any `create_*` slot.
+ * Token id 0 is the valid empty string; `OVX_INVALID_TOKEN` is UINT64_MAX.
+ * Empty token strings round-trip through `create_tokens_from_strings` and
+ * `get_strings_from_tokens`. Empty prim-path strings remain invalid.
  * `add_path_list_reference` and `release_path_list_reference` accept
  * `OVX_INVALID_PRIMPATH_LIST` as a no-op `OVX_API_SUCCESS`. An unknown
  * (e.g. already-released) non-zero handle returns `OVX_API_ERROR`.

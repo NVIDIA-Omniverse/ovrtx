@@ -141,6 +141,19 @@ def test_completed_outputs_follow_sensor_rates(multi_rate_runs):
                 assert event["capture_end_time"] - event["capture_start_time"] == pytest.approx(1 / 20)
 
 
+def test_lidar_quality_renders_do_not_advance_scan_frame_ids(multi_rate_runs):
+    for report in multi_rate_runs.values():
+        for name in ("Lidar40", "Lidar20"):
+            events = [event for event in report["events"] if event["product"] == f"/Render/{name}"]
+            # A fresh lidar starts at frame zero and advances once per scheduled
+            # 25 ms slice, including slices with no completed output. Streaming
+            # and quality retries must not consume frame IDs before delivery.
+            np.testing.assert_array_equal(
+                [event["frameId"] for event in events],
+                [event["step"] - 1 for event in events],
+            )
+
+
 def test_completed_lidar_scans_keep_history_across_empty_steps(multi_rate_runs):
     for name, hz in (("Lidar40", 40), ("Lidar20", 20)):
         events = [event for event in multi_rate_runs[False]["events"] if event["product"] == f"/Render/{name}"]
@@ -158,8 +171,6 @@ def test_completed_lidar_scans_keep_history_across_empty_steps(multi_rate_runs):
 
 def test_accumulated_lidar_timestamp_anchors_scan_start(multi_rate_runs):
     report = multi_rate_runs[False]
-    if tuple(report["ovrtx_version"]) < (0, 6, 0):
-        pytest.skip("OMPE-106853 fixes accumulated lidar timestampNs in ovrtx 0.6; the pinned 0.5 lacks the fix")
     for name, hz in (("Lidar40", 40), ("Lidar20", 20)):
         events = [event for event in report["events"] if event["product"] == f"/Render/{name}"]
         for index, event in enumerate(events):

@@ -36,14 +36,12 @@ Running
 
 .. code-block:: bash
 
-   uv run main.py
+   uv run main.py                                     # CUDA
+   uv run main.py --scene grayscale_scene_slang.usda  # Slang
 
-The first step compiles the CUDA kernel with NVRTC and can block for up to a minute on a fresh
+The first step compiles the kernel and can block for up to 5 minutes on a fresh
 shader cache. A successful run writes ``_output/input.png`` and ``_output/grayscale.png``, which
 is the same image with the colour taken out.
 
-The run checks ``R == G == B`` in every pixel of the output, which the renderer's own
-``LdrColor`` does not satisfy, and tests the input as well so that a node which never ran cannot
-pass on a scene that was already grey. A failing check exits non-zero.
-
-See the :doc:`../spg/overview` documentation for the full authoring reference.
+See the :doc:`SPG reference <../spg/ref/index>` for every Lua function and USD attribute you can
+author.

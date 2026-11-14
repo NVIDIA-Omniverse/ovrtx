@@ -58,7 +58,7 @@ def "Render" {
     render_products.render_products = &rp_path;
     render_products.num_render_products = 1;
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
         renderer_, render_products, 1.0 / 60.0, ordinal, &step_handle);
     ASSERT_API_SUCCESS(enqueue_result.status);
@@ -72,8 +72,8 @@ def "Render" {
     ASSERT_GT(outputs.outputs[0].output_frame_count, 0u);
 
     // [snippet:doc-step-and-map-camera-outputs-c]
-    ovrtx_render_var_output_handle_t ldr_handle = OVRTX_INVALID_HANDLE;
-    ovrtx_render_var_output_handle_t hdr_handle = OVRTX_INVALID_HANDLE;
+    ovrtx_render_var_output_handle_t ldr_handle{};
+    ovrtx_render_var_output_handle_t hdr_handle{};
 
     // This step requested one RenderProduct. Select its first output frame,
     // then find RenderVars by their full prim paths.
@@ -91,8 +91,8 @@ def "Render" {
             hdr_handle = var.output_handle;
         }
     }
-    ASSERT_NE(ldr_handle, OVRTX_INVALID_HANDLE);
-    ASSERT_NE(hdr_handle, OVRTX_INVALID_HANDLE);
+    ASSERT_NE(ldr_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
+    ASSERT_NE(hdr_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
 
     // Map LdrColor to CPU
     ovrtx_map_output_description_t map_desc = {};

@@ -21,7 +21,7 @@ function info(msg) end
 ---@param msg string
 function warning(msg) end
 
---- Print values to the SPG log (info level). Concatenates all arguments with tabs.
+--- Print values to the SPG log (verbose level). Concatenates all arguments with spaces.
 ---@param ... any
 function print(...) end
 
@@ -40,3 +40,12 @@ LOCAL_MATRIX = nil
 --- name. The same value a prim table reads as .world_matrix.
 ---@type string
 WORLD_MATRIX = nil
+
+---@class SpgSelf  What the launch states about the node itself; a new table on every call
+---@field memory table<string, SpgResourceDesc>  The node's memory by name: a descriptor from `image` or `empty` under a string key, kept across frames and zeroed when created; not a port
+---@field stateful boolean  Set to true to mark every output of the node stateful
+
+--- The node itself: `self.memory["acc"] = cuda.empty({ n }, cuda.float)` gives the node memory it keeps
+--- across frames, passed to the kernel with the wrappers an output takes.
+---@type SpgSelf
+self = nil

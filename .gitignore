@@ -2,6 +2,8 @@
 _*/
 # But keep the Sphinx extensions directory.
 !docs/_ext/
+# And the generated doc copy that tools/ci/populate_sensor_introspection_docs.py checks in.
+!docs/sensors/common/_generated/
 
 # Python virtual environments.
 .venv/

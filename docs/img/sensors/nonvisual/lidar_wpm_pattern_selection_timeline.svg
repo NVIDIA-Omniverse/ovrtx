@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="414" viewBox="0 0 960 414" role="img" aria-labelledby="title desc">
+<title id="title">Pattern selection with two patterns and a dwell of two ticks</title>
+<desc id="desc">Top: a rotary sensor numbers its ticks from 0 at every scan boundary; with patterns p001 and p002 and firingPatternDwellTicks = 2, ticks 0 and 1 fire p001, ticks 2 and 3 fire p002, tick 4 fires p001, and the next scan starts with p001 again, three p001 ticks in a row across the boundary. Bottom: a solid-state sensor's tick is the scan itself, counted from time zero, so scans 0 and 1 fire p001, scans 2 and 3 fire p002 and scans 4 and 5 fire p001; a jump in time from scan 1 to scan 4 lands on the pattern of that scan index.</desc>
+<defs><marker id="arrow-757575-1p8" markerUnits="userSpaceOnUse" markerWidth="9.9" markerHeight="8.1" refX="0" refY="4.05" orient="auto" overflow="visible"><path d="M0,0 L9.9,4.05 L0,8.1 z" fill="#757575"/></marker></defs>
+<rect width="960" height="414" fill="#fff"/>
+<text x="30" y="30" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" font-weight="bold">Which pattern fires: two patterns, each held for two ticks</text>
+<text x="30" y="48" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">patterns p001, p002; firingPatternDwellTicks = 2</text>
+<text x="30" y="80" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Rotary: ticks numbered from 0 at every scan boundary</text>
+<path d="M30,118 L30,112 L384,112 L384,118" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="207" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">scan n</text>
+<rect x="30" y="122" width="66" height="44" rx="6" fill="#0074DF"/>
+<text x="63" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">0</text>
+<text x="63" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<rect x="102" y="122" width="66" height="44" rx="6" fill="#0074DF"/>
+<text x="135" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">1</text>
+<text x="135" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<rect x="174" y="122" width="66" height="44" rx="6" fill="#952FC6"/>
+<text x="207" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<text x="207" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p002</text>
+<rect x="246" y="122" width="66" height="44" rx="6" fill="#952FC6"/>
+<text x="279" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">3</text>
+<text x="279" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p002</text>
+<rect x="318" y="122" width="66" height="44" rx="6" fill="#0074DF"/>
+<text x="351" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<text x="351" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<path d="M408,118 L408,112 L762,112 L762,118" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="585" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">scan n+1</text>
+<rect x="408" y="122" width="66" height="44" rx="6" fill="#0074DF"/>
+<text x="441" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">0</text>
+<text x="441" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<rect x="480" y="122" width="66" height="44" rx="6" fill="#0074DF"/>
+<text x="513" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">1</text>
+<text x="513" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<rect x="552" y="122" width="66" height="44" rx="6" fill="#952FC6"/>
+<text x="585" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<text x="585" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p002</text>
+<rect x="624" y="122" width="66" height="44" rx="6" fill="#952FC6"/>
+<text x="657" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">3</text>
+<text x="657" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p002</text>
+<rect x="696" y="122" width="66" height="44" rx="6" fill="#0074DF"/>
+<text x="729" y="139.08" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<text x="729" y="156.36" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<line x1="396" y1="110" x2="396" y2="178" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="396" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">numbering restarts</text>
+<path d="M318,170 L318,176 L546,176 L546,170" fill="none" stroke="#0074DF" stroke-width="1.5"/>
+<text x="432" y="198" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" text-anchor="middle">three p001 ticks in a row</text>
+<text x="790" y="138" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">pattern index</text>
+<text x="790" y="160" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">(tickIndex / 2) % 2</text>
+<text x="30" y="234" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Solid state: one tick per scan, counted from time zero</text>
+<rect x="30" y="282" width="110" height="44" rx="6" fill="#0074DF"/>
+<text x="85" y="298.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan 0</text>
+<text x="85" y="315.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<rect x="144" y="282" width="110" height="44" rx="6" fill="#0074DF"/>
+<text x="199" y="298.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan 1</text>
+<text x="199" y="315.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<rect x="258" y="282" width="110" height="44" rx="6" fill="#952FC6"/>
+<text x="313" y="298.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan 2</text>
+<text x="313" y="315.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p002</text>
+<rect x="372" y="282" width="110" height="44" rx="6" fill="#952FC6"/>
+<text x="427" y="298.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan 3</text>
+<text x="427" y="315.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p002</text>
+<rect x="486" y="282" width="110" height="44" rx="6" fill="#0074DF"/>
+<text x="541" y="298.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan 4</text>
+<text x="541" y="315.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<rect x="600" y="282" width="110" height="44" rx="6" fill="#0074DF"/>
+<text x="655" y="298.84" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">scan 5</text>
+<text x="655" y="315.88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#fff" text-anchor="middle">p001</text>
+<path d="M199,280 C227.5,278 314.65,268.12 370,268 C425.35,267.88 504.27,277.42 531.12,279.31" fill="none" stroke="#757575" stroke-width="1.8" marker-end="url(#arrow-757575-1p8)"/>
+<text x="370" y="256" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">a jump in time lands on the pattern of that scan index (p001)</text>
+<line x1="30" y1="338" x2="724" y2="338" stroke="#757575" stroke-width="1.5"/>
+<line x1="30" y1="338" x2="30" y2="344" stroke="#757575" stroke-width="1.5"/>
+<text x="30" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">0</text>
+<line x1="144" y1="338" x2="144" y2="344" stroke="#757575" stroke-width="1.5"/>
+<text x="144" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">1</text>
+<line x1="258" y1="338" x2="258" y2="344" stroke="#757575" stroke-width="1.5"/>
+<text x="258" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">2</text>
+<line x1="372" y1="338" x2="372" y2="344" stroke="#757575" stroke-width="1.5"/>
+<text x="372" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">3</text>
+<line x1="486" y1="338" x2="486" y2="344" stroke="#757575" stroke-width="1.5"/>
+<text x="486" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">4</text>
+<line x1="600" y1="338" x2="600" y2="344" stroke="#757575" stroke-width="1.5"/>
+<text x="600" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">5</text>
+<line x1="714" y1="338" x2="714" y2="344" stroke="#757575" stroke-width="1.5"/>
+<text x="714" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">6</text>
+<text x="30" y="372" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">t, in scan periods from time zero (one scan period is 0.1 s in the example)</text>
+<text x="790" y="298" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">pattern index</text>
+<text x="790" y="320" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">(scanIndex / 2) % 2</text>
+<rect x="790" y="386" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="809" y="396.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">p001</text>
+<rect x="861.52" y="386" width="12" height="12" rx="2" fill="#952FC6"/>
+<text x="880.52" y="396.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">p002</text>
+</svg>

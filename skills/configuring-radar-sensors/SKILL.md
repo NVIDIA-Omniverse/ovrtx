@@ -1,20 +1,13 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: configuring-radar-sensors
 description: >
   Authoring and configuring OmniRadar sensor prims and radar PointCloud render outputs.
   Use when user asks to create a radar scene, configure an OmniRadar prim, choose radar
   output frame/coordinate behavior, configure radar scan outputs, or request radar
   PointCloud channels.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -88,9 +81,9 @@ The same USDA scene pattern is used from Python and C; the language-specific cod
 
 > **Source:** `examples/c/radar/radar_example.usda` snippet `configure-radar-sensor`
 
-Use `OmniSensorGenericRadarWpmDmatAPI` for the generic WPM DMAT radar model. The schema automatically includes scan configuration `s001`; apply `OmniSensorGenericRadarWpmDmatScanCfgAPI:s002`, `s003`, and so on only when authoring additional scan patterns.
+Use `OmniSensorGenericRadarWpmDmatAPI` for the Radar generic wpmDmat model. The schema automatically includes scan configuration `s001`; apply `OmniSensorGenericRadarWpmDmatScanCfgAPI:s002`, `s003`, and so on only when authoring additional scan patterns.
 
-In Z-up scenes, keep the physical scene Z-up and rotate the radar prim so sensor `+X` points along the intended forward direction. Prefer authoring that transform in USD instead of relying on renderer settings that change the coordinate frame globally.
+In Z-up scenes, keep the stage Z-up and rotate the radar prim so that its local `-Z`, the prim's forward axis, points along the intended forward direction; the examples author `xformOp:rotateXYZ = (90, 0, -90)` to look along world `+X`, and a point straight ahead then comes back on the output's `+X` axis. Author that transform on the prim in USD.
 
 ## Output Attributes
 
@@ -99,18 +92,21 @@ These output-defining attributes, among others, live on the radar prim with the 
 | Attribute | Values / Shape | Use |
 |---|---|---|
 | `elementsCoordsType` | `CARTESIAN`, `SPHERICAL` | Coordinate representation for detection coordinates. |
-| `outputFrameOfReference` | `SENSOR`, `WORLD`, `CUSTOM` | Frame of reference for outputs. Prefer `SENSOR` when downstream consumers expect sensor-frame detections. |
+| `outputFrameOfReference` | `SENSOR`, `WORLD`, `CUSTOM` | Frame of reference for detection coordinates. Doppler remains sensor-relative and scan limits remain sensor-frame. Prefer `SENSOR` when downstream consumers expect sensor-frame detections. |
 | `customFrameOfReferenceTrafo` | `[x, y, z, roll, pitch, yaw]` | Custom transform used only with `outputFrameOfReference = CUSTOM`. |
 
-OmniRadar prims expose many additional WPM DMAT sensor and scan attributes for wavelength, ray depth, CFAR behavior, range/velocity/angular bins, noise, RCS tuning, and antenna/aperture configuration. Preserve existing attributes when editing a tuned sensor, and author model-specific values from the schema.
+OmniRadar prims expose many additional sensor-level and per-scan attributes for wavelength, ray depth, CFAR behavior, range/velocity/angular bins, noise, RCS tuning, and antenna/aperture configuration. Preserve existing attributes when editing a tuned sensor, and author model-specific values from the schema.
 
-For the full schema-derived attribute list, read `schemas/omni_sensors/schema.usda`.
+For the full attribute list with types, defaults and tokens, read the product reference:
+[Radar Attributes](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/attributes.html).
 
 ## Scan Configuration
 
 The default scan is `s001`, and scan attributes use the `omni:sensor:WpmDmat:scan:<scanName>:` prefix. Use scan attributes such as max range, angular limits, resolution, bin counts, CFAR settings, noise settings, and RCS tuning to match the target radar model.
 
 For concise examples, keep one scan unless the behavior being demonstrated requires near/far or otherwise distinct scan patterns.
+
+The model cycles through its scan configurations in lexicographic instance order, one per firing. A step without a radar acquisition leaves the pending scan (the one whose turn is next) and its ambiguity entry unchanged, and publishes no radar PointCloud frame. A frame carries at most one scan, and a step longer than the scan period returns several frames, so inspect every returned frame. A scan's `timeOffsetUsec` delays its acquisition after its scan time, in microseconds, and `timestampNs` reports the delayed time (see [the frame rate](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/attributes.html#sensors-radar-frame-rate)). A published scan with no detections has `Counts[0] == 0` and still carries scan metadata. Read `scanIdx` from every published scan, including empty scans. See [Run More Than One Scan Pattern](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/howto/scan_configurations.html).
 
 ## PointCloud Render Output
 
@@ -129,18 +125,21 @@ Common radar channels:
 | Channel | Meaning |
 |---|---|
 | `Coordinates` | 3D detection coordinates in the configured coordinate representation and output frame. |
-| `RCS` | Radar cross section in dBsm. |
+| `RCS` | Radar cross section in dBsm. Request it when the consumer needs to inspect detection strength or material response. |
 | `RadialVelocityMs` | Doppler radial velocity in meters per second. Approaching objects can have negative velocity, so use magnitude when checking only for motion. |
-| `TimeOffsetNs` | Per-detection time offset in nanoseconds relative to scan start. |
+| `TimeOffsetNs` | Time offset of the detection within the scan, in nanoseconds. It is `0` for every detection by design, because the model simulates each scan at one instant, so a radar frame carries no per-detection timing. |
 | `Flags` | Model-delivered per-detection status flags. The model auto-enables this channel even when it is not requested explicitly. |
-| `Counts` | Model-delivered detection entry count used to bound every per-detection tensor. The model auto-enables this channel even when it is not requested explicitly. |
+| `Counts` | Model-delivered detection entry count used to bound every per-detection tensor; zero for a scan with no detections. The model auto-enables this channel even when it is not requested explicitly. |
 
 ## Troubleshooting
 
-- Output-defining attributes are not intended for runtime mutation; author them in USD before loading the scene.
+- The three output-shaping attributes (`elementsCoordsType`, `outputFrameOfReference`, `customFrameOfReferenceTrafo`) can be changed on a running radar: the model re-reads them with every parameter update and applies them from the next frame, while a frame already in flight keeps the values it started with; [Radar Attributes](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/attributes.html) describes the behavior.
 - `Counts` defines the delivered range in per-detection tensors. Do not iterate over the full tensor allocation; use `Flags` for per-detection validity.
 - `PointCloud` only needs requested payload channels; the model auto-enables `Counts` and `Flags` and delivers them like ordinary channel tensors.
 - Radar output frame and visualizer frame are separate concerns. If output is in `SENSOR` frame, configure the visualizer to interpret that frame instead of changing the sensor to `WORLD` unless world-frame output is actually desired.
+- This model needs an active motion BVH for motion effects, with `AUTO` or `ENABLE`: create the renderer with `ENABLE`, as the radar examples do (`ovrtx.MotionBvh.ENABLE` in Python, `OVRTX_MOTION_BVH_ENABLE` in C). Without it the radar runs and raises no error: it traces each scan from the radar's pose at the scan's acquisition time against a scene that does not move, so nothing moves within a frame and an animated target's detections report a radial velocity near zero, though a moving radar still reports radial velocity from its own movement. Nothing in the output reports whether the motion BVH was active; compare a run with it against one without. The Lidar generic core model also keeps running without motion BVH: it delivers its points without motion effects and logs a warning once that says so. Motion BVH is a renderer-level switch chosen when the renderer is created, not an attribute on the prim.
+- A scan delivers at most 2500 detections. The cap is fixed in the model, is also the allocation bound published as the `maxPoints` param, and contributions past it are dropped with nothing in the output reporting that the scan saturated.
+- The output-shaping attributes are in the radar's own namespace. Authoring `omni:sensor:Core:elementsCoordsType` on a radar prim changes nothing -- that is the Lidar generic core model's namespace. Use `omni:sensor:WpmDmat:`, and note that `elementsCoordsType` defaults to `SPHERICAL` and `outputFrameOfReference` to `SENSOR`.
 
 ## Related Skills
 
@@ -152,3 +151,13 @@ Common radar channels:
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+Product documentation owns the detail this skill only summarizes:
+
+- [Radar generic wpmDmat model](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/index.html) -- what a detection is, the three attribute namespaces, aliasing, what a radar reads from a material label, the motion BVH requirement.
+- [Radar Attributes](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/attributes.html) -- every scan, CFAR, noise, waveform and antenna attribute with its default.
+- [Choose Radar Parameter Values](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/howto/choose_parameters.html) and [Validate a Radar Parameterization](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/howto/validate_parameterization.html) -- picking values that hold together, and checking them before trusting output.
+- [Run More Than One Scan Pattern](https://nvidia-omniverse.github.io/ovrtx/sensors/nonvisual/radar_wpm_dmat/howto/scan_configurations.html) -- authoring more than one scan and telling which one produced a frame.
+- [Sensor Outputs](https://nvidia-omniverse.github.io/ovrtx/sensors/common/sensor_outputs.html) -- the output container, bounding a read by `Counts`, the `VALID` (`0x40`) bit, packing and the params every point cloud shares.
+- [Output Configuration](https://nvidia-omniverse.github.io/ovrtx/sensors/common/output_configuration.html) -- RenderProduct and RenderVar wiring, and the motion BVH renderer option.
+- [Troubleshooting](https://nvidia-omniverse.github.io/ovrtx/sensors/troubleshooting/index.html) -- symptoms, their causes, and the by-design limits of the models.

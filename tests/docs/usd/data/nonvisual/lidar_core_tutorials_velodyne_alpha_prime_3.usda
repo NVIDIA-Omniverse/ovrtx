@@ -1,0 +1,22 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-tutorials-velodyne-alpha-prime-3]
+#usda 1.0
+
+def OmniLidar "Velodyne_Alpha_Prime_Rev4"
+{
+    float omni:sensor:Core:nearRangeM = 0.3
+    float omni:sensor:Core:farRangeM = 300.0
+    float omni:sensor:Core:rangeResolutionM = 0.004
+    float omni:sensor:Core:rangeAccuracyM = 0.03
+    float omni:sensor:Core:minReflectance = 0.10
+    float omni:sensor:Core:minReflectionRangeM = 300.0
+    uint omni:sensor:Core:maxReturns = 2
+    float omni:sensor:Core:minDistBetweenEchosM = 1.0
+    uint omni:sensor:Core:rangeCount = 1
+    float[] omni:sensor:Core:rangesMinM = [0.3]
+    float[] omni:sensor:Core:rangesMaxM = [300.0]
+}
+# [/snippet:doc-nonvisual-lidar-core-tutorials-velodyne-alpha-prime-3]

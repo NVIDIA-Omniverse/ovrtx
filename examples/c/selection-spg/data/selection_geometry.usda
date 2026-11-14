@@ -1,0 +1,92 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    defaultPrim = "World"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+# Geometry, ground texture, and studio HDRI are bundled copies of tests/docs/data assets.
+def Xform "World"
+{
+    def Xform "Ground" (
+        prepend references = @ground.usd@
+    )
+    {
+        double3 xformOp:scale = (2, 2, 2)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+    }
+
+    # Reference the meshes directly so selection paths name renderable geometry.
+    def Mesh "Sphere" (
+        prepend references = @sphere.usd@</World/Sphere>
+    )
+    {
+        color3f[] primvars:displayColor = [(0.28, 0.42, 0.55)]
+        double3 xformOp:translate = (-24, 17.5, 0)
+        double3 xformOp:scale = (0.35, 0.35, 0.35)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Mesh "Torus" (
+        prepend references = @torus.usd@</World/Torus>
+    )
+    {
+        color3f[] primvars:displayColor = [(0.5, 0.32, 0.42)]
+        double3 xformOp:translate = (34, 7.5, 0)
+        double3 xformOp:scale = (0.3, 0.3, 0.3)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    # The foreground cube partly occludes the sphere; select only the sphere to see hidden edges.
+    def Mesh "Cube" (
+        prepend references = @cube.usd@</World/Cube>
+    )
+    {
+        color3f[] primvars:displayColor = [(0.55, 0.38, 0.22)]
+        double3 xformOp:translate = (-33, 12, 30)
+        double3 xformOp:scale = (0.24, 0.24, 0.24)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Camera "Camera"
+    {
+        float2 clippingRange = (1, 10000)
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        token projection = "perspective"
+        double3 xformOp:translate = (0, 100, 240)
+        double3 xformOp:rotateXYZ = (-18.434948823, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 1000
+        asset inputs:texture:file = @studio.exr@
+        token inputs:texture:format = "latlong"
+        custom int omni:rtx:usdluxVersion = 2505
+        double3 xformOp:rotateXYZ = (0, 266.7786936375202, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+}
+
+def Scope "Render"
+{
+    # [snippet:selection-spg-geometry-gpu]
+    def RenderProduct "Camera"
+    {
+        rel camera = </World/Camera>
+        uint[] deviceIds = [0]
+        int2 resolution = (1920, 1080)
+        rel orderedVars = <LdrColor>
+
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+    # [/snippet:selection-spg-geometry-gpu]
+}

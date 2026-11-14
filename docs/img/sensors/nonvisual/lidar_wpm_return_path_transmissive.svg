@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="300" viewBox="0 0 1100 300" role="img" aria-labelledby="title desc">
+<title id="title">What each return-processing mode can see through</title>
+<desc id="desc">Three plan views of a pulse that passes a glass pane and hits a wall. Left, waveform mode: the return from the wall crosses the pane on its way back and is accepted, attenuated. Middle, directDetector or directMaterial mode: the return is blocked at the pane, so only the pane itself can be reported. Right, waveform mode with two panes: the return crosses the first pane it meets and is blocked at the second.</desc>
+<defs><marker id="arrow-0074df-1p2" markerUnits="userSpaceOnUse" markerWidth="6.6" markerHeight="5.4" refX="0" refY="2.7" orient="auto" overflow="visible"><path d="M0,0 L6.6,2.7 L0,5.4 z" fill="#0074DF"/></marker><marker id="arrow-313131-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#313131"/></marker><marker id="arrow-313131-2p2" markerUnits="userSpaceOnUse" markerWidth="12.1" markerHeight="9.9" refX="0" refY="4.95" orient="auto" overflow="visible"><path d="M0,0 L12.1,4.95 L0,9.9 z" fill="#313131"/></marker></defs>
+<rect width="1100" height="300" fill="#fff"/>
+<rect x="12" y="14" width="352" height="240" rx="8" fill="#F2F2F2"/>
+<text x="188" y="40" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">waveform</text>
+<rect x="26" y="94" width="70" height="48" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="61" y="122.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">sensor</text>
+<rect x="209" y="66" width="6" height="118" rx="1" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<rect x="330" y="66" width="14" height="118" rx="1" fill="#757575"/>
+<line x1="96" y1="114" x2="316.9" y2="114" stroke="#313131" stroke-width="2.2" marker-end="url(#arrow-313131-2p2)"/>
+<circle cx="330" cy="114" r="4" fill="#313131"/>
+<line x1="330" y1="114" x2="212" y2="126.1" stroke="#0074DF" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="212" y1="126.1" x2="102.57" y2="137.33" stroke="#0074DF" stroke-width="1.2" stroke-dasharray="3.6 2.4" marker-end="url(#arrow-0074df-1p2)"/>
+<text x="154" y="202" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#76B900" text-anchor="middle" font-weight="bold">return accepted (attenuated)</text>
+<text x="212" y="222" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">glass (transmissive)</text>
+<text x="337" y="222" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">wall</text>
+<rect x="374" y="14" width="352" height="240" rx="8" fill="#F2F2F2"/>
+<text x="550" y="40" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">directDetector / directMaterial</text>
+<rect x="388" y="94" width="70" height="48" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="423" y="122.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">sensor</text>
+<rect x="571" y="66" width="6" height="118" rx="1" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<rect x="692" y="66" width="14" height="118" rx="1" fill="#757575"/>
+<line x1="458" y1="114" x2="678.9" y2="114" stroke="#313131" stroke-width="2.2" marker-end="url(#arrow-313131-2p2)"/>
+<circle cx="692" cy="114" r="4" fill="#313131"/>
+<line x1="692" y1="114" x2="574" y2="126.1" stroke="#0074DF" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="568" y1="120.1" x2="580" y2="132.1" stroke="#C8102E" stroke-width="2.5"/>
+<line x1="568" y1="132.1" x2="580" y2="120.1" stroke="#C8102E" stroke-width="2.5"/>
+<text x="574" y="202" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#C8102E" text-anchor="middle" font-weight="bold">return blocked</text>
+<text x="574" y="222" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">glass (transmissive)</text>
+<text x="699" y="222" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">wall</text>
+<rect x="736" y="14" width="352" height="240" rx="8" fill="#F2F2F2"/>
+<text x="912" y="40" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">waveform, two panes</text>
+<rect x="750" y="94" width="70" height="48" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="785" y="122.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">sensor</text>
+<rect x="883" y="66" width="6" height="118" rx="1" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<rect x="963" y="66" width="6" height="118" rx="1" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<rect x="1054" y="66" width="14" height="118" rx="1" fill="#757575"/>
+<line x1="820" y1="114" x2="1040.9" y2="114" stroke="#313131" stroke-width="2.2" marker-end="url(#arrow-313131-2p2)"/>
+<circle cx="1054" cy="114" r="4" fill="#313131"/>
+<line x1="1054" y1="114" x2="966" y2="123.03" stroke="#0074DF" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="966" y1="123.03" x2="886" y2="131.23" stroke="#0074DF" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<line x1="880" y1="125.23" x2="892" y2="137.23" stroke="#C8102E" stroke-width="2.5"/>
+<line x1="880" y1="137.23" x2="892" y2="125.23" stroke="#C8102E" stroke-width="2.5"/>
+<text x="886" y="202" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#C8102E" text-anchor="middle" font-weight="bold">return blocked</text>
+<text x="926" y="222" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">glass (transmissive), two panes</text>
+<text x="1061" y="222" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">wall</text>
+<line x1="16" y1="279" x2="27" y2="279" stroke="#313131" stroke-width="2" marker-end="url(#arrow-313131-2)"/>
+<text x="44" y="283.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">pulse out</text>
+<line x1="121.67" y1="279" x2="139.67" y2="279" stroke="#0074DF" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="149.67" y="283.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">return to the receiver</text>
+<line x1="305.57" y1="274.5" x2="314.57" y2="283.5" stroke="#C8102E" stroke-width="2.5"/>
+<line x1="305.57" y1="283.5" x2="314.57" y2="274.5" stroke="#C8102E" stroke-width="2.5"/>
+<text x="329.07" y="283.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">blocked</text>
+</svg>

@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1106" height="460" viewBox="0 0 1106 460" role="img" aria-labelledby="title desc">
+<title id="title">A parameter edit on a running sensor</title>
+<desc id="desc">How an edit lands on a running sensor. The frame in flight finishes with its starting values; the next frame built after the edit uses the new ones. A refused batch changes nothing, and every later frame stays on the accepted configuration until the offending value is corrected.</desc>
+<defs><marker id="arrow-757575-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#757575"/></marker></defs>
+<rect width="1106" height="460" fill="#fff"/>
+<rect x="32" y="56" width="1042" height="84" rx="4" fill="#F2F2F2"/>
+<text x="44" y="102.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">edit applied</text>
+<line x1="160" y1="62" x2="160" y2="134" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="170" y="66" width="144" height="64" rx="6" fill="#0074DF"/>
+<text x="242" y="102.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">frame n-1</text>
+<rect x="320" y="66" width="144" height="64" rx="6" fill="#0074DF"/>
+<text x="392" y="102.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">frame n</text>
+<rect x="470" y="66" width="144" height="64" rx="6" fill="#76B900"/>
+<text x="542" y="102.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">frame n+1</text>
+<rect x="620" y="66" width="144" height="64" rx="6" fill="#76B900"/>
+<text x="692" y="102.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">frame n+2</text>
+<rect x="770" y="66" width="144" height="64" rx="6" fill="#76B900"/>
+<text x="842" y="102.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">frame n+3</text>
+<rect x="920" y="66" width="144" height="64" rx="6" fill="#76B900"/>
+<text x="992" y="102.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">frame n+4</text>
+<rect x="32" y="226" width="1042" height="84" rx="4" fill="#F2F2F2"/>
+<text x="44" y="272.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">batch refused</text>
+<line x1="160" y1="232" x2="160" y2="304" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="170" y="236" width="144" height="64" rx="6" fill="#0074DF"/>
+<text x="242" y="272.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">frame n-1</text>
+<rect x="320" y="236" width="144" height="64" rx="6" fill="#0074DF"/>
+<text x="392" y="272.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">frame n</text>
+<rect x="470" y="236" width="144" height="64" rx="6" fill="#0074DF"/>
+<text x="542" y="272.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">frame n+1</text>
+<rect x="620" y="236" width="144" height="64" rx="6" fill="#0074DF"/>
+<text x="692" y="272.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">frame n+2</text>
+<rect x="770" y="236" width="144" height="64" rx="6" fill="#76B900"/>
+<text x="842" y="272.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">frame n+3</text>
+<rect x="920" y="236" width="144" height="64" rx="6" fill="#76B900"/>
+<text x="992" y="272.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">frame n+4</text>
+<line x1="354.56" y1="50" x2="354.56" y2="146" stroke="#313131" stroke-width="2.5"/>
+<text x="361.56" y="46" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">edit at t</text>
+<text x="392" y="160" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">in flight: finishes with</text>
+<text x="392" y="177" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">its starting values</text>
+<line x1="474" y1="152" x2="1060" y2="152" stroke="#757575" stroke-width="1.5"/>
+<line x1="474" y1="152" x2="474" y2="146" stroke="#757575" stroke-width="1.5"/>
+<line x1="1060" y1="152" x2="1060" y2="146" stroke="#757575" stroke-width="1.5"/>
+<text x="767" y="170" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">new values: every frame built after the edit</text>
+<line x1="354.56" y1="220" x2="354.56" y2="316" stroke="#C8102E" stroke-width="2.5" stroke-dasharray="7.5 5"/>
+<text x="361.56" y="216" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">refused batch at t</text>
+<rect x="479.06" y="201.93" width="102.41" height="19.5" rx="3" fill="#fff" stroke="#C8102E" stroke-width="1.5"/>
+<text x="530.26" y="215.82" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#C8102E" text-anchor="middle" font-weight="bold">error logged</text>
+<line x1="740.96" y1="220" x2="740.96" y2="316" stroke="#313131" stroke-width="2.5"/>
+<text x="747.96" y="216" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">value corrected</text>
+<line x1="324" y1="322" x2="760" y2="322" stroke="#757575" stroke-width="1.5"/>
+<line x1="324" y1="322" x2="324" y2="316" stroke="#757575" stroke-width="1.5"/>
+<line x1="760" y1="322" x2="760" y2="316" stroke="#757575" stroke-width="1.5"/>
+<text x="542" y="340" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">accepted configuration kept: the refused batch changed nothing</text>
+<line x1="774" y1="322" x2="1060" y2="322" stroke="#757575" stroke-width="1.5"/>
+<line x1="774" y1="322" x2="774" y2="316" stroke="#757575" stroke-width="1.5"/>
+<line x1="1060" y1="322" x2="1060" y2="316" stroke="#757575" stroke-width="1.5"/>
+<text x="917" y="340" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">new values</text>
+<line x1="160" y1="384" x2="1075.75" y2="384" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="170" y1="384" x2="170" y2="390" stroke="#757575" stroke-width="1.5"/>
+<line x1="320" y1="384" x2="320" y2="390" stroke="#757575" stroke-width="1.5"/>
+<line x1="470" y1="384" x2="470" y2="390" stroke="#757575" stroke-width="1.5"/>
+<line x1="620" y1="384" x2="620" y2="390" stroke="#757575" stroke-width="1.5"/>
+<line x1="770" y1="384" x2="770" y2="390" stroke="#757575" stroke-width="1.5"/>
+<line x1="920" y1="384" x2="920" y2="390" stroke="#757575" stroke-width="1.5"/>
+<line x1="1064" y1="384" x2="1064" y2="390" stroke="#757575" stroke-width="1.5"/>
+<line x1="354.56" y1="384" x2="354.56" y2="393" stroke="#757575" stroke-width="2"/>
+<text x="354.56" y="405" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">t</text>
+<text x="1084" y="405" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">time</text>
+<rect x="32" y="414" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="55" y="424.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">values before the edit</text>
+<rect x="209.1" y="414" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="232.1" y="424.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">new values</text>
+<line x1="321.76" y1="420" x2="337.76" y2="420" stroke="#313131" stroke-width="2"/>
+<text x="344.76" y="424.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">edit or correction</text>
+<line x1="470.49" y1="420" x2="486.49" y2="420" stroke="#C8102E" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="493.49" y="424.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">refused batch</text>
+</svg>

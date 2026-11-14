@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="560" viewBox="0 0 1060 560" role="img" aria-labelledby="title desc">
+<title id="title">Dense and compact point layouts of a two-tile aggregate</title>
+<desc id="desc">Top, dense output: twelve capacity slots in tile-major, row-major, return-major order for two tiles with receiversPerTile 3 and maxReturns 2; the VALID bit of Flags marks the six slots that hold a return, tileStridePoints = 6 and receiverStridePoints = 2 locate a slot and Counts[0] = 12 is the capacity. Bottom, compact output: the same six returns gathered into a prefix of length Counts[0] = 6 in the same order, TilePointOffsets = [0, 3, 6] and TilePointCounts = [3, 3] saying where each tile's returns are, and the six remaining slots unspecified with Flags 0.</desc>
+<defs><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker></defs>
+<rect width="1060" height="560" fill="#fff"/>
+<text x="104" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Dense output</text>
+<text x="225.13" y="34" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">includeInvalidPoints = true · Counts[0] = 12 (capacity) · compactionType = 1</text>
+<path d="M104,76 L104,70 L544,70 L544,76" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="324" y="62" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">tile 0</text>
+<text x="176" y="92" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">row 0</text>
+<text x="324" y="92" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">row 1</text>
+<text x="472" y="92" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">row 2</text>
+<path d="M564,76 L564,70 L1004,70 L1004,76" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="784" y="62" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">tile 1</text>
+<text x="636" y="92" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">row 0</text>
+<text x="784" y="92" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">row 1</text>
+<text x="932" y="92" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">row 2</text>
+<rect x="104" y="100" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="139" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">0</text>
+<rect x="178" y="100" width="70" height="44" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="213" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">1</text>
+<rect x="252" y="100" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="287" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">2</text>
+<rect x="326" y="100" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="361" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">3</text>
+<rect x="400" y="100" width="70" height="44" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="435" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">4</text>
+<rect x="474" y="100" width="70" height="44" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="509" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">5</text>
+<rect x="564" y="100" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="599" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">6</text>
+<rect x="638" y="100" width="70" height="44" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="673" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">7</text>
+<rect x="712" y="100" width="70" height="44" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="747" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">8</text>
+<rect x="786" y="100" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="821" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">9</text>
+<rect x="860" y="100" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="895" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">10</text>
+<rect x="934" y="100" width="70" height="44" rx="6" fill="#fff" stroke="#757575" stroke-width="1.5"/>
+<text x="969" y="127.04" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">11</text>
+<text x="90" y="162" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">return</text>
+<text x="139" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="213" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">1</text>
+<text x="287" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="361" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">1</text>
+<text x="435" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="509" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">1</text>
+<text x="599" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="673" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">1</text>
+<text x="747" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="821" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">1</text>
+<text x="895" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="969" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">1</text>
+<text x="90" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">VALID bit</text>
+<text x="139" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="213" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="287" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="361" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="435" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="509" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="599" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="673" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="747" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="821" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="895" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="969" y="180" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<path d="M104,192 L104,198 L252,198 L252,192" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="178" y="216" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">receiverStridePoints = 2</text>
+<path d="M104,224 L104,230 L564,230 L564,224" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="334" y="248" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">tileStridePoints = 6</text>
+<line x1="554" y1="262" x2="554" y2="289" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="566" y="285" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">compaction (stable order: tile, row, return)</text>
+<text x="104" y="326" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Compact output (the default)</text>
+<text x="350.03" y="326" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">includeInvalidPoints = false · Counts[0] = 6 · compactionType = 2</text>
+<path d="M104,366 L104,360 L544,360 L544,366" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="324" y="352" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">Counts[0] = 6</text>
+<path d="M104,387 L104,392 L322,392 L322,387" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="213" y="378" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">TilePointCounts[0] = 3</text>
+<path d="M326,387 L326,392 L544,392 L544,387" fill="none" stroke="#757575" stroke-width="1.5"/>
+<text x="435" y="378" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">TilePointCounts[1] = 3</text>
+<line x1="104" y1="414" x2="104" y2="422" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="104" y="408" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">TilePointOffsets[0] = 0</text>
+<line x1="326" y1="414" x2="326" y2="422" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="326" y="408" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">TilePointOffsets[1] = 3</text>
+<line x1="544" y1="414" x2="544" y2="422" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="544" y="408" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">TilePointOffsets[2] = 6</text>
+<text x="784" y="408" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">unspecified, Flags = 0</text>
+<rect x="104" y="434" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="139" y="459.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle" font-weight="bold">slot 0</text>
+<rect x="178" y="434" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="213" y="459.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle" font-weight="bold">slot 2</text>
+<rect x="252" y="434" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="287" y="459.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle" font-weight="bold">slot 3</text>
+<rect x="326" y="434" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="361" y="459.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle" font-weight="bold">slot 6</text>
+<rect x="400" y="434" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="435" y="459.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle" font-weight="bold">slot 9</text>
+<rect x="474" y="434" width="70" height="44" rx="6" fill="#76B900"/>
+<text x="509" y="459.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle" font-weight="bold">slot 10</text>
+<rect x="564" y="434" width="70" height="44" rx="6" fill="#C0C0C0"/>
+<rect x="638" y="434" width="70" height="44" rx="6" fill="#C0C0C0"/>
+<rect x="712" y="434" width="70" height="44" rx="6" fill="#C0C0C0"/>
+<rect x="786" y="434" width="70" height="44" rx="6" fill="#C0C0C0"/>
+<rect x="860" y="434" width="70" height="44" rx="6" fill="#C0C0C0"/>
+<rect x="934" y="434" width="70" height="44" rx="6" fill="#C0C0C0"/>
+<text x="90" y="496" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">index</text>
+<text x="139" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">0</text>
+<text x="213" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">1</text>
+<text x="287" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">2</text>
+<text x="361" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">3</text>
+<text x="435" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">4</text>
+<text x="509" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">5</text>
+<text x="599" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">6</text>
+<text x="673" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">7</text>
+<text x="747" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">8</text>
+<text x="821" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">9</text>
+<text x="895" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">10</text>
+<text x="969" y="496" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">11</text>
+<text x="90" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="end">VALID bit</text>
+<text x="139" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="213" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="287" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="361" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="435" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="509" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">set</text>
+<text x="599" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="673" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="747" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="821" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="895" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<text x="969" y="514" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">clear</text>
+<rect x="104" y="534" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="123" y="544.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">slot holding a return (VALID bit set)</text>
+<rect x="358.76" y="535" width="10" height="10" rx="2" fill="none" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="376.76" y="544.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">empty slot (VALID bit clear)</text>
+<rect x="564.66" y="534" width="12" height="12" rx="2" fill="#C0C0C0"/>
+<text x="583.66" y="544.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">unspecified tail</text>
+</svg>

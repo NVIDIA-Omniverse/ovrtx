@@ -1,18 +1,11 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: stepping-and-rendering
 description: >
   Running a simulation step to produce rendered frames. Use when user asks to render a
   frame, step the renderer, simulate a sensor, or get an image from ovrtx.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -77,7 +70,7 @@ ovrtx tracks **two independent clocks** — a frequent point of confusion:
 | **Simulation time** | seconds | `step(products, delta_time)` (accumulates); `reset(time)` | sensor timing — motion blur, lidar/radar scan, `TimeOffsetNs` |
 | **USD time** | **timecodes** (converted from seconds via `timeCodesPerSecond`) | `update_from_usd_time(seconds)` (see `loading-usd`) | time-sampled attributes — animated transforms, visibility, ... |
 
-`step()` does **not** advance USD animation, and `update_from_usd_time()` does **not** advance the simulation/sensor clock. To render an animated frame at time *t*: call `update_from_usd_time(t)` first, then `step(...)`. `reset(time)` resets simulation time only (not USD time, and distinct from `reset_stage()`). Remember `update_from_usd_time` takes **seconds**, not timecodes — see `loading-usd` for the `timeCodesPerSecond` conversion.
+`step()` does **not** advance USD animation, and `update_from_usd_time()` does **not** advance the simulation/sensor clock. To render an animated frame at time *t*: call `update_from_usd_time(t)` first, then `step(...)`. `reset(time)` resets the simulation clock, not USD time, and is distinct from `reset_stage()`. It also discards all accumulated rendering history: every render product's, plus the renderer's path-tracer radiance cache, Flow simulation and the frame number its sampling sequences are keyed on, so warm up again before capturing (see `warmup`). Remember `update_from_usd_time` takes **seconds**, not timecodes — see `loading-usd` for the `timeCodesPerSecond` conversion.
 
 ### Step window vs. frame capture time
 
@@ -118,16 +111,16 @@ A default viewport camera captures instantaneously at the *end* of the step wind
 Keep all active sensor RenderProducts in every step, including steps with no
 completed output. Omitting a product discards its accumulated rendering history.
 Apply `OmniSensorAPI` to scheduled cameras and author `omni:sensor:frameRate`
-as rational Hz. For compatibility with the pinned ovrtx 0.5 package, set the
-camera's `omni:sensor:Core:partialOutputs` through ovstage: its camera USD schemas
-do not declare this attribute, so an extra USD opinion alone is not populated.
+as rational Hz. Set a camera's `omni:sensor:Core:partialOutputs` through ovstage:
+no camera USD schema declares this attribute, so an extra USD opinion alone is
+not populated.
 `LdrColor` has no public completion flag and can repeat the last
 completed image during an intermediate rolling-shutter split.
 
 The runnable example and `tests/docs/python/test_multi_rate_sensors.py` validate
 40/20 Hz lidars and 10/20 Hz cameras on a 40 Hz simulation clock, both output
 policies, and accumulated scan history. The example records from the first step
-without warmup. See `docs/sensors/multi_rate.rst` for the timing and metadata distinctions.
+without warmup. See `docs/sensors/common/multi_rate.rst` for the timing and metadata distinctions.
 
 ### Reset simulation time
 
@@ -139,6 +132,19 @@ without warmup. See `docs/sensors/multi_rate.rst` for the timing and metadata di
 >
 > Assert the clock base via `products.simulation_start_time` after the next step
 > (distinct from `FrameOutput.start_time`).
+
+### Clear rendering history
+
+`renderer.clear_history(products)` discards the temporal history of those RenderProducts
+(for example after a camera cut) on the next frame each one produces, keeping
+the simulation time, the sensor schedule and the other products' history. The
+cleared frame renders once, unless it is frame 0 or the first frame of a
+product that started paused by `omni:sensor:frameLimit`; pass
+`first_frame_quality=True` to apply the product's `omni:rtx:waitForEvents` and
+`omni:rtx:quality`, or `quality=RenderQuality(...)` to choose them.
+A clear also resets lidar and radar model state. `tiles=[...]` clears
+selected tiles of one tiled RenderProduct instead of the deprecated
+`omni:rtx:viewTile:renderHistoryReset` attributes.
 
 ## C
 
@@ -152,6 +158,13 @@ without warmup. See `docs/sensors/multi_rate.rst` for the timing and metadata di
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `find-output-helper`
 
+A step returns *zero or more* frames per render product, not always one. A sensor
+whose exposures end more than once during the step produces one frame per exposure,
+and DLSS Frame Generation produces N interpolated frames followed by the real
+rendered frame for each completed camera capture. Total frame count alone cannot
+distinguish interpolation from multiple simulated captures in one step. Drive loops from `output_frame_count` and pick the frame you
+want deliberately — see `dlss-frame-generation` for the frame-generation contract.
+
 ## Key Types / Functions
 
 | Python | C |
@@ -159,6 +172,7 @@ without warmup. See `docs/sensors/multi_rate.rst` for the timing and metadata di
 | `renderer.step(products, dt)` | `ovrtx_step()` + `ovrtx_wait_op()` + `ovrtx_fetch_results()` |
 | `renderer.step_async(products, dt)` | `ovrtx_step()` (always async) |
 | `renderer.reset(time)` | `ovrtx_reset(renderer, time)` |
+| `renderer.clear_history(products, ...)` | `ovrtx_clear_history(renderer, products, flags, quality, tiles)` |
 | `RenderProductSetOutputs` | `ovrtx_render_product_set_outputs_t` |
 | `ProductOutput` | `ovrtx_render_product_output_t` |
 | `FrameOutput` | `ovrtx_render_product_frame_output_t` |
@@ -176,7 +190,7 @@ RenderProductSetOutputs
 
 ## Troubleshooting
 
-- The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure; later runs should be faster once the shader cache is populated.
+- The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure; later runs should be faster once the shader cache is populated.
 - In C, you must call `ovrtx_destroy_results()` after processing to free resources. ovrtx will warn if results are leaked.
 - `delta_time` controls sensor simulation timing. A camera without an authored positive sensor frame rate is auto-triggered; a scheduled camera follows its own capture rate.
 - The render product paths must match actual RenderProduct prims in the USD stage.

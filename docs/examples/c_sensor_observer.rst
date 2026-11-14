@@ -31,7 +31,7 @@ simulation. Frames are returned from the observer camera as soon as they are rea
 The observer camera's image is drawn to the viewport as fast as the display allows,
 and the sensor camera's image is drawn as an inset 30 times per second.
 
-See :doc:`../sensors/multi_rate` for the scheduling contract.
+See :doc:`../sensors/common/multi_rate` for the scheduling contract.
 
 Build and Run
 -------------

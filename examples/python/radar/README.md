@@ -20,6 +20,39 @@ The scene is Z-up and contains:
 The moving cube advances 1 m toward the radar on each of 10 simulation steps.
 Approaching radar detections report negative `RadialVelocityMs`.
 
+## Alternative Scene
+
+`radar_example_field.usda`, beside the default scene, sends the same 1.5 m
+steel cube from `(30, 4, 0.75)` to `(20, 4, 0.75)` over the ten steps, closing
+at 10 m/s, across a field of 33 thin steel panels, 0.25 m thick, 2 m tall and
+0.75 m to 3 m wide, placed at increasing range across the field of view and
+each facing the radar in a range bin of its own, on the asphalt ground plane of
+the default scene. The radar authors one scan explicitly: 112 range bins, 161
+velocity bins, 12 azimuth bins and 2 elevation bins, 90 m maximum range,
+75-degree azimuth and 10-degree elevation half-angles, constant transmit and
+receive antenna gain, a one-cell CFAR training neighborhood with no guard
+cells, and every noise input authored with zero mean and zero deviation. Its
+labels are `asphalt` and `steel`; both `Material` prims carry the
+`omni:simready:nonvisual` label the radar reads and a visual shader. The scene
+also carries a `PreviewCamera` with its own `CameraProduct`, a high vantage
+behind the radar looking across the field, which this example does not step;
+its `PointCloud` request adds `RCS` to the channels listed below.
+
+Select it with `--scene`:
+
+```bash
+uv run main.py --scene radar_example_field.usda
+```
+
+With that scene, `uv run main.py --scene radar_example_field.usda --no-rr`
+printed 35 to 37 valid points per step with
+`radial velocity min/max=[-9.92, 0.0004] m/s`, the minimum from the closing
+cube and the maximum from the static panels; the first line read:
+
+```text
+step 1: valid points=35, radial velocity min/max=[-9.921682357788086, 0.0003972465347032994] m/s
+```
+
 ## Render Output
 
 The USD requests the radar `PointCloud` render variable with these channels:

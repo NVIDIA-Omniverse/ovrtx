@@ -9,8 +9,8 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 #
-# Slang variant of overlay_scene.usda. The rendered world is referenced from that scene, so
-# this file shows only what differs between the two backends: the shader definition it
+# Slang variant of overlay_scene.usda. The rendered world is referenced from that scene;
+# the render graph below differs only in the shader definition it
 # instantiates.
 (
     defaultPrim = "World"

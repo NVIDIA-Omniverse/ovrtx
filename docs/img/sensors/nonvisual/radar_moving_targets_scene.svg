@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="994" height="536" viewBox="0 0 994 536" role="img" aria-labelledby="title desc">
+<title id="title">The radar example scene from above</title>
+<desc id="desc">Top-down sketch, X to the right and Y up, in meters. The radar sits at the origin and looks along +X over an asphalt ground plane. A steel cube travels along the line y = 4 from x = 30 to x = 20, one meter per 0.1 s step, toward the radar; its detections report a negative RadialVelocityMs near -10 m/s. A concrete cube stays at (30, -4) and reports a radial velocity near zero. A dashed line of sight joins the radar to the steel cube. The shaded wedge is the field of view at the schema defaults; both cubes lie well inside it.</desc>
+<defs><marker id="arrow-0074df-3" markerUnits="userSpaceOnUse" markerWidth="16.5" markerHeight="13.5" refX="0" refY="6.75" orient="auto" overflow="visible"><path d="M0,0 L16.5,6.75 L0,13.5 z" fill="#0074DF"/></marker><marker id="arrow-313131-2p5" markerUnits="userSpaceOnUse" markerWidth="13.75" markerHeight="11.25" refX="0" refY="5.62" orient="auto" overflow="visible"><path d="M0,0 L13.75,5.62 L0,11.25 z" fill="#313131"/></marker></defs>
+<rect width="994" height="536" fill="#fff"/>
+<rect x="64" y="80" width="902" height="396" fill="#F2F2F2" stroke="#C0C0C0" stroke-width="1"/>
+<polygon points="152,278 240.16,80 966,80 966,476 240.16,476" fill="#C0C0C0" fill-opacity="0.45"/>
+<line x1="64" y1="190" x2="966" y2="190" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="64" y1="278" x2="966" y2="278" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="64" y1="366" x2="966" y2="366" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="372" y1="80" x2="372" y2="476" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="592" y1="80" x2="592" y2="476" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="812" y1="80" x2="812" y2="476" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="231.2" y="141.6" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">field of view at the schema defaults</text>
+<text x="72.8" y="104.2" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">outside the field of view</text>
+<text x="74" y="466" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">asphalt ground plane: -200 m to 200 m in X and in Y (the sketch shows the part near the radar)</text>
+<line x1="152" y1="278" x2="795.5" y2="192.2" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="460" y="258.2" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">line of sight</text>
+<line x1="162" y1="278" x2="248.25" y2="278" stroke="#313131" stroke-width="2.5" marker-end="url(#arrow-313131-2p5)"/>
+<rect x="144" y="270" width="16" height="16" rx="3" fill="#313131"/>
+<circle cx="155" cy="278" r="2.5" fill="#fff"/>
+<text x="204.8" y="293.4" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">boresight, +X</text>
+<text x="182.8" y="315.4" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">radar at (0, 0), 1 m above the plane</text>
+<rect x="773.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="751.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="729.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="707.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="685.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="663.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="641.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="619.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="597.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="575.5" y="173.5" width="33" height="33" fill="#fff" stroke="#C0C0C0" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<rect x="795.5" y="173.5" width="33" height="33" fill="#0074DF"/>
+<line x1="793.3" y1="190" x2="583.2" y2="190" stroke="#0074DF" stroke-width="3" marker-end="url(#arrow-0074df-3)"/>
+<text x="691" y="135" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">1 m per step (0.1 s): about 10 m/s</text>
+<text x="532.02" y="157" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">RadialVelocityMs &lt; 0</text>
+<text x="681.5" y="157" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">(approaching, near -10 m/s)</text>
+<text x="812" y="221.9" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">steel cube</text>
+<text x="812" y="243.9" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">from (30, 4) to (20, 4), 1.5 m edge</text>
+<rect x="795.5" y="349.5" width="33" height="33" fill="#76B900"/>
+<text x="812" y="402.3" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">concrete cube, fixed at (30, -4)</text>
+<text x="716.11" y="424.3" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">RadialVelocityMs ~ 0</text>
+<text x="865.59" y="424.3" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">(static)</text>
+<line x1="64" y1="476" x2="966" y2="476" stroke="#757575" stroke-width="1.5"/>
+<line x1="152" y1="476" x2="152" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="152" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">0</text>
+<line x1="262" y1="476" x2="262" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="262" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">5</text>
+<line x1="372" y1="476" x2="372" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="372" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">10</text>
+<line x1="482" y1="476" x2="482" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="482" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">15</text>
+<line x1="592" y1="476" x2="592" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="592" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">20</text>
+<line x1="702" y1="476" x2="702" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="702" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">25</text>
+<line x1="812" y1="476" x2="812" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="812" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">30</text>
+<line x1="922" y1="476" x2="922" y2="482" stroke="#757575" stroke-width="1.5"/>
+<text x="922" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">35</text>
+<text x="966" y="516" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">X (m)</text>
+<line x1="64" y1="80" x2="64" y2="476" stroke="#757575" stroke-width="1.5"/>
+<line x1="64" y1="102" x2="58" y2="102" stroke="#757575" stroke-width="1.5"/>
+<text x="52" y="106.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">8</text>
+<line x1="64" y1="190" x2="58" y2="190" stroke="#757575" stroke-width="1.5"/>
+<text x="52" y="194.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">4</text>
+<line x1="64" y1="278" x2="58" y2="278" stroke="#757575" stroke-width="1.5"/>
+<text x="52" y="282.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">0</text>
+<line x1="64" y1="366" x2="58" y2="366" stroke="#757575" stroke-width="1.5"/>
+<text x="52" y="370.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">-4</text>
+<line x1="64" y1="454" x2="58" y2="454" stroke="#757575" stroke-width="1.5"/>
+<text x="52" y="458.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">-8</text>
+<text x="64" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">Y (m)</text>
+<rect x="64" y="22" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="87" y="32.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">steel cube, closing on the radar</text>
+<rect x="299.09" y="22" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="322.09" y="32.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">concrete cube, fixed</text>
+<rect x="467.96" y="23" width="10" height="10" rx="2" fill="none" stroke="#C0C0C0" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="489.96" y="32.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">later positions of the steel cube, one per step</text>
+<line x1="785.55" y1="28" x2="801.55" y2="28" stroke="#757575" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="808.55" y="32.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">line of sight</text>
+</svg>

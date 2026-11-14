@@ -43,9 +43,11 @@ bool cuda_compile_kernel();
 //
 // Presentation has to be decoupled from copying: with frame generation one step
 // yields several frames at once, and they are shown one at a time on a schedule.
-// A ring needs room for the image being displayed, the frames of a step waiting
-// their turn, and one being written, so two is not enough.
-constexpr int CUDA_SHARED_IMAGE_COUNT = 4;
+// A ring needs room for the published step's frames, one of which is displayed,
+// and the next step's frames being written, plus spare slots so the step after
+// that can start copying before the next one is published; the renderer then
+// never waits on presentation. Sized for 3 interpolated frames: 2 * (3 + 1) + 2.
+constexpr int CUDA_SHARED_IMAGE_COUNT = 10;
 
 // Import Vulkan external memory into CUDA at a specific buffer index
 // Returns a CUDA surface object for writing
@@ -90,7 +92,7 @@ void cuda_run_gradient_kernel(
 );
 
 // Copy from linear CUDA memory to the imported Vulkan surface
-// buffer_index: which double-buffer slot to write to (0 or 1)
+// buffer_index: which presentation-ring slot to write to
 // src_ptr: source device pointer (linear memory)
 // src_pitch: row pitch in bytes of source
 // width, height: dimensions in pixels
@@ -105,7 +107,7 @@ void cuda_copy_to_surface(
 );
 
 // Copy from CUDA array to the imported Vulkan surface (array-to-array); return false on failure
-// buffer_index: which double-buffer slot to write to (0 or 1)
+// buffer_index: which presentation-ring slot to write to
 // src_array: source CUDA array
 // width, height: dimensions in pixels
 // format: pixel format (determines bytes per pixel)

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="510" viewBox="0 0 1000 510" role="img" aria-labelledby="title desc">
+<title id="title">Prim orientation and the ISO 8855 output frame</title>
+<desc id="desc">A sensor prim seen from behind in a Z-up stage. Its camera-style local axes after xformOp:rotateXYZ = (90, 0, -90): local -Z is forward along world +X, local +Y is up along world +Z, local +X is right along world -Y. The ISO 8855 output frame at the same origin, +X forward (azimuth 0), +Y left, +Z up, coincides with the world axes. A target straight ahead of the prim is reported on output +X.</desc>
+<defs><marker id="arrow-0074df-2p5" markerUnits="userSpaceOnUse" markerWidth="13.75" markerHeight="11.25" refX="0" refY="5.62" orient="auto" overflow="visible"><path d="M0,0 L13.75,5.62 L0,11.25 z" fill="#0074DF"/></marker><marker id="arrow-757575-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#757575"/></marker><marker id="arrow-952fc6-2p5" markerUnits="userSpaceOnUse" markerWidth="13.75" markerHeight="11.25" refX="0" refY="5.62" orient="auto" overflow="visible"><path d="M0,0 L13.75,5.62 L0,11.25 z" fill="#952FC6"/></marker><marker id="arrow-c0c0c0-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#C0C0C0"/></marker></defs>
+<rect width="1000" height="510" fill="#fff"/>
+<line x1="420" y1="340" x2="570" y2="198.66" stroke="#C0C0C0" stroke-width="1.5" marker-end="url(#arrow-c0c0c0-1p5)"/>
+<text x="584" y="212" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A">world +X</text>
+<line x1="420" y1="340" x2="169.82" y2="255.64" stroke="#C0C0C0" stroke-width="1.5" marker-end="url(#arrow-c0c0c0-1p5)"/>
+<text x="156" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="end">world +Y</text>
+<line x1="420" y1="340" x2="420" y2="99.25" stroke="#C0C0C0" stroke-width="1.5" marker-end="url(#arrow-c0c0c0-1p5)"/>
+<text x="428" y="99" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A">world +Z</text>
+<text x="420" y="75" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle" font-weight="bold">stage (Z-up)</text>
+<polygon points="421.12,325.74 421.47,323.28 422.5,321.23 454.74,290.85 456.38,289.34 458.52,288.47 461.01,288.32 463.68,288.88 466.35,290.12 468.84,291.95 470.98,294.26 472.62,296.87 473.65,299.62 474,302.32 473.65,304.78 472.62,306.83 440.38,337.21 438.74,338.72 436.6,339.59 434.11,339.74 431.44,339.18 428.77,337.94 426.28,336.11 424.14,333.8 422.5,331.19 421.47,328.44" fill="#CFCFCF" stroke="#757575" stroke-width="1.2" stroke-linejoin="round"/>
+<polygon points="453.36,295.36 453.71,292.9 454.74,290.85 456.38,289.34 458.52,288.47 461.01,288.32 463.68,288.88 466.35,290.12 468.84,291.95 470.98,294.26 472.62,296.87 473.65,299.62 474,302.32 473.65,304.78 472.62,306.83 470.98,308.34 468.84,309.21 466.35,309.36 463.68,308.8 461.01,307.56 458.52,305.73 456.38,303.42 454.74,300.81 453.71,298.06" fill="#B5B5B5" stroke="#757575" stroke-width="1.2" stroke-linejoin="round"/>
+<polygon points="437.8,375.58 379.32,355.86 379.32,325.98 437.8,345.7" fill="#DADADA" stroke="#757575" stroke-width="1.2" stroke-linejoin="round"/>
+<polygon points="437.8,375.58 460.68,354.02 460.68,324.14 437.8,345.7" fill="#C9C9C9" stroke="#757575" stroke-width="1.2" stroke-linejoin="round"/>
+<polygon points="437.8,345.7 460.68,324.14 402.2,304.42 379.32,325.98" fill="#EDEDED" stroke="#757575" stroke-width="1.2" stroke-linejoin="round"/>
+<text x="420" y="399.58" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">sensor prim</text>
+<text x="420" y="416.58" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">xformOp:rotateXYZ = (90, 0, -90)</text>
+<line x1="420" y1="340" x2="513.99" y2="251.43" stroke="#952FC6" stroke-width="2.5" marker-end="url(#arrow-952fc6-2p5)"/>
+<text x="538" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#952FC6" font-weight="bold">ISO +X forward (azimuth 0)</text>
+<line x1="420" y1="340" x2="261.03" y2="286.39" stroke="#952FC6" stroke-width="2.5" marker-end="url(#arrow-952fc6-2p5)"/>
+<text x="244" y="304" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#952FC6" text-anchor="end" font-weight="bold">ISO +Y left</text>
+<line x1="420" y1="340" x2="420" y2="187.75" stroke="#952FC6" stroke-width="2.5" marker-end="url(#arrow-952fc6-2p5)"/>
+<text x="430" y="164" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#952FC6" font-weight="bold">ISO +Z up</text>
+<text x="244" y="326" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#952FC6" text-anchor="end">the ISO 8855 axes coincide with the</text>
+<text x="244" y="341.95" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#952FC6" text-anchor="end">world axes in a Z-up stage</text>
+<line x1="420" y1="340" x2="477.59" y2="285.73" stroke="#0074DF" stroke-width="2.5" stroke-dasharray="7.5 5" marker-end="url(#arrow-0074df-2p5)"/>
+<text x="499.6" y="298.3" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" font-weight="bold">local -Z = forward</text>
+<line x1="420" y1="340" x2="420" y2="245.85" stroke="#0074DF" stroke-width="2.5" stroke-dasharray="7.5 5" marker-end="url(#arrow-0074df-2p5)"/>
+<text x="410" y="226.1" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" text-anchor="end" font-weight="bold">local +Y = up</text>
+<line x1="420" y1="340" x2="518.77" y2="373.31" stroke="#0074DF" stroke-width="2.5" stroke-dasharray="7.5 5" marker-end="url(#arrow-0074df-2p5)"/>
+<text x="539.8" y="391.7" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" font-weight="bold">local +X = right</text>
+<circle cx="420" cy="340" r="4" fill="#313131"/>
+<circle cx="599.4" cy="170.95" r="9" fill="none" stroke="#313131" stroke-width="1.5"/>
+<circle cx="599.4" cy="170.95" r="4" fill="#313131"/>
+<text x="609.4" y="192.95" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">target straight ahead of the prim</text>
+<rect x="680" y="102" width="280" height="52" rx="6" fill="#F2F2F2"/>
+<text x="820" y="122.6" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">reported on output +X</text>
+<text x="820" y="139.4" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">a point straight ahead comes back on ISO +X</text>
+<line x1="609.99" y1="165.31" x2="670.77" y2="131.97" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="30" y1="476" x2="46" y2="476" stroke="#0074DF" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="53" y="479.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">prim local axes (camera convention)</text>
+<line x1="276.86" y1="476" x2="292.86" y2="476" stroke="#952FC6" stroke-width="2"/>
+<text x="299.86" y="479.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">ISO 8855 output frame</text>
+<line x1="448.13" y1="476" x2="464.13" y2="476" stroke="#C0C0C0" stroke-width="2"/>
+<text x="471.13" y="479.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">stage axes (Z-up world)</text>
+</svg>

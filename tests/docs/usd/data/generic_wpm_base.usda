@@ -1,0 +1,45 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-base]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+)
+
+def Xform "World"
+{
+    def OmniGeneralSensor "Sensor" (
+        prepend apiSchemas = ["OmniSensorGenericWpmAPI"]
+    )
+    {
+        # Align the sensor's +X-forward basis with this Z-up world.
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+        double2 omni:sensor:frameRate = (10, 1)
+        uint omni:sensor:GenericWpm:maxBounces = 1
+        float omni:sensor:GenericWpm:maxHitDistanceM = 100
+        uint omni:sensor:GenericWpm:activeTxPatternIndex = 0
+        uint omni:sensor:GenericWpm:activeRxPatternIndex = 0
+        uint omni:sensor:GenericWpm:activeMappingPageIndex = 0
+    }
+}
+
+def Scope "Render"
+{
+    def RenderProduct "GenericWpm"
+    {
+        rel camera = </World/Sensor>
+        rel orderedVars = [</Render/GenericWpm/Contributions>]
+        def RenderVar "Contributions"
+        {
+            uniform string sourceName = "Contributions"
+            # Empty selects the default contribution channels.
+            token[] channels = []
+        }
+    }
+}
+# [/snippet:doc-generic-wpm-base]

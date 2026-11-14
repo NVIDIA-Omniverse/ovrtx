@@ -27,6 +27,9 @@ SLICED_RENDERING_USDA = f"""#usda 1.0
 over "Render" {{
     over RenderProduct "Camera" {{
         float4 dataWindowNDC = (0.0, 0.0, 1.0, 1.0)
+        token omni:rtx:rendermode = "PathTracing"
+        uint omni:rtx:pt:samplesPerPixel = 64
+        int omni:rtx:pt:samplesPerIteration = 32
     }}
 }}
 """
@@ -81,18 +84,19 @@ def test_sliced_rendering(renderer, stage, output_dir):
     stage.advance_write_floor(1, ovstage.Scope.ALL).wait()
 
     # [snippet:doc-sliced-rendering]
-    warmup_frames = 10
-
     def capture(ordinal):
-        for _ in range(warmup_frames):
-            renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
+        """Wait for the current crop to converge before copying its pixels."""
+        # A crop change clears accumulation; capture only the completed image.
+        while True:
+            products = renderer.step(
+                render_products={"/Render/Camera"},
+                delta_time=1.0 / 60,
+                ordinal=ordinal,
+            )
+            frame = products["/Render/Camera"].frames[-1]
+            if frame.converged:
+                break
 
-        products = renderer.step(
-            render_products={"/Render/Camera"},
-            delta_time=1.0 / 60,
-            ordinal=ordinal,
-        )
-        frame = products["/Render/Camera"].frames[-1]
         var = frame.render_vars[LDR_COLOR_PATH].map(device=ovrtx.Device.CPU)
         view = np.from_dlpack(var)
         pixels = view.copy()
@@ -164,7 +168,7 @@ def test_bind_material(renderer, stage, output_dir):
         with stage.query_from_path_list(path_list) as query:
             # [snippet:doc-bind-material]
             material_binding = paths.intern_token("material:binding")
-            material_path = np.array([paths.intern_path("/World/Looks/srf_glass")], dtype=np.uint64)
+            material_path = np.array([paths.intern_path("/World/Looks/srf_glass").raw_id], dtype=np.uint64)
             stage.write_attribute(
                 query,
                 material_binding,
@@ -252,7 +256,7 @@ def test_settings_view_lighting_camera_light(renderer, stage, output_dir):
                 query,
                 paths.intern_token("omni:rtx:viewLighting:lightType"),
                 ordinal=2,
-                tensors=np.array([paths.intern_token("spot")], dtype=np.uint64),
+                tensors=np.array([paths.intern_token("spot").raw_id], dtype=np.uint64),
                 is_array=False,
                 semantic=ovstage.AttributeSemantic.TOKEN_ID,
             ).wait()
@@ -316,7 +320,8 @@ def test_update_from_usd_time_async(renderer, stage):
                 attribute = paths.intern_token("omni:xform")
                 with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
                     group = read.fetch_next()
-                    matrix = np.from_dlpack(group.dlpack(0)).copy().reshape(4, 4)
+                    column = group.columns[0]
+                    matrix = np.from_dlpack(column.dlpack(0)).copy().reshape(4, 4)
                     stage.release_group(group)
             paths.destroy_path_list(path_list)
         return float(matrix[3, 0])

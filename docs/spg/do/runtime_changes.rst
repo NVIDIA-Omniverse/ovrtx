@@ -33,10 +33,7 @@ advancing the write floor, then step:
 How It Works
 ------------
 
-``inputs:X`` **is the name that binds.** A value-input is written at runtime by its USD name,
-``inputs:X``. Refer to :doc:`../ref/usd`.
-
-**An unconnected input takes effect on the next step.** Nothing else has to be reset or reloaded.
+**An unconnected input takes effect on the next step.**
 The blur example changes its radius this way and renders again:
 
 .. filtered-literalinclude:: ../../../examples/python/spg-blur/main.py
@@ -48,18 +45,23 @@ The blur example changes its radius this way and renders again:
 
 **A connected input ignores a direct write.** If ``inputs:X`` is connected to another prim, the
 connection is the source of the value, so writing ``inputs:X`` succeeds and changes nothing. Write
-the source attribute instead, then reset the renderer so the graph picks up the new value.
+the source attribute instead; the node reads it on the next step.
 
 **Each node carries its own copy.** Two nodes referencing the same shader definition each have
 their own ``inputs:X``, so retuning both means writing both.
 
 **A changed value can cost more than the value.** Anything the launch script derives from it is
-derived again, and a :doc:`cached computation <caching>` keyed on it runs again. That is the
-intended behaviour, not a cost to avoid: it is how a new radius reaches a new weight table.
+derived again, and a :doc:`cached computation <caching>` keyed on it runs again. This is how
+a new radius reaches a new weight table.
 
 **Rewiring changes what runs.** Execution order comes from connections, so changing a connection
 can make a node that was idle start running, or stop one that was running. Refer to
 :ref:`Order comes from connections <spg-execution-order>`.
+
+**Outputs can be connected while the scene runs.** Connecting a RenderVar to an existing
+node's output rebuilds that node's connected component and publishes the output on the next
+step. Adding or removing a binding or shader input also rebuilds only the affected component;
+writing an existing input's value does not rebuild it.
 
 Verify It Worked
 ----------------
@@ -68,9 +70,9 @@ Choose a value with an exact effect and check it byte for byte, before and after
 against the same input AOV. A picture that changes but not in the way the value predicts means the
 write landed somewhere other than the input you meant.
 
-The :doc:`blur example <../../examples/python_spg_blur>` uses a blur radius of zero, which makes
-the node the identity, and prints ``pixels differing from the input: 0``. A write that missed
-leaves the previous radius in place and every pixel differs.
+The :doc:`blur example <../../examples/python_spg_blur>` sets the radius to zero, which makes the
+node the identity, and saves that frame's input and output, which match pixel for pixel. A write
+that missed leaves the previous radius in place, and the output differs from the input.
 
 When It Goes Wrong
 ------------------
@@ -82,6 +84,9 @@ When It Goes Wrong
   attribute to exist while you are debugging.
 - A node stopped running after a rewire: it now feeds nothing that is requested. Refer to
   :ref:`Nothing Appears <spg-symptom-nothing>`.
+- A node stopped by a Lua sandbox limit stays stopped with the original error: change one of its
+  value-inputs to retry without rebuilding the graph. Writing an equal value or editing another
+  node does not clear the stop.
 
 Related
 -------

@@ -29,9 +29,9 @@ ovstage is optional when maintaining standalone compatibility code. The
 renderer-owned scene APIs used by that mode have been deprecated since ovrtx 0.4,
 and scene ownership will move entirely to ovstage in a future release.
 
-All the examples in `the repository <https://github.com/NVIDIA-Omniverse/ovrtx>`__ contain ``pyproject.toml`` files that are tested with uv. Python 3.10-3.13 are supported; on Windows, use Python 3.11 or newer.
+All the examples in `the repository <https://github.com/NVIDIA-Omniverse/ovrtx>`__ contain ``pyproject.toml`` files that are tested with uv. Python 3.10–3.13 are supported across the examples; projects that allow Python 3.14 declare it in their ``pyproject.toml``. On Windows, use Python 3.11 or newer.
 
-If installation fails, first verify that you are using a supported Python version and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
+If installation fails, first verify that your Python version matches the project's ``pyproject.toml`` and that your environment can reach PyPI. If you need a specific release artifact, GitHub Releases also contain Python wheels that can be installed explicitly.
 
 ovrtx runtime validation requires an NVIDIA RTX-capable GPU, a supported NVIDIA driver, internet access, and execution outside sandboxed environments. The minimal example downloads scene assets from S3. Supported driver versions are listed in :doc:`../driver_requirements`.
 
@@ -51,7 +51,7 @@ A successful run writes ``_output/render.png``. The output should match the refe
    :alt: Minimal example output
    :align: center
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 ovrtx and ovstage Load Order
 ----------------------------

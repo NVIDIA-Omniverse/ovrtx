@@ -57,5 +57,14 @@ Options
    * - ``--rrd PATH``
      - Write a Rerun recording instead of spawning a viewer
 
+``lidar_example_panels.usda``, beside the example, is an alternative scene for
+``--scene``: the same lidar, 1.5 m above the origin, among a glass pane, a
+silver panel and concrete walls, with a preview camera product the example does
+not step.
+
+.. code-block:: bash
+
+   uv run main.py --scene lidar_example_panels.usda
+
 Expected console output values vary, but a successful run prints the number of
 valid points, mean intensity, and maximum time offset in nanoseconds.

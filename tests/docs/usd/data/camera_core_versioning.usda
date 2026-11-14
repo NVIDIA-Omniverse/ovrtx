@@ -1,0 +1,23 @@
+#usda 1.0
+
+# [snippet:doc-camera-core-versioning]
+def Xform "World" {
+    def Camera "Camera" (
+        prepend apiSchemas = ["OmniSensorGenericCameraCoreAPI"]
+    )
+    {
+        string omni:sensor:modelVersion = "0"
+    }
+}
+
+def "Render" {
+    def RenderProduct "Camera" {
+        rel camera = </World/Camera>
+        rel orderedVars = [<LdrColor>]
+
+        def RenderVar "LdrColor" {
+            string sourceName = "LdrColor"
+        }
+    }
+}
+# [/snippet:doc-camera-core-versioning]

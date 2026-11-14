@@ -29,8 +29,9 @@ future release.
 
 Skills that touch ovstage concepts (cloning, attributes, queries, stage loading)
 should cross-reference ovstage as authoritative for scene-data behavior. When
-working in an attached-mode context, also pull ovstage's agent context — its
-`AGENTS.md`.
+working in an attached-mode context, also read ovstage's canonical agent context at
+https://github.com/NVIDIA-Omniverse/ovstage/blob/main/AGENTS.md.
+
 
 Key docs: `docs/core/ovstage_integration.rst` (attachment, ordinals, update
 loop), `CHANGELOG.md` §0.4.
@@ -58,6 +59,11 @@ For existing Python or C/C++ applications moving from ovrtx 0.5.x to 0.6.x,
 use [`update-0-5-to-0-6`](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-5-to-0-6/SKILL.md) for logging,
 animation, OVStage 0.3 source/data contracts, sensor outputs, and SPG scripts.
 Renderer-setting migrations are outside that skill's scope.
+
+For applications moving from ovrtx 0.6.x to 0.7.x, use
+[`update-0-6-to-0-7`](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-6-to-0-7/SKILL.md)
+for typed handles, native dependencies, output decoding, depth cameras, compression,
+SPG, and sensor frame limits.
 
 ## Start Here
 
@@ -97,7 +103,7 @@ cd examples/python/minimal
 uv run main.py --png
 ```
 
-Success means `_output/render.png` exists and matches the documented minimal reference image. The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+Success means `_output/render.png` exists and matches the documented minimal reference image. The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 Then validate the C minimal example when C coverage is relevant.
 
@@ -166,6 +172,7 @@ When a request maps to a known ovrtx workflow, go directly to the relevant skill
 - Semantic labels -> `skills/semantic-labels/SKILL.md`
 - Binding materials -> `skills/binding-materials/SKILL.md`
 - Render settings -> `skills/render-settings/SKILL.md`
+- DLSS Frame Generation (interpolated frames) -> `skills/dlss-frame-generation/SKILL.md`
 - Mapping attributes/bindings -> `skills/mapping-attributes/SKILL.md`, `skills/attribute-bindings/SKILL.md`
 - Async operations -> `skills/async-operations/SKILL.md`
 - Status/progress queries -> `skills/status-queries/SKILL.md`
@@ -185,6 +192,7 @@ When a request maps to a known ovrtx workflow, go directly to the relevant skill
 - 0.3 to 0.4 (+ ovstage 0.1) migration for Python codebases -> `skills/update-0_3-0_4-python/SKILL.md`
 - 0.4 to 0.5 migration for Python and C/C++ codebases -> `skills/update-0-4-to-0-5/SKILL.md`
 - 0.5 to 0.6 source/data migration for Python and C/C++ codebases -> [update-0-5-to-0-6](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-5-to-0-6/SKILL.md)
+- 0.6 to 0.7 application migration -> [update-0-6-to-0-7](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/skills/update-0-6-to-0-7/SKILL.md)
 
 If multiple skills seem relevant, start with `skills/application-flow/SKILL.md`, then layer in specialized skills.
 

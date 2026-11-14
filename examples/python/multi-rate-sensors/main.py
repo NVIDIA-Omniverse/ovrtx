@@ -60,7 +60,7 @@ def filmstrip_camera(stage, ordinal):
                         if group is None:
                             raise RuntimeError(f"Missing camera attribute: {name}")
                         try:
-                            values.append(np.from_dlpack(group.dlpack(0)).copy())
+                            values.append(np.from_dlpack(group.columns[0].dlpack(0)).copy())
                         finally:
                             stage.release_group(group)
         finally:
@@ -125,6 +125,7 @@ def save_filmstrip(path: Path, images: dict, clouds: dict, camera: tuple,
 
 
 def main() -> None:
+    import ovstage
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--partial-outputs", action="store_true", help="Also deliver incomplete scans and exposures")
     parser.add_argument("--steps", type=int, default=40, help="Number of 1/40-second steps (default: 40)")
@@ -173,6 +174,9 @@ def main() -> None:
         stage.advance_write_floor(ordinal, ovstage.Scope.ALL).wait()
 
         # [snippet:doc-multi-rate-partial-outputs]
+        import numpy as np
+        import ovstage
+
         # Set the delivery policy on all four sensors before the first step.
         # False returns completed captures only; True also allows intermediate outputs.
         ordinal += 1
@@ -199,6 +203,8 @@ def main() -> None:
 
         for step_index in range(args.steps):
             # [snippet:doc-multi-rate-step]
+            import ovstage
+
             # Update scene animation to the next 25 ms simulation time.
             ordinal += 1
             simulation_time = (step_index + 1) / 40

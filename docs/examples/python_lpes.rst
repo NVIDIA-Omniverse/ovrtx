@@ -76,4 +76,4 @@ Running
    uv run main.py --rrd _output/lpes.rrd
    uv run main.py --no-rr --png _output/light-path-expressions.png
 
-The first run may take several minutes while shaders compile and cache.
+The first run may take up to 5 minutes while shaders compile and cache.

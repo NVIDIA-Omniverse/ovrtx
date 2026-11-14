@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: application-flow
 description: >
   High-level overview of a typical ovrtx application lifecycle. Use when user asks how
   to structure an ovrtx program, what the main steps are, or how the pieces fit
   together.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -91,7 +84,7 @@ The USD stage contains three prim types that work together to produce rendered o
 
 - **Camera** (or sensor) prim -- defines the sensor itself: position, orientation, lens properties (focal length, aperture), exposure settings. This is a standard `UsdGeomCamera` prim in the scene hierarchy.
 - **RenderProduct** prim -- the thing you actually point the renderer at. It ties together a Camera (via `rel camera`), an output resolution (`int2 resolution`), and a list of output variables (via `rel orderedVars`). When you call `step()`, you pass RenderProduct paths, not Camera paths.
-- **RenderVar** prim -- declares a single output. Its full prim path identifies the output in step results; its `sourceName` (e.g., `LdrColor`, `HdrColor`, `DepthSD`) selects the renderer AOV.
+- **RenderVar** prim -- declares a single output. Its full prim path identifies the output in step results; its `sourceName` (e.g., `LdrColor`, `HdrColor`, `DistanceToImagePlaneSD`) selects the renderer AOV.
 
 ```
 /World/Camera          ← Camera prim (sensor definition)

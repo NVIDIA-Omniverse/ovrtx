@@ -21,7 +21,7 @@
 
 ---@class SpgMatrixOrder  A matrix storage-order marker
 
----@class SpgDispatchConfig  Dispatch configuration returned by slang.dispatch()
+---@class SpgDispatchConfig  Launch configuration returned by slang.compute(), slang.dispatch() and the ray-generation calls
 ---@field isValid boolean
 ---@field order string[]  Binding order
 ---@field args table      Binding map
@@ -78,21 +78,14 @@
 ---@field quatf SpgDtype     Float quaternion (32-bit, 4 lanes)
 ---@field quatd SpgDtype     Double quaternion (64-bit, 4 lanes)
 ---@field quath SpgDtype     Half quaternion (16-bit, 4 lanes)
----@field stateful SpgStateful  Marker: keep an output's memory across frames
----@field row_major SpgMatrixOrder     Marker: row-major matrix storage
----@field column_major SpgMatrixOrder  Marker: column-major matrix storage
+---@field stateful SpgStateful  Marker: keep an output's resource across frames
+---@field row_major SpgMatrixOrder     Deprecated marker: row-major matrix storage
+---@field column_major SpgMatrixOrder  Deprecated marker: column-major matrix storage
 slang = {}
 
---- A dtype constructor takes an optional second argument stating where the value
---- sits in the parameter block: a bare number is a byte offset, and the long form
---- `{ offset, order, stride }` also states how a matrix is stored. Offsets are
---- derived when every value in the block is a single four-byte number, and
---- required as soon as any vector or matrix appears. For example:
----     slang.uint(inputs["key"], 0)
----     slang.float4x4(inputs["xform"], { offset = 16, order = slang.column_major, stride = 16 })
-
 --- Create a texture-backed output descriptor, the counterpart of `cuda.image`.
---- Pass `slang.stateful` to keep the resource across frames.
+--- Assigned to `outputs[name]` it describes an output; assigned to `self.memory[name]` it describes
+--- memory of the node, kept across frames. Pass `slang.stateful` to keep an output's resource across frames.
 ---@param width integer     Texture width
 ---@param height integer    Texture height
 ---@param dtype SpgDtype    Element data type
@@ -103,34 +96,49 @@ function slang.image(width, height, dtype, flag) end
 
 --- Create a buffer-backed output descriptor from a shape table, the counterpart
 --- of `cuda.empty`. Use `slang.image` for texture-backed outputs.
+--- Assigned to `self.memory[name]` instead of `outputs[name]`, it describes memory of the
+--- node, kept across frames. Pass `slang.stateful` to keep an output's resource across frames.
 ---@param shape integer[]   Dimensions in [height, width] order (tensor convention)
 ---@param dtype SpgDtype    Element data type
 ---@param flag? SpgStateful Pass `slang.stateful` for a persistent output
 ---@return SpgResourceDesc
 function slang.empty(shape, dtype, flag) end
 
---- Create an output filled with zeros.
+--- Create a zero-filled array.
 ---@param shape integer[]  Dimensions
 ---@param dtype SpgDtype   Element data type
----@return SpgResourceDesc
+---@return SpgSlangBinding
 function slang.zeros(shape, dtype) end
 
---- Create an output filled with ones.
+--- Create an array filled with ones.
 ---@param shape integer[]  Dimensions
 ---@param dtype SpgDtype   Element data type
----@return SpgResourceDesc
+---@return SpgSlangBinding
 function slang.ones(shape, dtype) end
 
---- Create an output filled with a custom value.
+--- Create an array filled with a custom value.
 ---@param shape integer[]  Dimensions
 ---@param value number     Fill value
 ---@param dtype SpgDtype   Element data type
----@return SpgResourceDesc
+---@return SpgSlangBinding
 function slang.full(shape, value, dtype) end
 
 --- Pack value-inputs into the shader's constant buffer. Arguments are listed in
 --- the order the shader's struct declares its fields, wrapped with a dtype
 --- constructor (for example `slang.float(inputs["strength"])`).
+---
+--- A dtype constructor holds one value of its type; an input with more elements
+--- fails the launch, and goes in with `slang.array` instead. It takes an optional
+--- second argument stating where the value sits in the parameter block: a bare
+--- number is a byte offset, and the long form `{ offset, strides }` also states the
+--- bytes from one row and one column of a matrix to the next. Offsets are derived
+--- when every value in the block is a single four-byte number, and must be stated as
+--- soon as any vector or matrix appears. A shader without reflection needs a matrix's
+--- strides. Where the shader reports the layout, it uses its own and warns when a
+--- stated one differs. The form `{ offset, order, stride }` is deprecated. For
+--- example:
+---     slang.uint(inputs["key"], 0)
+---     slang.float4x4(inputs["xform"], { offset = 16, strides = { 4, 16 } })
 ---@param ... any  Wrapped values
 ---@return SpgSlangBinding
 function slang.ParameterBlock(...) end
@@ -212,9 +220,11 @@ function slang.RWByteAddressBuffer(output) end
 function slang.RWBuffer(output) end
 
 --- Group resources into one descriptor set. Pass one call per set in the array
---- part of `slang.dispatch`. A single group may leave the space unstated, in
+--- part of `slang.compute`. A single group may leave the space unstated, in
 --- which case it comes from shader reflection; two or more groups must each
---- state one.
+--- state one. Each entry takes the binding of its position in the group, and a
+--- ParameterBlock's position is the binding of its constant buffer; where the
+--- shader reports a place, the stated one must be it.
 ---@param resources SpgSlangBinding[]  Bindings for this descriptor set
 ---@param space? integer               Descriptor space, required with two or more groups
 ---@return SpgSlangBindGroup
@@ -225,11 +235,17 @@ function slang.bind(resources, space) end
 --- - `slang.array(resourceDesc)` — reference an existing buffer, such as a composite channel
 --- - `slang.array(assetInput, dtype)` — upload an `asset` value-input's raw bytes
 --- - `slang.array(tokenInput)` — a `token` value-input as a null-terminated `char` array
---- Wrap the result in a buffer binder where the shader declares a buffer.
+--- Wrap the result in a buffer binder where the shader declares a buffer. Inside a
+--- parameter block, a trailing `{ offset, strides }` states where the array sits and
+--- the bytes from one index to the next at each level, padding included; a shader
+--- without reflection needs both. For example:
+---     slang.array(inputs["pairs"], slang.float2, { offset = 64, strides = { 16 } })
+---     slang.array(inputs["mats"], slang.float2x2, { offset = 176, strides = { 32, 4, 16 } })
 ---@param data table|SpgResourceDesc  Lua table of values, a resource descriptor, or a value-input
 ---@param dtype? SpgDtype             Element type (required for Lua table and asset modes)
+---@param layout? table               `{ offset, strides }` of the array in its parameter block
 ---@return SpgSlangBinding
-function slang.array(data, dtype) end
+function slang.array(data, dtype, layout) end
 
 --- Cache the result of a function call. Re-evaluates only when arguments change.
 ---@param fn function  Function to call and cache
@@ -239,8 +255,8 @@ function slang.static(fn, ...) end
 
 --- Define a ray-generation dispatch. The node's entry point must be a
 --- `[shader("raygeneration")]` function. The ray grid is the output AOV's shape,
---- so there is no `numthreads`. Bind the scene acceleration structure like any
---- other resource, with `slang.binding("scene", inputs["scene"])`.
+--- so there is no `numthreads`. Bind the scene acceleration structure with
+--- `slang.binding("scene", inputs["scene"])`.
 ---@param config { bind: SpgSlangBinding[] }
 ---@return SpgDispatchConfig
 function slang.rayQuery(config) end
@@ -262,11 +278,18 @@ function slang.traceRays(config) end
 ---@return SpgSlangBinding
 function slang.binding(provider, input) end
 
---- Define the dispatch configuration. `bind` is matched positionally against
+--- Define a compute launch. `bind` is matched positionally against
 --- the resources declared in the shader. Resources may instead be grouped per
 --- descriptor set by passing `slang.bind(...)` calls in the array part.
 --- `numthreads` is for a shader that carries no reflection, meaning a `.spv`: a
 --- shader that declares `[numthreads]` overrides it and the disagreement is reported.
----@param config { bind?: SpgSlangBinding[], numthreads?: integer[], grid?: integer[], stage?: string }
+---@param config { bind?: SpgSlangBinding[], numthreads?: integer[], grid?: integer[] }
+---@return SpgDispatchConfig
+function slang.compute(config) end
+
+--- Deprecated: the same call as `slang.compute`, under a second name. Logs a
+--- warning once per node; call `slang.compute` instead.
+---@deprecated
+---@param config { bind?: SpgSlangBinding[], numthreads?: integer[], grid?: integer[] }
 ---@return SpgDispatchConfig
 function slang.dispatch(config) end

@@ -47,7 +47,8 @@ def _read_attribute(stage, prim_path, attribute_name, ordinal):
                 with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
                     group = read.fetch_next()
                     assert group is not None
-                    values = np.from_dlpack(group.dlpack(0)).copy()
+                    column = group.columns[0]
+                    values = np.from_dlpack(column.dlpack(0)).copy()
                     stage.release_group(group)
                     return values
         finally:

@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> None:
     # [/snippet:initialize-rerun]
 
     # [snippet:create-renderer]
-    # Enable motion BVH: required by the lidar sensor pipeline.
+    # Enable motion BVH: without it the lidar traces every ray from its end-of-frame pose.
     log_file_path = None
     if args.log is not None:
         args.log.parent.mkdir(parents=True, exist_ok=True)

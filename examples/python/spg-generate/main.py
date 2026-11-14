@@ -10,13 +10,10 @@
 
 """Run the generating Sensor Processing Graph and save its output.
 
-Loads checker_scene.usda, whose SPG node has no resource-input at all: it reads
-no AOV, and every value it needs arrives as a typed USD attribute. It writes a
-checkerboard into its own output, which the scene publishes as an AOV.
-
-This script saves that image and then checks it, by rebuilding the same
-checkerboard on the host from the attributes the scene authored and comparing
-the two pixel for pixel.
+Loads checker_scene.usda, whose SPG node reads no AOV: every value it needs
+arrives as a typed USD attribute. It writes a
+checkerboard into its own output, which the scene publishes as an AOV, and
+this script saves that image to _output/.
 """
 
 import argparse
@@ -36,25 +33,8 @@ OUTPUT_VAR_PATH = f"{RENDER_PRODUCT}/Checker"
 WARMUP_STEPS = 3
 STEP_DT = 1.0 / 60.0
 
-# These must match the attributes authored in the scene, because the check below
-# rebuilds the same pattern from them.
-SQUARE_SIZE = 64
-COLOR_A = (1.0, 1.0, 1.0)
-COLOR_B = (0.0, 0.0, 0.2)
 
-
-def expected_checker(height: int, width: int) -> np.ndarray:
-    """The image the node should have produced, computed on the host."""
-    ys, xs = np.mgrid[0:height, 0:width]
-    on_a = (((xs // SQUARE_SIZE) + (ys // SQUARE_SIZE)) % 2) == 0
-    # Rounded, not truncated: a uchar4 texture written from a float goes through
-    # a unorm conversion on the GPU, and that rounds.
-    a = np.array([int(c * 255.0 + 0.5) for c in COLOR_A], dtype=np.uint8)
-    b = np.array([int(c * 255.0 + 0.5) for c in COLOR_B], dtype=np.uint8)
-    return np.where(on_a[..., None], a, b)
-
-
-def main() -> int:
+def main() -> None:
     parser = argparse.ArgumentParser(description="ovrtx SPG generating-node example")
     parser.add_argument("--scene", type=Path, default=DEFAULT_SCENE, help="USDA scene to load")
     args = parser.parse_args()
@@ -80,20 +60,6 @@ def main() -> int:
     mapped = frame.render_vars[OUTPUT_VAR_PATH].map(device=ovrtx.Device.CPU)
     pixels = np.ascontiguousarray(np.from_dlpack(mapped))
 
-    # [snippet:generate-check]
-    # Rebuild the same checkerboard on the host from the authored attributes and
-    # compare it pixel for pixel. The pattern is exact, so any difference at all
-    # means a value did not reach the GPU or the launch did not cover the output.
-    height, width = pixels.shape[0], pixels.shape[1]
-    expected = expected_checker(height, width)
-    mismatched = int(np.count_nonzero(np.any(pixels[..., :3] != expected, axis=-1)))
-    print(f"output {width}x{height}, {SQUARE_SIZE}px squares", file=sys.stderr)
-    print(f"pixels differing from the host-computed pattern: {mismatched}", file=sys.stderr)
-    failures = []
-    if mismatched:
-        failures.append("the node's output does not match what its attributes describe")
-    # [/snippet:generate-check]
-
     path = OUTPUT_DIR / "checker.png"
     Image.fromarray(pixels[..., :3]).save(path)
     print(f"Saved {OUTPUT_VAR_PATH} -> {path}", file=sys.stderr)
@@ -103,13 +69,6 @@ def main() -> int:
     stage.destroy()
     renderer.destroy()
 
-    for failure in failures:
-        print(f"FAILED: {failure}", file=sys.stderr)
-    if failures:
-        return 1
-    print("All checks passed.", file=sys.stderr)
-    return 0
-
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

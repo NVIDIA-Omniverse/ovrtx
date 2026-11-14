@@ -88,6 +88,6 @@ Notes
 - Put labels on the prims whose pixels or hits should carry that semantic
   meaning.
 - Inline override layers are useful when a source asset cannot be edited.
-- For sensor material behavior, use :doc:`../sensors/nonvisual_materials`
+- For sensor material behavior, use :doc:`../materials/nonvisual_sensor_materials`
   instead. Semantic labels and non-visual material labels serve different
   systems.

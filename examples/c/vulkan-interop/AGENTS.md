@@ -103,10 +103,19 @@ Options:
   --headless, --no-window       Run the interop path without GLFW
   --camera, -c <path>           Orbit camera prim (default: /World/Camera)
   --present-mode <mode>         fifo | mailbox | immediate (default: fifo)
-  --pace                        Space generated frames evenly (default: off)
+  --pace, --no-pace             Time generated frames like Kit's present
+                                thread (default: on with DLSS-G, off otherwise)
   --dlssg                       Enable DLSS Frame Generation (default: off)
   --dlssg-frames <N>            Interpolated frames per rendered frame,
-                                implies --dlssg (default: renderer picks)
+                                implies --dlssg (default: GPU maximum)
+  --dlssg-force-frame <K>       Show only frame K of each step (0 = first
+                                interpolated, clamped to the real frame),
+                                implies --dlssg; for visual debugging
+  --dlssg-indicator             Draw a corner square: green on real frames,
+                                red on interpolated ones
+  --dlss-mode <mode>            DLSS-SR mode on the render product:
+                                performance | balanced | quality | auto | rtxaa
+                                (default: performance, as in Kit's viewport)
   --help, -h                    Show help
 ```
 
@@ -121,20 +130,44 @@ Options:
   throughput. `immediate` is the mode to use for benchmarking. On a virtual or
   remote display with no client attached, `fifo` *and* `mailbox` can both pin to
   a very low rate because `vkAcquireNextImageKHR` waits on the display.
-- `--pace` spreads frame promotions instead of showing a whole step's frames back
-  to back. `FramePacer` targets the observed step period divided by the frames
-  per step, deliberately undershooting by a safety factor: promoting a frame is
-  what frees a ring slot, so a target slower than the renderer's real output rate
-  would throttle production and inflate the very period being measured.
-- Pacing only engages when a step yields more than one frame; there is nothing to
-  spread out otherwise.
+- Each present shows one frame of the most recently completed step.
+  `SubframeScheduler` implements it:
+  - A step is *published* only once all of its frames have landed in the ring,
+    so a partially copied sequence is never shown.
+  - A newly published step replaces the current one outright. Frames of the old
+    step not yet shown are freed unshown, including its real frame; nothing is
+    queued behind the newest step.
+- Pacing is on by default whenever DLSS-G is enabled; `--no-pace`
+  forces it off and `--pace` forces it on. Without DLSS-G a step yields one
+  frame, so pacing has no effect.
+- Paced, each present picks the frame from time since publish:
+  `index = elapsed / (mean_publish_interval / frames_per_step * 5/6)`, clamped to
+  the last (real) frame and never moving backward. The mean is over the last 10
+  publish intervals, and the 1/6 shortening is an allowance for projection
+  error, so the real frame is reached before the next step lands. Frames whose
+  time has passed are skipped and counted as dropped. Because the index is
+  anchored to the publish time, a late present cannot delay the rest of the step,
+  which is why pacing works under `fifo` (vsync) too.
+- Before the first publish interval is known, or when a step yields one frame,
+  the last frame is shown directly.
+- With `--no-pace`, a step's frames are shown one per present, back to back.
+- `--dlssg-force-frame K` bypasses `SubframeScheduler::choose` and shows only
+  frame `min(K, last)` of each published step, for inspecting interpolated
+  frames in isolation. The other frames count as `dropped`, `--num-frames` exits
+  and saves `out.png` on the forced frame instead of the real one, and headless
+  reads back the forced frame of the final step.
+- `--dlssg-indicator` clears a 48 px square at (16, 16) of the swapchain image
+  with `vkCmdClearAttachments` after the fullscreen draw: green when
+  `read_holds_real_frame`, red otherwise. It needs no pipeline state and never
+  touches the shared images, so `out.png` is unaffected.
 
 ## Metrics
 
 The per-second line separates measurements that frame generation makes diverge:
 
 - `Steps/s` counts `ovrtx_step_with_stage` calls; `Frames/s` counts frames that
-  actually became visible. With DLSS-G, `Frames/s` is `(N + 1) x Steps/s`.
+  actually became visible. With DLSS-G it is at most `(N + 1) x Steps/s`;
+  frames skipped by pacing or superseded by a newer step count as `dropped`.
 - `Presents/s` counts loop iterations. Because the map is polled, the loop
   re-presents the current image while the next frame renders, so this is much
   higher than `Frames/s` and is not a smoothness measure.
@@ -142,6 +175,8 @@ The per-second line separates measurements that frame generation makes diverge:
   the copy submission, which is cheap now that the unmap is deferred.
 - `Frame gap` is the spread between visible frames. Judder shows up here as a
   wide min/max even when the mean looks healthy; pacing is what tightens it.
+- `dropped` counts frames never shown: skipped by pacing because their time had
+  passed, or freed because a newer step was published first.
 
 ## Runtime Flow (Current Implementation)
 
@@ -150,11 +185,11 @@ Initialization:
 1. `cuda_apply_scheduling_workaround()` as the first statement of `main()`, before anything can create a CUDA context
 2. `ovrtx_initialize` -> `ovrtx_create_renderer`
 3. Create an ovstage instance, attach it to OVRTX, populate USD with `ovstage_population_open_usd_from_file`, and advance the write floor
-4. Author the DLSS-G settings on the RenderProduct prim (`author_dlssg_settings`), unconditionally, so the CLI overrides the scene's opinion
+4. Author the DLSS-G settings (`author_dlssg_settings`) and the DLSS-SR mode (`author_dlss_exec_mode`) on the RenderProduct prim, unconditionally, so the CLI overrides the scene's opinion
 5. Configure CUDA-visible device 0 in ovrtx, then call `cuda_init(0, &cuda_uuid)` to validate the OVRTX context and obtain its MIG-aware UUID with `cuDeviceGetUuid_v2`
 6. Run one `ovrtx_step_with_stage` to detect output type and dimensions
 7. Create Vulkan context using CUDA UUID for device matching
-8. Create the ring of exportable sampled images (`CUDA_SHARED_IMAGE_COUNT = 4`)
+8. Create the ring of exportable sampled images (`CUDA_SHARED_IMAGE_COUNT = 10`)
 9. Export Vulkan image memory and import into CUDA as surface-backed arrays
 10. Export Vulkan timeline semaphore and import into CUDA
 11. Prime first frame into buffer 0
@@ -166,13 +201,27 @@ current image.
 1. Poll window/events and acquire swapchain image
 2. Retire ring slots whose copy has landed (`cuEventQuery(slot.copy_done)`):
    release the ovrtx mapping with `release_mapped_output` and move the slot from
-   `Writing` to `Ready`, appending it to `ready_queue`
-3. If a frame is ready and `FramePacer` says it is due, show the oldest one: free
-   the previously shown slot, adopt the new `read_idx`, and take that slot's
-   `timeline_value` and `holds_real_frame`
-4. If camera moved, write transform to ovstage with `ovstage_write_attribute` and advance the write floor
-5. If any ring slot is `Free`:
-   - if no step is in flight, enqueue one:
+   `Writing` to `Ready`
+3. Publish the newest step whose `FrameSlot::frames_in_step` frames are all
+   `Ready`: free the `Ready` slots of older steps (dropped), order the step's
+   slots by `FrameSlot::timeline_value` (copy order), and hand the count to
+   `SubframeScheduler::publish` (see `Presentation and Frame Pacing`)
+4. Ask `SubframeScheduler::choose` for this present's frame. If it changed, free
+   skipped frames and the previously shown slot, adopt the new `read_idx`, and
+   take that slot's `timeline_value` and `holds_real_frame`
+5. Advance the producer until it stalls: repeat the stages below while any of
+   them made progress, so one iteration can copy a step's frames, retire it and
+   enqueue the next. Under `fifo` an iteration lasts a whole refresh, and moving
+   one stage per iteration used to cap rendering at a fraction of the display rate
+   - if no step is in flight, enqueue one (not gated on a free slot; it bumps
+     `pending.step`, which each copied slot records in `FrameSlot::step`):
+     - if the camera moved, write the transform with `ovstage_write_attribute`
+       and advance the write floor. This must happen here, with no step in
+       flight: the write blocks until the renderer is done reading the stage, so
+       writing while a step renders stalls the loop for the rest of that step.
+       Under DLSS-G that left one present per step, always on the interpolated
+       frame, because the next step replaced the sequence before the real one
+       came up
      - enqueue pending `ovrtx_enqueue_pick_query` before stepping, if the user clicked or dragged in the viewport
      - `ovrtx_step_with_stage`
    - poll `ovrtx_fetch_results` with timeout 0. On success:
@@ -182,10 +231,10 @@ current image.
    - if a pick query is still outstanding, poll its CPU map with timeout 0. On
      success, print resolved prim paths and update selection outline groups; on
      `OVRTX_API_TIMEOUT` leave the query pending and retry next iteration
-   - poll `copy_output_to_surface` with timeout 0 for the next unconsumed frame:
-     map, wait on `cuda_sync.wait_event` (if provided), copy OVRTX `CUarray` ->
-     CUDA-imported Vulkan image at the free slot. The mapping is **not** released
-     here; it is handed back for step 2
+   - if a ring slot is `Free`, poll `copy_output_to_surface` with timeout 0 for
+     the next unconsumed frame: map, wait on `cuda_sync.wait_event` (if
+     provided), copy OVRTX `CUarray` -> CUDA-imported Vulkan image at the free
+     slot. The mapping is **not** released here; it is handed back for step 2
    - signal external timeline semaphore from CUDA and record `slot.copy_done`
    - destroy the step result once every frame it produced has been copied out
      and any pick hit has been read (`PendingFrames::retirable()`)
@@ -201,13 +250,22 @@ current image.
 - Consequently the renderer wait lives in the polled `ovrtx_fetch_results`, not in the map. The map poll is kept anyway because it costs nothing and the ordering is a renderer implementation detail, not a documented guarantee.
 - `PendingFrames` holds the step result plus one color output handle per frame, and tracks `results_fetched` because a step result is fetched before its frames are mappable. The next step is only enqueued once the queue is drained, and `ovrtx_destroy_results` runs only after the last frame of a step has been copied out.
 - Priming uses the last (real) frame of its step, and so does `find_accumulation_status`, since interpolated frames carry no accumulation status.
-- `--num-frames` must save a real frame to `out.png`. Each ring slot records `holds_real_frame` (set from `pending.drained()` at copy time), the shown slot's value becomes `read_holds_real_frame`, and the loop exits only once the shown buffer holds a real frame. Headless drains all frames of a step in one iteration, so it always exits on a step boundary. Both count frames that became visible, so either can overshoot `--num-frames` by up to `N`.
+- `--num-frames` must save a real frame to `out.png`. Each ring slot records `holds_real_frame` (set from `pending.drained()` at copy time), the shown slot's value becomes `read_holds_real_frame`, and the loop exits only once the shown buffer holds a real frame. Once the frame count is reached the present jumps straight to the published step's real frame, because a newer step can otherwise replace the sequence before pacing reaches it. Headless drains all frames of a step in one iteration, so it always exits on a step boundary. Both count frames that became visible, so either can overshoot `--num-frames` by up to `N`.
 - The two settings are authored with `ovstage_write_attribute` + `OVSTAGE_PRIM_MODE_UPSERT` on the RenderProduct prim, not through a renderer config entry. No USD API schema needs to be applied first; both the sensor scheduling layer and Hydra read them from the runtime scene by attribute name.
   - `bool omni:rtx:dlss:frameGeneration`
-  - `int omni:rtx:dlss:frameGenerationInterpolatedFrameCount` (0 means "renderer picks")
+  - `int omni:rtx:dlss:frameGenerationInterpolatedFrameCount`. The renderer clamps it to the GPU maximum and treats 0 or unset as 1, so without `--dlssg-frames` the sample writes `MAX_DLSSG_INTERPOLATED_FRAMES` (3) to get the GPU maximum. The ring (`CUDA_SHARED_IMAGE_COUNT`) is sized for that count, enforced by a `static_assert`.
+- `--dlss-mode` authors `token omni:rtx:post:dlss:execMode` the same way (an
+  `OVSTAGE_SEMANTIC_TOKEN_ID` write of a token interned through the stage's path
+  dictionary). It sets the internal render resolution for DLSS-SR/DLSS-RR, which
+  is what DLSS-G interpolates from. Like the DLSS-G settings it is written on
+  every run, defaulting to `performance` (`DEFAULT_DLSS_MODE`) to match Kit's
+  viewport; `quality` shows noticeably more interpolation artifacts.
 - Frame generation is declined silently in several situations, so `report_dlssg_frame_count` warns once if no step produced extra frames within `DLSSG_WARMUP_STEPS`. The warmup exists because DLSS-G interpolates between two rendered frames and legitimately produces a single frame right after a history reset.
 
 ## OVRTX Integration Contract
+
+Startup attaches ovstage before enqueueing selection styling because attachment
+requires an idle renderer. Styling remains ordered before the first rendered frame.
 
 The core OVRTX frame lifecycle used by this sample:
 
@@ -251,6 +309,9 @@ Format mapping used in this sample:
 
 ## Synchronization Model
 
+- Startup attaches the stage before enqueueing selection styling; no renderer
+  operation is pending at attachment.
+
 - OVRTX -> CUDA: per-frame CUDA wait event from mapped output (`cuda_sync.wait_event`)
 - CUDA -> Vulkan: external timeline semaphore; CUDA signals monotonically increasing value
 - CPU side: nothing in the windowed loop waits on the renderer.
@@ -264,6 +325,11 @@ Format mapping used in this sample:
   - Vulkan samples the `Showing` slot
   - a slot becomes `Ready` only after its copy event completes, and the slot
     being shown is freed when a newer frame replaces it
+  - a `Ready` slot from a superseded step goes straight back to `Free` (dropped)
+  - sized `2 * (3 + 1) + 2 = 10`: the published step's frames (one of them
+    shown) and the next step's frames being written, for up to 3 interpolated
+    frames, plus spare slots so the step after can start copying before the next
+    one is published, so the renderer never waits on presentation
 - **Each slot owns its own `copy_start` / `copy_done` events.** Several copies are
   in flight at once, so a shared completion event would be unsafe and a shared
   timing pair could not attribute a duration to one frame. The single shared

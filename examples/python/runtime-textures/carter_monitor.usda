@@ -1,0 +1,200 @@
+#usda 1.0
+(
+    "Copy of the robot lineup, trimmed to the warehouse and NVIDIA Carter. Runtime-texture camera monitor."
+    customLayerData = {
+        string sourceScene = "../semantic-segmentation/ovrtx-robot-lineup.usda"
+    }
+    defaultPrim = "World"
+    endTimeCode = 100
+    metersPerUnit = 1
+    startTimeCode = 0
+    timeCodesPerSecond = 60
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def "warehouse" (
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Environments/Simple_Warehouse/warehouse.usd@
+    )
+    {
+    }
+
+    def "carter_v1" (
+        prepend payload = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/NVIDIA/Carter/carter_v1.usd@
+    )
+    {
+        matrix4d xformOp:transform = ( (2.220446049250313e-16, 1, 0, 0), (-1, 2.220446049250313e-16, 0, 0), (0, 0, 1, 0), (-3.6, 4, 0.25, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+
+        def Camera "Camera"
+        {
+            float2 clippingRange = (0.05, 1000)
+            float focalLength = 18
+            float horizontalAperture = 24
+            float verticalAperture = 18
+            matrix4d xformOp:transform = ( (0, -1, 0, 0), (0.03331483023263847, 0, 0.9994449069791542, 0), (-0.9994449069791542, 0, 0.03331483023263847, 0), (0.35, 0, 1.0000000000000002, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+    }
+
+    def Camera "Overview"
+    {
+        float2 clippingRange = (0.05, 1000)
+        float focalLength = 21
+        float horizontalAperture = 24
+        float verticalAperture = 18
+        matrix4d xformOp:transform = ( (0.824728851845978, 0.5655283555515276, 2.7755575615628914e-17, 0), (-0.19950657918466808, 0.2909470946443076, 0.9357066383114252, -0), (0.5291686364429083, -0.7717042614792415, 0.35277909096193893, 0), (1.0000000000000002, -3.000000000000001, 4.300000000000001, 1.0000000000000002) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def Camera "MonitorCamera"
+    {
+        float2 clippingRange = (0.05, 1000)
+        float focalLength = 24
+        float horizontalAperture = 24
+        token projection = "orthographic"
+        float verticalAperture = 18
+        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (-1.2, 1.8, 1.85, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def Xform "Monitor"
+    {
+        double3 xformOp:translate = (-1.2, 5, 1.85)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        def Material "Material"
+        {
+            token outputs:surface.connect = </World/Monitor/Material/Surface.outputs:surface>
+
+            def Shader "Surface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0, 0, 0)
+                color3f inputs:emissiveColor.connect = </World/Monitor/Material/Tex.outputs:rgb>
+                float inputs:roughness = 1
+                color3f inputs:specularColor = (0, 0, 0)
+                int inputs:useSpecularWorkflow = 1
+                token outputs:surface
+            }
+
+            def Shader "Tex"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @dynamic://carterMonitor@
+                float2 inputs:st.connect = </World/Monitor/Material/UV.outputs:result>
+                token inputs:wrapS = "clamp"
+                token inputs:wrapT = "clamp"
+                float3 outputs:rgb
+            }
+
+            def Shader "UV"
+            {
+                uniform token info:id = "UsdPrimvarReader_float2"
+                token inputs:varname = "st"
+                float2 outputs:result
+            }
+        }
+
+        def Mesh "Screen" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            uniform bool doubleSided = 1
+            int[] faceVertexCounts = [4]
+            int[] faceVertexIndices = [0, 1, 2, 3]
+            rel material:binding = </World/Monitor/Material>
+            point3f[] points = [(-1.2, -0.06, -0.9), (1.2, -0.06, -0.9), (1.2, -0.06, 0.9), (-1.2, -0.06, 0.9)]
+            texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+                interpolation = "vertex"
+            )
+            uniform token subdivisionScheme = "none"
+        }
+
+        def Cube "Housing"
+        {
+            color3f[] primvars:displayColor = [(0.025, 0.03, 0.035)]
+            float3 xformOp:scale = (1.28, 0.055, 0.98)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        }
+
+        def Cube "Post"
+        {
+            color3f[] primvars:displayColor = [(0.025, 0.03, 0.035)]
+            float3 xformOp:scale = (0.07, 0.07, 0.45)
+            double3 xformOp:translate = (0, 0, -1.4)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        }
+
+        def Cube "Foot"
+        {
+            color3f[] primvars:displayColor = [(0.025, 0.03, 0.035)]
+            float3 xformOp:scale = (0.5, 0.35, 0.05)
+            double3 xformOp:translate = (0, -0.05, -1.8)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        }
+    }
+
+    def DomeLight "Studio"
+    {
+        float inputs:intensity = 250
+        asset inputs:texture:file = @../../../tests/docs/data/studio.exr@
+    }
+}
+
+def OmniRuntimeTexture "Texture"
+{
+    token texture:colorSpace = "sRGB"
+    uchar[] texture:data = [0, 0, 0, 255]
+    token texture:dimension = "2d"
+    int3 texture:extent = (1, 1, 1)
+    token texture:format = "rgba8unorm"
+    string texture:uri = "dynamic://carterMonitor"
+}
+
+def "Render"
+{
+    def RenderProduct "Robot"
+    {
+        rel camera = </World/carter_v1/Camera>
+        custom int omni:rtx:post:tonemap:op = 0
+        custom token omni:rtx:rendermode = "RealTimePathTracing"
+        rel orderedVars = </Render/Robot/LdrColor>
+        uniform int2 resolution = (320, 240)
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+        }
+    }
+
+    def RenderProduct "Overview"
+    {
+        rel camera = </World/Overview>
+        custom int omni:rtx:post:tonemap:op = 0
+        custom token omni:rtx:rendermode = "RealTimePathTracing"
+        rel orderedVars = </Render/Overview/LdrColor>
+        uniform int2 resolution = (960, 720)
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+        }
+    }
+
+    def RenderProduct "Monitor"
+    {
+        rel camera = </World/MonitorCamera>
+        custom int omni:rtx:post:tonemap:op = 0
+        custom token omni:rtx:rendermode = "RealTimePathTracing"
+        rel orderedVars = </Render/Monitor/LdrColor>
+        uniform int2 resolution = (320, 240)
+
+        def RenderVar "LdrColor"
+        {
+            uniform string sourceName = "LdrColor"
+        }
+    }
+}

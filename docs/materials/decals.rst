@@ -162,7 +162,7 @@ Limitations
 -----------
 
 - A maximum of six decals can be active at any surface point. If more than six overlap, only the six with the highest priority values are rendered.
-- Real-Time Path-Tracing and Path Tracing support decals. The Minimal renderer does not.
+- Real-Time Path Tracing and Path Tracing support decals. The Minimal renderer does not.
 - Cutout opacity is supported. Transmissive decal materials are not supported.
 - In path-traced modes, decal cutouts contribute to shadow visibility.
 

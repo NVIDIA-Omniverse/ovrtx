@@ -11,7 +11,7 @@
 #define OVRTX_TYPES_H
 
 #define OVRTX_VERSION_MAJOR 0
-#define OVRTX_VERSION_MINOR 6
+#define OVRTX_VERSION_MINOR 7
 #define OVRTX_VERSION_PATCH 0
 #include <stdint.h>
 #include <stdbool.h>
@@ -56,26 +56,50 @@ extern "C"
      */
 
     /** Handle representing a USD stage. */
-    typedef uint64_t ovrtx_usd_handle_t;
+    typedef struct ovrtx_usd_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_usd_handle_t;
     /** Handle representing an event. */
-    typedef uint64_t ovrtx_event_handle_t;
+    typedef struct ovrtx_event_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_event_handle_t;
     /** Handle representing a persistent attribute binding. */
-    typedef uint64_t ovrtx_attribute_binding_handle_t;
+    typedef struct ovrtx_attribute_binding_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_attribute_binding_handle_t;
     /** Handle representing a resource mapping that can be used to unmap it. */
-    typedef uint64_t ovrtx_map_handle_t;
+    typedef struct ovrtx_map_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_map_handle_t;
     /** Handle to the result of a @ref ovrtx_step() operation. */
-    typedef uint64_t ovrtx_step_result_handle_t;
+    typedef struct ovrtx_step_result_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_step_result_handle_t;
     /** Handle to a rendered output; pass to @ref ovrtx_map_render_var_output() to access its data. */
-    typedef uint64_t ovrtx_render_var_output_handle_t;
+    typedef struct ovrtx_render_var_output_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_render_var_output_handle_t;
     /** Handle to the mapping of a rendered output that can be used to unmap it with @ref ovrtx_unmap_render_var_output(). */
-    typedef uint64_t ovrtx_render_var_output_map_handle_t;
+    typedef struct ovrtx_render_var_output_map_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_render_var_output_map_handle_t;
     /** Identifier of a particular asynchronous operation such as @ref ovrtx_open_usd_from_file() that can be used to poll or wait. */
-    typedef uint64_t ovrtx_op_id_t;
+    typedef struct ovrtx_op_id_t
+    {
+        uint64_t raw_id;
+    } ovrtx_op_id_t;
 
     /**
-    * Sentinel value representing an invalid/null ovrtx handle.
+    * Raw ID value representing an invalid/null renderer handle.
     *
-    * Valid handles are non-zero, so 0 is reserved to indicate "no handle" or
+    * Valid renderer handles have non-zero raw IDs, so 0 is reserved to indicate "no handle" or
     * "invalid handle". Zero-initializing output handles and structures containing
     * handles is valid API usage.
     *
@@ -85,7 +109,12 @@ extern "C"
     * does not clear handle values stored by the caller. For asynchronous
     * operations, distinguish successful enqueue from successful execution.
     *
-    * OVRTX_INVALID_HANDLE is not universally an error when passed to an API:
+    * Use a kind-specific OVRTX_INVALID_* constant for comparisons and resets.
+    * OVRTX_INVALID_HANDLE is the legacy raw numeric sentinel; it cannot be
+    * assigned or passed as a typed handle. Array lease IDs are an
+    * exception: zero is a valid accessor-local lease ID.
+    *
+    * An invalid handle is not universally an error when passed to an API:
     * required live-handle parameters reject it, while discriminated inputs may use
     * it to select an inline description instead. Each API parameter documents its
     * specific behavior.
@@ -121,7 +150,7 @@ extern "C"
      * @brief Result from an asynchronous function call.
      *
      * Contains the API call status and the operation index. A non-zero operation index can be used to poll or wait
-     * on completion, while OVRTX_INVALID_HANDLE means the operation could not be enqueued.
+     * on completion, while a zero op ID means the operation could not be enqueued.
      *
      * Note that if OVRTX_CONFIG_SYNC_MODE is active any error from the async operation itself will cause status to
      * be OVRTX_API_ERROR and the error is obtainable using ovrtx_get_last_error(). In addition to this a valid
@@ -130,7 +159,7 @@ extern "C"
     typedef struct
     {
         ovrtx_api_status_t status; /**< Status of the API call. */
-        ovrtx_op_id_t op_index; /**< Non-zero operation identifier if operation enqueued successfully, OVRTX_INVALID_HANDLE otherwise. */
+        ovrtx_op_id_t op_index; /**< Non-zero operation identifier if operation enqueued successfully, a zero op ID otherwise. */
     } ovrtx_enqueue_result_t;
 
     typedef enum
@@ -169,7 +198,11 @@ extern "C"
         uint64_t time_out_ns;
     } ovrtx_timeout_t;
 
-    /** Represents a CUDA event to wait for on a particular stream.
+    /** CUDA synchronization inputs, or readiness information on mapped render-var outputs.
+     *
+     * For input arguments, stream specifies the stream to synchronize to. On
+     * ovrtx_render_var_output_t, stream instead optionally identifies a borrowed producer
+     * stream; see that type's contract. wait_event remains the output-ready event.
      *
      * @note **Known driver scheduling interaction on Linux.** A non-zero @c stream creates a
      * stream-ordered CUDA wait that can reduce throughput when it is concurrent with the
@@ -179,7 +212,7 @@ extern "C"
      */
     typedef struct
     {
-        uintptr_t stream; /**< Cuda stream to synchronize to. 0 = no synchronization. 1 = default cuda stream, >1 specific stream */
+        uintptr_t stream; /**< Input: stream to synchronize to (0 = none, 1 = default, >1 = specific). Mapped output: optional borrowed producer stream. */
         uintptr_t wait_event; /**< Event to wait on before operation (0 = none) */
     } ovrtx_cuda_sync_t;
 
@@ -308,7 +341,7 @@ extern "C"
         ovrtx_prim_list_t prim_list; /**< Explicit list of prims when no handle provided */
         ovx_primpath_list_t prims_list_handle; /**< Handle to a persistent prim list */
 
-        ovx_string_or_token_t attribute_name; /**< Name of the attribute*/
+        ovx_token_or_string_t attribute_name; /**< Name of the attribute*/
         ovrtx_attribute_type_t attribute_type; /**< Type of the attribute being bound */
 
         ovrtx_binding_prim_mode_t prim_mode; /**< Mode to determine how prims are handled */
@@ -391,8 +424,11 @@ extern "C"
     /** Named render variable param represented as a DLTensor with labels.
      *
      * The DLTensor's dtype encodes the value type (e.g. kDLFloat/32 for float,
-     * kDLUInt/64 for uint64_t) and shape encodes scalar vs. array
-     * (e.g. {1} for scalar, {N} for array, {4,4} for a matrix).
+     * kDLUInt/64 for uint64_t). Sensor scalar params use shape {1}, including
+     * CameraParams, InstanceIdTokenMapSD and point-cloud params. Inspect ndim
+     * and shape; vectors use {N} and matrices can use {4,4}. Params with
+     * ndim >= 1 provide strides. Other params, such as picking and compression
+     * metadata, may be rank 0 with NULL shape and strides.
      * Param values are always CPU-resident: param.device is {kDLCPU, 0}.
      */
     typedef struct
@@ -420,7 +456,10 @@ extern "C"
      */
 
     /** Handle to the result of a @ref ovrtx_query_prims() operation. */
-    typedef uint64_t ovrtx_query_handle_t;
+    typedef struct ovrtx_query_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_query_handle_t;
 
     typedef enum ovrtx_filter_kind_t
     {
@@ -431,7 +470,7 @@ extern "C"
     typedef struct ovrtx_filter_t
     {
         ovrtx_filter_kind_t kind;   /**< What property to match */
-        ovx_string_or_token_t name; /**< Prim type name or attribute name */
+        ovx_token_or_string_t name; /**< Prim type name or attribute name */
     } ovrtx_filter_t;
 
     typedef enum ovrtx_attribute_filter_mode_t
@@ -444,7 +483,7 @@ extern "C"
     typedef struct ovrtx_attribute_filter_t
     {
         ovrtx_attribute_filter_mode_t mode; /**< Which attributes to report */
-        const ovx_string_or_token_t* attribute_names; /**< Attribute names (used when mode is SPECIFIC) */
+        const ovx_token_or_string_t* attribute_names; /**< Attribute names (used when mode is SPECIFIC) */
         size_t attribute_name_count;                   /**< Number of entries in attribute_names */
     } ovrtx_attribute_filter_t;
 
@@ -505,7 +544,10 @@ extern "C"
     /** Handle to the result of a @ref ovrtx_read_attribute() operation.
      *  The same handle is passed to @ref ovrtx_fetch_read_result() and
      *  @ref ovrtx_release_read_result(). */
-    typedef uint64_t ovrtx_read_handle_t;
+    typedef struct ovrtx_read_handle_t
+    {
+        uint64_t raw_id;
+    } ovrtx_read_handle_t;
 
     /** Attribute read output retrieved via @ref ovrtx_fetch_read_result().
      *
@@ -548,13 +590,25 @@ extern "C"
         OVRTX_RENDERER_EVENT_FAILED = 2 /**< Operation failed with error */
     } ovrtx_renderer_event_status_t;
 
-    /** Associates a RenderVar output handle with the RenderVar that produced it. */
+    /** Associates a RenderVar output handle with the RenderVar that produced it.
+     *
+     * A rendered frame has an entry for every RenderVar in the render product's orderedVars, in that order, including
+     * one OVRTX could not produce; a DLSS-G interpolated frame has entries only for its color RenderVars, and one fails
+     * when the same RenderVar's compression fails on the rendered frame. A failed entry has @ref status set to
+     * OVRTX_EVENT_FAILURE and says why in @ref error_message; the render product's other RenderVars are still rendered.
+     * Mapping a failed output fails with the same message.
+     */
     typedef struct
     {
         ovx_string_t render_var_path; /**< Full USD RenderVar prim path, or a reserved OVRTX synthetic output name. */
         ovx_string_t source_name; /**< RenderVar sourceName, e.g. "LdrColor". */
         ovx_string_t source_type; /**< RenderVar sourceType, e.g. "raw" or "lpe". */
         ovrtx_render_var_output_handle_t output_handle; /**< Handle to the rendered output. */
+        /** OVRTX_EVENT_COMPLETED when the output was produced, OVRTX_EVENT_FAILURE when OVRTX could not produce it. */
+        ovrtx_event_status_t status;
+        /** Why OVRTX could not produce the output, naming the RenderVar and, for an invalid setting, the attribute and
+         * its accepted values. Empty when @ref status is OVRTX_EVENT_COMPLETED. */
+        ovx_string_t error_message;
     } ovrtx_render_product_render_var_output_t;
 
     /** Path-tracing accumulation status for a rendered frame. */
@@ -607,6 +661,25 @@ extern "C"
         double end_time; /**< Sensor time (based on step(delta_time) history) when the sensor simulation for this step ended */
     } ovrtx_render_product_set_outputs_t;
 
+    /** @ref ovrtx_clear_history flag: render the cleared frame like the RenderProduct's first frame, applying its
+     *  @c omni:rtx:waitForEvents and @c omni:rtx:quality. Cannot be combined with a quality override. */
+#define OVRTX_CLEAR_HISTORY_FLAG_FIRST_FRAME_QUALITY (1u << 0)
+
+    /** Tiles of a tiled RenderProduct for @ref ovrtx_clear_history, as indices into its view-tile grid. */
+    typedef struct ovrtx_tile_list_t
+    {
+        const uint32_t* tile_indices; /**< Array of tile indices. */
+        size_t num_tiles; /**< Number of indices in the array. */
+    } ovrtx_tile_list_t;
+
+    /** Quality override for the frame rendered after @ref ovrtx_clear_history. A zero-initialized value renders once,
+     *  like passing NULL. */
+    typedef struct ovrtx_render_quality_t
+    {
+        bool wait_for_streaming; /**< Wait for asset streaming, as @c omni:rtx:waitForEvents = [AllLoadingFinished]. */
+        int32_t quality; /**< Initial quality in [0, 100], with the same meaning as @c omni:rtx:quality. */
+    } ovrtx_render_quality_t;
+
 #define OVRTX_RENDER_VAR_PICK_HIT "ovrtx_pick_hit"
 
     /** @defgroup ovrtx_pick_types Pick query and pick-hit buffer layout
@@ -657,14 +730,16 @@ extern "C"
      *
      * The selection outline pass supports two layers of styling:
      *
-     * 1. Per-group state (outline color, fill color) — set at runtime via
-     *    @ref ovrtx_set_selection_group_styles. The slot is keyed by the
-     *    per-prim group id passed to @ref ovrtx_set_selection_outline_group.
+     * 1. Per-group state (outline color, fill color, outline width) — set at
+     *    runtime via @ref ovrtx_set_selection_group_styles. The slot is keyed
+     *    by the per-prim group id passed to @ref ovrtx_set_selection_outline_group.
      *
-     * 2. Global state (outline thickness, fill mode) — set at renderer creation
-     *    via @ref OVRTX_CONFIG_SELECTION_OUTLINE_WIDTH and
+     * 2. Global state (default outline width, fill mode) — set at renderer
+     *    creation via @ref OVRTX_CONFIG_SELECTION_OUTLINE_WIDTH and
      *    @ref OVRTX_CONFIG_SELECTION_FILL_MODE. Changing these at runtime
-     *    requires destroying and recreating the renderer.
+     *    requires destroying and recreating the renderer. Per-group
+     *    @ref ovrtx_selection_group_style_t::outline_width overrides the
+     *    default width for that group.
      *
      * Outline dashing/stippling is **not supported** by the underlying RTX
      * outline pipeline and is intentionally not exposed here.
@@ -688,7 +763,7 @@ extern "C"
      *  Set via @ref OVRTX_CONFIG_MOTION_BVH at renderer creation. */
     typedef enum ovrtx_motion_bvh_t
     {
-        /** Motion BVH disabled (default when the config entry is omitted). */
+        /** Motion BVH disabled (the default global policy). */
         OVRTX_MOTION_BVH_DISABLE = 0,
         /** Motion BVH enabled from renderer creation. */
         OVRTX_MOTION_BVH_ENABLE = 1,
@@ -704,6 +779,13 @@ extern "C"
         /** Interior fill color (matches @c /persistent/app/viewport/outline/shadeColor;
          *  used when @ref OVRTX_CONFIG_SELECTION_FILL_MODE selects per-group fill modes). */
         float fill_color[4];
+        /** Outline width in pixels, 1..15 (matches @c /persistent/app/viewport/outline/widths; group 255 sets @c /persistent/app/viewport/outline/width).
+         *  Overrides the renderer-creation default from @ref OVRTX_CONFIG_SELECTION_OUTLINE_WIDTH
+         *  for this group. Leaving it at 0 (C zero-init, so color-only initializers need not mention
+         *  it) leaves the group's current width in place rather than setting a width of 0; a group
+         *  that has never been given an explicit width therefore keeps the configured default.
+         *  Suppressing one group's outline is not expressible here — clear the group instead. */
+        float outline_width;
     } ovrtx_selection_group_style_t;
 
     /** @} */ // end of ovrtx_selection_style_types
@@ -757,6 +839,33 @@ extern "C"
      *
      *  Lifetime: valid from ovrtx_map_render_var_output() until ovrtx_unmap_render_var_output().
      *
+     *  @note Experimental producer-stream handoff: for uniform zero-copy CUDA outputs,
+     *  cuda_sync.stream may be nonzero and identify the stream on which cuda_sync.wait_event
+     *  was recorded. Enqueue read-only consumer work directly on that stream without an
+     *  additional event wait. Use the CUDA context owning the stream on tensors[0].dl's
+     *  device.device_id (the renderer's CUDA primary context). A zero stream means this
+     *  path is unavailable: observe wait_event before reading on a consumer-owned stream.
+     *  CPU, asynchronously copied, compressed, and composite outputs do not expose a stream.
+     *  Map with sync_stream=0 to avoid an additional map-time cross-stream readiness wait.
+     *
+     *  The stream is a moving queue tail, not the event's fixed readiness point. Work
+     *  enqueued here follows everything already queued on it, including later products,
+     *  the end of the render graph, and already-submitted subsequent steps. This gives
+     *  up per-product readiness even when wait_event is per-product; the same queue-tail
+     *  rule applies with a per-device end-of-graph event. Consumers using the readiness
+     *  event must ignore cuda_sync.stream rather than treat it as another dependency.
+     *
+     *  The stream is borrowed, enqueue-only, and is NOT kept alive by the mapping. Never
+     *  destroy it, change its configuration, or begin CUDA graph capture on it. Use it only
+     *  while the mapping is live and the renderer's render graph is stable: serialize
+     *  handoff with operations that may rebuild the graph, reset, or destroy the renderer.
+     *  Finish consumer work and release mappings before such operations; never cache the
+     *  handle across them or assume consecutive outputs use the same stream. Keep work
+     *  short because it can delay subsequent renderer work sharing this stream.
+     *  Unmapping still requires before_destroy_cuda_sync covering all consumer reads
+     *  (or prior completion). Returning the borrowed stream as that input is supported,
+     *  but may block the CPU; a consumer completion event can be used instead.
+     *
      *  @note ABI break from pre-0.3: the ovrtx_output_buffer_t buffer field has been removed.
      *        Consumers must migrate to the tensors[]/params[] layout.
      */
@@ -765,7 +874,7 @@ extern "C"
         ovrtx_event_status_t status; /**< Current operation status */
         ovx_string_t error_message; /**< Error description if failed, NULL if succeeded */
         ovrtx_render_var_output_map_handle_t map_handle; /**< Handle to use for unmap */
-        ovrtx_cuda_sync_t cuda_sync; /**< Single sync covering all tensors */
+        ovrtx_cuda_sync_t cuda_sync; /**< Readiness event covering all tensors; optional borrowed producer stream as described above. */
 
         ovx_string_t name; /**< Full USD prim path of the associated RenderVar */
         ovx_string_t type; /**< Semantic type identifier */
@@ -875,10 +984,10 @@ extern "C"
         /** If true, keeps the renderer system alive after all instances are destroyed (for reuse). Create_renderer. */
         OVRTX_CONFIG_KEEP_SYSTEM_ALIVE,
         /** Retired OVRTX_CONFIG_USE_VULKAN slot. Passing this key returns an error. */
-        OVRTX_CONFIG_DEPRECATED_4 = 4,
+        OVRTX_CONFIG_DEPRECATED_4,
         /** If true, enables the selection outline postprocessing pass. Create_renderer.
          *  When not specified, defaults to true. */
-        OVRTX_CONFIG_SELECTION_OUTLINE_ENABLED = 5,
+        OVRTX_CONFIG_SELECTION_OUTLINE_ENABLED,
         /** If true, enables geometry streaming. Create_renderer.
          *  When not specified, defaults to false. */
         OVRTX_CONFIG_ENABLE_GEOMETRY_STREAMING,
@@ -930,6 +1039,23 @@ extern "C"
          * Configure this option during the first initialization or renderer creation in the process.
          * Changing the cache root within the same process is unsupported, including after ovrtx_shutdown(). */
         OVRTX_CONFIG_ENABLE_GLOBAL_CACHE_ROOT,
+        /** Enable graphics API debug validation before creating shared graphics devices. Create_renderer.
+         *  Applies to Debug and Release builds. Omission preserves GPU Foundation's default.
+         *  Additional renderers inherit the existing mode. A conflicting explicit value logs a warning
+         *  and creates the renderer with the existing mode. To change it, destroy all renderers and
+         *  release OVRTX_CONFIG_KEEP_SYSTEM_ALIVE retention before creating new graphics devices.
+         *  D3D12 validation disables NVIDIA Nsight Aftermath even when Aftermath is explicitly enabled. */
+        OVRTX_CONFIG_ENABLE_DEBUG_VALIDATION,
+        /** If true, an attached history-capable ovstage presents the retained values of the renderable
+         *  history-enabled pairs when ovrtx_step_with_stage() names an ordinal below the write floor. A
+         *  history-capable ovstage is an instance of "history_selective", created with that name in the
+         *  `implementation` member of ovstage_instance_desc_t. History is on for the pairs that
+         *  ovstage_enable_history() selects. The renderer restores the live values after the render.
+         *  Pass to ovrtx_create_renderer(). Defaults to false: the renderer makes no history calls, and
+         *  such a step fails with a reason that names this key. A default stage, an instance of
+         *  "history_latest", keeps history off and renders its latest values for every committed
+         *  ordinal in both cases. Borrow mode with the Fabric stage provider only. */
+        OVRTX_CONFIG_ENABLE_HISTORY_PRESENTATION,
         OVRTX_CONFIG_BOOL_COUNT
     } ovrtx_config_bool_t;
 
@@ -974,8 +1100,9 @@ extern "C"
          *  Default: @ref OVRTX_SELECTION_FILL_MODE_GLOBAL. */
         OVRTX_CONFIG_SELECTION_FILL_MODE,
         /** Motion BVH mode. Value type: @ref ovrtx_motion_bvh_t.
-         *  Init-time only; changing requires renderer recreation.
-         *  When not specified, defaults to @ref OVRTX_MOTION_BVH_DISABLE. */
+         *  Per renderer instance. Init-time only; changing requires renderer recreation.
+         *  When omitted, defaults to @ref OVRTX_MOTION_BVH_DISABLE.
+         *  Creating another renderer does not change this instance's policy. */
         OVRTX_CONFIG_MOTION_BVH,
         /** Retired OVRTX_CONFIG_DOME_BAKING_RESOLUTION slot, replaced by the per-RenderProduct
          *  'omni:rtx:lights:dome:baking:resolution' attribute. Passing this key returns an error.
@@ -1057,6 +1184,72 @@ extern "C"
     static const ovrtx_timeout_t ovrtx_timeout_infinite = { (size_t)-1 }; /* .time_out_ns = would require C++20 */
 
 #ifdef __cplusplus
+}
+#endif
+
+/** @addtogroup ovrtx_handle_types
+ * Typed zero sentinels; copying a handle never acquires ownership.
+ *
+ * @{
+ */
+#ifdef __cplusplus
+/** Invalid value for @ref ovrtx_usd_handle_t. */
+#define OVRTX_INVALID_USD_HANDLE ovrtx_usd_handle_t{0}
+/** Invalid value for @ref ovrtx_event_handle_t. */
+#define OVRTX_INVALID_EVENT_HANDLE ovrtx_event_handle_t{0}
+/** Invalid value for @ref ovrtx_attribute_binding_handle_t. */
+#define OVRTX_INVALID_ATTRIBUTE_BINDING_HANDLE ovrtx_attribute_binding_handle_t{0}
+/** Invalid value for @ref ovrtx_map_handle_t. */
+#define OVRTX_INVALID_MAP_HANDLE ovrtx_map_handle_t{0}
+/** Invalid value for @ref ovrtx_step_result_handle_t. */
+#define OVRTX_INVALID_STEP_RESULT_HANDLE ovrtx_step_result_handle_t{0}
+/** Invalid value for @ref ovrtx_render_var_output_handle_t. */
+#define OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE ovrtx_render_var_output_handle_t{0}
+/** Invalid value for @ref ovrtx_render_var_output_map_handle_t. */
+#define OVRTX_INVALID_RENDER_VAR_OUTPUT_MAP_HANDLE ovrtx_render_var_output_map_handle_t{0}
+/** Invalid value for @ref ovrtx_op_id_t. */
+#define OVRTX_INVALID_OP_ID ovrtx_op_id_t{0}
+/** Invalid value for @ref ovrtx_query_handle_t. */
+#define OVRTX_INVALID_QUERY_HANDLE ovrtx_query_handle_t{0}
+/** Invalid value for @ref ovrtx_read_handle_t. */
+#define OVRTX_INVALID_READ_HANDLE ovrtx_read_handle_t{0}
+#else
+/** Invalid value for @ref ovrtx_usd_handle_t. */
+#define OVRTX_INVALID_USD_HANDLE ((ovrtx_usd_handle_t){0})
+/** Invalid value for @ref ovrtx_event_handle_t. */
+#define OVRTX_INVALID_EVENT_HANDLE ((ovrtx_event_handle_t){0})
+/** Invalid value for @ref ovrtx_attribute_binding_handle_t. */
+#define OVRTX_INVALID_ATTRIBUTE_BINDING_HANDLE ((ovrtx_attribute_binding_handle_t){0})
+/** Invalid value for @ref ovrtx_map_handle_t. */
+#define OVRTX_INVALID_MAP_HANDLE ((ovrtx_map_handle_t){0})
+/** Invalid value for @ref ovrtx_step_result_handle_t. */
+#define OVRTX_INVALID_STEP_RESULT_HANDLE ((ovrtx_step_result_handle_t){0})
+/** Invalid value for @ref ovrtx_render_var_output_handle_t. */
+#define OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE ((ovrtx_render_var_output_handle_t){0})
+/** Invalid value for @ref ovrtx_render_var_output_map_handle_t. */
+#define OVRTX_INVALID_RENDER_VAR_OUTPUT_MAP_HANDLE ((ovrtx_render_var_output_map_handle_t){0})
+/** Invalid value for @ref ovrtx_op_id_t. */
+#define OVRTX_INVALID_OP_ID ((ovrtx_op_id_t){0})
+/** Invalid value for @ref ovrtx_query_handle_t. */
+#define OVRTX_INVALID_QUERY_HANDLE ((ovrtx_query_handle_t){0})
+/** Invalid value for @ref ovrtx_read_handle_t. */
+#define OVRTX_INVALID_READ_HANDLE ((ovrtx_read_handle_t){0})
+#endif
+/** @} */
+
+#ifdef __cplusplus
+extern "C++"
+{
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_usd_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_event_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_attribute_binding_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_map_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_step_result_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_render_var_output_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_render_var_output_map_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_op_id_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_query_handle_t)
+OVX_DEFINE_HANDLE_CPP_OPERATORS(ovrtx_read_handle_t)
 }
 #endif
 

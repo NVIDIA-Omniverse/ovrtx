@@ -1,13 +1,6 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: spg
 description: >
   Sensor Processing Graphs: run your own GPU code as a pass over RTX render outputs.
@@ -18,7 +11,7 @@ description: >
   `omni:rtx:aov`, `orderedVars` or a `spg:` built-in node, post-process an AOV on the GPU,
   read a lidar or radar point cloud in a kernel, trace the scene from a node, or work out
   why an SPG output is empty or black.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -41,9 +34,9 @@ tools:
 Any task where the user's own GPU code has to run inside the renderer, over the images or
 sensor data the renderer produces. Trigger vocabulary: SPG, `.cu.lua`, `.slang.lua`,
 `info:spg:sourceAsset`, `subIdentifier`, `omni:rtx:aov`, `orderedVars`, `cuda.kernel`,
-`slang.dispatch`, `spg:rtx.spg.stdlib/...`, "post-process the AOV", "custom kernel on the
-render output", "my SPG AOV is black". Not this skill: reading a finished AOV back on the host,
-which is `reading-render-output`.
+`slang.compute`, `slang.dispatch`, `spg:rtx.spg.stdlib/...`, "post-process the AOV", "custom
+kernel on the render output", "my SPG AOV is black". Not this skill: reading a finished AOV back
+on the host, which is `reading-render-output`.
 
 ## Task → Sections
 
@@ -66,10 +59,8 @@ Read **The Model**, **Instructions** and **The Traps** for any task. Then only w
 ## Prerequisites
 
 - ovrtx 0.4 or later. SPG is enabled by default.
-- The user can already render: a stage, a RenderProduct with a camera, and a step loop.
-- Slang nodes need the renderer on Vulkan, which is the ovrtx default on Linux and Windows.
-- Proficiency with CUDA kernels or Slang/HLSL compute shaders, and with USD authoring, is
-  assumed. This skill maps those onto SPG rather than teaching them.
+- A working stage, camera RenderProduct and step loop; Slang requires Vulkan (the default).
+- CUDA or Slang/HLSL compute and USD authoring are assumed; this skill maps them onto SPG.
 
 ## Inputs
 
@@ -82,8 +73,7 @@ have not said, choose by what the node needs: **Choosing a Backend**.
 Precedence when facts conflict: the code under `examples/python/spg-*` first, then the pages
 under `docs/spg/`, then this skill. Every code reference below names a snippet marker in a
 runnable example, a pair of comments `// [snippet:name]` and `// [/snippet:name]` (`--` in
-`.lua`, `#` in `.py` and `.usda`). Read the file between the markers rather than relying on
-memory; this skill is not the source of truth for API shape. Conventions in `skills/README.md`.
+`.lua`, `#` in `.py` and `.usda`); read the file between the markers, not memory.
 
 ## The Model
 
@@ -99,8 +89,8 @@ Three facts drive most mistakes:
 
 1. **The launch script is found by appending `.lua` to the source asset path**, and cannot be
    redirected. `GrayscaleKernel.cu` pairs with `GrayscaleKernel.cu.lua`.
-2. **The launch script runs once per rendered frame**, on the CPU, before the GPU work, and
-   sees resource *descriptors* — shape, dtype, rank — never pixel or point *data*.
+2. **The launch script's function runs once per rendered frame**, on the CPU, before the GPU
+   work, and sees resource *descriptors* (shape, dtype, rank), never pixel or point *data*.
 3. **Execution is driven backwards from what is asked for.** A node whose output nothing
    consumes and which publishes no RenderVar never runs at all.
 
@@ -111,16 +101,16 @@ Three facts drive most mistakes:
 2. **Write the GPU code**, one entry point, named the same in all three files and `extern "C"`
    on CUDA so the symbol survives.
 3. **Write the launch script**, one global Lua function of that name taking
-   `(inputs, outputs)`, assigning a descriptor to every declared output and returning a launch
-   configuration.
+   `(inputs, outputs)`, assigning a descriptor to every declared output, which is otherwise never
+   backed, and returning a launch configuration.
 4. **Write the shader definition**: `info:implementationSource = "sourceAsset"`,
    `info:spg:sourceAsset` at the GPU file, `subIdentifier` naming the entry point, and one
    `opaque inputs:`/`outputs:` port per resource. Details in **The Three Files**.
 5. **Wire it into the scene**: **Wiring the Graph**.
 6. **Verify by content, not by exit code.** A node that never ran leaves an AOV of zeros, so a
-   clean run proves nothing. Assert something only your node could have produced, as every
-   `spg-*` example's `README.md` does. If you cannot run anything, hand the user the command
-   and the check rather than reporting the work as verified.
+   clean run proves nothing. Assert something only your node could have produced, such as
+   `R == G == B` in every pixel of a grayscale output. If you cannot run anything, hand the user
+   the command and the check rather than reporting the work as verified.
 
 The smallest complete node, in all three files:
 
@@ -141,16 +131,13 @@ prim's own name when absent.
 typed attribute, `float inputs:strength`, carrying a number, vector, matrix, token or asset.
 
 **A resource is described by `shape`, `rank` and `dtype`.** A dtype is a value taken from the
-`cuda` or `slang` table, not a type name: `cuda.uchar4` is four unsigned 8-bit numbers, so one
+`cuda` or `slang` table: `cuda.uchar4` is four unsigned 8-bit numbers, so one
 RGBA pixel. It compares, `inputs["Image"].dtype == cuda.uchar4`, and it is callable to wrap a
 value, `cuda.int(42)`.
 
 **Shapes are height-first.** `shape[1]` is height and `shape[2]` is width, while
 `cuda.image(width, height, dtype)` takes width first. That reversal is the most common
 cause of a transposed or wrongly proportioned result.
-
-**Every declared output must be assigned a descriptor** before the launch script returns, or
-it is never backed and the node has nothing to write into.
 
 ## Choosing a Backend
 
@@ -161,7 +148,7 @@ They differ in how the GPU code receives things.
 |---|---|---|
 | Values arrive | as individual kernel arguments, matched by position | packed into one constant buffer, read through a `ParameterBlock` |
 | Resources arrive | as `cudaTextureObject_t` / `cudaSurfaceObject_t` / raw pointers | bound by declared type: `Texture2D`, `RWTexture2D`, `StructuredBuffer` |
-| Splitting across files | not possible — one translation unit against a single include directory (`CUDA_PATH`/`CUDA_HOME`, else the bundled headers), never the `.cu`'s own | `import MyModule;` resolves beside the shader |
+| Splitting across files | not possible: one translation unit against a single include directory (`CUDA_PATH`/`CUDA_HOME`, else the bundled headers), never the `.cu`'s own | `import MyModule;` resolves beside the shader |
 | 64-bit integers | work | do not; the Vulkan `shaderInt64` feature is off |
 | Ray generation | not available | available |
 
@@ -176,18 +163,27 @@ Declare a typed attribute on the shader definition; a scene instance may overrid
 
 > **Source (USD):** `examples/python/spg-pipeline/InvertKernel.usda` snippet `invert-shader-definition`
 
-**A value input is a wrapper, not a number.** Arithmetic on `inputs["strength"]` raises. Pass
-it through a dtype constructor to hand it to the GPU, or read `.value` to compute with it in
-Lua.
+**A value input is a wrapper, not a number.** Arithmetic on `inputs["strength"]` raises. Pass it
+through a dtype constructor to hand it to the GPU, or read `.value` to compute with it in Lua.
 
-**A vector is not a scalar on CUDA.** Scalars pass by value, but a `float3`, a matrix or a
-quaternion is bound with `cuda.array` and arrives as a pointer to its components; passing one
-by value gives a correct first component and garbage after it. On Slang every value goes into
-the parameter block.
+**Slang integer fields require matching element widths.** Narrower integers are rejected with
+an error naming the value and widths. Use `slang.int` or `slang.uint` for a 32-bit field.
 
-**Two traps in the type mapping.** A quaternion is written `(w, x, y, z)` in USDA and arrives
+**A numeric vector can pass by value on CUDA.** A dtype constructor passes every component
+to a kernel parameter of the matching type and component count. `cuda.array` passes a pointer
+to the components instead; use it for matrices or when the kernel expects a pointer. A quaternion
+can use a matching four-component dtype constructor or `cuda.array`. On Slang every value goes
+into the parameter block.
+
+**An array may hold no elements.** Its `sourceShape[1]` is 0, `cuda.array` gives a null pointer
+and a Slang buffer a placeholder, so pass the count to the GPU code and read no element past it.
+
+**Traps in the type mapping.** A quaternion is written `(w, x, y, z)` in USDA and arrives
 as `(x, y, z, w)`. A `token` arrives as a null-terminated `char` array and an `asset` as the
-file's raw bytes, so both are bound with `array`, not a scalar constructor.
+file's raw bytes. CUDA passes a token with `array`. A Slang `uint4` field needs token bytes packed
+explicitly into four 32-bit words; see `docs/spg/do/values.rst`. Assets use `array` with the dtype
+the shader reads. A `token[]` input is
+not taken: it keeps the node's graph from being built, with an error naming the node and the input.
 
 Depth, including every USD type SPG reads: `docs/spg/ref/usd.rst` and `docs/spg/do/values.rst`.
 
@@ -216,14 +212,16 @@ Depth: `docs/spg/do/textures_buffers.rst`.
 
 ## Launch Geometry
 
-**Both keys are optional and SPG derives them.** Left out, the geometry comes from the first
+**`block` and `grid` are optional; SPG derives them.** Left out, the geometry comes from the first
 output's shape: one thread per element. On CUDA the derived block is 16 x 16 x 1, or
-256 x 1 x 1 for a rank-1 resource.
+256 x 1 x 1 for a rank-1 or rank-0 resource.
 
-**On Slang, `numthreads` states the group size the shader was compiled with**, so SPG can divide
-the output's shape into groups. It is for a `.spv`, which carries no reflection; nothing compares
-it against the byte code, so a value that differs mis-covers the output. A shader that declares
-`[numthreads]` supersedes it, logged at INFO level and so invisible by default.
+Without a `block` override, any `blockDimX`, `blockDimY` or `blockDimZ` value input makes the
+missing axes default to 1. An explicit launch `block` takes precedence over those inputs.
+
+**On Slang, `numthreads` states the group size a `.spv` was compiled with**, which it does not
+reflect; nothing checks it against the byte code, so a wrong value mis-covers the output. A
+shader that declares `[numthreads]` supersedes it, logged only at INFO level.
 
 **State the geometry when the iteration domain is not the output.** A kernel whose threads
 walk a buffer, or take one thread per column rather than per pixel, must say so. Round up
@@ -246,17 +244,17 @@ what passes between them.
 > **Source (no input):** `examples/python/spg-generate/CheckerKernel.cu.lua` snippet `checker-launch`
 
 **Order comes from connections, not from `orderedVars`.** SPG runs nodes in topological order
-over the edges the connections create, so an unpublished intermediate stays inside the graph
-and is unreadable from the host. That is the default; publishing is the deliberate act.
+over the edges the connections create. An unpublished intermediate stays inside the graph
+and is unreadable from the host.
 
 **Publishing needs both parts**: a `sourceName`, which registers the name, and the connection.
 A RenderVar with only one produces nothing. Under a name the renderer already produces it
 overwrites in place, which downstream consumers pick up unknowingly.
 
-**Fan-out and fan-in are ordinary connections**, but a node output binds to one RenderVar at a
+**Fan-out and fan-in are allowed**, but a node output binds to one RenderVar at a
 time, and a node cannot read an AOV and republish under that same name in one product.
 
-**A node needs no input at all.** With no resource port it generates its output from authored
+**A node may have no input at all.** With no resource port it generates its output from authored
 values, and must state its own size because nothing hands it a shape.
 
 Depth: `docs/spg/do/chaining.rst`, `split_join.rst`, `aovs.rst`, `products.rst`, `generate.rst`.
@@ -277,32 +275,32 @@ The four that exist:
 | `spg:rtx.spg.stdlib/Scale` | `Input`, `scaleX`, `scaleY` (0.5) → `Output` | Nearest-neighbour resize |
 | `spg:rtx.spg.stdlib/Swizzle` | `Input`, `swizzle` (`"xyzw"`) → `Output` | Per-channel routing |
 
-That is the complete standard library and the whole of the published surface. Other renderer
+Other renderer
 components register nodes into the same registry under their own prefix, so an `info:id`
-outside this table may still resolve; treat anything else as internal and unsupported. These
-four take 2D textures only and refuse integer formats. A built-in is the whole node: the moment
-you need something it does not do, you are writing a node.
+outside this table may still resolve; treat anything else as internal and unsupported.
 
 Depth: `docs/spg/ref/builtin_catalogue.rst`.
 
 ## Cross-Frame State
 
-Two mechanisms, differing in who owns the data.
+**Memory is the node's own resource**, handed back on every run and to nobody else. State it on
+`self.memory` with an output's allocator, `self.memory["History"] = cuda.image(...)`, and pass it
+with an output's wrapper. SPG zeroes it when it creates it, creates it again zeroed when a launch
+describes it otherwise, and leaves it alone when a launch does not state it. It is not a port.
 
-**A stateful output is the node's own resource**, handed back to it next frame instead of a
-fresh one. Mark it with a trailing `cuda.stateful` / `slang.stateful` on the allocation. It is
-zero-initialised on first use and needs no RenderVar.
+**A stateful output is the node's resource that the scene also reads**: a trailing `cuda.stateful`
+/ `slang.stateful` on the allocation, or `self.stateful = true` for every output of the node. Zeroed
+and kept as memory is, it stays a port a RenderVar can publish and another node can connect to.
 
-**A previous-frame read is an AOV**, so any node connected to it sees the same history. Suffix
-a RenderVar's `sourceName` with `:-N`, for N from 1 to 8. Nothing on the node says anything
-about time; that follows from what the scene connects it to.
+**A previous-frame read is an AOV**, so any node connected to it sees the same history: suffix a
+RenderVar's `sourceName` with `:-N`, N from 1 to `/rtx/spg/state/maxPreviousFrameOffset` (8 by
+default); further back stops the node's graph. A `:-N` read of a sensor composite gives that frame
+as the sensor filled it, and zeros where its history holds none. A suffix that is not a number,
+`:-x`, is part of the name and reads the live AOV under it; `:-0` reads the current frame.
 
-> **Source (stateful, CUDA):** `examples/python/spg-stateful/TrailKernel.cu.lua` snippet `trail-alloc`
-> **Source (stateful, Slang):** `examples/python/spg-stateful/TrailKernel.slang.lua` snippet `trail-slang-alloc`
+> **Source (memory, CUDA):** `examples/python/spg-stateful/TrailKernel.cu.lua` snippet `trail-alloc`
+> **Source (memory, Slang):** `examples/python/spg-stateful/TrailKernel.slang.lua` snippet `trail-slang-alloc`
 > **Source (previous frame):** `examples/python/spg-previous-frame/motion_scene.usda` snippet `render-graph`
-
-An unrecognised suffix is not an error: it leaves the name unchanged and reads the live AOV
-under that literal name, which looks like the feature silently not working.
 
 Depth: `docs/spg/do/state.rst`, `previous_frame.rst`.
 
@@ -311,8 +309,7 @@ Depth: `docs/spg/do/state.rst`, `previous_frame.rst`.
 `array` takes a Lua table and a dtype and creates a device buffer, or uploads an `asset` value
 input's raw bytes; `zeros`, `ones` and `full` fill one without Lua data.
 
-**An `asset` file is resolved exactly as the GPU source is**, so it may sit beside the scene,
-inside a `.usdz` package, or behind a URI the Omniverse client can reach.
+**An `asset` file resolves as the GPU source does**: beside the scene, in a `.usdz` or at a URI.
 
 **Wrap the construction in `static`** so it is built once rather than on every frame, since
 the launch script runs per frame under an instruction budget.
@@ -320,9 +317,13 @@ the launch script runs per frame under an instruction budget.
 > **Source (CUDA):** `examples/python/spg-blur/BlurKernel.cu.lua` snippet `blur-weights`
 > **Source (Slang):** `examples/python/spg-blur/BlurKernel.slang.lua` snippet `blur-slang-weights`
 
-`static` caches the Lua work, not the GPU upload: the bytes are copied again each frame. For a
-filter kernel that costs nothing measurable, so size a design around the Lua saving rather than
-the transfer.
+`static` caches the Lua work, for each node that calls it on its own. The GPU upload is
+separate: an array whose bytes stay the same from frame to frame stays on the GPU and is not
+copied again, whether or not it came from `static`; an array whose bytes change is copied again.
+Size a design around the Lua saving rather than the transfer.
+
+An error inside `cuda.static` or `slang.static` fails the launch like any script error.
+The failed call stores no result; a later successful call can be cached normally.
 
 Depth: `docs/spg/do/upload_data.rst`, `caching.rst`.
 
@@ -335,30 +336,32 @@ by advancing the write floor, then step.
 
 **An unconnected input takes effect on the next step**, with no reset. **A connected input
 ignores a direct write**: the connection is the source, so the write succeeds and changes
-nothing; write the source attribute instead and reset the renderer. Each node carries its own
-copy, so retuning two nodes means writing both.
+nothing; write the source attribute instead, which also takes effect on the next step. Each node
+carries its own copy, so retuning two nodes means writing both.
+
+Connecting a RenderVar to an existing node's output while the scene runs publishes that
+output on the next step. Adding or removing a binding or shader input rebuilds the affected
+connected component; writing an existing input's value does not.
 
 Depth: `docs/spg/do/runtime_changes.rst`.
 
 ## Sensor Composites
 
 A lidar or radar publishes a **composite**: several named channels under one render var rather
-than the single image a camera AOV gives. The node's port is declared like any other, and
-nothing on the shader side says "composite".
+than the single image a camera AOV gives. The node's port is an `opaque` input.
 
 > **Source (launch script):** `examples/python/spg-composite-aov/RangeHistogramKernel.cu.lua` snippet `histogram-launch`
 > **Source (scene):** `examples/python/spg-composite-aov/lidar_scene.usda` snippet `lidar-render-graph`
 
-Test `inputs["X"].isComposite` first — it is the only way to tell the two shapes apart, and a
+Test `inputs["X"].isComposite` first: it is the only way to tell the two shapes apart, and a
 node written for one will not work on the other. Then take channels from `.tensors[name]` and
 scalars from `.params[name]`, with `.channelNames` saying what this render var carries. A
-render var with no `channels` authored is not a composite: it binds as a one-dimensional
-`uchar` buffer of raw bytes.
+lidar or radar `PointCloud` is a composite whether or not `channels` is authored.
 
 **Bound the work by the count channel.** Point channels are allocated for the worst case and
 only the first `Counts[0]` entries hold a return. The launch script sees descriptors, not data,
-so pass `Counts` to the GPU and apply the bound there. `Coordinates` is `[3, Nmax]` — all x,
-then all y, then all z — so the stride between runs is the capacity, not the count.
+so pass `Counts` to the GPU and apply the bound there. `Coordinates` is `[3, Nmax]`: all x,
+then all y, then all z, so the stride between runs is the capacity, not the count.
 
 Do not branch on `.status`: it reports what the render output said when the launch script ran,
 and reads `"empty"` on every frame of the working example while the channels carry a full sweep.
@@ -367,28 +370,11 @@ Depth: `docs/spg/do/composites.rst`.
 
 ## Ray Generation
 
-Slang only. The entry point is `[shader("raygeneration")]` and the launch script returns
-`slang.rayQuery` or `slang.traceRays` in place of `slang.dispatch`. Either way the ray grid is
-the output's shape, one invocation per element, so there is no `numthreads`.
-
-`slang.rayQuery` traverses and shades inline in the ray-generation shader and needs nothing
-else. `slang.traceRays` drives a pipeline with a shader binding table, so shading moves into
-one `miss` and one hit group in the same file, named by the extra launch fields `miss`, `hit`,
-`payloadSize` and `attributeSize`.
+Slang supports ray generation; CUDA kernels and C++ callbacks reject provider bindings.
+Read [Ray generation](references/shader-sources.md#ray-generation) before writing a ray launch or binding the scene.
 
 > **Source (inline):** `examples/python/spg-raygen/RaygenCornellBox.slang.lua` snippet `raygen-launch`
 > **Source (pipeline):** `examples/python/spg-raygen/RaygenCornellBoxPipeline.slang.lua` snippet `pipeline-launch`
-
-A shader under a RenderProduct is given the scene acceleration structure and its camera with
-**no authored input and no connection**: bind it with `slang.binding("scene", inputs["scene"])`
-and place rays with the `sceneTransform` value input rather than assuming world coordinates.
-Exactly one hit group is supported, `payloadSize` and `attributeSize` are byte counts you work
-out yourself, and a `.spv` cannot be used on a ray-tracing stage.
-
-**No geometry is exposed.** A hit yields distance and the surface's instance and primitive
-index, and nothing else, so the example recovers geometric normals from two extra probe rays.
-
-Depth: `docs/spg/do/raygen.rst`.
 
 ## Scene Queries
 
@@ -403,40 +389,27 @@ Depth: `docs/spg/do/scene_queries.rst`, `docs/spg/ref/lua_rtx.rst`.
 
 ## Pre-Compiled Sources
 
-The extension on `info:spg:sourceAsset` decides what happens: CUDA takes `.cu`, `.ptx`,
-`.cubin` and `.fatbin`, Slang takes `.slang`, `.slang-module` and `.spv`. The launch script is
-still required and still found by appending `.lua`, and a CUDA entry point must be `extern "C"`
-so the symbol is findable in the artifact.
-
-A `.spv` carries no reflection at all: the descriptor space, the binding slots, the
-parameter-block offsets and the thread group size all have to be stated in the launch script,
-and it cannot be used on a ray-tracing stage. A `.slang-module` keeps its reflection and binds
-like source.
-
-Sources and `asset` value inputs may live beside the scene, inside a `.usdz` package, or
-behind a URI the Omniverse client can reach, and the launch script always follows its source;
-inside a package the `.lua` goes within the brackets.
-
-Depth: `docs/spg/do/precompiled.rst`, `descriptor_sets.rst`, `docs/spg/ref/usd.rst`.
+Read [Pre-compiled sources](references/shader-sources.md#pre-compiled-sources) when using CUDA binaries,
+Slang modules or SPIR-V: the source format determines entry-point, reflection and binding requirements.
 
 ## The Traps
 
-These bite across every task, and each produces a plausible result rather than an error.
+These bite across every task.
 
 1. **Shapes are height-first**, while the `image` constructors take width first.
 2. **Argument order is unchecked.** CUDA `args` is matched against the C signature by
    position and a mismatch is not diagnosed: the kernel reads whatever occupies that slot.
 3. **A value input is a wrapper**, so arithmetic on it raises. Use `.value`.
 4. **The launch script has fixed limits**: one million VM instructions and 64 KB of log output
-   per call, and 10 MB of memory, not adjustable. Reaching one logs an execution-limit error and
-   stops the node until the stage's SPG setup changes, so heavy work belongs in the GPU code.
+   per call, and 10 MB of memory, not adjustable. Reaching one logs an execution-limit error naming
+   the node and stops the node's whole graph. The stopped node retries when one of its own value
+   inputs changes or its graph is rebuilt; equal values and another node's edits keep it stopped.
+   Heavy work belongs in the GPU code.
 5. **The sandbox scans the script's text before running it**, as a plain substring match
    over the whole file including comments. A comment mentioning a forbidden construct is
    enough to reject the script, which surfaces as an output that is never written.
 6. **`info()` and `print()` are invisible at the default log level.** Use `warning()` when
    you need to see something.
-7. **A rejected or never-scheduled node leaves zeros and exits 0.** Never take a clean run
-   as evidence.
 
 ## Output Format
 
@@ -457,7 +430,9 @@ This skill has no scripts. Every `spg-*` example runs itself with `uv run main.p
   load names their prim.
 - A shader output binds to one RenderVar at a time; a node cannot read an AOV and republish
   under that same name in one product.
-- Previous-frame reads reach 8 frames back.
+- Previous-frame reads reach as far back as `/rtx/spg/state/maxPreviousFrameOffset` allows, 8 by default. An earlier frame of a sensor composite is kept
+  only when all its channels are GPU buffers of an element type SPG binds, stored compactly, with no `/` in their names, and a 64-bit composite param, such
+  as a lidar's `timestamp`, cannot be read in the launch script.
 - A cross-product read can be one frame stale when the consuming product renders first.
 - SPG Shader prims must not sit under a `Material` prim, and shaders under an instance
   prototype are ignored.
@@ -472,28 +447,29 @@ writes its log to standard output, where launch-script `warning()` lines appear 
 | Symptom | Most likely cause |
 |---|---|
 | Output empty or black | The node never ran: its output is consumed by nothing and publishes no RenderVar |
-| Output empty, scene looks right | The RenderVar has a connection but no `sourceName`, or the name collides with a built-in AOV that shadows it |
+| Output empty, scene looks right | The RenderVar has a connection but no `sourceName` |
 | Output empty, node looks right | The launch script was rejected by the sandbox scan, an output was never assigned a descriptor, or the shader sits under a `Material` or instanceable prim and is ignored |
 | Wrong pixels rather than none | Argument or bind order does not match the GPU code, or the shape order is reversed |
-| First component right, rest garbage | A vector was passed by value on CUDA instead of with `cuda.array` |
+| Vector components wrong on CUDA | The dtype constructor does not match the kernel parameter's type or component count, or a pointer parameter needs `cuda.array` |
 | A band or corner unwritten | The grid is too small; round up when dividing the domain by the block |
-| Node fails, log names `numthreads` | A `.spv` with no thread group size from either the shader or the script |
-| Values right on frame one only | A cache key is changing every frame, often a value input passed as its wrapper |
+| Graph stops, log names `numthreads` | A `.spv` with no thread group size from either the shader or the script |
+| Values right on frame one only | A `static` function reads a value that is not one of its arguments, such as a variable declared at the top level of the script, or a field of a table argument whose contents change |
 | Lidar output empty | The sweep returned nothing; check `Counts`, and that motion BVH is enabled |
 
 ## References
 
-Docs are the depth behind every section here, under `docs/spg/`: `overview.rst` for what SPG
-is, `first_node.rst` for one node built from nothing, `do/index.rst` for one page per task,
-`ref/index.rst` for every Lua function and USD attribute, and `diagnose/index.rst` for the
-symptom index and the limitations.
+Docs under `docs/spg/`: `overview.rst` explains the model; `first_node.rst` builds one node;
+`do/index.rst` routes tasks; `ref/index.rst` covers Lua functions and USD attributes;
+`diagnose/index.rst` indexes symptoms and limitations.
+Runnable examples: `spg-grayscale` (smallest node), `spg-pipeline` (chaining/value inputs),
+`spg-builtin-nodes`, `spg-generate` (no input), `spg-blur` (uploads/caching/launch/runtime/fan-out),
+`spg-stateful`, `spg-previous-frame`, `spg-composite-aov`, `spg-raygen`, `spg-scene-query`.
+Related skills: `reading-render-output`, `loading-usd`, `stepping-and-rendering`, `cuda-interop`.
+Editor support: `docs/spg/.luarc/` type stubs; setup in `docs/spg/ref/lua_contract.rst`.
 
-Runnable examples, each self-checking: `spg-grayscale` (smallest node), `spg-pipeline`
-(chaining, value inputs), `spg-builtin-nodes`, `spg-generate` (no input), `spg-blur` (uploads,
-caching, launch geometry, runtime changes, fan-out), `spg-stateful`, `spg-previous-frame`,
-`spg-composite-aov`, `spg-raygen`, `spg-scene-query`.
+## Custom selection overlay reference
 
-Related skills: `reading-render-output` for getting an AOV back on the host, `loading-usd` and
-`stepping-and-rendering` for the surrounding loop, `cuda-interop` for sharing GPU memory.
-Editor support: type stubs in `docs/spg/.luarc/`, wired up as `docs/spg/ref/lua_contract.rst`
-describes.
+Read [Custom selection overlays](references/selection-overlay.md) for the SelectionState format and styling contract.
+> **Source (kernel):** `examples/c/selection-spg/SelectionOutline.slang` snippet `selection-spg-outline-kernel`
+> **Source (launch):** `examples/c/selection-spg/SelectionOutline.slang.lua` snippet `selection-spg-launch`
+> **Source (graph):** `examples/c/selection-spg/selection_scene.usda` snippet `selection-spg-render-graph`

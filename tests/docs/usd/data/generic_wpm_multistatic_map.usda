@@ -1,0 +1,26 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-multistatic-map]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_multistatic.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        token[] omni:sensor:GenericWpm:tx:mappingModes = ["map"]
+        uint[] omni:sensor:GenericWpm:tx:mappingTargetRxGroups = [0]
+        uint[] omni:sensor:GenericWpm:txRxMappings:numRxGroupsPerPages = [1]
+        uint[] omni:sensor:GenericWpm:txRxMappings:numRxPerGroups = [2]
+        # Receiver-slot order is explicit and local to the selected Rx pattern.
+        uint[] omni:sensor:GenericWpm:txRxMappings:rxIndices = [2, 0]
+    }
+}
+# [/snippet:doc-generic-wpm-multistatic-map]

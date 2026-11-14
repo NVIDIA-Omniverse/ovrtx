@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: reading-render-output
 description: >
   Mapping rendered output to access pixel data on CPU or GPU. Use when user asks to get
   pixels, read an image, save a PNG, display rendered output, or access render var
   data.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -35,7 +28,7 @@ Use this skill when the user asks to get pixels, read an image, save a PNG, disp
 Resolve inputs in this order: existing repository files and referenced snippets, explicit user request, then broader agent context.
 
 - Target API surface: Python, C/C++, USD, or a combination.
-- RenderProduct path, full RenderVar prim path or reserved synthetic output name, and whether the output is single-tensor or composite.
+- RenderProduct path, a unique returned prim name (Python), full RenderVar prim path or reserved synthetic output name, and whether the output is single-tensor or composite.
 - Mapping target: CPU pixels, linear CUDA tensor, or C CUDA array mapping.
 - Image/tensor shape, dtype, channel order, synchronization requirements, and whether the data must outlive the mapping.
 - Repository source snippets referenced below. Treat these snippets as the API source of truth.
@@ -49,7 +42,7 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 ## Instructions
 
-1. Identify the RenderProduct path, full RenderVar prim path, target device, and whether the caller needs CPU pixels, CUDA tensors, or CUDA arrays.
+1. Identify the RenderProduct path, RenderVar key (a unique returned prim name or full path in Python), target device, and whether the caller needs CPU pixels, CUDA tensors, or CUDA arrays.
 2. Read the matching map/unmap snippet before choosing Python `frame.render_vars[...]` access or C `ovrtx_map_render_var_output()`.
 3. Preserve dtype, shape, channel order, and ownership rules for the selected output.
 4. Always unmap C outputs, and keep CUDA synchronization aligned with the CUDA interop skill when reading on GPU.
@@ -70,11 +63,29 @@ This skill has no scripts.
 
 ## Overview
 
-This skill is the hands-on counterpart to the conceptual reference at `docs/sensors/sensor_outputs.rst`, which describes what a render variable output is and how its tensors and params are laid out. Use this skill for *how* to map and read one; use the conceptual page when the question is about *what* the structure carries or *why* it is shaped the way it is.
+This skill is the hands-on counterpart to the conceptual reference at `docs/sensors/common/sensor_outputs.rst`, which describes what a render variable output is and how its tensors and params are laid out. Use this skill for *how* to map and read one; use the conceptual page when the question is about *what* the structure carries or *why* it is shaped the way it is.
 
-After stepping the renderer and fetching results, each `RenderVarOutput` is identified by its full RenderVar prim path (for example `/Render/Camera/LdrColor`) and must be mapped to access its data. Names such as `LdrColor` or `HdrColor` are RenderVar `source_name` values, not Python `frame.render_vars` keys.
+After stepping the renderer and fetching results, each `RenderVarOutput` is identified by its full RenderVar prim path (for example `/Render/Camera/LdrColor`) and must be mapped to access its data. Python `frame.render_vars` also accepts a prim name unique among the outputs returned in that RenderProduct's frame. This is the final path component, not `source_name`. Ambiguous indexing raises `KeyError`; `get` returns its default and containment is false. Missing outputs remain missing. Exact full paths and reserved synthetic names take precedence.
 
-A render variable carries one or more named tensors and zero or more named params. For a single-tensor render variable, consume the mapping directly with DLPack (`np.from_dlpack(rv)`); for a multi-tensor render variable, address tensors by name (`rv["TensorName"]`) and reach params through `rv.params["paramName"]`. Both tensors and params expose the DLPack protocol uniformly, so `np.from_dlpack(rv["TensorName"])` and `np.from_dlpack(rv.params["paramName"])` both yield zero-copy NumPy/Warp/etc. arrays.
+Short-name lookup scans the current returned dictionary keys on demand; configured targets that produced no output do not count toward ambiguity. It returns the same output object as full-path lookup. Continue using `render_var_path` for identity and application maps; dictionary iteration, counts and mutations retain exact canonical keys. Adding or removing canonical entries updates name resolution. Later scene edits do not change an earlier result's returned keys, including when fetched later. Lookup uses the existing released native API with no extra capability requirement. The C API enumerates full-path outputs and maps handles.
+
+A rendered frame has an output for every RenderVar the RenderProduct lists (a DLSS-G interpolated frame has outputs only for its color RenderVars), including one OVRTX could not produce, such as a RenderVar with an invalid `ovrtx:compression:*` setting or an unsupported sensor `sourceName`. Check its status before mapping: such an output has status `EventStatus.FAILURE` (C: `OVRTX_EVENT_FAILURE` in `ovrtx_render_product_render_var_output_t::status`) and says why in `error_message`, and mapping it fails with that message. The RenderProduct's other outputs are unaffected.
+
+A render variable carries zero or more named tensors and zero or more named params.
+For a single-tensor render variable, consume the mapping directly with DLPack;
+address individual tensors by name and read params independently through `params`.
+`CameraParams` has no tensors and 23 CPU params, so read its params without indexing a tensor or
+passing the mapping itself to DLPack. Its scalar params, and those of
+`InstanceIdTokenMapSD` and point-cloud outputs, use shape `(1,)`.
+Inspect each descriptor's shape. Both tensors and params expose the DLPack protocol
+for zero-copy access by compatible consumers and devices. The snippets below copy
+the arrays so they remain usable after the mapping is released.
+
+> **Source (single-tensor readback):** `tests/docs/python/test_camera_aovs.py` snippet `doc-sd-map-image-python`.
+>
+> **Source (named tensors and CPU params):** `tests/docs/python/test_camera_aovs.py` snippet `doc-sd-map-structured-python`.
+
+> **Source (parameter-only output):** `tests/docs/python/test_camera_aovs.py` snippet `doc-sd-camera-python`.
 
 - In Python, render-var mapping supports `device=Device.CPU`, `device=Device.CUDA`, and `device=Device.CUDA_ARRAY` (from `from ovrtx import Device`).
 - `Device.CUDA_ARRAY` / `OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY` is the zero-copy image path. It yields an opaque CUDA array handle rather than readable memory, so it is outside the DLPack workflow described here — see the `cuda-interop` skill.
@@ -97,6 +108,10 @@ After reading/processing, unmap to release the mapped buffer.
 
 > **Source:** `examples/python/lpes/main.py` snippet `doc-read-lpe-outputs`
 
+### Copy composite Generic WPM contributions and filter valid slots
+
+> **Source:** `examples/python/generic-wpm/main.py` snippets `doc-generic-wpm-copy-contributions`, `doc-generic-wpm-read-output`
+
 ### Map to CUDA for GPU processing
 
 > **Source:** `tests/docs/python/test_camera_sensors.py` snippet `doc-map-render-output-cuda`
@@ -106,6 +121,10 @@ After reading/processing, unmap to release the mapped buffer.
 ### Map to CPU
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `map-rendered-output-cpu`
+
+### Copy composite Generic WPM contributions and filter valid slots
+
+> **Source:** `examples/c/generic-wpm/main.cpp` snippets `doc-generic-wpm-read-output-c`, `doc-generic-wpm-valid-slots-c`
 
 ### Map to linear CUDA memory
 
@@ -120,6 +139,13 @@ After reading/processing, unmap to release the mapped buffer.
 This helper is not part of the ovrtx API; define it in your own code (see `examples/c/minimal/main.cpp`):
 
 > **Source:** `examples/c/minimal/main.cpp` snippet `find-output-helper`
+
+The minimal example's helper searches every RenderProduct and frame and returns
+the first matching RenderVar. It does not let the caller select a frame. When a
+product can return several frames, select the intended product and frame before
+looking up its RenderVar; otherwise the helper can return an earlier exposure or
+an interpolated frame. See `dlss-frame-generation` for selecting interpolated and
+simulated frames.
 
 ## Key Types / Functions
 

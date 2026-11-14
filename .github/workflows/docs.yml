@@ -11,62 +11,172 @@
 name: Build and Deploy Docs
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  release:
+    types: [published]
+  workflow_dispatch:
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+permissions:
+  contents: read
+
+# All production runs publish the complete site, so serialize across refs.
 concurrency:
-  group: pages-${{ github.ref }}
+  group: pages-production
   cancel-in-progress: false
 
 jobs:
-  build:
+  versions:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.versions.outputs.matrix }}
+      publisher_sha: ${{ steps.publisher.outputs.sha }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          # Resolve the current publishing tools once, independently of the release tag.
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: publisher
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/versioned_docs.py discover >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-versions
+          path: versions.json
 
-      - name: Install Doxygen
+  build:
+    needs: versions
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.versions.outputs.matrix) }}
+    steps:
+      # Keep publishing tools separate from the historical source checkout.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.versions.outputs.publisher_sha }}
+          path: publisher
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: docs-versions
+      - name: Reuse archived release documentation
+        if: matrix.reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ matrix.ref }}
+          DOCS_VERSION: ${{ matrix.version }}
+          DOCS_ASSET: ${{ matrix.asset }}
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$DOCS_ASSET"
+          python publisher/.github/scripts/versioned_docs.py unpack "$DOCS_ASSET" html "$DOCS_VERSION"
+      - uses: actions/checkout@v4
+        if: ${{ !matrix.reuse }}
+        with:
+          ref: ${{ matrix.sha }}
+          path: source
+          persist-credentials: false
+      - name: Install documentation tools
+        if: ${{ !matrix.reuse }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y doxygen
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python
-        run: uv python install 3.10
-
+          sudo apt-get install -y doxygen graphviz
+      - uses: astral-sh/setup-uv@v4
+        if: ${{ !matrix.reuse }}
+      - name: Configure version switcher
+        if: ${{ !matrix.reuse }}
+        env:
+          DOCS_VERSION: ${{ matrix.version }}
+        run: python publisher/.github/scripts/versioned_docs.py configure source "$DOCS_VERSION"
       - name: Build documentation
-        working-directory: docs
-        run: make html
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        if: ${{ !matrix.reuse }}
+        working-directory: source/docs
+        env:
+          OVRTX_SKIP_SCHEMA_AUTO_REGISTER: '1'
+        run: |
+          mkdir -p _doxygen
+          doxygen Doxyfile
+          uv run --no-project --python 3.11 --with-requirements ../../publisher/docs/requirements.txt sphinx-build -b html . "$GITHUB_WORKSPACE/html"
+      - name: Archive documentation with build provenance
+        if: ${{ !matrix.reuse }}
+        env:
+          DOCS_VERSION: ${{ matrix.version }}
+          DOCS_ASSET: ${{ matrix.asset }}
+        run: uv run --no-project --python 3.11 --with-requirements publisher/docs/requirements.txt python publisher/.github/scripts/versioned_docs.py pack html "$DOCS_ASSET" "$DOCS_VERSION"
+      - name: Pass archive to the isolated release uploader
+        if: ${{ !matrix.reuse }}
+        uses: actions/upload-artifact@v4
         with:
-          path: docs/_build/html
+          name: docs-archive-${{ matrix.version }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-html-${{ matrix.version }}
+          path: html
+
+  upload:
+    needs: [versions, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.versions.outputs.matrix) }}
+    steps:
+      # This fresh runner never checks out or executes release/build code. The
+      # archive is opaque; names come only from the trusted discovery job.
+      - uses: actions/download-artifact@v4
+        if: ${{ !matrix.reuse }}
+        with:
+          name: docs-archive-${{ matrix.version }}
+          path: archives
+      - name: Store documentation on the release
+        if: ${{ !matrix.reuse }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ matrix.ref }}
+          DOCS_ASSET: ${{ matrix.asset }}
+        # No --clobber: replacing archived documentation must be intentional.
+        run: gh release upload "$RELEASE_TAG" "archives/$DOCS_ASSET" --repo "$GITHUB_REPOSITORY"
+
+  assemble:
+    needs: [versions, build, upload]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.versions.outputs.publisher_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: docs-versions
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: docs-html-*
+          path: artifacts
+      - name: Assemble all versions
+        run: python .github/scripts/versioned_docs.py assemble artifacts site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
 
   deploy:
-    # Only deploy on push to main
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build
+    needs: assemble
     runs-on: ubuntu-latest
-
-    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
       pages: write
       id-token: write
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - name: Deploy to GitHub Pages
+      - uses: actions/deploy-pages@v4
         id: deployment
-        uses: actions/deploy-pages@v4

@@ -1,0 +1,17 @@
+#usda 1.0
+# [snippet:doc-calibration-write-camera-usda]
+def Camera "CalibratedCamera" (
+    prepend apiSchemas = ["OmniLensDistortionOpenCvFisheyeAPI"]
+)
+{
+    float omni:lensdistortion:opencvFisheye:cx = 965.48444
+    float omni:lensdistortion:opencvFisheye:cy = 767.19696
+    float omni:lensdistortion:opencvFisheye:fx = 489.91925
+    float omni:lensdistortion:opencvFisheye:fy = 489.53534
+    int2 omni:lensdistortion:opencvFisheye:imageSize = (1920, 1536)
+    float omni:lensdistortion:opencvFisheye:k1 = 0.07464232
+    float omni:lensdistortion:opencvFisheye:k2 = -0.026043002
+    float omni:lensdistortion:opencvFisheye:k3 = 0.009413581
+    float omni:lensdistortion:opencvFisheye:k4 = -0.0014346525
+}
+# [/snippet:doc-calibration-write-camera-usda]

@@ -1,0 +1,54 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-depth]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_base.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        token[] omni:sensor:GenericWpm:tx:patternTypes = ["grid"]
+        token[] omni:sensor:GenericWpm:rx:patternTypes = ["grid"]
+        token[] omni:sensor:GenericWpm:ray:patternTypes = ["free"]
+        uint[] omni:sensor:GenericWpm:tx:rayPatternIndices = [0]
+        token[] omni:sensor:GenericWpm:tx:mappingModes = ["1to1"]
+        uint[] omni:sensor:GenericWpm:tx:mappingBloomFactors = []
+
+        # A 3-by-5 angular grid includes both nonperiodic endpoints.
+        token[] omni:sensor:GenericWpm:gridPatterns:tx:modes = ["SPHERICAL"]
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:numRows = [3]
+        uint[] omni:sensor:GenericWpm:gridPatterns:tx:numCols = [5]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:startRowUnits = [-10]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:endRowUnits = [10]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:startColUnits = [-20]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:endColUnits = [20]
+        token[] omni:sensor:GenericWpm:gridPatterns:tx:layouts = ["rowMajor"]
+        float3[] omni:sensor:GenericWpm:gridPatterns:tx:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:gridPatterns:tx:orientations = [(0, 0, 0, 1)]
+
+        token[] omni:sensor:GenericWpm:gridPatterns:rx:modes = ["SPHERICAL"]
+        uint[] omni:sensor:GenericWpm:gridPatterns:rx:numRows = [3]
+        uint[] omni:sensor:GenericWpm:gridPatterns:rx:numCols = [5]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:startRowUnits = [-10]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:endRowUnits = [10]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:startColUnits = [-20]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:endColUnits = [20]
+        token[] omni:sensor:GenericWpm:gridPatterns:rx:layouts = ["rowMajor"]
+        float3[] omni:sensor:GenericWpm:gridPatterns:rx:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:gridPatterns:rx:orientations = [(0, 0, 0, 1)]
+
+        # One transmitter-relative +X ray follows each transmitter's orientation.
+        uint[] omni:sensor:GenericWpm:freePatterns:ray:numElementsPerPattern = [1]
+        float3[] omni:sensor:GenericWpm:freePatterns:ray:positions = [(0, 0, 0)]
+        float4[] omni:sensor:GenericWpm:freePatterns:ray:orientations = [(0, 0, 0, 1)]
+    }
+}
+# [/snippet:doc-generic-wpm-depth]

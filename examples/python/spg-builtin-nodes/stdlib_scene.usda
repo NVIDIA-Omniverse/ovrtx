@@ -117,7 +117,7 @@ def Xform "World"
 
 # Built-in SPG factory nodes need no .cu / .cu.lua: author each with
 # info:implementationSource = "id" and info:id = "spg:<plugin>/<node>". This graph
-# chains two stdlib nodes — Add brightens LdrColor by adding it to itself (saturating
+# chains two stdlib nodes: Add brightens LdrColor by adding it to itself (saturating
 # at 255), then Scale downscales that result to half resolution. The intermediate
 # AddNode output stays internal to the chain; only the final Downscaled AOV is published.
 # [snippet:render-graph]

@@ -1,13 +1,6 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: reading-sensor-pointclouds
 description: >
   Mapping and reading lidar or radar PointCloud composite render-var tensors. Use
@@ -15,7 +8,7 @@ description: >
   Intensity, RCS, RadialVelocityMs, or TimeOffsetNs tensors, slice valid entries, or
   move sensor point clouds through CPU/CUDA memory. For channel meanings and units,
   use the interpreting-lidar-pointclouds or interpreting-radar-pointclouds skills.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -114,11 +107,13 @@ The radar C example uses the same map/read/unmap flow and additionally reads rad
 | Channel | Meaning |
 |---|---|
 | `Counts` | Scalar delivered-entry count. Always use it to bound per-point or per-detection channel access. |
-| `Coordinates` | Point coordinates, commonly packed as `3 x N`; transpose or index according to the mapped tensor shape. |
-| `Flags` | Model-delivered per-entry status flags. The `VALID` bit is `0x40`. |
-| `TimeOffsetNs` | Per-point time offset in nanoseconds. |
+| `Coordinates` | Point coordinates. The generic lidar and radar models pack them component-first as `3 x N`; the WPM lidar model packs the same channel point-first. Packing is a property of the model, not of the channel name, so take shape and strides from the mapped tensor rather than assuming a layout. |
+| `Flags` | Model-delivered per-entry status flags. The `VALID` bit is `0x40`; test it only within the delivered range bounded by `Counts[0]`. See the modality-specific interpreting skills for validity semantics. |
+| `TimeOffsetNs` | Per-point time offset in nanoseconds. Its reference instant differs by modality, and the radar model leaves it zero; see the interpreting skills. |
 
-The model auto-enables `Counts` and `Flags`, and they are delivered as ordinary `PointCloud` channel tensors. Other payload channels must be requested by the sensor `PointCloud` `RenderVar`. There are additional modality specific channels, see `configuring-lidar-sensors` and `configuring-radar-sensors`.
+The model auto-enables `Counts` and `Flags`, and they are delivered as ordinary `PointCloud` channel tensors. Other payload channels must be requested by the sensor `PointCloud` `RenderVar`. The WPM lidar model departs from this twice: a `PointCloud` RenderVar with an empty `channels` list receives all eight of the model's channels, and its default compact output (`omni:sensor:LidarWpm:includeInvalidPoints = false`) also carries `TilePointCounts` and `TilePointOffsets`; see [Sensor Channels](https://nvidia-omniverse.github.io/ovrtx/sensors/common/output_configuration.html#sensors-channels-requesting). There are additional modality specific channels, see `configuring-lidar-sensors` and `configuring-radar-sensors`.
+
+A radar scan with no detections is published with `Counts[0] == 0` and scan metadata. Skip per-detection reads for that scan; no `RCS` channel is needed to recognize it. See `interpreting-radar-pointclouds`.
 
 ## Troubleshooting
 
@@ -137,7 +132,12 @@ The model auto-enables `Counts` and `Flags`, and they are delivered as ordinary 
 
 ## Related Docs
 
-- `docs/sensors/sensor_outputs.rst` -- conceptual reference for the render variable output format, mapping flow, tensor/param layout, and lifetime rules.
+Product documentation owns the detail this skill only summarizes:
+
+- [Sensor Outputs](https://nvidia-omniverse.github.io/ovrtx/sensors/common/sensor_outputs.html) -- the same map/read flow as a doc page, with the Python and C snippets inline.
+- [Sensor Outputs](https://nvidia-omniverse.github.io/ovrtx/sensors/common/sensor_outputs.html) -- the mapping flow and how to map results back.
+- [Sensor Outputs](https://nvidia-omniverse.github.io/ovrtx/sensors/common/sensor_outputs.html) -- the descriptor-before-data contract, the tensor and param layout, the four mapping device modes with their costs, and the synchronization and lifetime rules that come with a mapping.
+- [Sensor Channels](https://nvidia-omniverse.github.io/ovrtx/sensors/common/sensor_outputs.html) -- every channel, and the capacity-versus-count and validity rules stated once for all modalities.
 
 ## References
 

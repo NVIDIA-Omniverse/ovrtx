@@ -31,10 +31,11 @@ def run_python_example(
     example_main: Callable[[list[str]], None],
     capsys,
     output_dir: Path,
+    extra_args: list[str] | None = None,
 ) -> str:
     """Run a public Python sensor example headless in the docs test process."""
     log_file_path = output_dir / f"python-doc-tests-{example_name}-example.log"
-    example_main(["--no-rr", "--log", str(log_file_path)])
+    example_main(["--no-rr", "--log", str(log_file_path), *(extra_args or [])])
 
     captured = capsys.readouterr()
     return captured.out + captured.err
@@ -102,3 +103,41 @@ def test_python_radar_example_reports_moving_detections(capsys, output_dir):
 
     assert max_abs_radial_velocity > 0.1
     # [/snippet:python-radar-example-reports-moving-detections]
+
+
+def test_python_lidar_example_runs_the_panels_scene(capsys, output_dir):
+    """The alternative lidar scene, selected with --scene, delivers a point cloud through the same code."""
+    output = run_python_example(
+        "lidar-panels",
+        run_lidar_example,
+        capsys,
+        output_dir,
+        ["--scene", str(PYTHON_EXAMPLES / "lidar" / "lidar_example_panels.usda")],
+    )
+    match = re.search(r"valid points=(\d+), mean intensity=([-+0-9.eE]+), ", output)
+    assert match, output
+    # Five panels around the sensor return far more points than the single cube of the default scene.
+    assert int(match.group(1)) > 100000
+    assert math.isfinite(float(match.group(2)))
+
+
+def test_python_radar_example_runs_the_field_scene(capsys, output_dir):
+    """The alternative radar scene, selected with --scene, reports the panel field and the closing cube."""
+    output = run_python_example(
+        "radar-field",
+        run_radar_example,
+        capsys,
+        output_dir,
+        ["--scene", str(PYTHON_EXAMPLES / "radar" / "radar_example_field.usda")],
+    )
+    step_matches = re.findall(
+        r"step (\d+): valid points=(\d+), "
+        r"radial velocity min/max=\[([-+0-9.eE]+), ([-+0-9.eE]+)\] m/s",
+        output,
+    )
+    assert len(step_matches) == 10, output
+    for _step, valid_points, min_velocity, _max_velocity in step_matches:
+        # The field holds 33 steel panels; each step reports most of them plus the cube.
+        assert int(valid_points) >= 20
+        # The cube closes at 10 m/s along the radar's line of sight.
+        assert -11.0 < float(min_velocity) < -8.0

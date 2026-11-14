@@ -1,20 +1,13 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: cuda-interop
 description: >
   GPU interop patterns for CUDA arrays, timeline semaphores, Vulkan shared memory,
   and MIG-safe CUDA-to-Vulkan device matching.
   Use when user asks about CUDA interop, GPU rendering pipelines, Vulkan interop,
   shared memory, timeline semaphores, MIG, or multi-GPU output routing.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -54,8 +47,8 @@ Resolve inputs in this order: existing repository files and referenced snippets,
 
 1. Identify whether the workflow maps render output to CUDA memory, maps output to a CUDA array, writes attributes from CUDA memory, or coordinates CUDA with Vulkan.
 2. Read the source snippet for the exact map/unmap path before choosing between linear CUDA memory and a CUDA array; both selectors exist in C (`OVRTX_MAP_DEVICE_TYPE_CUDA`, `OVRTX_MAP_DEVICE_TYPE_CUDA_ARRAY`) and in Python (`Device.CUDA`, `Device.CUDA_ARRAY`).
-3. Preserve the synchronization contract: wait on ovrtx-provided CUDA events before reading, record CUDA work completion events before unmapping, and use `sync_stream` only for the auto-sync path.
-4. For Vulkan interop, keep external-memory ownership, timeline semaphore ordering, and double-buffer lifetimes aligned with the full `vulkan-interop` example.
+3. Preserve the synchronization contract: wait on ovrtx-provided CUDA events before reading unless enqueueing directly on an available borrowed producer stream, record CUDA work completion events before unmapping, and use `sync_stream` only for the auto-sync path.
+4. For Vulkan interop, keep external-memory ownership, timeline semaphore ordering, and presentation-ring lifetimes aligned with the full `vulkan-interop` example.
 5. When changing code, run the CUDA render-output or Vulkan interop example/test that owns the snippet whenever practical.
 6. Select a Vulkan device by comparing `cuDeviceGetUuid_v2()` for the configured or mapped CUDA ordinal with `VkPhysicalDeviceIDProperties::deviceUUID`. Do not use PCI identity, `cudaDeviceProp::uuid`, or legacy `cuDeviceGetUuid()` for MIG selection.
 
@@ -78,6 +71,25 @@ This skill has no scripts.
 ovrtx renders on the GPU and can provide output as CUDA device memory or as a CUDA array (zero-copy). Both are reachable from C and from Python. For advanced pipelines (e.g., Vulkan display, custom CUDA post-processing), you need to handle CUDA synchronization correctly to avoid race conditions between ovrtx's internal GPU work and your own.
 
 ## Python
+
+### Experimental producer-stream handoff
+
+Uniform zero-copy GPU mappings may expose `MappedRenderVar.producer_stream`
+(C: `ovrtx_render_var_output_t::cuda_sync.stream`). This is a borrowed enqueue
+target, not an additional readiness dependency. Consumers using the readiness
+event must ignore the output stream rather than synchronize it as well.
+
+Map with `sync_stream=0` to avoid Python's default map-time legacy-stream event wait.
+Queue short read-only work on the borrowed stream in the tensor device's primary
+CUDA context, without an additional readiness wait. Work follows everything already
+queued on that stream, including later products, the end of the render graph, and
+already-submitted subsequent steps. This gives up per-product readiness, even when
+`wait_event` identifies a per-product event; the same rule applies to the per-device fallback.
+Keep the mapping alive through consumer completion and provide completion synchronization
+at unmap. The mapping does not retain the stream; serialize use with render-graph rebuild,
+reset, and destruction and finish reads before those operations. Never destroy, configure,
+capture, or cache this stream. CPU, copied, compressed, and composite mappings retain
+the event-based path.
 
 ### Map render output to CUDA
 
@@ -219,9 +231,9 @@ with timeline semaphores and CUDA-Vulkan shared images.
 
 If you provide `sync_stream` on the map call, ovrtx inserts the wait automatically:
 
-> **Source:** `examples/c/vulkan-interop/src/main.cpp` snippet `map-rendered-output-cuda-array`
+> **Source:** `tests/docs/c/test_camera_sensors.cpp` snippet `doc-map-render-output-cuda-array-c`
 >
-> Set `map_desc.sync_stream = (uintptr_t)cuda_stream` for automatic synchronization.
+> The tested snippet sets `map_desc.sync_stream = 1` to synchronize the CUDA default stream. The Vulkan example instead sets it to zero and explicitly waits on `cuda_sync.wait_event` in its own stream.
 
 ## Key Types / Functions
 
@@ -247,7 +259,7 @@ value of `0` means no event wait.
   > **Source:** `examples/c/vulkan-interop/src/cuda/cuda_kernel.cpp` snippet `cuda-device-max-connections`
 
 - **Consumer owns lifetime (Python).** The C render resource stays alive as long as any DLPack consumer (Warp, PyTorch, CuPy, etc.) holds a reference to the tensor. Drop the views when you're done to release the resource. If you need data to outlive the mapping, take a `.copy()`.
-- Always wait on `rendered_output.cuda_sync.wait_event` before accessing CUDA array data.
+- Observe `rendered_output.cuda_sync.wait_event` before accessing CUDA array data on a consumer-owned stream; direct reads on the borrowed producer stream follow the handoff contract above.
 - Always signal completion (via event or stream) when unmapping after CUDA work, or ovrtx may reclaim the buffer while your kernel is still running.
 - The CUDA-array path returns a `CUarray` (opaque handle in `dl.data`, or `tensor.cuda_array` in Python), not linear memory. In C, use `surf2Dwrite`/`tex2D` or copy out with `cudaMemcpy2DFromArray`; in Python, go through Warp 1.15+, CuPy, or your own wrapper. Dereferencing it as a device pointer is an invalid access, not an error you get told about.
 - The CUDA path (`OVRTX_MAP_DEVICE_TYPE_CUDA` / `Device.CUDA`) returns linear device memory (may incur a copy for image outputs).

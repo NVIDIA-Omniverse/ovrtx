@@ -1,0 +1,14 @@
+#usda 1.0
+
+# [snippet:doc-sensor-config-override]
+(
+    subLayers = [@sensor_configuration_minimal.usda@]
+)
+
+# Override the existing sensor without redefining it.
+over "Lidar"
+{
+    double2 omni:sensor:frameRate = (20, 1)
+    string omni:sensor:marketName = "Example device"
+}
+# [/snippet:doc-sensor-config-override]

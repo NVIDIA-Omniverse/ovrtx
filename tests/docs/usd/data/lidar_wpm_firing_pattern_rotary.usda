@@ -1,0 +1,44 @@
+#usda 1.0
+
+# [snippet:doc-lidar-wpm-firing-pattern-rotary]
+(
+    metersPerUnit = 1
+    timeCodesPerSecond = 10
+    upAxis = "Z"
+)
+
+def Xform "Sensor"
+{
+    def OmniLidar "Lidar" (
+        prepend apiSchemas = ["OmniSensorGenericLidarWpmAPI"]
+    )
+    {
+        token visibility = "invisible"
+        double2 omni:sensor:frameRate = (10, 1)
+        token omni:sensor:LidarWpm:scanType = "rotary"
+        float omni:sensor:LidarWpm:rotPatternFiringResDeg = 1
+        uint omni:sensor:LidarWpm:maxReturns = 2
+
+        float[] omni:sensor:LidarWpm:firingPattern:p001:azimuthDeg = [0, 0]
+        float[] omni:sensor:LidarWpm:firingPattern:p001:elevationDeg = [-1, 1]
+        uint[] omni:sensor:LidarWpm:firingPattern:p001:fireTimeNs = [0, 1000]
+        uint[] omni:sensor:LidarWpm:firingPattern:p001:channelId = [1, 2]
+        uint[] omni:sensor:LidarWpm:firingPattern:p001:rangeId = []
+    }
+
+    def Scope "Outputs"
+    {
+        def RenderProduct "Product"
+        {
+            rel camera = </Sensor/Lidar>
+            rel orderedVars = [</Sensor/Outputs/PointCloud>]
+        }
+
+        def RenderVar "PointCloud"
+        {
+            uniform string sourceName = "PointCloud"
+            token[] channels = []
+        }
+    }
+}
+# [/snippet:doc-lidar-wpm-firing-pattern-rotary]

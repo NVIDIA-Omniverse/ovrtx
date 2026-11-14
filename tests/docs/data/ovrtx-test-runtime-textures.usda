@@ -1,0 +1,60 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+(
+    subLayers = [@ovrtx-test-base-geometry.usda@, @ovrtx-test-base-camera.usda@, @ovrtx-test-base-light.usda@]
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+# [snippet:doc-runtime-texture-usda]
+def OmniRuntimeTexture "Texture" {
+    string texture:uri = "dynamic://runtimeTextureExample"
+    token texture:dimension = "2d"
+    int3 texture:extent = (1, 1, 1)
+    token texture:format = "rgba8unorm"
+    token texture:colorSpace = "linear"
+    uchar[] texture:data = [255, 0, 0, 255]
+}
+
+def Material "RuntimeMaterial" {
+    token outputs:surface.connect = </RuntimeMaterial/Surface.outputs:surface>
+    def Shader "Surface" {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor.connect = </RuntimeMaterial/Tex.outputs:rgb>
+        float inputs:roughness = 1
+        token outputs:surface
+    }
+    def Shader "Tex" {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @dynamic://runtimeTextureExample@
+        float2 inputs:st.connect = </RuntimeMaterial/UV.outputs:result>
+        float3 outputs:rgb
+    }
+    def Shader "UV" {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        token inputs:varname = "st"
+        float2 outputs:result
+    }
+}
+# [/snippet:doc-runtime-texture-usda]
+
+over "World" {
+    over "logo" (active = false) {}
+    over "Plane" {
+        rel material:binding = </RuntimeMaterial>
+    }
+}
+def Scope "Render" {
+    def RenderProduct "Camera" {
+        rel camera = </World/Camera>
+        int2 resolution = (512, 512)
+        rel orderedVars = </Render/Camera/LdrColor>
+        token omni:rtx:rendermode = "PathTracing"
+        int omni:rtx:pathtracing:spp = 4
+        int omni:rtx:pathtracing:totalSpp = 64
+        def RenderVar "LdrColor" {
+            string sourceName = "LdrColor"
+        }
+    }
+}

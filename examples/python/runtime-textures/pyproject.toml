@@ -1,0 +1,28 @@
+[project]
+name = "runtime-textures"
+version = "0.1.0"
+description = "Stage-owned runtime texture example"
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+    "numpy==2.2.6; python_version < '3.14'",
+    "numpy==2.4.6; python_version >= '3.14'",
+    "warp-lang==1.12.1",
+    "ovrtx==0.7.0.1794596436",
+    "ovstage==0.4.0.1794520352",
+    "pillow==12.1.1",
+    "rerun-sdk==0.29.0",
+]
+
+[tool.uv]
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+

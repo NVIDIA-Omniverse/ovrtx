@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="600" viewBox="0 0 1180 600" role="img" aria-labelledby="title desc">
+<title id="title">Angle conventions of a rotary sensor</title>
+<desc id="desc">Two top-down views of a rotary sensor. Left: the firing angle measured clockwise from the forward axis, before startAzimuthOffsetDeg, with the validStartAzimuthDeg to validEndAzimuthDeg window and the ROI interval drawn as arcs, and arrows showing the CW and CCW sweep directions. Right: the delivered azimuth measured counter-clockwise from the forward axis in the range (-180, 180], including startAzimuthOffsetDeg.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-313131-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#313131"/></marker><marker id="arrow-952fc6-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#952FC6"/></marker></defs>
+<rect width="1180" height="600" fill="#fff"/>
+<path d="M300,180 A150,150 0 0 1 450,330 L300,330 Z" fill="#76B900" fill-opacity="0.18"/>
+<text x="300" y="46" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" text-anchor="middle" font-weight="bold">Firing angle — where the window is measured</text>
+<text x="300" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" xml:space="preserve" text-anchor="middle"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">clockwise from +X, before </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">startAzimuthOffsetDeg</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> is added</tspan></text>
+<circle cx="300" cy="330" r="150" fill="none" stroke="#C0C0C0" stroke-width="1.5"/>
+<circle cx="300" cy="330" r="5" fill="#313131"/>
+<line x1="300" y1="330" x2="300" y2="176.25" stroke="#313131" stroke-width="1.5" marker-end="url(#arrow-313131-1p5)"/>
+<text x="300" y="148" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">0° (+X forward)</text>
+<text x="464" y="334" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">90° (-Y, right)</text>
+<text x="300" y="525" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">180° (behind)</text>
+<text x="136" y="334" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="end">270° (+Y, left)</text>
+<path d="M300,175 A155,155 0 0 1 455,330" fill="none" stroke="#76B900" stroke-width="4"/>
+<text x="428" y="186" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">validStartAzimuthDeg ..</text>
+<text x="428" y="202" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">validEndAzimuthDeg</text>
+<text x="428" y="218" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">(example: 0° to 90°)</text>
+<path d="M455.99,386.78 A166,166 0 0 1 356.78,485.99" fill="none" stroke="#EF9100" stroke-width="3"/>
+<text x="434.69" y="468.69" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">minAzimuthROI ..</text>
+<text x="434.69" y="484.69" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">maxAzimuthROI</text>
+<text x="434.69" y="500.69" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">ROI interval, not the field of view</text>
+<path d="M189.44,198.24 A172,172 0 0 1 372.69,174.12" fill="none" stroke="#757575" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="176" y="186" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" text-anchor="end">a window with start &gt; end</text>
+<text x="176" y="202" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" text-anchor="end">wraps through 360°</text>
+<path d="M309.35,196.33 A134,134 0 0 1 348.67,205.15" fill="none" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<text x="314" y="242" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF">CW climbs</text>
+<text x="314" y="258" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF">from 0°</text>
+<path d="M290.65,196.33 A134,134 0 0 0 251.33,205.15" fill="none" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<text x="286" y="242" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF" text-anchor="end">CCW descends</text>
+<text x="286" y="258" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF" text-anchor="end">from 360°</text>
+<path d="M880,180 A150,150 0 0 1 1030,330 L880,330 Z" fill="#76B900" fill-opacity="0.18"/>
+<text x="880" y="46" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" text-anchor="middle" font-weight="bold">Delivered azimuth — what the output reports</text>
+<text x="880" y="68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" xml:space="preserve" text-anchor="middle"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">counter-clockwise from +X in (-180, 180], including </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">startAzimuthOffsetDeg</tspan></text>
+<circle cx="880" cy="330" r="150" fill="none" stroke="#C0C0C0" stroke-width="1.5"/>
+<circle cx="880" cy="330" r="5" fill="#313131"/>
+<line x1="880" y1="330" x2="880" y2="176.25" stroke="#313131" stroke-width="1.5" marker-end="url(#arrow-313131-1p5)"/>
+<text x="880" y="148" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">0° (+X forward)</text>
+<text x="1044" y="334" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">-90° (-Y, right)</text>
+<text x="880" y="525" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">±180° (behind)</text>
+<text x="716" y="334" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="end">+90° (+Y, left)</text>
+<path d="M880,175 A155,155 0 0 1 1035,330" fill="none" stroke="#76B900" stroke-width="4"/>
+<text x="1008" y="186" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131">window 0°..90°</text>
+<text x="1008" y="202" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131">delivers -90°..0°</text>
+<text x="1008" y="218" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">(no offset)</text>
+<path d="M870.65,196.33 A134,134 0 0 0 814.43,213.14" fill="none" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<text x="866" y="242" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF" text-anchor="end">azimuth increases</text>
+<text x="866" y="258" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF" text-anchor="end">counter-clockwise</text>
+<path d="M711.76,294.24 A172,172 0 0 1 765.66,201.51" fill="none" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<text x="699.76" y="300.24" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#952FC6" xml:space="preserve" text-anchor="end"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">+ </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">startAzimuthOffsetDeg</tspan></text>
+<text x="699.76" y="316.24" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">rotates the whole pattern</text>
+<rect x="40" y="560" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="63" y="570.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">azimuth window, example 0° to 90°</text>
+<line x1="300.84" y1="566" x2="316.84" y2="566" stroke="#EF9100" stroke-width="2"/>
+<text x="323.84" y="570.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">ROI interval</text>
+<line x1="416.74" y1="566" x2="432.74" y2="566" stroke="#757575" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="439.74" y="570.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">window with start &gt; end</text>
+<line x1="608.62" y1="566" x2="624.62" y2="566" stroke="#0074DF" stroke-width="2"/>
+<text x="631.62" y="570.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">angle or sweep direction</text>
+<line x1="801.95" y1="566" x2="817.95" y2="566" stroke="#952FC6" stroke-width="2"/>
+<text x="824.95" y="570.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">start offset rotation</text>
+</svg>

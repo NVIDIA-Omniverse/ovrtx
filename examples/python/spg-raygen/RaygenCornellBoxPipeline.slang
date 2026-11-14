@@ -8,18 +8,17 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// SPG raygen SHOWCASE: a ray-traced Cornell box rendered by a single SPG ray-generation node.
+// SPG raygen showcase: a ray-traced Cornell box rendered by a single SPG ray-generation node.
 //
-// Uses ONLY the standard ray-tracing intrinsics and the scene binding a node already receives from its
-// RenderProduct -- no scene-geometry buffers, no renderer types, no includes, nothing required at link
-// time:
-//   * one PRIMARY ray per pixel through a perspective camera, placed by the auto-provided
+// Uses only the standard ray-tracing intrinsics and the scene binding a node receives from its
+// RenderProduct, with no scene-geometry buffers and no renderer types:
+//   * one primary ray per pixel through a perspective camera, placed by the auto-provided
 //     camera-to-trace-space transform,
-//   * the exact per-triangle GEOMETRIC NORMAL, recovered from the trace itself,
-//   * a SHADOW ray toward the light -> hard ray-traced shadows,
+//   * the exact per-triangle geometric normal, recovered from the trace itself,
+//   * a shadow ray toward the light -> hard ray-traced shadows,
 //   * N.L diffuse shading tinted by the recovered normal.
 //
-// The scene's two blocks are ordinary solid 6-sided meshes rotated about Y, so their faces are not axis
+// The scene's two blocks are solid 6-sided meshes rotated about Y, so their faces are not axis
 // aligned; each face still resolves to its own correct normal.
 //
 // PER-PIXEL ALGORITHM
@@ -27,9 +26,9 @@
 //    the image) and from there to a direction in scene-unit camera space, where the camera sits at the
 //    origin looking down -Z and tanHalfFov sets the fan angle. Origin and direction are then moved into
 //    trace space by sceneTransform, so the shader never needs to know where the camera is in the world.
-// 2. Primary trace. An inline RayQuery returns the hit distance and the surface's identity -- instance
-//    and primitive index -- which the probes use to confirm they landed on the same triangle. A miss
-//    writes black with alpha 0 and stops.
+// 2. Primary trace. TraceRay fills the payload with the hit distance and the surface's identity
+//    (instance and primitive index), which the probes use to confirm they landed on the same
+//    triangle. A miss writes black with alpha 0 and stops.
 // 3. Normal. See RECOVERING THE NORMAL below.
 // 4. Shadow ray. The hit point is lifted along the normal by a small epsilon so the ray cannot strike
 //    its own surface, then traced toward the light with RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH: an
@@ -40,36 +39,31 @@
 //
 // RECOVERING THE NORMAL
 // A triangle is flat, so three points on it define its plane exactly. The primary ray gives one point
-// and the surface's identity (instance + primitive). Two probe rays parallel to it -- origin shifted
-// sideways, direction unchanged -- give two more points on the same face, and the cross product of the
+// and the surface's identity (instance + primitive). Two probe rays parallel to it (origin shifted
+// sideways, direction unchanged) give two more points on that face, and the cross product of the
 // two edge vectors is the geometric normal. The probe offset scales with hit distance so it stays
 // roughly constant on screen.
 //
 // Probes are trusted only when they land on the same surface, checked over four attempts: both offset
 // directions requiring the same triangle, then both again requiring only the same instance. The relaxed
-// pass matters because a flat quad is two coplanar triangles -- a probe crossing that seam still lies in
+// pass matters because a flat quad is two coplanar triangles: a probe crossing that seam lies in
 // the same plane, so the fit stays exact; without it every quad diagonal becomes a line of fallback
 // pixels. When all four fail (a true silhouette) the normal falls back to -direction, confining the
 // error to a thin edge line.
 //
 // The result is exact in the triangle interior for any geometry, including tessellated and moving
 // objects, since it is re-derived every frame. It costs three rays per shaded hit plus one shadow ray,
-// and degrades on triangles smaller than the probe offset -- tune normalEpsilon: too small makes the
+// and degrades on triangles smaller than the probe offset; tune normalEpsilon: too small makes the
 // cross product ill-conditioned, too large crosses more edges.
 //
 // OUTPUT ENCODING
 // RGB = the recovered normal encoded to [0,1] (n*0.5+0.5), modulated by N.L and shadowing.
 // A   = visibility: 1 lit, shadowFactor shadowed, 0 miss.
 //
-// Colour and visibility are kept in separate channels so shading and shadowing can be verified
-// independently. main.py checks the render without a golden image: that every ray
-// hits a surface; that each wall's dominant colour channel matches its normal (the channel ordering
-// survives any lighting level, so the check is immune to brightness but fails on a wrong or flipped
-// normal); that more than 1% of pixels carry a normal more than 15 degrees off every axis direction,
-// which only genuine per-triangle recovery produces; and that both shadowed and lit pixel populations
-// are present, the latter so a uniformly dark image cannot pass the colour checks.
+// Colour and visibility are kept in separate channels, so a consumer can tell a shadowed surface from
+// a dimly lit one without decoding the normal.
 //
-// Direct lighting only -- no global illumination, so none of the colour bleeding a physically lit
+// Direct lighting only: no global illumination, so none of the colour bleeding a physically lit
 // Cornell box shows. The colours are surface normals, not materials.
 
 struct Params
@@ -124,7 +118,7 @@ void missCornellBox(inout HitPayload p)
 }
 // [/snippet:pipeline-entrypoints]
 
-/// One inline trace. Returns false on a miss; otherwise reports the hit distance and the surface the
+/// One trace. Returns false on a miss; otherwise reports the hit distance and the surface the
 /// ray landed on (instance + primitive), which is what lets the probes below confirm they share a
 /// triangle with the primary hit.
 bool traceHit(float3 origin, float3 direction, float tMax, out float t, out uint instanceId, out uint primIndex)
@@ -149,17 +143,17 @@ bool traceHit(float3 origin, float3 direction, float tMax, out float t, out uint
     return p.hit != 0;
 }
 
-/// Recover the EXACT geometric normal of the hit triangle using only ray queries.
+/// Recover the exact geometric normal of the hit triangle using only traced rays.
 ///
 /// Two extra rays are fired parallel to the primary one, offset sideways by a small distance. When all
-/// three land on the SAME triangle (same instance and primitive), their three hit points lie on that
+/// three land on the same triangle (same instance and primitive), their hit points lie on that
 /// triangle's plane, so the cross product of the two edge vectors is the triangle's exact geometric
-/// normal -- no vertex data, no scene-geometry buffer, no renderer types.
+/// normal.
 ///
 /// Near a triangle boundary a probe can land on a neighbouring triangle; that is detected (the
-/// instance/primitive differs) and retried with the probes mirrored to the other side. If both attempts
-/// straddle an edge the function reports failure and the caller falls back, which confines any error to
-/// a thin line of pixels along silhouettes.
+/// instance/primitive differs) and retried mirrored, then with only the same instance required.
+/// If all four attempts straddle an edge the function reports failure and the caller falls back,
+/// which confines any error to a thin line of pixels along silhouettes.
 bool estimateGeometricNormal(float3 origin, float3 direction, float tMax, float t0, uint id0, uint prim0, out float3 normal)
 {
     normal = -direction;
@@ -174,9 +168,7 @@ bool estimateGeometricNormal(float3 origin, float3 direction, float tMax, float 
     const float3 hit0 = origin + direction * t0;
 
     // Attempts 0-1 probe each side requiring the exact same triangle. Attempts 2-3 repeat requiring only
-    // the same instance: a probe that merely crossed the seam between two coplanar triangles of the same
-    // flat face still lies on the same plane, so the fit stays exact -- without this, every quad's
-    // diagonal would show as a line of fallback pixels.
+    // the same instance.
     for (int attempt = 0; attempt < 4; ++attempt)
     {
         const float sign = ((attempt & 1) == 0) ? 1.0f : -1.0f;
@@ -206,8 +198,8 @@ bool estimateGeometricNormal(float3 origin, float3 direction, float tMax, float 
     return false;
 }
 
-/// Is the light blocked? ACCEPT_FIRST_HIT stops at the first blocker -- an occlusion query needs no
-/// closest hit.
+/// Is the light blocked? ACCEPT_FIRST_HIT stops at the first blocker; its closest-hit shader sets
+/// p.hit.
 bool isOccluded(float3 origin, float3 direction, float tMax)
 {
     RayDesc shadowRay;

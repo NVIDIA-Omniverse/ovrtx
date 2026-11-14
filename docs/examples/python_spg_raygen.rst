@@ -13,8 +13,7 @@ Python: SPG Ray Generation
 
 An SPG node that traces the scene itself instead of post-processing an AOV. One primary ray per
 pixel through the render product's camera, a shadow ray toward the light, and the exact
-geometric normal of every surface recovered from two extra probe rays. The whole image is
-produced by the node; nothing in it is a renderer AOV.
+geometric normal of every surface recovered from two extra probe rays.
 
 .. image:: ../../img/example-spg-raygen.png
    :alt: A ray-traced Cornell box rendered by a single SPG ray-generation node
@@ -27,7 +26,7 @@ faces are not axis aligned and each still resolves to its own correct normal.
 
 A shader under a RenderProduct receives the scene acceleration structure and its camera's
 transform with no authored input and no connection, which is what lets it author rays in
-ordinary camera space. No vertex data is exposed, so the normal is derived from the trace
+camera space. No vertex data is exposed, so the normal is derived from the trace
 itself: three points on a flat triangle define its plane.
 
 Prerequisites
@@ -46,10 +45,6 @@ Running
    uv run main.py                                          # inline RayQuery
    uv run main.py --scene cornell_box_pipeline_scene.usda  # ray-tracing pipeline
 
-The same room, traced two ways. Both runs print the same checks, and the two images agree on
-99.85% of pixels. Refer to :doc:`../spg/do/raygen` for what the two forms differ in.
-
-``main.py`` checks the render with no golden image: that no ray escaped the room, that each
-wall's dominant colour channel matches its normal, that a real population of off-axis normals
-is present, and that both shadowed and lit pixels exist. See :doc:`../spg/do/raygen` for
+The same room, traced two ways. Each run writes ``_output/cornell_box.png``, and the two images
+agree on 99.85% of pixels. Refer to :doc:`../spg/do/raygen` for what the two forms differ in,
 the ray-generation dispatch and the implicit scene binding.

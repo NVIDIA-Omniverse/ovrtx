@@ -13,8 +13,8 @@
 )
 
 # [snippet:histogram-shader-definition]
-# A composite input is declared as an ordinary opaque resource port. Nothing in
-# the shader definition says "composite". That follows from the RenderVar it gets
+# A composite input is declared as an opaque resource port. Whether it is a
+# composite follows from the RenderVar it gets
 # connected to, and the launch script discovers it through .isComposite, so the
 # same node can be pointed at a different sensor without editing the shader.
 def Shader "RangeHistogramKernel"
@@ -24,8 +24,7 @@ def Shader "RangeHistogramKernel"
     uniform token info:spg:sourceAsset:subIdentifier = "rangeHistogram"
 
     # The two chart axes, in scene units (metres here) and in returns per bin.
-    # main.py prints the sweep's furthest return and busiest bin so both can be
-    # retuned for another sensor or scene.
+    # Retune both for another sensor or scene.
     float inputs:maxRange = 12.8
     float inputs:maxCount = 15000.0
 

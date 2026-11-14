@@ -25,11 +25,16 @@
 
 # [snippet:ovrtx_fetch]
 # Capture this file's directory at parse time (before macro expansion)
-# CMAKE_CURRENT_LIST_DIR inside a macro would refer to the caller's directory
-set(_OVRTX_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+# CMAKE_CURRENT_LIST_DIR inside a macro would refer to the caller's directory.
+# Keep this distinct from the temporary _OVRTX_CMAKE_DIR in ovrtxConfig.cmake.
+set(_OVRTX_EXAMPLES_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 # Fetch ovrtx package
 macro(ovrtx_fetch)
+    # ovrtxConfig.cmake requires the ovstage package (ovrtx.h includes its headers),
+    # so make it findable first.
+    ovstage_fetch()
+
     find_package(ovrtx QUIET)
 
     if (ovrtx_FOUND)
@@ -41,20 +46,20 @@ macro(ovrtx_fetch)
         # Uses the directory where ovrtx.cmake lives, ensuring all examples share the same _deps.
         # If copying this project to your own workspace, delete this line or override it.
         if(NOT DEFINED CACHE{FETCHCONTENT_BASE_DIR})
-            set(FETCHCONTENT_BASE_DIR "${_OVRTX_CMAKE_DIR}/_deps" CACHE PATH "Shared FetchContent directory")
+            set(FETCHCONTENT_BASE_DIR "${_OVRTX_EXAMPLES_CMAKE_DIR}/_deps" CACHE PATH "Shared FetchContent directory")
         endif()
 
         # Platform-specific package selection
         if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             set(OVRTX_PACKAGE_SYSTEM "windows-x86_64")
-            set(OVRTX_HASH "96de03fdcbee3a398f059f1ffb15a3d8f30bb8bcc6ae5d84a08e8875769ce296")
+            set(OVRTX_HASH "6e8eac1e216907a9498e34956ecec0285dde04be1c01167ce4102f65c8c94086")
         elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_aarch64")
-                set(OVRTX_HASH "c91048d75743a06cf887031721d37508564c853e321a92ec3bfb6ec7a74bc568")
+                set(OVRTX_HASH "c63e9d6377fddcc16846100c4ecaefef58db472a63910373f934c4c41c74ce02")
             elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
                 set(OVRTX_PACKAGE_SYSTEM "manylinux_2_35_x86_64")
-                set(OVRTX_HASH "63639c3eabaf31553dbf883ac2376d8b6e361806dee4e17bafaa0962ce23dd51")
+                set(OVRTX_HASH "6aa6da398dd0a79aec8adfe06ab720d4e46ca4af28db68dbe4e3418dab6ec1cb")
             else()
                 message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}")
             endif()
@@ -79,7 +84,7 @@ macro(ovrtx_fetch)
         FetchContent_Declare(
             ovrtx
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.6.0/ovrtx@0.6.0.1791947691.c6d71501.${OVRTX_PACKAGE_SYSTEM}.zip"
+            URL "https://github.com/NVIDIA-Omniverse/ovrtx/releases/download/v0.7.0/ovrtx@0.7.0.1794596436.0f2886e1.${OVRTX_PACKAGE_SYSTEM}.zip"
             URL_HASH SHA256=${OVRTX_HASH}
         )
 
@@ -182,7 +187,17 @@ function(ovrtx_setup_runtime TARGET_NAME)
                     "$<TARGET_FILE_DIR:${TARGET_NAME}>"
                 COMMENT "Copying ovrtx package root DLLs to build directory"
             )
-            set(OVRTX_RUNTIME_DIRS cache library libs mdl plugins rendering-data usd_plugins)
+            # Keep an executable-owned plugin root so OVStage can add its plugin
+            # without writing through a junction into the OVRTX package.
+            add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File
+                    "${_OVRTX_EXAMPLES_CMAKE_DIR}/stage_plugins.ps1"
+                    -Source "${OVRTX_BINARY_DIR}/plugins"
+                    -Destination "$<TARGET_FILE_DIR:${TARGET_NAME}>/plugins"
+                COMMENT "Staging the shared-loader plugin directory"
+                VERBATIM
+            )
+            set(OVRTX_RUNTIME_DIRS cache library libs mdl rendering-data usd_plugins)
             foreach(DIR ${OVRTX_RUNTIME_DIRS})
                 _ovrtx_add_dir_junction(${TARGET_NAME}
                     "$<TARGET_FILE_DIR:${TARGET_NAME}>/${DIR}" "${OVRTX_BINARY_DIR}/${DIR}"
@@ -196,3 +211,6 @@ function(ovrtx_setup_runtime TARGET_NAME)
         endif()
     endif()
 endfunction()
+
+# ovrtx_fetch() calls ovstage_fetch(); include after the helpers ovstage.cmake looks for.
+include("${CMAKE_CURRENT_LIST_DIR}/ovstage.cmake")

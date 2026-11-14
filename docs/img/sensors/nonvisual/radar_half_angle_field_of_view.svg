@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="660" viewBox="0 0 1080 660" role="img" aria-labelledby="title desc">
+<title id="title">Radar half-angle field of view</title>
+<desc id="desc">A top view and a side view of a radar. In the top view the azimuth field of view spans from minus maxAzAngDeg to plus maxAzAngDeg, with the COSINE_FALLOFF gain curve at its peak on boresight and falling to zero at both limits; a 150-degree field of view is labeled as authored with maxAzAngDeg = 75. The side view shows the same symmetric interval for elevation, from minus maxElAngDeg to plus maxElAngDeg.</desc>
+<rect width="1080" height="660" fill="#fff"/>
+<text x="310" y="36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" text-anchor="middle" font-weight="bold">Top view: azimuth</text>
+<path d="M150,338 L245.58,552.68 A235,235 0 0 0 245.58,123.32 Z" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M150,338 L150,338 L154.41,347.05 L159.44,355.75 L165.05,364.07 L171.21,371.94 L177.88,379.34 L185.02,386.21 L192.59,392.51 L200.53,398.22 L208.79,403.29 L217.32,407.71 L226.07,411.46 L234.98,414.51 L243.98,416.86 L253.03,418.49 L262.05,419.41 L271,419.62 L279.81,419.11 L288.43,417.92 L296.79,416.05 L304.85,413.52 L312.54,410.37 L319.83,406.61 L326.65,402.3 L332.97,397.45 L338.74,392.12 L343.93,386.35 L348.5,380.19 L352.42,373.69 L355.66,366.9 L358.2,359.88 L360.03,352.69 L361.13,345.37 L361.5,338 L361.13,330.63 L360.03,323.31 L358.2,316.12 L355.66,309.1 L352.42,302.31 L348.5,295.81 L343.93,289.65 L338.74,283.88 L332.97,278.55 L326.65,273.7 L319.83,269.39 L312.54,265.63 L304.85,262.48 L296.79,259.95 L288.43,258.08 L279.81,256.89 L271,256.38 L262.05,256.59 L253.03,257.51 L243.98,259.14 L234.98,261.49 L226.07,264.54 L217.32,268.29 L208.79,272.71 L200.53,277.78 L192.59,283.49 L185.02,289.79 L177.88,296.66 L171.21,304.06 L165.05,311.93 L159.44,320.25 L154.41,328.95 L150,338 Z" fill="#76B900" fill-opacity="0.18" stroke="#76B900" stroke-width="2" stroke-linejoin="round"/>
+<line x1="150" y1="338" x2="245.58" y2="123.32" stroke="#313131" stroke-width="1.5"/>
+<line x1="150" y1="338" x2="245.58" y2="552.68" stroke="#313131" stroke-width="1.5"/>
+<line x1="150" y1="338" x2="385" y2="338" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<circle cx="150" cy="338" r="5" fill="#313131"/>
+<text x="138" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">radar</text>
+<text x="136" y="278" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">outside the limits:</text>
+<text x="136" y="296" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">gain 0</text>
+<text x="136" y="314" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">(every profile)</text>
+<text x="198" y="352" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">boresight (+X)</text>
+<text x="214" y="318" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#76B900" font-weight="bold">COSINE_FALLOFF</text>
+<text x="214" y="374" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">peak on boresight</text>
+<text x="214" y="390" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">zero at the limits</text>
+<text x="257.58" y="119.32" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" font-weight="bold">+maxAzAngDeg</text>
+<text x="257.58" y="137.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">the half-angle; drawn at the default, 66°</text>
+<text x="257.58" y="558.68" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" font-weight="bold">−maxAzAngDeg</text>
+<text x="257.58" y="576.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">the half-angle; drawn at the default, 66°</text>
+<path d="M252.09,567.3 A251,251 0 0 0 252.09,108.7" fill="none" stroke="#757575" stroke-width="1.5"/>
+<line x1="250.06" y1="562.73" x2="254.12" y2="571.87" stroke="#757575" stroke-width="1.5"/>
+<line x1="250.06" y1="113.27" x2="254.12" y2="104.13" stroke="#757575" stroke-width="1.5"/>
+<text x="415" y="332" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">field of view</text>
+<text x="415" y="350" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">= 2 × maxAzAngDeg</text>
+<text x="820" y="36" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131" text-anchor="middle" font-weight="bold">Side view: elevation</text>
+<path d="M650,338 L870.83,418.37 A235,235 0 0 0 870.83,257.63 Z" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M650,338 L650,338 L659.49,341.34 L669.03,344.47 L678.6,347.39 L688.16,350.09 L697.69,352.55 L707.17,354.79 L716.58,356.79 L725.87,358.55 L735.04,360.07 L744.06,361.35 L752.9,362.39 L761.54,363.19 L769.95,363.76 L778.11,364.1 L786,364.21 L793.6,364.1 L800.88,363.78 L807.83,363.26 L814.43,362.53 L820.66,361.62 L826.49,360.52 L831.93,359.26 L836.94,357.85 L841.52,356.29 L845.65,354.6 L849.32,352.79 L852.52,350.87 L855.25,348.87 L857.49,346.78 L859.24,344.64 L860.5,342.45 L861.25,340.23 L861.5,338 L861.25,335.77 L860.5,333.55 L859.24,331.36 L857.49,329.22 L855.25,327.13 L852.52,325.13 L849.32,323.21 L845.65,321.4 L841.52,319.71 L836.94,318.15 L831.93,316.74 L826.49,315.48 L820.66,314.38 L814.43,313.47 L807.83,312.74 L800.88,312.22 L793.6,311.9 L786,311.79 L778.11,311.9 L769.95,312.24 L761.54,312.81 L752.9,313.61 L744.06,314.65 L735.04,315.93 L725.87,317.45 L716.58,319.21 L707.17,321.21 L697.69,323.45 L688.16,325.91 L678.6,328.61 L669.03,331.53 L659.49,334.66 L650,338 Z" fill="#76B900" fill-opacity="0.18" stroke="#76B900" stroke-width="2" stroke-linejoin="round"/>
+<line x1="650" y1="338" x2="870.83" y2="257.63" stroke="#313131" stroke-width="1.5"/>
+<line x1="650" y1="338" x2="870.83" y2="418.37" stroke="#313131" stroke-width="1.5"/>
+<line x1="650" y1="338" x2="885" y2="338" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<circle cx="650" cy="338" r="5" fill="#313131"/>
+<text x="638" y="356" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">radar</text>
+<text x="900.83" y="247.63" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" font-weight="bold">+maxElAngDeg</text>
+<text x="900.83" y="265.63" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">drawn at the default, 20°</text>
+<text x="900.83" y="432.37" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" font-weight="bold">−maxElAngDeg</text>
+<text x="900.83" y="450.37" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">drawn at the default, 20°</text>
+<path d="M885.86,423.85 A251,251 0 0 0 885.86,252.15" fill="none" stroke="#757575" stroke-width="1.5"/>
+<line x1="881.16" y1="422.14" x2="890.56" y2="425.56" stroke="#757575" stroke-width="1.5"/>
+<line x1="881.16" y1="253.86" x2="890.56" y2="250.44" stroke="#757575" stroke-width="1.5"/>
+<text x="915" y="332" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">field of view</text>
+<text x="915" y="350" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">= 2 × maxElAngDeg</text>
+<text x="690" y="494" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">subject to elevMode</text>
+<text x="690" y="512" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">FULL_EL reports both halves, POS_EL only non-negative</text>
+<text x="690" y="528.67" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">elevation, NO_EL zero elevation for every detection</text>
+<rect x="580" y="72" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="599" y="82.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">COSINE_FALLOFF gain: peak on boresight, zero at the limits</text>
+<rect x="580" y="92" width="12" height="12" rx="2" fill="#F2F2F2"/>
+<text x="599" y="102.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">field of view: the symmetric interval between the two limits</text>
+<rect x="260" y="596" width="560" height="40" rx="6" fill="#F2F2F2"/>
+<text x="298.26" y="620.7" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131">worked example — spec sheet: 150° field of view →</text>
+<text x="640.25" y="620.7" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131" font-weight="bold">maxAzAngDeg = 75</text>
+</svg>

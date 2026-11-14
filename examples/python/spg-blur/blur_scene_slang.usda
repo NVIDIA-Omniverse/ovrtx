@@ -122,7 +122,7 @@ def Xform "World"
 }
 
 # The SPG graph lives in the Render scope. LdrColor feeds a horizontal blur
-# pass, whose output feeds a vertical one; only the final result is published.
+# pass, whose output feeds a vertical one; both results are published.
 # Both Shader prims reference a definition that points at the same source asset
 # and names a different entry point in it.
 # [snippet:render-graph]

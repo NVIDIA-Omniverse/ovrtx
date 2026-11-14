@@ -1,22 +1,28 @@
 .. SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 .. SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+..
+.. NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+.. property and proprietary rights in and to this material, related
+.. documentation and any modifications thereto. Any use, reproduction,
+.. disclosure or distribution of this material and related documentation
+.. without an express license agreement from NVIDIA CORPORATION or
+.. its affiliates is strictly prohibited.
 
 .. _dlss-nr:
+
+.. _sensors-cameras-render-modes-dlss-nr:
 
 DLSS 5 3D-Guided Neural Rendering
 =================================
 
 .. warning::
 
-   This feature is **experimental** and currently supported only on **Windows**.
+   This feature is **experimental** and supported on **Windows and Linux**.
    It requires an NVIDIA Blackwell GPU and
-   a driver that supports DLSS Neural Rendering. The current integration requires
-   driver 615.64 or newer.
+   a driver that supports DLSS Neural Rendering (615.64 or newer).
 
    The required driver has **not been validated for use with Omniverse**.
    There may be unknown compatibility, rendering, or stability issues.
-   This guidance will be updated once a suitable **Production Branch driver**
-   has been validated.
 
 DLSS 5 3D-Guided Neural Rendering (DLSS-NR) uses a neural model to enhance
 lighting and material appearance in a rendered image. It uses the image,
@@ -56,13 +62,16 @@ The resolution sets the output size; the scene must provide ``/World/Camera``.
 .. tab-set::
 
    .. tab-item:: USDA
+      :sync: usda
 
       .. literalinclude:: ../../../../tests/docs/usd/data/dlss_nr.usda
          :language: usda
          :start-after: # [snippet:doc-dlss-nr-render-product]
          :end-before: # [/snippet:doc-dlss-nr-render-product]
+         :prepend: #usda 1.0
 
-   .. tab-item:: Python
+   .. tab-item:: USD Python
+      :sync: python
 
       .. literalinclude:: ../../../../tests/docs/usd/test_dlss_nr.py
          :language: python
@@ -108,9 +117,9 @@ DLSS-NR affects :ref:`LdrColor <camera-output-tables>`. If you request both
 effect to the separately tone-mapped LDR image and keeps HDR unchanged.
 If you request only :ref:`HdrColor <camera-output-tables>`, DLSS-NR is skipped.
 
-Further Reading
----------------
+Related
+-------
 
-* :doc:`real_time_path_tracing`
-* :doc:`../outputs`
-* `DLSS 5: Generative Neural Rendering <https://research.nvidia.com/labs/adlr/DLSS5/>`_
+- :doc:`real_time_path_tracing`
+- :doc:`../outputs`
+- `DLSS 5: Generative Neural Rendering <https://research.nvidia.com/labs/adlr/DLSS5/>`_

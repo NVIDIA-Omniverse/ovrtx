@@ -141,7 +141,7 @@ static inline ovrtx_binding_desc_or_handle_t ovrtx_make_binding_desc(
 {
     ovrtx_binding_desc_or_handle_t bindingDesc;
     ovrtx_attribute_type_t attr_type;
-    ovx_string_or_token_t attr_lookup;
+    ovx_token_or_string_t attr_lookup;
 
     memset(&bindingDesc, 0, sizeof(bindingDesc));
     memset(&attr_lookup, 0, sizeof(attr_lookup));
@@ -336,7 +336,7 @@ static inline ovrtx_enqueue_result_t ovrtx_set_path_attributes(
         if (path_count > SIZE_MAX / sizeof(*heapTensors) || path_count > SIZE_MAX / sizeof(*heapShapes))
         {
             result.status = OVRTX_API_ERROR;
-            result.op_index = OVRTX_INVALID_HANDLE;
+            result.op_index = OVRTX_INVALID_OP_ID;
             return result;
         }
 
@@ -347,7 +347,7 @@ static inline ovrtx_enqueue_result_t ovrtx_set_path_attributes(
             free(heapTensors);
             free(heapShapes);
             result.status = OVRTX_API_ERROR;
-            result.op_index = OVRTX_INVALID_HANDLE;
+            result.op_index = OVRTX_INVALID_OP_ID;
             return result;
         }
 

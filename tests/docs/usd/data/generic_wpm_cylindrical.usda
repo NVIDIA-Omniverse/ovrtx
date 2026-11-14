@@ -1,0 +1,27 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-cylindrical]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_depth.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        # Rows span heights in meters; columns retain -20..20 degree azimuths.
+        token[] omni:sensor:GenericWpm:gridPatterns:tx:modes = ["CYLINDRICAL"]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:startRowUnits = [-1]
+        float[] omni:sensor:GenericWpm:gridPatterns:tx:endRowUnits = [1]
+        token[] omni:sensor:GenericWpm:gridPatterns:rx:modes = ["CYLINDRICAL"]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:startRowUnits = [-1]
+        float[] omni:sensor:GenericWpm:gridPatterns:rx:endRowUnits = [1]
+    }
+}
+# [/snippet:doc-generic-wpm-cylindrical]

@@ -29,13 +29,13 @@ A node under one product can read an AOV published by another. Dashed boxes are 
    :align: center
    :alt: In product A, LdrColor feeds node a, which writes Out. Node b in product B reads Out and writes OutB.
 
-**A chain of three.** Each product's result feeds the next, so SPG orders all three.
+**A chain of three.** Each product's result feeds the next.
 
 .. image:: ../../img/spg/products-chain-of-three.svg
    :align: center
    :alt: Node a in product A writes M1. Node b in product B reads M1 and writes M2. Node c in product C reads M2 and writes Out.
 
-**Two products into one node.** ``g`` runs after both producers, wherever they live.
+**Two products into one node.** ``g`` reads both producers, wherever they live.
 
 .. image:: ../../img/spg/products-two-into-one.svg
    :align: center
@@ -119,7 +119,8 @@ readable outside its own product, and the connection that reaches it.
 producing node's result needs a RenderVar and a place in that product's ``orderedVars`` before
 anything outside can name it.
 
-**Each product needs its own camera**, including one that only hosts nodes.
+**Give each product its own camera**, including one that only hosts nodes. Products stepped together
+with the same camera and resolution are rendered as one view, so only one of them runs its nodes.
 
 **One step fills every product you ask for.** Pass them together rather than stepping each in
 turn, so the frame is shared:
@@ -136,12 +137,7 @@ turn, so the frame is shared:
 
 **Reaching another node's result is a choice between two edges with different costs.** Inside one
 product, a direct connection is exact and same-frame; refer to :doc:`chaining`. Across products, the
-same dependency is carried by a RenderVar and can lag by a frame. If a result has to be current
-within the frame, that is an argument for keeping both nodes under one product, not for accepting
-the lag.
-
-**A node can read another product's output.** SPG orders the graphs so the producer runs
-first where it can.
+same dependency is carried by a RenderVar.
 
 .. _spg-cross-product-stale:
 

@@ -38,12 +38,11 @@ def Scope "Render"
             opaque omni:rtx:aov.connect = <../CheckerKernel.outputs:Checker>
         }
 
-        # No input is connected. The node has no `opaque inputs:` port to
-        # connect, and the values it needs are authored on it directly.
         def Shader "CheckerKernel" (
             references = @CheckerKernel.usda@
         )
         {
+            # Overrides the definition's squareSize of 32; every other value comes from it.
             int inputs:squareSize = 64
         }
     }

@@ -4,39 +4,97 @@
 C: Gaussian Splats
 ==================
 
-This example loads the same USDA scene as :doc:`python_gaussian_splats`,
-renders one frame without preceding warmup frames, and saves :ref:`LdrColor <camera-output-tables>`.
-Both static-loader and shared-loader executables are built.
+This example demonstrates two ParticleField rendering features using the same cactus scene:
 
-The scene defines a ``ParticleField3DGaussianSplat`` prim. The following
-USDA declaration and equivalent Python code show one orange splat. The supplied
-scene uses the same array layout for all 73 splats. See
-:doc:`../geometry/gaussian_splats` for the attribute meanings.
+* **Smoother Gaussians:** non-stochastic rendering reduces transparency noise in RTPT,
+  making fine details smoother from the first frame.
+* **Relighting:** ``ParticleFieldSHDiffuse.mdl`` lets scene lights illuminate the
+  Gaussians using their captured color as diffuse albedo.
+
+Smoother Gaussians with Non-Stochastic Rendering
+------------------------------------------------
+
+The close-up compares ``stochastic.usda`` and ``non_stochastic.usda`` through
+``Camera_close``. Both use the default emissive material and identical settings
+apart from ``omni:rtx:rtpt:gaussian:nonStochastic:enabled``.
+Enabling it reduces the grain around the cactus spines without waiting for
+multiple frames to accumulate, at a performance cost. Lighting and shadows can
+still contain noise.
+
+.. figure:: ../img/gaussian-splats-non-stochastic.avif
+   :alt: Camera_close with non-stochastic compositing off and on
+   :align: center
+
+   *Camera_close, RTPT first frame: non-stochastic compositing off (left)
+   and on (right). Matching crops enlarged 3× without smoothing.
+   Only the non-stochastic attribute differs.*
+
+Enable non-stochastic compositing on the RenderProduct. This feature requires
+RTPT; disable adaptive disocclusion sampling, which would force stochastic
+rendering:
 
 .. tab-set::
 
    .. tab-item:: USDA
 
-      .. literalinclude:: ../../tests/docs/usd/data/gaussian_splat.usda
+      .. literalinclude:: ../../examples/python/gaussian-splats/non_stochastic.usda
          :language: usda
-         :start-after: # [snippet:doc-gaussian-splat-prim]
-         :end-before: # [/snippet:doc-gaussian-splat-prim]
-         :dedent:
+         :start-after: # [snippet:doc-gaussian-non-stochastic]
+         :end-before: # [/snippet:doc-gaussian-non-stochastic]
 
    .. tab-item:: Python
 
-      .. literalinclude:: ../../tests/docs/usd/test_usd_python_examples.py
+      .. literalinclude:: ../../tests/docs/usd/test_gaussian_splats_usda.py
          :language: python
-         :start-after: # [snippet:doc-gaussian-splat-prim-python]
-         :end-before: # [/snippet:doc-gaussian-splat-prim-python]
+         :start-after: # [snippet:doc-gaussian-non-stochastic-python]
+         :end-before: # [/snippet:doc-gaussian-non-stochastic-python]
          :dedent:
 
-Before running, follow the :doc:`C API setup <../c_api/getting_started>` and
-check the :doc:`GPU and driver requirements <../driver_requirements>`.
-The first render may take longer while shaders compile and cache.
+Relighting with the Diffuse MDL
+-------------------------------
 
-Start in the public ovrtx repository root, ``rendering/ovrtx/public`` in a
-Kit checkout. Choose the commands for your platform to build and run both loaders:
+The wider view through ``Camera`` compares the default emissive appearance with
+``sh_diffuse.usda`` under the same studio lighting. The default material displays
+the captured appearance; ``ParticleFieldSHDiffuse`` uses the SH0 color as diffuse
+albedo so scene lights can shade the cactus and pot.
+
+.. figure:: ../img/gaussian-splats-sh-diffuse.avif
+   :alt: Camera with default emissive and SH diffuse Gaussian materials
+   :align: center
+
+   *Camera, RTPT after 32 frames: default emissive material (left) and
+   ParticleFieldSHDiffuse with normal tone mapping (right).*
+
+ovrtx supplies ``ParticleFieldSHDiffuse.mdl`` with its runtime materials, at
+``bin/mdl/ParticleFieldSHDiffuse.mdl`` in the extracted SDK package. You do not
+need to write an MDL material; see :ref:`gaussian-diffuse-material-source`. The snippet below references and binds the
+supplied material to the ParticleField and enables normal tone mapping.
+Diffuse relighting works in PT and RTPT and uses stochastic transparency.
+Captured lighting remains in SH0, so this does not recover unlit surface color.
+
+.. tab-set::
+
+   .. tab-item:: USDA
+
+      .. literalinclude:: ../../examples/python/gaussian-splats/sh_diffuse.usda
+         :language: usda
+         :start-after: # [snippet:doc-gaussian-sh-diffuse]
+         :end-before: # [/snippet:doc-gaussian-sh-diffuse]
+
+   .. tab-item:: Python
+
+      .. literalinclude:: ../../tests/docs/usd/test_gaussian_splats_usda.py
+         :language: python
+         :start-after: # [snippet:doc-gaussian-sh-diffuse-python]
+         :end-before: # [/snippet:doc-gaussian-sh-diffuse-python]
+         :dedent:
+
+Run the Scenes
+--------------
+
+Follow the :doc:`C API setup <../c_api/getting_started>` and
+:doc:`GPU requirements <../driver_requirements>`. From the ovrtx repository root,
+build and run the example for your platform:
 
 .. tab-set::
 
@@ -48,9 +106,9 @@ Kit checkout. Choose the commands for your platform to build and run both loader
          cmake -B build
          cmake --build build --config Release
          .\build\static\Release\gaussian-splats.exe `
-           ../../python/gaussian-splats/gaussian_splats.usda gaussian-static.png
+           ../../python/gaussian-splats/non_stochastic.usda non-stochastic.png
          .\build\shared\Release\gaussian-splats-dynamic.exe `
-           ../../python/gaussian-splats/gaussian_splats.usda gaussian-shared.png
+           ../../python/gaussian-splats/sh_diffuse.usda sh-diffuse.png
 
    .. tab-item:: Linux
 
@@ -60,32 +118,25 @@ Kit checkout. Choose the commands for your platform to build and run both loader
          cmake -B build -DCMAKE_BUILD_TYPE=Release
          cmake --build build
          ./build/static/gaussian-splats \
-           ../../python/gaussian-splats/gaussian_splats.usda gaussian-static.png
+           ../../python/gaussian-splats/non_stochastic.usda non-stochastic.png
          ./build/shared/gaussian-splats-dynamic \
-           ../../python/gaussian-splats/gaussian_splats.usda gaussian-shared.png
+           ../../python/gaussian-splats/sh_diffuse.usda sh-diffuse.png
 
-Both loaders render the supplied ``gaussian_splats.usda`` scene. The commands
-write ``gaussian-static.png`` and ``gaussian-shared.png`` in
-``examples/c/gaussian-splats``. If you omit the output filename, the example
-writes ``out.png`` in the current directory.
+Both loaders accept the same scene layers. Use ``stochastic.usda`` for the
+close-up with non-stochastic rendering disabled, or ``gaussian_splats.usda`` for
+the wider view with the default emissive material.
 
-To render PT or Minimal, change ``omni:rtx:rendermode`` on ``/Render/Camera``
-in the supplied scene to ``PathTracing`` or ``MinimalRendering``. For Minimal,
-keep ``omni:rtx:minimal:mode = 3`` and ``omni:rtx:minimal:dlss:mode = 2``,
-which the scene already supplies. Both loaders use these settings.
+The C example saves one frame. The diffuse comparison above was rendered with
+32 frames using the :doc:`Python example <python_gaussian_splats>`.
 
-The following code requests one RenderProduct and waits for its first frame.
+Scene and Source
+----------------
 
-.. literalinclude:: ../../examples/c/gaussian-splats/main.cpp
-   :language: cpp
-   :start-after: // [snippet:gaussian-c-step-renderer]
-   :end-before: // [/snippet:gaussian-c-step-renderer]
-   :dedent:
+The scene references `cactus-100.usdc
+<https://huggingface.co/buckets/nvidia/ovrtx-storage/resolve/cactus-100.usdc>`__
+and requires internet access on first load. The capture is by
+`Steam Studio <https://www.steam-studio.jp>`__, released under CC0-1.0;
+see the `original dataset <https://note.com/steam_studio/n/ne9736d94f162>`__.
 
-The output is copied to a PNG while its CPU mapping is alive:
-
-.. literalinclude:: ../../examples/c/gaussian-splats/main.cpp
-   :language: cpp
-   :start-after: // [snippet:gaussian-c-map-rendered-output-cpu]
-   :end-before: // [/snippet:gaussian-c-map-rendered-output-cpu]
-   :dedent:
+See :doc:`../geometry/gaussian_splats` for the Gaussian attribute layout,
+render-mode support, and feature limitations.

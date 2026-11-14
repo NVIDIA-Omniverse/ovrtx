@@ -32,7 +32,7 @@ on reflection for both. Grouping states them from the script:
 
 .. code-block:: lua
 
-    return slang.dispatch({
+    return slang.compute({
         slang.bind({
             slang.ParameterBlock(
                 slang.float(inputs["strength"])   -- -> slot 0, the constant buffer
@@ -65,14 +65,23 @@ How It Works
    * - ``slang.bind({...})``, no space
      - Slots, but not the space. The space comes from reflection; if the shader uses more than one, the load fails naming the spaces it found.
    * - ``slang.bind({...}, N)``
-     - Both. Space ``N``, slots by position. Respected unconditionally.
+     - Both. Space ``N``, slots by position. Where the shader reports a place, the stated one must be it.
 
-Two or more groups must each state a space. There is no positional default and no ordering
-assumption, so groups may be listed in any order. Grouping also scopes the matching: within a
+Two or more groups must each state a space, and may be listed in any order.
+Grouping also scopes the matching: within a
 group, resources are matched against the reflected resources of that space alone.
 
 Lua rejects two ``ParameterBlock`` s in one group, a duplicate space across groups, and a space
 that is negative or not an integer.
+
+**Loose uniform values sit where the compiler puts them.** A shader can declare its values as
+``uniform`` globals instead of a ``ParameterBlock`` struct. The compiler gathers them into one
+buffer and gives it a binding and a descriptor space of its own, around the resources the shader
+places, such as binding 1 of space 0 beside a resource at ``[[vk::binding(0, 0)]]``. Reflection
+does not report that place, so SPG reads it from the compiled shader and binds the values there. A
+launch script that states it, as the ``ParameterBlock``'s position in a group, must state the same
+place. When SPG cannot read the place from the compiled shader, the launch script has to state it,
+and without it the node's graph stops with a message saying so.
 
 The With-Reflection Case
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,28 +106,95 @@ matched against what reflection found.
 
 The highlighted blocks are one contract seen from both ends. The ``Params`` struct fixes the
 field order the ``ParameterBlock`` call has to follow, and the ``vk::binding`` declarations fix
-the order of everything after it.
+the order of everything after it. A value that states its offset goes to the field that starts
+there instead, and the values after it continue from that field.
 
 .. _spg-do-layout:
 
 Stating the Layout
 ------------------
 
-Each dtype constructor takes an optional second argument saying where its value sits in the
-block. A bare number is a byte offset; the long form also states how a matrix is stored:
+Each dtype constructor and ``slang.array`` take an optional table saying where the value sits
+in the block: ``offset``, the byte it starts at, and ``strides``, one number per level of the
+value, outermost first, each the bytes from one index of that level to the next. The levels
+are the value's array dimensions and, for a matrix, its rows and then its columns. The lanes of
+a vector sit one after another and take no stride. A stride of ``0`` leaves that level's stride
+to the shader. A bare number in place of the table is the offset of a single number:
 
 .. code-block:: lua
 
     slang.ParameterBlock(
         slang.uint(inputs["key"], 0),
-        slang.float4x4(inputs["xform"], { offset = 16, order = slang.column_major, stride = 16 })
+        slang.float4x4(inputs["xform"], { offset = 16, strides = { 4, 16 } }),
+        slang.array(inputs["weights"], slang.float, { offset = 80, strides = { 16 } })
     )
 
-``order`` takes ``slang.row_major`` or ``slang.column_major``. A bare number on a matrix is
-rejected, because a matrix needs its storage order as well as its offset.
+The strides of some common fields, as a padded layout lays them out, such as slangc's SPIR-V
+build of a constant buffer:
 
-Offsets are **derived** when every value in the block is a single four-byte number. They become
-**required** as soon as any vector or matrix appears, since alignment then decides the packing.
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 40
+
+   * - Field
+     - ``strides``
+     - Reads as
+   * - ``float weights[4]``
+     - ``{ 16 }``
+     - each number 16 bytes after the one before
+   * - ``float2x2 m``, column-major
+     - ``{ 4, 16 }``
+     - the next row 4 bytes on, the next column 16
+   * - ``float2x2 m``, row-major
+     - ``{ 16, 4 }``
+     - the next row 16 bytes on, the next column 4
+   * - ``float2x2 mats[2]``, column-major
+     - ``{ 32, 4, 16 }``
+     - the next matrix 32 bytes on, then as one matrix
+
+**An array of structs** goes in field by field. Each field of the structs is a value of its own,
+an array starting at the offset of that field in the first struct. A value that states an offset
+goes to the field, or the field of the structs, that starts there, and the values after it take
+the fields after that one. With reflection the offset is enough, and the shader gives the strides;
+without it, the stride of each struct is stated too. For ``struct Item { float a; int b; }
+items[3]`` followed by ``float gain``, where each ``Item`` takes 16 bytes:
+
+.. code-block:: lua
+
+    -- With reflection
+    slang.array(inputs["a"], slang.float, { offset = 0 }),
+    slang.array(inputs["b"], slang.int,   { offset = 4 }),
+    slang.float(inputs["gain"])
+
+    -- Without reflection
+    slang.array(inputs["a"], slang.float, { offset = 0, strides = { 16 } }),
+    slang.array(inputs["b"], slang.int,   { offset = 4, strides = { 16 } }),
+    slang.float(inputs["gain"], 48)
+
+A value that goes to an array of structs without stating an offset stops the node's graph with
+an error that names the field.
+
+A dtype constructor holds one value: given an input with more elements, it stops the node's
+graph with an error that names the input. An array goes in with ``slang.array``.
+
+A matrix layout stated as ``{ offset, order, stride }`` is deprecated and logs a warning; it will
+be removed in a later release. ``order = slang.column_major, stride = 16`` on a ``float4x4`` is
+``strides = { 4, 16 }``, and ``order = slang.row_major, stride = 16`` is ``strides = { 16, 4 }``.
+An ``order`` alone or a ``stride`` alone leaves the rest of the layout to the shader, so it works
+only with reflection; without it, the node's graph stops with an error that names what is
+missing.
+
+Without reflection, offsets are **derived** when every value in the block is a single four-byte
+number. They become **required** as soon as any vector or matrix appears, since alignment then
+decides the packing.
+
+A value fills the block from its offset with all of its elements: an array given at an offset is
+packed whole, each element where its strides place it, and for a shader without reflection SPG
+sizes the block to hold every element. A value with more elements than the field the shader declares for it holds stops
+the node's graph, with an error that names the node, the value, its element count and the field.
+A field holds the elements the shader declares, whatever padding its layout puts between or after
+them: each element of an array, and each row or column of a matrix, goes where the layout starts
+it.
 
 .. _spg-do-reflection:
 
@@ -126,10 +202,19 @@ What Reflection Fills In
 ------------------------
 
 ``.slang`` source and a pre-compiled ``.slang-module`` both carry reflection. A ``.spv``, which is
-SPIR-V byte code, does not. Refer to :doc:`precompiled`. The rule between them is
-one line: **the launch script is the source of truth, and reflection is the check on it.** What
-the script states, reflection verifies; what it leaves out, reflection supplies; where the two
-disagree, SPG reports it and binds what the shader declares.
+SPIR-V byte code, does not. Refer to :doc:`precompiled`.
+**Reflection checks the launch script:** what
+the script states, reflection verifies; what it leaves out, reflection supplies; what reflection
+does not report, the script supplies. Where the two disagree about where a value sits, its
+parameter-block offset or the strides of an array or matrix, SPG packs the value where the shader
+declares it and logs a warning once per node and value that names the value, what the script states and
+what the shader declares. Where they disagree about a descriptor space, a binding slot or a
+texture's dimension, the node's graph stops with an error that names the resource and both sides.
+A value that neither the shader nor the script places, such as one more value than the shader's
+fields, stops the node's graph with an error that names the value.
+
+SPG reads the fields of a ``ConstantBuffer<T>`` from the compiled shader, so they are filled in and
+checked as the fields of a ``ParameterBlock<T>`` are.
 
 .. list-table::
    :header-rows: 1
@@ -145,15 +230,15 @@ disagree, SPG reports it and binds what the shader declares.
      - From the shader, or by position in a group
      - **By position in a group**, counting from zero
    * - Parameter-block offsets
-     - From the shader, or stated
+     - From the shader; a stated one that differs logs a warning
      - **Must be stated**, unless every value is a single four-byte number
-   * - Matrix order and stride
-     - From the shader, or stated
-     - **Must be stated**
+   * - Strides of an array or matrix
+     - From the shader; stated ones that differ log a warning
+     - **Must be stated**, with ``{ offset, strides }``
    * - Thread group size
      - The shader's ``[numthreads]``, which overrides a stated one
      - **Must be stated** with ``numthreads``, or ``grid`` stated in its place. With neither, the
-       node reports what is missing and does not run.
+       node reports what is missing and its graph stops.
    * - Entry point
      - ``subIdentifier``, or the prim name
      - Read from the binary
@@ -162,7 +247,7 @@ disagree, SPG reports it and binds what the shader declares.
      - The same, once a thread group size exists
 
 A flat ``bind = { ... }`` therefore cannot work without reflection: nothing states a space, so
-the node reports that the shader exposes no descriptor space and does not run.
+the node reports that the shader exposes no descriptor space and its graph stops.
 
 Verify It Worked
 ----------------
@@ -177,6 +262,12 @@ When It Goes Wrong
 
 - "Shader exposes no descriptor space": a flat ``bind`` with a ``.spv``. Group with
   ``slang.bind``.
+- "... but the shader places that buffer at binding ..." or "... but the shader declares ...
+  there": a group lists its entries in another order than the shader's bindings. Order the group
+  as the shader's ``vk::binding`` declarations.
+- A warning "... in the launch script but the shader declares it ...": a stated offset or strides
+  differ from the shader's, and the shader's were used. Correct the launch script, or leave the
+  layout to reflection.
 - A value lands in the wrong field: the order does not match the struct. A wrong count is an
   error, a wrong order only a warning.
 

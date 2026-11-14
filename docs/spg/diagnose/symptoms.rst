@@ -13,8 +13,7 @@
 Symptom Index
 =============
 
-Start from what you see. Each cause has its own tell, so work down the list rather than
-guessing.
+Start from what you see and work down the list.
 
 .. _spg-symptom-nothing:
 
@@ -29,9 +28,6 @@ Check the output is connected to a RenderVar and that the RenderVar is in ``orde
 Refer to :ref:`how execution order is decided <spg-execution-order>`.
 
 **The RenderVar is not published.** It needs a ``sourceName`` as well as the connection.
-
-**The name collides with a built-in AOV.** The renderer's own output shadows the node's. Refer
-to :ref:`name collisions <spg-aov-collision>`.
 
 **A node is wired to another product's node instead of to a published AOV.** A shader-to-shader
 connection only works inside one product. Reaching across a product boundary needs the producing
@@ -51,23 +47,60 @@ it, is skipped before the kernel is ever compiled. Move the shader out, or drop 
 
 **A Slang node had no thread group size to work from.** A ``.spv`` whose launch script states
 neither ``numthreads`` nor ``grid`` leaves nothing to derive a grid from, so the node reports what
-is missing and does not run. Refer to
+is missing and its graph stops. Refer to
 :ref:`with a group size from neither place <spg-slang-no-group-size>`.
 
-**A composite channel or parameter was asked for by a name it does not carry.** The node fails
-without publishing, and the message names the port, the name used and the nearest match.
+**A composite channel or parameter was asked for by a name it does not carry.** The node's graph
+stops, and the message names the port, the name used and the nearest match.
 
-**The launch script does not parse.** The node fails, and the log has a ``Lua load error`` line
-naming the script and the line of the error. The renderer keeps running.
+**A ``:-N`` read of a sensor composite stopped its graph.**
+SPG keeps earlier frames of a composite whose channels are all GPU buffers of an element type SPG
+binds, stored compactly, with no ``/`` in their names,
+so a ``:-N`` read of another composite stops the node's graph, and the message names the channel and
+why. Refer to :doc:`../do/previous_frame`.
+
+**A node input holds a token[].** SPG node inputs do not take a ``token[]``, so the node's graph is
+not built, and the log names the node and the input. Refer to :doc:`../ref/usd`.
+
+**The launch script does not parse.** The node's graph stops, and the log has a
+``Lua load error`` line naming the script and the line of the error. The renderer keeps running.
 
 **The launch script was rejected.** Scripts run in a sandbox and the source is scanned before
 it runs. The scan is a plain substring match over the whole file, **including comments**, so a
 comment mentioning a forbidden construct is enough. A rejected script produces no GPU work.
 
-**A node stopped after one failure.** A launch script that reaches a sandbox limit stops its
-node, and the log says once that the node is stopped until its graph is rebuilt. Fix the script,
-then change the stage's SPG setup or open the stage again. Refer to
-:ref:`the sandbox <spg-lua-sandbox>`.
+.. _spg-symptom-graph-stopped:
+
+**A graph stopped after one failure.** A node that fails stops its whole graph, not only itself:
+the graph's outputs are not written, and the log has an error naming the node and the
+reason. The node can fail at two points:
+
+- **Before its GPU work starts**: a launch script that does not parse, raises an error or reaches
+  a :ref:`sandbox limit <spg-lua-sandbox>`, a value that cannot be converted, or a ``:-N`` read
+  SPG does not serve.
+- **While its GPU work runs**: a CUDA kernel that does not compile or launch, the upload of an
+  array value that fails, or a built-in node that rejects its input. The graph then stops from
+  the next frame, and the outputs of the frame in which the work failed may be incomplete.
+
+A graph that reads the output of a graph that failed fails in that frame too, but does not stop.
+Until the failed graph runs again, the nodes that read its output, and the nodes that need
+theirs, do not run; then they read its new output.
+
+A stopped graph runs again, on its schedule, once one of these happens:
+
+- A value-input of one of its nodes changes, such as a corrected ``inputs:swizzle``. While the
+  values that stopped it stay the same, it does not run again.
+- It is rebuilt. An edit to ``info:spg:sourceAsset`` or to the connections of one of its nodes
+  rebuilds it, and so do an edit to the ``sourceName`` of a RenderVar it reads or publishes and
+  opening the stage again.
+
+A launch script that has loaded is not read again while the stage stays open, so after fixing
+one, open the stage again.
+
+**A graph was not built because an asset input cannot be loaded.** A node input that names an
+asset, such as a lookup table, that cannot be loaded keeps the node's whole graph from being built.
+The log has an error naming the prim, the input and the asset. Once the input names an asset that
+loads, the graph is built.
 
 **An output was never described.** Every declared output must be assigned a descriptor before
 the launch script returns.
@@ -123,7 +156,8 @@ first. Refer to :ref:`cross-product staleness <spg-cross-product-stale>`.
 **The first frame of a stateful node reads zeros.** Defined behaviour. Refer to
 :ref:`stateful zero-initialisation <spg-stateful-zeroed>`.
 
-**A scene edit had no effect.** The write did not land before the step.
+**A scene edit had no effect.** The write did not land before the step: advance the write floor
+before stepping. Refer to :doc:`../do/runtime_changes`.
 
 Reading the Log
 ---------------

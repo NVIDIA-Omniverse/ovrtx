@@ -35,6 +35,12 @@ file(GLOB_RECURSE OVRTX_PUBLIC_HEADERS
     "${OVRTX_INCLUDE_DIR}/*.h")
 list(SORT OVRTX_PUBLIC_HEADERS)
 
+set(OVRTX_CXX_LINKAGE_HEADERS
+    ovx/string_types.h
+    ovx/types.h
+    ovrtx/ovrtx_types.h
+    ovrtx/ovrtx_data_provider.h)
+
 set(OVRTX_HEADER_SWEEP_DIR "${CMAKE_CURRENT_BINARY_DIR}/header-standalone")
 file(MAKE_DIRECTORY "${OVRTX_HEADER_SWEEP_DIR}")
 
@@ -43,24 +49,35 @@ foreach(header IN LISTS OVRTX_PUBLIC_HEADERS)
     set(c_source "${OVRTX_HEADER_SWEEP_DIR}/${header_id}.c")
     set(cxx_source "${OVRTX_HEADER_SWEEP_DIR}/${header_id}.cpp")
     file(WRITE "${c_source}" "#include <${header}>\n")
-    file(WRITE "${cxx_source}" "#include <${header}>\n")
+    if(header IN_LIST OVRTX_CXX_LINKAGE_HEADERS)
+        file(WRITE "${cxx_source}" "extern \"C\" {\n#include <${header}>\n}\n")
+    else()
+        file(WRITE "${cxx_source}" "#include <${header}>\n")
+    endif()
     list(APPEND OVRTX_HEADER_C_SOURCES "${c_source}")
     list(APPEND OVRTX_HEADER_CXX_SOURCES "${cxx_source}")
 endforeach()
 
 add_library(ovrtx_public_headers_c OBJECT ${OVRTX_HEADER_C_SOURCES})
-target_include_directories(ovrtx_public_headers_c PRIVATE "${OVRTX_INCLUDE_DIR}")
+target_link_libraries(ovrtx_public_headers_c PRIVATE ovrtx::ovrtx)
 set_target_properties(ovrtx_public_headers_c PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED ON
     C_EXTENSIONS OFF)
 
 add_library(ovrtx_public_headers_cxx OBJECT ${OVRTX_HEADER_CXX_SOURCES})
-target_include_directories(ovrtx_public_headers_cxx PRIVATE "${OVRTX_INCLUDE_DIR}")
+target_link_libraries(ovrtx_public_headers_cxx PRIVATE ovrtx::ovrtx)
 set_target_properties(ovrtx_public_headers_cxx PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF)
+
+add_library(ovrtx_handle_contracts OBJECT strong_handles.c)
+target_link_libraries(ovrtx_handle_contracts PRIVATE ovrtx::ovrtx)
+set_target_properties(ovrtx_handle_contracts PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF)
 
 # Fetch GoogleTest
 include(FetchContent)
@@ -77,10 +94,12 @@ enable_testing()
 
 add_executable(ovrtx_docs_tests
     main.cpp
+    test_profiling.cpp
     test_base.cpp
     test_camera_aovs.cpp
     test_camera_sensors.cpp
     test_sensor_configuration.cpp
+    test_video_textures.cpp
     test_stage_query.cpp
     test_stage_mutation.cpp
     test_attribute_bindings.cpp
@@ -118,7 +137,16 @@ ovrtx_setup_runtime(ovrtx_docs_tests)
 ovstage_setup_runtime(ovrtx_docs_tests)
 
 include(GoogleTest)
-gtest_discover_tests(ovrtx_docs_tests TEST_FILTER "*-PickingSelectionTest.*:SelectionStyleTest.*:PickingSelectionLegacyTest.*")
+set(OVRTX_DOCS_DISCOVERY_TIMEOUT 5)
+if(WIN32)
+    # Allow transient executable startup delays on Windows builders without
+    # changing test execution timeouts. A stalled discovery still fails the build.
+    set(OVRTX_DOCS_DISCOVERY_TIMEOUT 60)
+endif()
+gtest_discover_tests(ovrtx_docs_tests
+    DISCOVERY_TIMEOUT ${OVRTX_DOCS_DISCOVERY_TIMEOUT}
+    TEST_FILTER "*-PickingSelectionTest.*:SelectionStyleTest.*:PickingSelectionLegacyTest.*"
+)
 
 # Add picking tests manually so CTest reports fixture setup failures as
 # failures instead of converting GoogleTest's skipped child-test lines into a

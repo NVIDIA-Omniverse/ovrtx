@@ -56,6 +56,10 @@ def test_step_and_map_camera_outputs(renderer, stage, output_dir):
         renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
 
     # [snippet:doc-step-and-map-camera-outputs]
+    import numpy as np
+    from PIL import Image
+    import ovrtx
+
     products = renderer.step(
         render_products={"/Render/Camera"},
         delta_time=1.0 / 60,
@@ -119,6 +123,8 @@ def test_map_camera_output_cuda(renderer, stage):
     products = renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
 
     # [snippet:doc-map-render-output-cuda]
+    import ovrtx
+
     mapping = products["/Render/Camera"].frames[0].render_vars["/Render/Camera/LdrColor"].map(
         device=ovrtx.Device.CUDA
     )
@@ -139,6 +145,8 @@ def test_map_camera_output_cuda_array(renderer, stage):
     products = renderer.step(render_products={"/Render/Camera"}, delta_time=1.0 / 60, ordinal=ordinal)
 
     # [snippet:doc-map-render-output-cuda-array]
+    import ovrtx
+
     # Device.CUDA_ARRAY hands back the render target's CUDA array instead of copying
     # it into linear memory. The tensor therefore carries an opaque cudaArray_t handle
     # that no DLPack consumer can read. ovrtx exposes it as a plain int and leaves the

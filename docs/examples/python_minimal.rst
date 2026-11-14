@@ -43,4 +43,4 @@ Running
 
    uv run main.py --png
 
-A successful run writes ``_output/render.png``. The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+A successful run writes ``_output/render.png``. The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.

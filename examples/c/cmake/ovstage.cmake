@@ -64,7 +64,17 @@ endfunction()
 
 # Fetch the ovstage package
 macro(ovstage_fetch)
-    find_package(ovstage QUIET)
+    # Like ovrtxConfig.cmake, accept an ovstage package extracted beside an ovrtx
+    # prefix so CMAKE_PREFIX_PATH may name only ovrtx.
+    set(_ovstage_sibling_hints)
+    foreach(_ovstage_prefix IN LISTS CMAKE_PREFIX_PATH)
+        if(EXISTS "${_ovstage_prefix}/lib/cmake/ovrtx/ovrtxConfig.cmake")
+            list(APPEND _ovstage_sibling_hints "${_ovstage_prefix}/../ovstage")
+        endif()
+    endforeach()
+    find_package(ovstage QUIET HINTS ${_ovstage_sibling_hints})
+    unset(_ovstage_sibling_hints)
+    unset(_ovstage_prefix)
 
     if (ovstage_FOUND)
         message(STATUS "found ovstage at: ${ovstage_DIR}")
@@ -84,14 +94,14 @@ macro(ovstage_fetch)
         # deps/ovrtx_deps.yaml; do not hand-edit.
         if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             set(OVSTAGE_PACKAGE_SYSTEM "windows-x86_64")
-            set(OVSTAGE_HASH "007cd7ef776415c95342985fcf60ba89aa4222a07c914fdd314acb860e0b95a5")
+            set(OVSTAGE_HASH "aef6b5c24fe220e888cf0021638d5e7ba9947f3fc09cde8ca5bb2e0dc11fc707")
         elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
                 set(OVSTAGE_PACKAGE_SYSTEM "manylinux_2_35_aarch64")
-                set(OVSTAGE_HASH "14d8815694779799768480eaded48ae3c401ab128eca7e18ea2c3f30e385a307")
+                set(OVSTAGE_HASH "955311eadaccfc8f16e0efa43261c2c1a1ff3e456cc4e93489d4951e78bca2bf")
             elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
                 set(OVSTAGE_PACKAGE_SYSTEM "manylinux_2_35_x86_64")
-                set(OVSTAGE_HASH "922a64c3583040ea3ab3262c0e95aa4ac642bef8676b43a02fa262ea14adc387")
+                set(OVSTAGE_HASH "e39fc83dce13cd2818bc43448d27137f1659511a2d2f91a66bff263a23a6a4dd")
             else()
                 message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}")
             endif()
@@ -116,7 +126,7 @@ macro(ovstage_fetch)
         FetchContent_Declare(
             ovstage
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-            URL "https://github.com/NVIDIA-Omniverse/ovstage/releases/download/v0.3.0/ovstage@0.3.0.1791986420.36fe3c44.${OVSTAGE_PACKAGE_SYSTEM}.zip"
+            URL "https://github.com/NVIDIA-Omniverse/ovstage/releases/download/v0.4.0/ovstage@0.4.0.1794520352.987892c3.${OVSTAGE_PACKAGE_SYSTEM}.zip"
             URL_HASH SHA256=${OVSTAGE_HASH}
         )
 
@@ -155,8 +165,8 @@ endmacro()
 #   - Model #1: ovrtx's runtime stays under the single `ovrtx/` link, so <exe>/plugins
 #     is free and we junction ovstage's own plugins/ closure there.
 #   - Model #2: ovrtx replicates its plugins/ at the exe root, so <exe>/plugins is
-#     ovrtx's; the ovstage runtime shares that single tree
-#     and we do NOT junction a second, colliding plugins/.
+#     an executable-owned root with linked subdirectories. Add OVStage's
+#     population plugin there without modifying either source package.
 #
 # OVSTAGE_BINARY_DIR is exported by ovstageConfig.cmake (the package's bin/ dir).
 function(ovstage_setup_runtime TARGET_NAME)
@@ -208,6 +218,16 @@ function(ovstage_setup_runtime TARGET_NAME)
         set(OVSTAGE_RUNTIME_DIRS)
         if(_ovstage_static_model)
             list(APPEND OVSTAGE_RUNTIME_DIRS plugins)
+        elseif(EXISTS "${OVSTAGE_BINARY_DIR}/plugins/ovstage.population.plugin.dll")
+            # ovstage 0.3 and earlier ship population as plugins/usdrt, which
+            # the ovrtx plugins/ tree already provides.
+            add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${OVSTAGE_BINARY_DIR}/plugins/ovstage.population.plugin.dll"
+                    "$<TARGET_FILE_DIR:${TARGET_NAME}>/plugins/ovstage.population.plugin.dll"
+                COMMENT "Copying the OVStage population plugin beside the shared runtime"
+                VERBATIM
+            )
         endif()
         foreach(DIR ${OVSTAGE_RUNTIME_DIRS})
             if(EXISTS "${OVSTAGE_BINARY_DIR}/${DIR}")

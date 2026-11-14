@@ -12,7 +12,7 @@
 // Slang counterpart of CheckerKernel.cu. Same node, same attributes, same
 // output: a checkerboard built from values alone, with no AOV read.
 //
-// Values do not arrive individually on Slang. They are packed into one constant
+// On Slang, values are packed into one constant
 // buffer, and the struct's field order must match the order the launch script
 // lists them in slang.ParameterBlock(...).
 struct Params

@@ -15,12 +15,12 @@ import pytest
 @pytest.mark.skipif(platform.machine().lower() in ("aarch64", "arm64"),
                     reason="The pinned usd-core distribution has no aarch64 wheel")
 def test_usd_plugin_paths_example():
+    """Exercise USD plugin registration with the suite's OVRTX in an isolated example process."""
     # Use the version installed with this suite, independent of the shell PATH.
     uv = [sys.executable, "-m", "uv"]
     example = Path(__file__).parents[3] / "examples/python/usd-plugin-paths"
     env = os.environ.copy()
-    # Use the exact ovrtx under test, including the local dev build when
-    # invoked through dev-tests.sh. usd-core stays out of this parent process.
+    # Use the exact ovrtx under test; keep usd-core out of this parent process.
     root = str(Path(ovrtx.__file__).resolve().parents[1])
     env["PYTHONPATH"] = os.pathsep.join([root, env.get("PYTHONPATH", "")])
     # Public checkouts omit lockfiles; let uv create one from the pinned dependencies.
@@ -99,8 +99,9 @@ with ovstage.Stage("schema-registration-order") as stage:
                 group = read.fetch_next()
                 assert group is not None, "schema fallback read returned no data"
                 try:
-                    values = np.from_dlpack(group.dlpack(0)).reshape(-1)
-                    assert [paths.token_to_string(int(value)) for value in values] == ["white"]
+                    column = group.columns[0]
+                    values = np.from_dlpack(column.dlpack(0)).reshape(-1)
+                    assert [paths.token_to_string(ovstage.Token(value)) for value in values] == ["white"]
                 finally:
                     stage.release_group(group)
         finally:

@@ -35,7 +35,7 @@ TEST_F(AttributeShapesTest, ScalarInt32) {
     DocsQueryAndToken q;
     docs_make_query_and_token(stage_, "/Render/Camera", "omni:rtx:rtpt:maxBounces", &q);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = q.attr_token;
 
     // [snippet:doc-shape-scalar-int32-c]
@@ -69,17 +69,23 @@ TEST_F(AttributeShapesTest, ScalarInt32) {
     ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount),
               OVSTAGE_OK);
 
-    DLTensor const& t = group.data.tensors[0];
+    ASSERT_EQ(group.column_count, 1u);
+    ASSERT_NE(group.columns, nullptr);
+    ovstage_read_column_t const& column = group.columns[0];
+    ASSERT_GT(column.data.tensor_count, 0u);
+    ASSERT_NE(column.data.tensors, nullptr);
+    DLTensor const& t = column.data.tensors[0];
     EXPECT_EQ(t.ndim, 1);
     EXPECT_EQ(t.shape[0], 1);
     EXPECT_EQ(t.dtype.lanes, 1u);
     EXPECT_EQ(*static_cast<uint32_t const*>(t.data), 23u);
 
-    ovstage_release_group(stage_, &group);
+    ovstage_release_groups(stage_, &group, 1);
     ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-shape-scalar-int32-c]
 
@@ -96,7 +102,7 @@ TEST_F(AttributeShapesTest, Float3ArraySingleElement) {
     DocsQueryAndToken q;
     docs_make_query_and_token(stage_, "/World/Plane", "points", &q);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = q.attr_token;
 
     float point_data[1][3] = {{1.0f, 2.0f, 3.0f}};
@@ -127,11 +133,17 @@ TEST_F(AttributeShapesTest, Float3ArraySingleElement) {
     ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount),
               OVSTAGE_OK);
 
-    DLTensor const& t = group.data.tensors[0];
+    ASSERT_EQ(group.column_count, 1u);
+    ASSERT_NE(group.columns, nullptr);
+    ovstage_read_column_t const& column = group.columns[0];
+    ASSERT_GT(column.data.tensor_count, 0u);
+    ASSERT_NE(column.data.tensors, nullptr);
+    DLTensor const& t = column.data.tensors[0];
     EXPECT_EQ(t.ndim, 2);
     EXPECT_EQ(t.shape[0], 1);
     EXPECT_EQ(t.shape[1], 3);
@@ -141,7 +153,7 @@ TEST_F(AttributeShapesTest, Float3ArraySingleElement) {
     EXPECT_FLOAT_EQ(data[1], 2.0f);
     EXPECT_FLOAT_EQ(data[2], 3.0f);
 
-    ovstage_release_group(stage_, &group);
+    ovstage_release_groups(stage_, &group, 1);
     ovstage_release_read(stage_, read_handle);
     docs_release_query_and_token(stage_, &q);
 }
@@ -153,7 +165,7 @@ TEST_F(AttributeShapesTest, Float3Array) {
     DocsQueryAndToken q;
     docs_make_query_and_token(stage_, "/World/Plane", "points", &q);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = q.attr_token;
 
     // [snippet:doc-shape-float3-array-c]
@@ -194,17 +206,23 @@ TEST_F(AttributeShapesTest, Float3Array) {
     ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount),
               OVSTAGE_OK);
 
-    DLTensor const& t = group.data.tensors[0];
+    ASSERT_EQ(group.column_count, 1u);
+    ASSERT_NE(group.columns, nullptr);
+    ovstage_read_column_t const& column = group.columns[0];
+    ASSERT_GT(column.data.tensor_count, 0u);
+    ASSERT_NE(column.data.tensors, nullptr);
+    DLTensor const& t = column.data.tensors[0];
     EXPECT_EQ(t.ndim, 2);
     EXPECT_EQ(t.shape[0], 4);
     EXPECT_EQ(t.shape[1], 3);
     EXPECT_EQ(t.dtype.lanes, 1u);
 
-    ovstage_release_group(stage_, &group);
+    ovstage_release_groups(stage_, &group, 1);
     ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-shape-float3-array-c]
 
@@ -218,7 +236,7 @@ TEST_F(AttributeShapesTest, Mat4Array) {
     DocsQueryAndToken q;
     docs_make_query_and_token(stage_, "/World/Camera", "omni:xform", &q);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = q.attr_token;
 
     // [snippet:doc-shape-mat4-array-c]
@@ -262,11 +280,17 @@ TEST_F(AttributeShapesTest, Mat4Array) {
     ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount),
               OVSTAGE_OK);
 
-    DLTensor const& t = group.data.tensors[0];
+    ASSERT_EQ(group.column_count, 1u);
+    ASSERT_NE(group.columns, nullptr);
+    ovstage_read_column_t const& column = group.columns[0];
+    ASSERT_GT(column.data.tensor_count, 0u);
+    ASSERT_NE(column.data.tensors, nullptr);
+    DLTensor const& t = column.data.tensors[0];
     EXPECT_EQ(t.ndim, 3);
     EXPECT_EQ(t.shape[0], 1);
     EXPECT_EQ(t.shape[1], 4);
@@ -279,7 +303,7 @@ TEST_F(AttributeShapesTest, Mat4Array) {
     EXPECT_DOUBLE_EQ(data[3 * 4 + 1], 20.0);
     EXPECT_DOUBLE_EQ(data[3 * 4 + 2], 30.0);
 
-    ovstage_release_group(stage_, &group);
+    ovstage_release_groups(stage_, &group, 1);
     ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-shape-mat4-array-c]
 

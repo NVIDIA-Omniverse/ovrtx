@@ -54,7 +54,7 @@ uv run main.py --png _output/stickers.png --rrd _output/stickers.rrd
 
 With no output options, the example opens Rerun. `--png` saves a PNG without opening a viewer; its default path is `_output/decals.png`. `--rrd PATH` saves a Rerun recording, and can be combined with `--png`.
 
-The first run may take several minutes while shaders are compiled and cached.
+The first run may take up to 5 minutes while shaders are compiled and cached.
 
 ## Scene and masks
 

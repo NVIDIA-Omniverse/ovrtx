@@ -7,7 +7,7 @@ Python: Multi-rate Sensors
 This example demonstrates best practices for running sensors with different
 capture rates in one simulation. The example runs two cameras and two lidars
 at different rates, and demonstrates the different returns expected with
-different values for ``omni:sensor:core:partialOutputs``, which controls whether
+different values for ``omni:sensor:Core:partialOutputs``, which controls whether
 a sensor waits for a complete frame before returning an output.
 
 Regardless of the configuration, for optimum performance, it is important to
@@ -245,5 +245,5 @@ Use ``partialOutputs=false`` to receive only newly completed images.
 shared time axis. ``--png`` saves the last delivered image from each camera
 side by side.
 
-See :doc:`../sensors/multi_rate` for scheduling, output policy, and history
+See :doc:`../sensors/common/multi_rate` for scheduling, output policy, and history
 preservation, and :doc:`../sensors/cameras/rolling_shutter` for partial camera AOVs.

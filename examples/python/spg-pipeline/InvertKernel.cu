@@ -10,7 +10,7 @@
 
 // [snippet:invert-kernel]
 // Second pass of the pipeline: invert an image. The input is whatever upstream
-// shader is connected to inputs:Image — here, the grayscale output.
+// shader is connected to inputs:Image; here, the grayscale output.
 extern "C" __global__ void invert(
     int width,
     int height,

@@ -21,7 +21,7 @@ function grayscale(inputs, outputs)
     -- Allocate the output AOV. Grayscale keeps the input's shape and dtype.
     outputs["LdrGrayscale"] = slang.image(inputs["LdrColor"].shape, inputs["LdrColor"].dtype)
 
-    return slang.dispatch({
+    return slang.compute({
         -- bind order must match the resource declaration order in the shader.
         bind = {
             slang.Texture2D(inputs["LdrColor"]),        -- -> Texture2D<float4> g_InLdrColor

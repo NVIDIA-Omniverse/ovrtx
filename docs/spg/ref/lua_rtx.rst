@@ -79,7 +79,7 @@ each time it is asked for a value. ``rtx.product``, the entries of its ``cameras
 
 - **Current.** A table kept from an earlier frame reads the current frame. A value read from it
   does not change, so keep the table, not the values.
-- **Read-only.** Assigning to it fails the node; keep a computed value in a local variable.
+- **Read-only.** Assigning to it stops the node's graph; keep a computed value in a local variable.
 - **Identified by its path.** Two tables of the same prim compare equal with ``==``.
 
 .. list-table::
@@ -143,8 +143,8 @@ attribute, large arrays included, so name the ones you need.
 
 Returns a table keyed by prim path, with one entry per prim on the stage; a prim that is not on
 the stage is left out. Each entry holds the named attributes, as listed in :ref:`spg-rtx-values`.
-Reading a name the query did not ask for, or one the prim does not carry, fails the node with a
-message naming it.
+Reading a name the query did not ask for, or one the prim does not carry, stops the node's graph
+with a message naming it.
 
 ``LOCAL_MATRIX`` and ``WORLD_MATRIX`` name the two transforms:
 
@@ -198,7 +198,7 @@ Every read, through a prim table or ``query_attributes``, gives the same value f
      - The value of the connection's source, as in USD. Connections are followed on SPG Shader
        prims; on other prims the attribute reads its own value.
 
-Reading any other value fails the node with a message naming the prim and the attribute.
+Reading any other value stops the node's graph with a message naming the prim and the attribute.
 
 .. _spg-rtx-transforms:
 
@@ -219,6 +219,6 @@ What Is on the Stage
 
 Loading a scene puts its prims on the stage with what the renderer needs of them. A prim of your
 own, such as a ``Scope`` holding settings, is on the stage too, but its custom attributes are
-not. They are published only when the load names the prim that carries it: in Python, a
+not. They are published only when the load names the prim that carries them: in Python, a
 description with a selector passed to ``ovstage.population.open_usd_with_desc``. Refer to
 :doc:`../do/scene_queries` for the call.

@@ -8,8 +8,8 @@
 // without an express license agreement from NVIDIA CORPORATION or
 // its affiliates is strictly prohibited.
 
-// The Slang half of the motion node. Both images arrive as ordinary textures;
-// which of them is a past frame is settled in the scene, not here.
+// The Slang half of the motion node. Both images arrive as textures;
+// which of them is a past frame is settled in the scene.
 
 struct Params
 {

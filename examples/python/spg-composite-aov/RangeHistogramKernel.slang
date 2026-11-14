@@ -18,8 +18,8 @@
 // three runs is Nmax, the allocated capacity, not the number of valid points.
 // Counts holds one number for the whole sweep and bounds the loop below.
 //
-// One thread per output column, which is why the launch script states a grid
-// and grid explicitly rather than letting SPG derive them from the output shape.
+// One thread per output column, which is why the launch script states the grid
+// explicitly rather than letting SPG derive it from the output shape.
 // Each thread owns its column exclusively, so the node needs no atomics, does
 // not depend on the output arriving cleared, and produces the same result
 // whatever order the threads run in.

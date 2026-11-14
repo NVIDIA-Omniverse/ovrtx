@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="650" viewBox="0 0 1180 650" role="img" aria-labelledby="title desc">
+<title id="title">A solid-state scan over two simulation steps</title>
+<desc id="desc">A solid-state scan on a time axis with scan period boundaries, fire-time groups and, in a second lane, a flash group; two simulation steps with half-open windows, the group on the step boundary firing in the later step, and the step that reaches the period end completing the scan and advancing the emitter state.</desc>
+<defs><marker id="arrow-0074df-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#0074DF"/></marker><marker id="arrow-313131-1p2" markerUnits="userSpaceOnUse" markerWidth="6.6" markerHeight="5.4" refX="0" refY="2.7" orient="auto" overflow="visible"><path d="M0,0 L6.6,2.7 L0,5.4 z" fill="#313131"/></marker><marker id="arrow-757575-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#757575"/></marker><marker id="arrow-952fc6-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#952FC6"/></marker></defs>
+<rect width="1180" height="650" fill="#fff"/>
+<line x1="210" y1="78" x2="830" y2="78" stroke="#313131" stroke-width="1.2"/>
+<line x1="210" y1="73" x2="210" y2="83" stroke="#313131" stroke-width="1.2"/>
+<line x1="830" y1="73" x2="830" y2="83" stroke="#313131" stroke-width="1.2"/>
+<text x="520" y="70" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve" text-anchor="middle"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">scan period = </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">1 / frameRate</tspan></text>
+<text x="210" y="100" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" text-anchor="middle" font-weight="bold">scan start</text>
+<text x="210" y="116" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">startTime + k * (1 / frameRate)</text>
+<text x="830" y="100" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" text-anchor="middle" font-weight="bold">scan end, next scan start</text>
+<text x="830" y="116" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">startTime + (k + 1) * (1 / frameRate)</text>
+<rect x="24" y="128" width="1132" height="92" rx="4" fill="#F2F2F2"/>
+<text x="36" y="178.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">flash pattern</text>
+<line x1="154" y1="134" x2="154" y2="214" stroke="#C0C0C0" stroke-width="1"/>
+<text x="36" y="196" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">every emitter shares</text>
+<text x="36" y="212" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575">one fireTimeNs</text>
+<rect x="24" y="232" width="1132" height="130" rx="4" fill="#F2F2F2"/>
+<text x="36" y="301.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">several groups</text>
+<line x1="154" y1="238" x2="154" y2="356" stroke="#C0C0C0" stroke-width="1"/>
+<text x="36" y="319" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">emitters with equal</text>
+<text x="36" y="335" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">fire times form a group</text>
+<line x1="210" y1="124" x2="210" y2="600" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<line x1="830" y1="124" x2="830" y2="600" stroke="#757575" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<circle cx="400" cy="204" r="4.5" fill="#0074DF"/>
+<circle cx="400" cy="195" r="4.5" fill="#0074DF"/>
+<circle cx="400" cy="186" r="4.5" fill="#0074DF"/>
+<circle cx="400" cy="177" r="4.5" fill="#0074DF"/>
+<circle cx="400" cy="168" r="4.5" fill="#0074DF"/>
+<circle cx="400" cy="159" r="4.5" fill="#0074DF"/>
+<circle cx="400" cy="150" r="4.5" fill="#0074DF"/>
+<circle cx="400" cy="141" r="4.5" fill="#0074DF"/>
+<text x="416" y="160" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">flash group: every emitter shares one </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">fireTimeNs</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">,</tspan></text>
+<text x="416" y="176" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131">so the whole pattern is one group that fires once per scan,</text>
+<text x="416" y="192" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131">in whichever step holds that time (step 1 here)</text>
+<circle cx="270" cy="356" r="4.5" fill="#0074DF"/>
+<circle cx="270" cy="345" r="4.5" fill="#0074DF"/>
+<circle cx="350" cy="356" r="4.5" fill="#0074DF"/>
+<circle cx="350" cy="345" r="4.5" fill="#0074DF"/>
+<circle cx="350" cy="334" r="4.5" fill="#0074DF"/>
+<circle cx="480" cy="356" r="4.5" fill="#952FC6"/>
+<circle cx="480" cy="345" r="4.5" fill="#952FC6"/>
+<circle cx="590" cy="356" r="4.5" fill="#952FC6"/>
+<circle cx="700" cy="356" r="4.5" fill="#952FC6"/>
+<circle cx="700" cy="345" r="4.5" fill="#952FC6"/>
+<circle cx="830" cy="356" r="4.5" fill="#952FC6"/>
+<line x1="210" y1="262" x2="343.4" y2="262" stroke="#313131" stroke-width="1.2" marker-end="url(#arrow-313131-1p2)"/>
+<text x="218" y="254" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" xml:space="preserve"><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">fireTimeNs</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif"> counted from the scan start</tspan></text>
+<text x="480" y="310" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">on the step boundary</text>
+<text x="820" y="330" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">timed exactly at the scan end</text>
+<line x1="154" y1="392" x2="1131.75" y2="392" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<text x="1140" y="382" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">time</text>
+<line x1="270" y1="362" x2="270" y2="414.75" stroke="#0074DF" stroke-width="1.5" marker-end="url(#arrow-0074df-1p5)"/>
+<line x1="350" y1="362" x2="350" y2="414.75" stroke="#0074DF" stroke-width="1.5" marker-end="url(#arrow-0074df-1p5)"/>
+<line x1="484" y1="362" x2="522.78" y2="453.41" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<line x1="590" y1="362" x2="590" y2="452.75" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<line x1="700" y1="362" x2="700" y2="452.75" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<line x1="830" y1="362" x2="830" y2="452.75" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<line x1="210" y1="430" x2="480" y2="430" stroke="#0074DF" stroke-width="2.5"/>
+<circle cx="210" cy="430" r="5.5" fill="#0074DF"/>
+<circle cx="480" cy="430" r="5.5" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="345" y="450" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve" text-anchor="middle"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">step 1: </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">[scan start, boundary)</tspan></text>
+<line x1="480" y1="468" x2="830" y2="468" stroke="#952FC6" stroke-width="2.5"/>
+<circle cx="480" cy="468" r="5.5" fill="#952FC6"/>
+<circle cx="830" cy="468" r="5.5" fill="#952FC6"/>
+<text x="655" y="486" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#313131" xml:space="preserve" text-anchor="middle"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">step 2: </tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">[boundary, scan end]</tspan></text>
+<text x="466" y="472" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#952FC6" text-anchor="end">boundary group fires in the later step</text>
+<circle cx="830" cy="468" r="9" fill="none" stroke="#76B900" stroke-width="2.5"/>
+<text x="846" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900">scan completes here;</text>
+<text x="846" y="480" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" xml:space="preserve"><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">emitter state advances (</tspan><tspan font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace">s001 → s002</tspan><tspan font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif">)</tspan></text>
+<text x="846" y="496" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">the closing step also fires the group at the scan end</text>
+<text x="820" y="522" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">a step that crosses a scan boundary</text>
+<text x="820" y="538" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">is split into one window per scan</text>
+<line x1="650" y1="556" x2="830" y2="556" stroke="#757575" stroke-width="2.5"/>
+<circle cx="650" cy="556" r="5.5" fill="#757575"/>
+<circle cx="830" cy="556" r="5.5" fill="#757575"/>
+<line x1="830" y1="572" x2="1000" y2="572" stroke="#757575" stroke-width="2.5"/>
+<circle cx="830" cy="572" r="5.5" fill="#757575"/>
+<circle cx="1000" cy="572" r="5.5" fill="#fff" stroke="#757575" stroke-width="2"/>
+<text x="740" y="594" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">window in scan k</text>
+<text x="915" y="594" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">window in scan k + 1</text>
+<rect x="154" y="618" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="177" y="628.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">fires in step 1</text>
+<rect x="281.1" y="618" width="12" height="12" rx="2" fill="#952FC6"/>
+<text x="304.1" y="628.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">fires in step 2</text>
+<line x1="408.2" y1="624" x2="424.2" y2="624" stroke="#757575" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="431.2" y="628.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">scan boundary</text>
+<rect x="542.02" y="618" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="565.02" y="628.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">scan completes, emitter state advances</text>
+<text x="1156" y="628" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575" text-anchor="end">filled end: instant included · open end: excluded</text>
+</svg>

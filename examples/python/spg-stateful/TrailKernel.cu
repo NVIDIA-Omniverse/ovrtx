@@ -9,21 +9,17 @@
 // its affiliates is strictly prohibited.
 
 // [snippet:trail-kernel]
-// Framebuffer feedback: fade what the node published last time, add what it was
+// Framebuffer feedback: fade what the node kept from last time, add what it was
 // handed this time.
 //
 //     history[n] = current[n] + decay * history[n-1]
 //
-// That one line is the whole node. history[n-1] is the previous execution's
-// output, and it exists only because the allocation is stateful. Take that away
-// and the recursion collapses to history[n] = current[n], which is the frame the
-// node was already handed. There is no version of this effect that does not read
-// back what it wrote.
+// history[n-1] is what the previous execution
+// wrote into the node's memory, and it exists only because that memory is kept
+// from one execution to the next.
 //
 // The node publishes both images so they can be compared directly. Live is the
-// frame as handed in, Trail is the feedback result. They come from the same
-// input through the same tone map, so the only difference between them is
-// history[n-1].
+// frame as handed in, Trail is the feedback result.
 //
 // Feedback amplifies whatever holds still: a pixel showing the same radiance
 // every frame settles at current / (1 - decay). Scaling the published image by
@@ -63,9 +59,9 @@ extern "C" __global__ void trail(
 
     float4 current = tex2D<float4>(inputImage, x, y);
 
-    // history[n-1], read through an ordinary surface: a stateful output binds
-    // like any other. Without the stateful marker this reads back empty every
-    // frame, whatever the node wrote below.
+    // history[n-1], read through a surface: the node's memory binds
+    // like an output. Were it an ordinary output instead, it would not be
+    // guaranteed to hold anything, whatever the node wrote below.
     float4 previous;
     surf2Dread<float4>(&previous, history, x * sizeof(float4), y);
 
@@ -75,8 +71,7 @@ extern "C" __global__ void trail(
     fed.z = current.z + decay * previous.z;
     fed.w = 1.0f;
 
-    // Carry it to the next execution. This write is the other half of the loop,
-    // and it is the only reason the node has anything to fade next frame.
+    // Carry it to the next execution, so the next frame has something to fade.
     surf2Dwrite<float4>(fed, history, x * sizeof(float4), y);
 
     float3 live = make_float3(current.x, current.y, current.z);

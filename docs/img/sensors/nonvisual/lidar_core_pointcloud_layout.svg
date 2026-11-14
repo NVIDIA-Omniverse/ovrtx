@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="556" viewBox="0 0 1160 556" role="img" aria-labelledby="title desc">
+<title id="title">One mapped PointCloud output of the Lidar generic core model</title>
+<desc id="desc">Left, the tensors of one mapped PointCloud output with their shapes: Counts [1]; Coordinates [3, Nmax] as three stacked rows x, y, z, component-first; Intensity, TimeOffsetNs and Flags [Nmax] as single rows; HitNormal [Nmax, 3] as Nmax groups of three adjacent cells, point-first. In every per-point row the leading range [0, Counts[0]) is shaded delivered and the remainder up to Nmax is hatched: it holds whatever it held before. One Flags byte is magnified: bit 6 (0x40) marks a real return, bit 5 (0x20) a return that belongs to the scan after the one the frame started in. Right, the CPU-resident params that travel beside the tensors.</desc>
+<defs><marker id="arrow-313131-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#313131"/></marker></defs>
+<rect width="1160" height="556" fill="#fff"/>
+<defs><pattern id="hatch" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#9A9A9A" stroke-width="1.6"/></pattern></defs>
+<text x="368" y="38" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">Counts[0]</text>
+<line x1="368" y1="44" x2="368" y2="290" stroke="#313131" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<rect x="186" y="48" width="26" height="22" rx="0" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<text x="24" y="63.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">Counts</text>
+<line x1="216" y1="59" x2="356.75" y2="59" stroke="#313131" stroke-width="1.5" marker-end="url(#arrow-313131-1p5)"/>
+<text x="290" y="83" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">entries delivered this frame</text>
+<text x="514" y="63.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">[1]</text>
+<text x="543.67" y="63.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">int32; always delivered</text>
+<rect x="186" y="98" width="182" height="22" rx="0" fill="#D6EAB3"/>
+<rect x="368" y="98" width="130" height="22" rx="0" fill="url(#hatch)"/>
+<rect x="186" y="98" width="312" height="22" rx="0" fill="none" stroke="#757575" stroke-width="1"/>
+<line x1="212" y1="98" x2="212" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="238" y1="98" x2="238" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="264" y1="98" x2="264" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="290" y1="98" x2="290" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="316" y1="98" x2="316" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="342" y1="98" x2="342" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="368" y1="98" x2="368" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="394" y1="98" x2="394" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="420" y1="98" x2="420" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="446" y1="98" x2="446" y2="120" stroke="#757575" stroke-width="1"/>
+<line x1="472" y1="98" x2="472" y2="120" stroke="#757575" stroke-width="1"/>
+<text x="176" y="113" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="end">x</text>
+<rect x="186" y="120" width="182" height="22" rx="0" fill="#D6EAB3"/>
+<rect x="368" y="120" width="130" height="22" rx="0" fill="url(#hatch)"/>
+<rect x="186" y="120" width="312" height="22" rx="0" fill="none" stroke="#757575" stroke-width="1"/>
+<line x1="212" y1="120" x2="212" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="238" y1="120" x2="238" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="264" y1="120" x2="264" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="290" y1="120" x2="290" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="316" y1="120" x2="316" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="342" y1="120" x2="342" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="368" y1="120" x2="368" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="394" y1="120" x2="394" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="420" y1="120" x2="420" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="446" y1="120" x2="446" y2="142" stroke="#757575" stroke-width="1"/>
+<line x1="472" y1="120" x2="472" y2="142" stroke="#757575" stroke-width="1"/>
+<text x="176" y="135" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="end">y</text>
+<rect x="186" y="142" width="182" height="22" rx="0" fill="#D6EAB3"/>
+<rect x="368" y="142" width="130" height="22" rx="0" fill="url(#hatch)"/>
+<rect x="186" y="142" width="312" height="22" rx="0" fill="none" stroke="#757575" stroke-width="1"/>
+<line x1="212" y1="142" x2="212" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="238" y1="142" x2="238" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="264" y1="142" x2="264" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="290" y1="142" x2="290" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="316" y1="142" x2="316" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="342" y1="142" x2="342" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="368" y1="142" x2="368" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="394" y1="142" x2="394" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="420" y1="142" x2="420" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="446" y1="142" x2="446" y2="164" stroke="#757575" stroke-width="1"/>
+<line x1="472" y1="142" x2="472" y2="164" stroke="#757575" stroke-width="1"/>
+<text x="176" y="157" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="end">z</text>
+<text x="24" y="135.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">Coordinates</text>
+<text x="514" y="126.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">[3, Nmax]</text>
+<text x="514" y="148" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">component-first: all x, then all y, then all z</text>
+<rect x="186" y="174" width="182" height="22" rx="0" fill="#D6EAB3"/>
+<rect x="368" y="174" width="130" height="22" rx="0" fill="url(#hatch)"/>
+<rect x="186" y="174" width="312" height="22" rx="0" fill="none" stroke="#757575" stroke-width="1"/>
+<line x1="212" y1="174" x2="212" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="238" y1="174" x2="238" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="264" y1="174" x2="264" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="290" y1="174" x2="290" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="316" y1="174" x2="316" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="342" y1="174" x2="342" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="368" y1="174" x2="368" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="394" y1="174" x2="394" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="420" y1="174" x2="420" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="446" y1="174" x2="446" y2="196" stroke="#757575" stroke-width="1"/>
+<line x1="472" y1="174" x2="472" y2="196" stroke="#757575" stroke-width="1"/>
+<text x="24" y="189.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">Intensity</text>
+<text x="514" y="189.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">[Nmax]</text>
+<rect x="186" y="204" width="182" height="22" rx="0" fill="#D6EAB3"/>
+<rect x="368" y="204" width="130" height="22" rx="0" fill="url(#hatch)"/>
+<rect x="186" y="204" width="312" height="22" rx="0" fill="none" stroke="#757575" stroke-width="1"/>
+<line x1="212" y1="204" x2="212" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="238" y1="204" x2="238" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="264" y1="204" x2="264" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="290" y1="204" x2="290" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="316" y1="204" x2="316" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="342" y1="204" x2="342" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="368" y1="204" x2="368" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="394" y1="204" x2="394" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="420" y1="204" x2="420" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="446" y1="204" x2="446" y2="226" stroke="#757575" stroke-width="1"/>
+<line x1="472" y1="204" x2="472" y2="226" stroke="#757575" stroke-width="1"/>
+<text x="24" y="219.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">TimeOffsetNs</text>
+<text x="514" y="219.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">[Nmax]</text>
+<rect x="186" y="234" width="182" height="22" rx="0" fill="#D6EAB3"/>
+<rect x="368" y="234" width="130" height="22" rx="0" fill="url(#hatch)"/>
+<rect x="186" y="234" width="312" height="22" rx="0" fill="none" stroke="#757575" stroke-width="1"/>
+<line x1="194.67" y1="234" x2="194.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="203.33" y1="234" x2="203.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="212" y1="234" x2="212" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="220.67" y1="234" x2="220.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="229.33" y1="234" x2="229.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="238" y1="234" x2="238" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="246.67" y1="234" x2="246.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="255.33" y1="234" x2="255.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="264" y1="234" x2="264" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="272.67" y1="234" x2="272.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="281.33" y1="234" x2="281.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="290" y1="234" x2="290" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="298.67" y1="234" x2="298.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="307.33" y1="234" x2="307.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="316" y1="234" x2="316" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="324.67" y1="234" x2="324.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="333.33" y1="234" x2="333.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="342" y1="234" x2="342" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="350.67" y1="234" x2="350.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="359.33" y1="234" x2="359.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="368" y1="234" x2="368" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="376.67" y1="234" x2="376.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="385.33" y1="234" x2="385.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="394" y1="234" x2="394" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="402.67" y1="234" x2="402.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="411.33" y1="234" x2="411.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="420" y1="234" x2="420" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="428.67" y1="234" x2="428.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="437.33" y1="234" x2="437.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="446" y1="234" x2="446" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="454.67" y1="234" x2="454.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="463.33" y1="234" x2="463.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="472" y1="234" x2="472" y2="256" stroke="#757575" stroke-width="1"/>
+<line x1="480.67" y1="234" x2="480.67" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<line x1="489.33" y1="234" x2="489.33" y2="256" stroke="#C0C0C0" stroke-width="0.8"/>
+<text x="24" y="249.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">HitNormal</text>
+<text x="514" y="249.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">[Nmax, 3]</text>
+<text x="587.02" y="249.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">point-first: one point's x, y, z adjacent</text>
+<rect x="186" y="264" width="182" height="22" rx="0" fill="#D6EAB3"/>
+<rect x="368" y="264" width="130" height="22" rx="0" fill="url(#hatch)"/>
+<rect x="186" y="264" width="312" height="22" rx="0" fill="none" stroke="#757575" stroke-width="1"/>
+<line x1="212" y1="264" x2="212" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="238" y1="264" x2="238" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="264" y1="264" x2="264" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="290" y1="264" x2="290" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="316" y1="264" x2="316" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="342" y1="264" x2="342" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="368" y1="264" x2="368" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="394" y1="264" x2="394" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="420" y1="264" x2="420" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="446" y1="264" x2="446" y2="286" stroke="#757575" stroke-width="1"/>
+<line x1="472" y1="264" x2="472" y2="286" stroke="#757575" stroke-width="1"/>
+<text x="24" y="279.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">Flags</text>
+<text x="514" y="279.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">[Nmax]</text>
+<text x="565.34" y="279.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">uint8; always delivered</text>
+<text x="186" y="302" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575">0</text>
+<text x="498" y="302" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="end">Nmax</text>
+<rect x="264" y="264" width="26" height="22" rx="0" fill="none" stroke="#313131" stroke-width="1.5"/>
+<line x1="264" y1="286" x2="196" y2="330" stroke="#9A9A9A" stroke-width="1"/>
+<line x1="290" y1="286" x2="420" y2="330" stroke="#9A9A9A" stroke-width="1"/>
+<text x="24" y="347.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">one Flags byte</text>
+<rect x="196" y="330" width="28" height="26" rx="0" fill="#fff" stroke="#757575" stroke-width="1"/>
+<text x="210" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle" font-weight="bold">7</text>
+<rect x="224" y="330" width="28" height="26" rx="0" fill="#76B900" stroke="#757575" stroke-width="1"/>
+<text x="238" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#fff" text-anchor="middle" font-weight="bold">6</text>
+<rect x="252" y="330" width="28" height="26" rx="0" fill="#EF9100" stroke="#757575" stroke-width="1"/>
+<text x="266" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#fff" text-anchor="middle" font-weight="bold">5</text>
+<rect x="280" y="330" width="28" height="26" rx="0" fill="#fff" stroke="#757575" stroke-width="1"/>
+<text x="294" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle" font-weight="bold">4</text>
+<rect x="308" y="330" width="28" height="26" rx="0" fill="#fff" stroke="#757575" stroke-width="1"/>
+<text x="322" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle" font-weight="bold">3</text>
+<rect x="336" y="330" width="28" height="26" rx="0" fill="#fff" stroke="#757575" stroke-width="1"/>
+<text x="350" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle" font-weight="bold">2</text>
+<rect x="364" y="330" width="28" height="26" rx="0" fill="#fff" stroke="#757575" stroke-width="1"/>
+<text x="378" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle" font-weight="bold">1</text>
+<rect x="392" y="330" width="28" height="26" rx="0" fill="#fff" stroke="#757575" stroke-width="1"/>
+<text x="406" y="347" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575" text-anchor="middle" font-weight="bold">0</text>
+<text x="430" y="347.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">bit</text>
+<rect x="196" y="370" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="215" y="380.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">bit 6, 0x40: a real return</text>
+<rect x="388.76" y="370" width="12" height="12" rx="2" fill="#EF9100"/>
+<text x="407.76" y="380.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">bit 5, 0x20: belongs to the next scan</text>
+<text x="196" y="420" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">Test the bit,</text>
+<text x="270.4" y="420" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575">Flags[i] &amp; 0x40;</text>
+<text x="386.12" y="420" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">never compare</text>
+<text x="478.41" y="420" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#757575">Flags[i] == 0x40,</text>
+<text x="196" y="437" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">because bit 5 can be set on a real return as well.</text>
+<text x="24" y="467" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">Every other requested channel follows the same rule: EmitterId, ChannelId, TickId, EchoId, TickState and MaterialId are [Nmax];</text>
+<text x="24" y="483.68" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">ObjectId [Nmax, 4] and Velocity [Nmax, 3] are point-first like HitNormal.</text>
+<rect x="24" y="520" width="12" height="12" rx="2" fill="#D6EAB3"/>
+<text x="43" y="530.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">delivered: indices [0, Counts[0])</text>
+<rect x="262.4" y="520" width="12" height="12" rx="2" fill="url(#hatch)" stroke="#9A9A9A" stroke-width="1"/>
+<text x="281.4" y="530.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">up to Nmax: holds whatever it held before; never read it</text>
+<rect x="806" y="48" width="330" height="318.5" rx="6" fill="#F2F2F2"/>
+<text x="822" y="74" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13.5" fill="#313131" font-weight="bold">params (CPU-resident)</text>
+<text x="822" y="98" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameId &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[1]</text>
+<text x="822" y="115.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">timestampNs &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[1]</text>
+<text x="822" y="133" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">modality &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[1]</text>
+<text x="822" y="150.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">coordsType &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[1]</text>
+<text x="822" y="168" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameOfReference &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[1]</text>
+<text x="822" y="185.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">motionCompensationState &#160;[1]</text>
+<text x="822" y="203" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">compactionType &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[1]</text>
+<text x="822" y="220.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">maxPoints &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[1] &#160;= Nmax</text>
+<text x="822" y="238" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameStartTimeStampNs &#160;&#160;&#160;[1]</text>
+<text x="822" y="255.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameStartPosM &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[3]</text>
+<text x="822" y="273" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameStartOrientation &#160;&#160;&#160;[4]</text>
+<text x="822" y="290.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameEndTimeStampNs &#160;&#160;&#160;&#160;&#160;[1]</text>
+<text x="822" y="308" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameEndPosM &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;[3]</text>
+<text x="822" y="325.5" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">frameEndOrientation &#160;&#160;&#160;&#160;&#160;[4]</text>
+<text x="822" y="343" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11.5" fill="#313131">modelToAppTransform &#160;&#160;&#160;&#160;&#160;[4, 4]</text>
+<text x="806" y="388.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">Scalars and small vectors that describe the frame,</text>
+<text x="806" y="405.18" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">readable the moment the output is mapped.</text>
+<text x="806" y="421.85" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">coordsType, frameOfReference,</text>
+<text x="806" y="438.52" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">motionCompensationState and compactionType echo</text>
+<text x="806" y="455.2" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">the shaping values in force for this frame.</text>
+</svg>

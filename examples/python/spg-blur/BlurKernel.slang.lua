@@ -9,15 +9,16 @@
 -- its affiliates is strictly prohibited.
 
 -- Launch script for BlurKernel.slang, one function per entry point. The weights
--- are built exactly as on CUDA; only the binding differs, because Slang binds by
+-- are built exactly as on CUDA; the binding differs, because Slang binds by
 -- declared type.
 
 local THREADS = 256
 
 -- [snippet:blur-slang-weights]
+-- One row of Gaussian taps for the stated radius, normalised so the blur keeps
+-- the image's brightness. It depends only on the radius, so it is built
+-- here rather than recomputed by every GPU thread.
 local function gaussianWeights(radius)
-    warning("blur: building the weight table for radius " .. radius)
-
     if radius == 0 then
         return slang.array({ 1.0 }, slang.float)
     end
@@ -46,7 +47,7 @@ function blurHorizontal(inputs, outputs)
 
     outputs["Blurred"] = slang.image(inputs["Image"].shape, inputs["Image"].dtype)
 
-    return slang.dispatch({
+    return slang.compute({
         bind = {
             slang.ParameterBlock(
                 slang.int(width),                       -- -> int width
@@ -75,7 +76,7 @@ function blurVertical(inputs, outputs)
 
     outputs["Blurred"] = slang.image(inputs["Image"].shape, inputs["Image"].dtype)
 
-    return slang.dispatch({
+    return slang.compute({
         bind = {
             slang.ParameterBlock(
                 slang.int(width),

@@ -1,0 +1,20 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-tutorials-sick-tim781-7]
+#usda 1.0
+
+def OmniLidar "SICK_TiM781"
+{
+    token omni:sensor:Core:rayType = "IDEALIZED"
+    float omni:sensor:Core:waveLengthNm = 850.0
+    float omni:sensor:Core:divergenceHorDeg = 0.8251
+    float omni:sensor:Core:divergenceVerDeg = 0.4927
+    float omni:sensor:Core:peakPowerW = 0.88
+    uint omni:sensor:Core:pulseTimeNs = 5
+    token omni:sensor:Core:intensityProcessing = "NORMALIZATION"
+    token omni:sensor:Core:intensityMappingType = "LINEAR"
+    float omni:sensor:Core:intensityScalePercent = 254.0
+}
+# [/snippet:doc-nonvisual-lidar-core-tutorials-sick-tim781-7]

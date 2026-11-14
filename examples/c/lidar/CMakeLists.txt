@@ -45,7 +45,10 @@ add_custom_command(TARGET lidar-composite-tensor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_LIST_DIR}/lidar_example.usda"
         "$<TARGET_FILE_DIR:lidar-composite-tensor>/lidar_example.usda"
-    COMMENT "Copying lidar_example.usda to build directory"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_LIST_DIR}/lidar_example_panels.usda"
+        "$<TARGET_FILE_DIR:lidar-composite-tensor>/lidar_example_panels.usda"
+    COMMENT "Copying lidar_example.usda and lidar_example_panels.usda to build directory"
 )
 
 # Setup runtime dependencies for both packages (side-by-side `ovrtx/` and

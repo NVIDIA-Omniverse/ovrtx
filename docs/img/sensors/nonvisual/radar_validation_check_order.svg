@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1182" height="288" viewBox="0 0 1182 288" role="img" aria-labelledby="title desc">
+<title id="title">The seven radar validation checks in dependency order</title>
+<desc id="desc">Seven boxes joined left to right by arrows: 1 coordinates and coverage, 2 resolution and accuracy, 3 Doppler and ambiguity, 4 materials and antenna response, 5 multipath, 6 detection filtering, 7 timing and scans. A band above the first five says to tune CFAR and noise only after they are stable and points at box 6. Under box 7: frame rate, scan order, motion BVH.</desc>
+<defs><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker><marker id="arrow-ef9100-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#EF9100"/></marker></defs>
+<rect width="1182" height="288" fill="#fff"/>
+<rect x="30" y="124" width="138" height="104" rx="8" fill="#0074DF"/>
+<text x="99" y="154" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">1</text>
+<text x="99" y="178" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">Coordinates and</text>
+<text x="99" y="195" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">coverage</text>
+<text x="99" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">range, angle, frame of</text>
+<text x="99" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">reference, rejection</text>
+<rect x="194" y="124" width="138" height="104" rx="8" fill="#0074DF"/>
+<text x="263" y="154" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">2</text>
+<text x="263" y="178" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">Resolution and</text>
+<text x="263" y="195" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">accuracy</text>
+<text x="263" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">separation, then</text>
+<text x="263" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">measurement error</text>
+<rect x="358" y="124" width="138" height="104" rx="8" fill="#0074DF"/>
+<text x="427" y="154" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">3</text>
+<text x="427" y="178" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">Doppler and</text>
+<text x="427" y="195" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">ambiguity</text>
+<text x="427" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">velocity sign,</text>
+<text x="427" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">resolution, folding</text>
+<rect x="522" y="124" width="138" height="104" rx="8" fill="#0074DF"/>
+<text x="591" y="154" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">4</text>
+<text x="591" y="178" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">Materials and</text>
+<text x="591" y="195" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">antenna</text>
+<text x="591" y="212" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">response</text>
+<text x="591" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">RCS and detection</text>
+<text x="591" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">probability</text>
+<rect x="686" y="124" width="138" height="104" rx="8" fill="#0074DF"/>
+<text x="755" y="154" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">5</text>
+<text x="755" y="178" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">Multipath</text>
+<text x="755" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">ghost detections</text>
+<text x="755" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">plausible for the scene</text>
+<rect x="850" y="124" width="138" height="104" rx="8" fill="#EF9100"/>
+<text x="919" y="154" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">6</text>
+<text x="919" y="178" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">Detection</text>
+<text x="919" y="195" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">filtering</text>
+<text x="919" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">false alarms and</text>
+<text x="919" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">missed detections</text>
+<rect x="1014" y="124" width="138" height="104" rx="8" fill="#757575"/>
+<text x="1083" y="154" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#fff" text-anchor="middle" font-weight="bold">7</text>
+<text x="1083" y="178" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#fff" text-anchor="middle" font-weight="bold">Timing and scans</text>
+<text x="1083" y="248" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">frame rate, scan order,</text>
+<text x="1083" y="264" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">motion BVH</text>
+<line x1="168" y1="176" x2="183" y2="176" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="332" y1="176" x2="347" y2="176" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="496" y1="176" x2="511" y2="176" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="660" y1="176" x2="675" y2="176" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="824" y1="176" x2="839" y2="176" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<line x1="988" y1="176" x2="1003" y2="176" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<rect x="30" y="60" width="794" height="32" rx="6" fill="#F2F2F2" stroke="#EF9100" stroke-width="1.5"/>
+<text x="427" y="80.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">tune CFAR and noise only after these five are stable</text>
+<path d="M824,76 C831.1,76 886.01,72.38 895,76 C903.99,79.62 912.02,108.62 913.91,112.25" fill="none" stroke="#EF9100" stroke-width="2" marker-end="url(#arrow-ef9100-2)"/>
+<rect x="30" y="20" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="49" y="30.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">shapes the signal: check first, in this order</text>
+<rect x="326.88" y="20" width="12" height="12" rx="2" fill="#EF9100"/>
+<text x="345.88" y="30.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">filters the signal: tune only after 1 to 5 are stable</text>
+<rect x="664.36" y="20" width="12" height="12" rx="2" fill="#757575"/>
+<text x="683.36" y="30.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">cadence and motion: check last</text>
+</svg>

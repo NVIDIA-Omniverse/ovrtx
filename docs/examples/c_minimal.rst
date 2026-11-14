@@ -15,7 +15,7 @@ This example shows basic initialization of the renderer, rendering a single fram
 
 The example loads a remote S3 scene asset and writes the resulting image to ``out.png``. Runtime validation requires internet access to download that scene asset.
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 .. pull-quote::
 

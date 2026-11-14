@@ -23,4 +23,4 @@ primitive types.
 uv run main.py
 ```
 
-The first run may take several minutes while shaders are compiled and cached.
+The first run may take up to 5 minutes while shaders are compiled and cached.

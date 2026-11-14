@@ -14,9 +14,7 @@
 //
 // A vector value-input arrives as a pointer to its components, not by value,
 // so the two colours are const float*. No system #include: NVRTC has no
-// toolkit include path, so uchar4 is
-// a CUDA built-in, and its fields are set individually because
-// make_uchar4 lives in a header that is not available here.
+// toolkit include path. uchar4 is a CUDA built-in.
 extern "C" __global__ void checker(
     int width,
     int height,
@@ -35,9 +33,7 @@ extern "C" __global__ void checker(
     const bool onA = (((x / squareSize) + (y / squareSize)) % 2) == 0;
     const float* c = onA ? colorA : colorB;
 
-    // Round rather than truncate, so this matches what the Slang variant gets
-    // for free: writing a float to a uchar4 texture goes through a unorm
-    // conversion, and that rounds.
+    // Round to the nearest 8-bit value rather than truncate.
     uchar4 out;
     out.x = (unsigned char)(c[0] * 255.0f + 0.5f);
     out.y = (unsigned char)(c[1] * 255.0f + 0.5f);

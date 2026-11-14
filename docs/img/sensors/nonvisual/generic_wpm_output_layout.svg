@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="370" viewBox="0 0 1000 370" role="img" aria-labelledby="title desc">
+<title id="title">Generic wpm contribution layout</title>
+<desc id="desc">Receiver slot varies fastest in aligned contribution channels; Valid gates payload reads.</desc>
+<defs><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker></defs>
+<rect width="1000" height="370" fill="#fff"/>
+<text x="32" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="20" fill="#313131" font-weight="bold">Dense slot order</text>
+<rect x="32" y="62" width="164" height="56" rx="6" fill="#0074DF"/>
+<text x="114" y="95.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">tile</text>
+<line x1="202" y1="90" x2="208" y2="90" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<rect x="225" y="62" width="164" height="56" rx="6" fill="#0074DF"/>
+<text x="307" y="95.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">transmitter</text>
+<line x1="395" y1="90" x2="401" y2="90" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<rect x="418" y="62" width="164" height="56" rx="6" fill="#0074DF"/>
+<text x="500" y="95.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">ray</text>
+<line x1="588" y1="90" x2="594" y2="90" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<rect x="611" y="62" width="164" height="56" rx="6" fill="#0074DF"/>
+<text x="693" y="95.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">bounce</text>
+<line x1="781" y1="90" x2="787" y2="90" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<rect x="804" y="62" width="164" height="56" rx="6" fill="#EF9100"/>
+<text x="886" y="95.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">receiver slot</text>
+<text x="32" y="151" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#757575">Slower varying</text>
+<text x="968" y="151" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#757575" text-anchor="end">Faster varying</text>
+<text x="32" y="200" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131" font-weight="bold">Example group [2, 0, 2]</text>
+<text x="450" y="199" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle">slot 0 → Rx 2</text>
+<text x="620" y="199" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle">slot 1 → Rx 0</text>
+<text x="790" y="199" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle">slot 2 → Rx 2</text>
+<text x="32" y="254" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131">Valid</text>
+<rect x="377" y="235" width="146" height="36" rx="6" fill="#76B900"/>
+<text x="450" y="258.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">1</text>
+<rect x="547" y="235" width="146" height="36" rx="6" fill="#C0C0C0"/>
+<text x="620" y="258.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">0</text>
+<rect x="717" y="235" width="146" height="36" rx="6" fill="#76B900"/>
+<text x="790" y="258.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">1</text>
+<text x="32" y="304" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="15" fill="#313131">Every payload channel</text>
+<rect x="377" y="285" width="146" height="36" rx="6" fill="#76B900"/>
+<text x="450" y="308.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">read</text>
+<rect x="547" y="285" width="146" height="36" rx="6" fill="#C0C0C0"/>
+<text x="620" y="308.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">do not read</text>
+<rect x="717" y="285" width="146" height="36" rx="6" fill="#76B900"/>
+<text x="790" y="308.04" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">read</text>
+<text x="32" y="350" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#757575">CPU parameters describe dimensions and the accepted selectors.</text>
+</svg>

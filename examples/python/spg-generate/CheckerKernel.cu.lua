@@ -11,7 +11,7 @@
 -- [snippet:checker-launch]
 -- Launch script for a node with no resource-input.
 --
--- Nothing hands this node a resource, so there is no descriptor to take a shape
+-- There is no input descriptor to take a shape
 -- from. The size comes from typed USD attributes instead, like every other
 -- value the node uses.
 function checker(inputs, outputs)

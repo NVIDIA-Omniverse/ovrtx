@@ -10,7 +10,7 @@
 
 // [snippet:grayscale-slang-kernel-template]
 // SPG shader: convert the LdrColor AOV to grayscale. Slang counterpart of
-// GrayscaleKernel.cu -- same inputs, same output, same result.
+// GrayscaleKernel.cu: same inputs, same output, same result.
 //
 // The entry point name ("grayscale") must match the subIdentifier authored in
 // GrayscaleKernel.slang.usda and the Lua launch function name.

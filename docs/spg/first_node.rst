@@ -18,7 +18,7 @@ publish the result as a new AOV of our own. This is what we will have at the end
    :alt: The grayscale image this walkthrough produces
 
 That takes three files and a scene to wire them into, written in that order, in CUDA. Being able
-to write a CUDA kernel and read USD is assumed; neither is taught here.
+to write a CUDA kernel and read USD is assumed.
 
 .. note::
 
@@ -27,7 +27,7 @@ to write a CUDA kernel and read USD is assumed; neither is taught here.
 
 .. note::
    This first node uses CUDA to keep the workflow focused. You can also build the same
-   example with Slang by changing the GPU source and Lua launch script.
+   example with Slang by changing the GPU source, the launch script and ``info:spg:sourceAsset``.
 
 Step 1: The Kernel
 ------------------
@@ -105,7 +105,7 @@ Four things to get right here:
 - SPG finds the launch script by appending ``.lua`` to the source asset path, which is why the two
   files are named as they are. Refer to :doc:`ref/lua_contract`.
 
-Nothing here names a scene. This file is a definition, and the scene we write next references it.
+This file is a definition, and the scene we write next references it.
 
 Step 4: The Scene File
 ----------------------
@@ -144,7 +144,7 @@ be handed:
 .. image:: images/grayscale-scene-loaded.png
    :alt: The loaded scene
 
-The first step compiles the node and can take up to a minute on a cold shader cache, so warm
+The first step compiles the node and can take up to 5 minutes on a cold shader cache, so warm
 up before reading anything back. Attach a stage, load the scene, and step the product:
 
 .. literalinclude:: ../../examples/python/spg-grayscale/main.py
@@ -184,8 +184,7 @@ An output AOV is read back the same way whatever it holds: map it to the CPU, or
 ``ovrtx.Device.CUDA``, and copy it out.
 
 That is a working SPG node. It runs inside the renderer's own frame, reads an AOV the renderer
-produced, and publishes one of its own that anything downstream reads without knowing SPG was
-involved. Nothing was compiled into the renderer to make that happen.
+produced, and publishes one of its own that anything downstream reads.
 
 What Next
 ---------

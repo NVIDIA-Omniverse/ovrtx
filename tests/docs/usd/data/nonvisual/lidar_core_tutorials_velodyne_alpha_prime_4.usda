@@ -1,0 +1,15 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-tutorials-velodyne-alpha-prime-4]
+#usda 1.0
+
+def OmniLidar "Velodyne_Alpha_Prime_Rev4"
+{
+    token omni:sensor:Core:rayType = "IDEALIZED"
+    float omni:sensor:Core:divergenceHorDeg = 0.1197482
+    float omni:sensor:Core:divergenceVerDeg = 0.06016057
+    float omni:sensor:Core:waveLengthNm = 905.0
+}
+# [/snippet:doc-nonvisual-lidar-core-tutorials-velodyne-alpha-prime-4]

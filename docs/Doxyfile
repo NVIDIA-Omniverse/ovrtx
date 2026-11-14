@@ -42,3 +42,6 @@ SORT_BRIEF_DOCS        = NO
 QUIET                  = YES
 WARNINGS               = YES
 WARN_IF_UNDOCUMENTED   = NO
+
+# Keep breathe from parsing full source listings (ParseWarning noise).
+XML_PROGRAMLISTING     = NO

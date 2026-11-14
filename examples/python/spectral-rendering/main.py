@@ -47,6 +47,8 @@ def main():
         parser.error("--white-point must be finite and positive and requires spectral transport")
     args.log.parent.mkdir(parents=True, exist_ok=True)
     # [snippet:doc-spectral-config-python]
+    import ovrtx
+
     # Select the process-wide material backend before creating any renderer.
     config = ovrtx.RendererConfig(
         enable_spectral_rendering=args.transport == "spectral",

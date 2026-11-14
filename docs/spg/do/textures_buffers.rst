@@ -44,7 +44,7 @@ Describe what the output has to be. ``image`` asks for a texture, ``empty`` asks
 How It Works
 ------------
 
-Five things hold whichever language the node is written in.
+Five things to know, whichever language the node is written in.
 
 **Backing is fixed at creation.** A resource is either texture-backed or buffer-backed, and that
 choice cannot be revisited. Describe it as what it needs to be, and bind it with a binder that
@@ -60,7 +60,7 @@ result.
 
 **Not every dtype can back a texture.** A texture element needs a hardware format, and the
 three-component types narrower than 32 bits have none: ``half3``, ``short3``, ``ushort3``,
-``char3`` and ``uchar3``. Asking for one is refused where it is asked for. Use the four-component
+``char3`` and ``uchar3``. Allocating one is an error. Use the four-component
 form and leave the fourth channel unread, or make the resource buffer-backed, where any dtype
 goes.
 
@@ -71,7 +71,7 @@ goes.
 and from the range 0.0 to 1.0 on every access. A Slang shader writes ``float4`` values in that
 range and the hardware rounds them to bytes; a CUDA kernel writes the bytes itself through
 ``surf2Dwrite`` and nothing rounds. The same intended colour can therefore land one least
-significant bit apart in the two languages. Where a test has to match byte for byte, pick colours
+significant bit apart in the two languages. Where the two must match byte for byte, pick colours
 that are exact in 8 bits.
 
 The names, and what the GPU code receives, depend on the language.
@@ -118,7 +118,8 @@ The names, and what the GPU code receives, depend on the language.
    .. tab-item:: Slang
       :sync: slang
 
-      **Allocate** with ``slang.image(width, height, dtype)`` for a texture and
+      **Allocate** with ``slang.image(width, height, dtype)`` or ``slang.image(shape, dtype)``
+      for a texture and
       ``slang.empty(shape, dtype)`` for a buffer. To create one from data you wrote in Lua, use
       ``slang.array(luaTable, dtype)``; refer to :doc:`upload_data`.
 
@@ -127,7 +128,7 @@ The names, and what the GPU code receives, depend on the language.
       they bind and checks what it is given, so the binder has to match how the shader declares
       the parameter. The full set is in :doc:`../ref/lua_slang`.
 
-      ``slang.StructuredBuffer`` **is one point in a small space**, not a name to memorise. It is
+      ``slang.StructuredBuffer`` **is one combination of three choices.** It is
       read-only, storage-backed and addressed by element, and each of those three has an
       alternative. Storage or typed decides whether the shader interprets the bytes itself or the
       hardware converts on access, and that one is fixed when the buffer is created. Read-only or
@@ -142,7 +143,7 @@ The names, and what the GPU code receives, depend on the language.
       ``slang.StructuredBuffer`` or ``slang.ByteAddressBuffer``. Reading one as the kind it was not
       created as is rejected by name, in both directions, with the fix in the message.
 
-      Two allocations are refused where they are asked for: an element type that names no format,
+      Two allocations are errors: an element type that names no format,
       and an element count past the device's typed-buffer limit.
 
       The grayscale node works on textures throughout. Highlighted: the allocation, then the two
@@ -171,7 +172,7 @@ Verify It Worked
 ----------------
 
 Write a known pattern into the resource and read it back on the host. A round trip that survives
-exactly proves both the backing and the binder. A result that looks plausible but shifted usually
+exactly confirms both the backing and the binder. A result that looks plausible but shifted usually
 means the stride or the shape order is wrong, not the binding.
 
 When It Goes Wrong

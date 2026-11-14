@@ -20,7 +20,7 @@ Use `cuDeviceGetUuid_v2()` explicitly. On MIG systems, `cudaGetDeviceProperties(
 
 Mapped CUDA outputs carry the actual process-visible CUDA ordinal in `DLTensor.device.device_id`. A simple application can validate that value once against its configured device. A multi-GPU application should use it to route each output to the Vulkan context cached for that CUDA ordinal.
 
-> _“Create a C++ interactive viewer that renders ovrtx camera output directly into a Vulkan presentation path through CUDA interop, with GPU selection, GPU image mapping, exported-image copies, explicit synchronization, double buffering, orbit camera controls, finite-frame capture, and click or marquee picking with selection outlines.”_
+> _“Create a C++ interactive viewer that renders ovrtx camera output directly into a Vulkan presentation path through CUDA interop, with GPU selection, GPU image mapping, exported-image copies, explicit synchronization, ring buffering, orbit camera controls, finite-frame capture, and click or marquee picking with selection outlines.”_
 
 ![example-vulkan-interop](../../../img/example-vulkan-interop.gif)
 
@@ -109,7 +109,7 @@ The example is configured to load the robot scene from Omniverse. Running the de
 
 ### DLSS Frame Generation
 
-Frame generation is off by default and is enabled with `--dlssg`. Use `--dlssg-frames <N>` to ask for a specific number of interpolated frames per rendered frame; it implies `--dlssg`, and the renderer clamps the count to what the GPU supports (1 on Ada, 3 on Blackwell). Omitting it lets the renderer pick.
+Frame generation is off by default and is enabled with `--dlssg`, which asks for as many interpolated frames per rendered frame as the GPU supports (1 on Ada, 3 on Blackwell). Use `--dlssg-frames <N>` to ask for a specific number instead; it implies `--dlssg`, and the renderer clamps the count to what the GPU supports.
 
 ```pwsh
 .\build\Release\ovrtx-interop.exe --dlssg-frames 2
@@ -117,34 +117,52 @@ Frame generation is off by default and is enabled with `--dlssg`. Use `--dlssg-f
 
 The sample authors the two DLSS-G render settings on the RenderProduct prim through ovstage at startup, and writes them on every run — including `false` when the flag is absent — so the command line always wins over whatever the scene file authored.
 
+`--dlss-mode {performance,balanced,quality,auto,rtxaa}` sets the DLSS-SR mode on the RenderProduct (`omni:rtx:post:dlss:execMode`), which determines the internal render resolution that DLSS-G interpolates from. `rtxaa` is DLAA. It defaults to `performance`, as in Kit's viewport, and like the DLSS-G settings it is written on every run. Higher-resolution modes such as `quality` show more interpolation artifacts:
+
+```pwsh
+.\build\Release\ovrtx-interop.exe --dlssg --dlss-mode quality
+```
+
 With frame generation active, one `ovrtx_step_with_stage()` returns several output frames: the interpolated frames first and the real rendered frame last. The sample shows them in that order, and only steps again once the previous step's frames have all been copied out.
 
-The renderer silently declines frame generation when it cannot run, in which case a step keeps returning a single frame and the sample prints a warning. It requires:
+The renderer can decline frame generation when it cannot run, in which case a step keeps returning a single frame and the sample prints a warning after warmup. Common requirements and blockers include:
 
 - An Ada or newer GPU that is driving the display
+- A supported driver and operating system
 - The `RealTimePathTracing` render mode (not `PathTracing`)
 - `LdrColor` or `HdrColor` as the only render outputs
 - A render resolution of at least 126 pixels per side
+- No OmniGraph postprocessing, debug view, or SDG disable-color mode
 
 ### Presentation and frame pacing
 
-All `N + 1` frames of a step become available at nearly the same moment, so showing them as soon as they arrive puts them on screen back to back and then leaves a gap until the next step lands. The frame counter doubles, but the motion reads as judder. Two flags control this:
+A step returns its `N + 1` frames together. Current implementations have been observed to make those frames mappable at nearly the same moment, but applications must still poll each map and handle a timeout. Showing a batch as soon as it is ready puts its frames on screen back-to-back and then leaves a gap until the next step lands. The frame counter rises, but the motion reads as judder. Two flags control this:
 
 - `--present-mode {fifo,mailbox,immediate}` selects the swapchain present mode, defaulting to `fifo`. `fifo` waits for vsync, which caps presentation at the display refresh and hides frame-generation throughput; use `immediate` to measure the real rate. Modes the surface does not support fall back to `fifo`, which is the only one Vulkan guarantees.
-- `--pace` spreads the frames of a step evenly instead of showing them in a burst. It targets the observed step period divided by the frames per step, and only engages when a step actually produces more than one frame.
+- `--pace` / `--no-pace` turn on or off timing the frames of a step the way Kit's present thread does, instead of showing them in a burst. Pacing is on by default whenever DLSS-G is enabled, as in Kit; without DLSS-G each step yields one frame and pacing has no effect. On every present it picks frame `elapsed / (mean step interval / frames per step * 5/6)` of the current step, where `elapsed` is the time since that step's frames all became available and the mean covers the last 10 steps. The 5/6 factor makes sure the real frame, which comes last, is reached before the next step arrives. The choice never moves backward, and it works under `fifo` as well as the other modes.
 
-The per-second log separates three rates that frame generation makes diverge. `Steps/s` counts renders, `Frames/s` counts frames that became visible, and `Presents/s` counts main-loop iterations — the loop re-presents the current image while the next frame renders, so it is much higher than either. `Frame gap` reports the spread between visible frames, which is what pacing improves:
+For visual debugging, `--dlssg-force-frame <K>` shows only frame `K` of every step and discards the rest: `0` is the first interpolated frame, and values past the end select the real frame. It implies `--dlssg`, and with `--num-frames` the saved `out.png` is that frame:
 
-```text
-# --dlssg-frames 1 --present-mode immediate, L40 (Ada), 1 interpolated frame per render
-Steps/s=22.0  Frames/s=45.0  Presents/s=291
-Frame gap (ms): min=3.13   mean=22.3  max=41.5    # unpaced: frames arrive in pairs
-Frame gap (ms): min=20.1   mean=22.3  max=25.0    # --pace: evenly spread
+```pwsh
+.\build\Release\ovrtx-interop.exe --dlssg-force-frame 0
 ```
 
-Pacing costs no throughput here — `Steps/s` and `Frames/s` are the same either way, because the ring lets copies and the next step proceed while an earlier frame is held back for its slot.
+`--dlssg-indicator` draws a small square in the top-left corner of the window: green while a real rendered frame is on screen, red while an interpolated one is. It is drawn on the swapchain only, so `out.png` does not contain it.
 
-Note the latency direction: frame generation adds a frame of latency and this sample has no Reflex to claw any of it back, so both flags trade responsiveness for smoothness.
+As in Kit, a step is shown only once all of its frames have arrived, and the newest step always wins: when it arrives, any frames of the previous step that have not been shown yet are discarded rather than queued, so presentation never falls behind the renderer.
+
+The per-second log separates three rates that frame generation makes diverge. `Steps/s` counts renders, `Frames/s` counts frames that became visible, and `Presents/s` counts main-loop iterations — the loop re-presents the current image while the next frame renders, so it is much higher than either. `Frame gap` reports the spread between visible frames, which is what pacing improves, and `dropped` counts frames never shown, either skipped by pacing or superseded by a newer step:
+
+```text
+# --dlssg-frames 1, fifo at ~57 Hz, RTX 6000 Ada, default robot scene
+Steps/s=11.0  Frames/s=22.0  Presents/s=57
+Frame gap (ms): min=13.8   mean=44.8  max=85.7    # --no-pace: frames arrive in pairs
+Frame gap (ms): min=21.7   mean=45.6  max=60.8    # paced (default): spread across the step
+```
+
+Pacing costs no throughput here — `Steps/s` and `Frames/s` are the same either way, because the ring of 10 shared images lets copies and the next step proceed while the current step's frames wait for their time, and each loop iteration advances the renderer as far as it can rather than one stage at a time. The remaining spread comes from the renderer: steps that take longer or shorter than the recent mean move the real frame's slot, in Kit as well as here. Kit's own DLSS-G comparison caps the render rate for that reason.
+
+Frame generation adds a frame of latency, and this sample has no Reflex to recover it. Pacing can hold a ready frame until its scheduled slot to trade some responsiveness for even spacing. `immediate` avoids the latency of waiting for vsync but may introduce tearing; it is primarily useful here for measuring uncapped throughput.
 
 # Licensing
 

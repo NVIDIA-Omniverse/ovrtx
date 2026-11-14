@@ -93,19 +93,18 @@ std::vector<uint16_t> half_values(std::initializer_list<float> values) {
 
 std::vector<uint8_t> bytes_of(char const *text) { return std::vector<uint8_t>(text, text + std::strlen(text)); }
 
-uint64_t create_token(ovstage_instance_t *stage, char const *text) {
+ovx_token_t create_token(ovstage_instance_t *stage, char const *text) {
     path_dictionary_instance_t *pd = ovstage_get_path_dictionary(stage);
     EXPECT_NE(pd, nullptr);
     ovx_string_t source = ovx_str(text);
-    ovx_token_t token = 0;
+    ovx_token_t token{};
     EXPECT_EQ(path_dictionary_create_tokens_from_strings(pd, &source, 1, &token).status, OVX_API_SUCCESS);
     return token;
 }
 
-std::string token_to_string(ovstage_instance_t *stage, uint64_t token_value) {
+std::string token_to_string(ovstage_instance_t *stage, ovx_token_t token) {
     path_dictionary_instance_t *pd = ovstage_get_path_dictionary(stage);
     EXPECT_NE(pd, nullptr);
-    ovx_token_t token = token_value;
     ovx_string_t text{};
     EXPECT_EQ(path_dictionary_get_strings_from_tokens(pd, &token, 1, &text).status, OVX_API_SUCCESS);
     return std::string(text.ptr, text.length);
@@ -192,29 +191,48 @@ class AllAttributesTest : public DocsOvstageTestBase {
 
         out.clear();
         while (true) {
+            size_t fetchedGroupCount = 0;
             ovstage_read_group_t group{};
             ovstage_api_status_t s =
-                ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group);
+                ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount);
             if (s == OVSTAGE_ERROR_END_OF_ITERATION) break;
             ASSERT_EQ(s, OVSTAGE_OK) << attribute << ": " << format_ovstage_last_error();
 
-            ASSERT_EQ(group.is_array, is_array) << attribute << ": is_array mismatch";
-            ASSERT_GT(group.data.tensor_count, 0u) << attribute;
-            if (::testing::Test::HasFatalFailure()) {
-                ovstage_release_group(stage_, &group);
+            if (group.column_count != 1u || group.columns == nullptr) {
+                ADD_FAILURE() << attribute << ": expected one column, got "
+                              << group.column_count << " with column array "
+                              << static_cast<const void*>(group.columns);
+                ovstage_release_groups(stage_, &group, 1);
                 break;
             }
-            DLTensor const &t = group.data.tensors[0];
-            ASSERT_GE(t.ndim, 1) << attribute;
-            ASSERT_EQ(t.dtype.code, dtype.code) << attribute;
-            ASSERT_EQ(t.dtype.bits, dtype.bits) << attribute;
-            ASSERT_EQ(t.dtype.lanes, 1u) << attribute;
+            ovstage_read_column_t const &column = group.columns[0];
+            const bool columnValid = column.attribute == q.attr_token && column.is_array == is_array
+                                     && column.data.tensor_count > 0u && column.data.tensors != nullptr;
+            EXPECT_EQ(column.attribute, q.attr_token) << attribute << ": attribute mismatch";
+            EXPECT_EQ(column.is_array, is_array) << attribute << ": is_array mismatch";
+            EXPECT_GT(column.data.tensor_count, 0u) << attribute;
+            EXPECT_NE(column.data.tensors, nullptr) << attribute;
+            if (!columnValid) {
+                ovstage_release_groups(stage_, &group, 1);
+                break;
+            }
+            DLTensor const &t = column.data.tensors[0];
             size_t components = 1;
-            for (int axis = 1; axis < t.ndim; ++axis)
-                components *= static_cast<size_t>(t.shape[axis]);
-            ASSERT_EQ(components, dtype.lanes) << attribute;
-            if (::testing::Test::HasFatalFailure()) {
-                ovstage_release_group(stage_, &group);
+            if (t.shape)
+                for (int axis = 1; axis < t.ndim; ++axis)
+                    components *= static_cast<size_t>(t.shape[axis]);
+            const bool tensorValid = t.ndim >= 1 && t.shape != nullptr && t.data != nullptr
+                                     && t.dtype.code == dtype.code && t.dtype.bits == dtype.bits
+                                     && t.dtype.lanes == 1 && components == dtype.lanes;
+            EXPECT_GE(t.ndim, 1) << attribute;
+            EXPECT_NE(t.shape, nullptr) << attribute;
+            EXPECT_NE(t.data, nullptr) << attribute;
+            EXPECT_EQ(t.dtype.code, dtype.code) << attribute;
+            EXPECT_EQ(t.dtype.bits, dtype.bits) << attribute;
+            EXPECT_EQ(t.dtype.lanes, 1u) << attribute;
+            EXPECT_EQ(components, dtype.lanes) << attribute;
+            if (!tensorValid) {
+                ovstage_release_groups(stage_, &group, 1);
                 break;
             }
 
@@ -224,7 +242,7 @@ class AllAttributesTest : public DocsOvstageTestBase {
             uint8_t const *base = static_cast<uint8_t const *>(t.data) + t.byte_offset;
             std::memcpy(out.data() + old_size, base, value_count * sizeof(T));
 
-            ovstage_release_group(stage_, &group);
+            ovstage_release_groups(stage_, &group, 1);
         }
 
         if (!::testing::Test::HasFatalFailure()) {
@@ -269,7 +287,7 @@ class AllAttributesTest : public DocsOvstageTestBase {
         write_data.is_array = is_array;
         write_data.semantic = semantic;
 
-        ovx_string_or_token_t attr_ref{};
+        ovx_token_or_string_t attr_ref{};
         attr_ref.token = q.attr_token;
 
         const ovstage_ordinal_t next = ordinal_ + 1;
@@ -316,7 +334,7 @@ class AllAttributesTest : public DocsOvstageTestBase {
         DLDataType dtype = dl_type(kDLUInt, 64, 1);
         const size_t expected_elements = is_array ? 2 : 1;
 
-        std::vector<uint64_t> actual;
+        std::vector<ovx_token_t> actual;
         read_values(attribute, dtype, is_array, expected_elements, actual);
         if (::testing::Test::HasFatalFailure()) return;
         EXPECT_EQ(token_to_string(stage_, actual[0]), initial);
@@ -324,7 +342,7 @@ class AllAttributesTest : public DocsOvstageTestBase {
             EXPECT_EQ(token_to_string(stage_, actual[1]), initial_b);
         }
 
-        std::vector<uint64_t> updated_tokens = {create_token(stage_, updated)};
+        std::vector<ovx_token_t> updated_tokens = {create_token(stage_, updated)};
         if (is_array) {
             updated_tokens.push_back(create_token(stage_, updated_b));
         }
@@ -343,14 +361,14 @@ class AllAttributesTest : public DocsOvstageTestBase {
     // asset does not resolve, so its resolved half is token id 0.
     void check_asset_case() {
         DLDataType dtype = dl_type(kDLUInt, 64, 2);
-        std::vector<uint64_t> actual;
+        std::vector<ovx_token_t> actual;
 
         read_values("test:asset", dtype, false, 1, actual);
         if (::testing::Test::HasFatalFailure()) return;
         EXPECT_EQ(token_to_string(stage_, actual[0]), "initial_asset.usd");
-        EXPECT_EQ(actual[1], 0u);
+        EXPECT_EQ(actual[1], ovx_token_t{0});
 
-        std::vector<uint64_t> const updated = {create_token(stage_, "updated_asset.usd"),
+        std::vector<ovx_token_t> const updated = {create_token(stage_, "updated_asset.usd"),
                                                create_token(stage_, "/abs/updated_asset.usd")};
         write_values("test:asset", dtype, false, updated, kWorld, OVSTAGE_SEMANTIC_ASSET_PATH_ID);
         if (::testing::Test::HasFatalFailure()) return;
@@ -390,13 +408,16 @@ class AllAttributesTest : public DocsOvstageTestBase {
         ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
         docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
+        size_t fetchedGroupCount = 0;
         ovstage_read_group_t group{};
         const ovstage_api_status_t fetch =
-            ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group);
+            ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount);
         if (fetch == OVSTAGE_OK) {
-            if (group.data.tensor_count > 0) {
-                DLTensor const &tensor = group.data.tensors[0];
-                bool id_pairs = group.semantic == OVSTAGE_SEMANTIC_ASSET_PATH_ID && !group.is_array &&
+            const ovstage_read_column_t *column =
+                group.column_count == 1 && group.columns != nullptr ? &group.columns[0] : nullptr;
+            if (column && column->data.tensor_count > 0) {
+                DLTensor const &tensor = column->data.tensors[0];
+                bool id_pairs = column->semantic == OVSTAGE_SEMANTIC_ASSET_PATH_ID && !column->is_array &&
                                 tensor.dtype.code == kDLUInt && tensor.dtype.bits == 64 &&
                                 tensor.dtype.lanes == 1 && tensor.ndim == 2 && tensor.shape != nullptr &&
                                 tensor.shape[1] == 2;
@@ -407,7 +428,7 @@ class AllAttributesTest : public DocsOvstageTestBase {
                               << " as an ASSET_PATH_ID id pair ('(authored_token, resolved_token)'), but the served "
                                  "group does not match";
             }
-            ovstage_release_group(stage_, &group);
+            ovstage_release_groups(stage_, &group, 1);
         } else if (fetch == OVSTAGE_ERROR_END_OF_ITERATION) {
             if (contract_required) {
                 ADD_FAILURE() << version_failure.str() << ", but the read had no group";
@@ -637,7 +658,7 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     DocsQueryAndToken q_float;
     docs_make_query_and_token(stage_, kWorld, "test:float", &q_float);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t float_attr_ref{};
+    ovx_token_or_string_t float_attr_ref{};
     float_attr_ref.token = q_float.attr_token;
 
     // [snippet:doc-read-usd-float-c]
@@ -650,15 +671,21 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(float_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, float_read_eq.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t float_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, float_read_handle, OVSTAGE_TIMEOUT_INFINITE, &float_group), OVSTAGE_OK)
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, float_read_handle, OVSTAGE_TIMEOUT_INFINITE, &float_group, 1, &fetchedGroupCount),
+              OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(float_group.data.tensor_count, 0u);
-    DLTensor const &float_tensor = float_group.data.tensors[0];
+    ASSERT_EQ(float_group.column_count, 1u);
+    ASSERT_NE(float_group.columns, nullptr);
+    ovstage_read_column_t const &float_column = float_group.columns[0];
+    ASSERT_GT(float_column.data.tensor_count, 0u);
+    DLTensor const &float_tensor = float_column.data.tensors[0];
     float const *float_data =
         reinterpret_cast<float const *>(static_cast<uint8_t const *>(float_tensor.data) + float_tensor.byte_offset);
     std::vector<float> float_values(float_data, float_data + float_tensor.shape[0] * float_tensor.dtype.lanes);
-    ovstage_release_group(stage_, &float_group);
+    ovstage_release_groups(stage_, &float_group, 1);
     ovstage_release_read(stage_, float_read_handle);
     // [/snippet:doc-read-usd-float-c]
     expect_values_near("test:float", float_values, std::vector<float>{23.5f}, dl_type(kDLFloat, 32, 1));
@@ -694,7 +721,7 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     DocsQueryAndToken q_point3f;
     docs_make_query_and_token(stage_, kWorld, "test:point3f", &q_point3f);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t point3f_attr_ref{};
+    ovx_token_or_string_t point3f_attr_ref{};
     point3f_attr_ref.token = q_point3f.attr_token;
 
     // [snippet:doc-read-usd-point3f-c]
@@ -707,17 +734,23 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(point3f_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, point3f_read_eq.op_index);
 
+    size_t point3f_fetched_count = 0;
     ovstage_read_group_t point3f_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, point3f_read_handle, OVSTAGE_TIMEOUT_INFINITE, &point3f_group), OVSTAGE_OK)
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, point3f_read_handle, OVSTAGE_TIMEOUT_INFINITE, &point3f_group, 1, &point3f_fetched_count),
+              OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(point3f_group.data.tensor_count, 0u);
-    DLTensor const &point3f_tensor = point3f_group.data.tensors[0];
+    ASSERT_EQ(point3f_group.column_count, 1u);
+    ASSERT_NE(point3f_group.columns, nullptr);
+    ovstage_read_column_t const &point3f_column = point3f_group.columns[0];
+    ASSERT_GT(point3f_column.data.tensor_count, 0u);
+    DLTensor const &point3f_tensor = point3f_column.data.tensors[0];
     // Scalar per-prim point3f: shape=[1,3], dtype.lanes=1.
     float const *point3f_data = reinterpret_cast<float const *>(static_cast<uint8_t const *>(point3f_tensor.data) +
                                                                 point3f_tensor.byte_offset);
     std::vector<float> point3f_values(point3f_data,
                                       point3f_data + point3f_tensor.shape[0] * point3f_tensor.shape[1]);
-    ovstage_release_group(stage_, &point3f_group);
+    ovstage_release_groups(stage_, &point3f_group, 1);
     ovstage_release_read(stage_, point3f_read_handle);
     // [/snippet:doc-read-usd-point3f-c]
     expect_values_near("test:point3f", point3f_values, std::vector<float>{75.1f, 75.2f, 75.3f},
@@ -756,7 +789,7 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     DocsQueryAndToken q_point3f_arr;
     docs_make_query_and_token(stage_, kWorld, "test:point3fArray", &q_point3f_arr);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t point3f_array_attr_ref{};
+    ovx_token_or_string_t point3f_array_attr_ref{};
     point3f_array_attr_ref.token = q_point3f_arr.attr_token;
 
     // [snippet:doc-read-usd-point3f-array-c]
@@ -770,19 +803,24 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(point3f_array_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, point3f_array_read_eq.op_index);
 
+    size_t point3f_array_fetched_count = 0;
     ovstage_read_group_t point3f_array_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, point3f_array_read_handle, OVSTAGE_TIMEOUT_INFINITE, &point3f_array_group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, point3f_array_read_handle, OVSTAGE_TIMEOUT_INFINITE, &point3f_array_group,
+                                      1, &point3f_array_fetched_count),
               OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_TRUE(point3f_array_group.is_array);
-    ASSERT_GT(point3f_array_group.data.tensor_count, 0u);
-    DLTensor const &point3f_array_tensor = point3f_array_group.data.tensors[0];
+    ASSERT_EQ(point3f_array_group.column_count, 1u);
+    ASSERT_NE(point3f_array_group.columns, nullptr);
+    ovstage_read_column_t const &point3f_array_column = point3f_array_group.columns[0];
+    ASSERT_TRUE(point3f_array_column.is_array);
+    ASSERT_GT(point3f_array_column.data.tensor_count, 0u);
+    DLTensor const &point3f_array_tensor = point3f_array_column.data.tensors[0];
     // Array of point3f: shape=[N,3], dtype.lanes=1.
     float const *point3f_array_data = reinterpret_cast<float const *>(
         static_cast<uint8_t const *>(point3f_array_tensor.data) + point3f_array_tensor.byte_offset);
     std::vector<float> point3f_array_values(
         point3f_array_data, point3f_array_data + point3f_array_tensor.shape[0] * point3f_array_tensor.shape[1]);
-    ovstage_release_group(stage_, &point3f_array_group);
+    ovstage_release_groups(stage_, &point3f_array_group, 1);
     ovstage_release_read(stage_, point3f_array_read_handle);
     // [/snippet:doc-read-usd-point3f-array-c]
     expect_values_near("test:point3fArray", point3f_array_values,
@@ -821,7 +859,7 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     DocsQueryAndToken q_matrix4d;
     docs_make_query_and_token(stage_, kWorld, "test:matrix4d", &q_matrix4d);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t matrix4d_attr_ref{};
+    ovx_token_or_string_t matrix4d_attr_ref{};
     matrix4d_attr_ref.token = q_matrix4d.attr_token;
 
     // [snippet:doc-read-usd-matrix4d-c]
@@ -834,18 +872,23 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(matrix4d_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, matrix4d_read_eq.op_index);
 
+    size_t matrix4d_fetched_count = 0;
     ovstage_read_group_t matrix4d_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, matrix4d_read_handle, OVSTAGE_TIMEOUT_INFINITE, &matrix4d_group),
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, matrix4d_read_handle, OVSTAGE_TIMEOUT_INFINITE, &matrix4d_group, 1, &matrix4d_fetched_count),
               OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(matrix4d_group.data.tensor_count, 0u);
-    DLTensor const &matrix4d_tensor = matrix4d_group.data.tensors[0];
+    ASSERT_EQ(matrix4d_group.column_count, 1u);
+    ASSERT_NE(matrix4d_group.columns, nullptr);
+    ovstage_read_column_t const &matrix4d_column = matrix4d_group.columns[0];
+    ASSERT_GT(matrix4d_column.data.tensor_count, 0u);
+    DLTensor const &matrix4d_tensor = matrix4d_column.data.tensors[0];
     // Per-prim 4x4 double matrix: shape=[1,4,4], dtype.lanes=1.
     double const *matrix4d_data = reinterpret_cast<double const *>(
         static_cast<uint8_t const *>(matrix4d_tensor.data) + matrix4d_tensor.byte_offset);
     std::vector<double> matrix4d_values(matrix4d_data,
                                         matrix4d_data + matrix4d_tensor.shape[0] * matrix4d_tensor.shape[1] * matrix4d_tensor.shape[2]);
-    ovstage_release_group(stage_, &matrix4d_group);
+    ovstage_release_groups(stage_, &matrix4d_group, 1);
     ovstage_release_read(stage_, matrix4d_read_handle);
     // [/snippet:doc-read-usd-matrix4d-c]
     expect_values_near("test:matrix4d", matrix4d_values,
@@ -886,7 +929,7 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     DocsQueryAndToken q_quatf;
     docs_make_query_and_token(stage_, kWorld, "test:quatf", &q_quatf);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t quatf_attr_ref{};
+    ovx_token_or_string_t quatf_attr_ref{};
     quatf_attr_ref.token = q_quatf.attr_token;
 
     // [snippet:doc-read-usd-quatf-c]
@@ -899,16 +942,22 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(quatf_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, quatf_read_eq.op_index);
 
+    size_t quatf_fetched_count = 0;
     ovstage_read_group_t quatf_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, quatf_read_handle, OVSTAGE_TIMEOUT_INFINITE, &quatf_group), OVSTAGE_OK)
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, quatf_read_handle, OVSTAGE_TIMEOUT_INFINITE, &quatf_group, 1, &quatf_fetched_count),
+              OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(quatf_group.data.tensor_count, 0u);
-    DLTensor const &quatf_tensor = quatf_group.data.tensors[0];
+    ASSERT_EQ(quatf_group.column_count, 1u);
+    ASSERT_NE(quatf_group.columns, nullptr);
+    ovstage_read_column_t const &quatf_column = quatf_group.columns[0];
+    ASSERT_GT(quatf_column.data.tensor_count, 0u);
+    DLTensor const &quatf_tensor = quatf_column.data.tensors[0];
     // Quaternion (i, j, k, real): shape=[1,4], dtype.lanes=1.
     float const *quatf_data = reinterpret_cast<float const *>(static_cast<uint8_t const *>(quatf_tensor.data) +
                                                               quatf_tensor.byte_offset);
     std::vector<float> quatf_values(quatf_data, quatf_data + quatf_tensor.shape[0] * quatf_tensor.shape[1]);
-    ovstage_release_group(stage_, &quatf_group);
+    ovstage_release_groups(stage_, &quatf_group, 1);
     ovstage_release_read(stage_, quatf_read_handle);
     // [/snippet:doc-read-usd-quatf-c]
     expect_values_near("test:quatf", quatf_values, std::vector<float>{82.1f, 82.2f, 82.3f, 1.0f},
@@ -947,7 +996,7 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     DocsQueryAndToken q_token;
     docs_make_query_and_token(stage_, kWorld, "test:token", &q_token);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t token_attr_ref{};
+    ovx_token_or_string_t token_attr_ref{};
     token_attr_ref.token = q_token.attr_token;
 
     // [snippet:doc-read-usd-token-c]
@@ -960,38 +1009,43 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(token_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, token_read_eq.op_index);
 
+    size_t token_fetched_count = 0;
     ovstage_read_group_t token_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, token_read_handle, OVSTAGE_TIMEOUT_INFINITE, &token_group), OVSTAGE_OK)
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, token_read_handle, OVSTAGE_TIMEOUT_INFINITE, &token_group, 1, &token_fetched_count),
+              OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(token_group.data.tensor_count, 0u);
-    DLTensor const &token_tensor = token_group.data.tensors[0];
+    ASSERT_EQ(token_group.column_count, 1u);
+    ASSERT_NE(token_group.columns, nullptr);
+    ovstage_read_column_t const &token_column = token_group.columns[0];
+    ASSERT_GT(token_column.data.tensor_count, 0u);
+    DLTensor const &token_tensor = token_column.data.tensors[0];
     // Scalar token: shape=[1], dtype={kDLUInt, 64, 1}. The uint64 is an interned
     // path-dictionary handle; resolve to a string via the stage's path dictionary.
-    uint64_t const *token_ids = reinterpret_cast<uint64_t const *>(
+    auto const *token_ids = reinterpret_cast<uint64_t const *>(
         static_cast<uint8_t const *>(token_tensor.data) + token_tensor.byte_offset);
+    ovx_token_t token_id_first{token_ids[0]};
     path_dictionary_instance_t *token_pd = ovstage_get_path_dictionary(stage_);
-    ovx_token_t token_id_first = token_ids[0];
     ovx_string_t token_first_string{};
     ASSERT_EQ(path_dictionary_get_strings_from_tokens(token_pd, &token_id_first, 1, &token_first_string).status,
               OVX_API_SUCCESS);
-    ovstage_release_group(stage_, &token_group);
+    ovstage_release_groups(stage_, &token_group, 1);
     ovstage_release_read(stage_, token_read_handle);
     // [/snippet:doc-read-usd-token-c]
     EXPECT_EQ(std::string(token_first_string.ptr, token_first_string.length), "initialToken");
 
     // [snippet:doc-write-usd-token-c]
-    // Intern "updatedToken" first so we can write its uint64 handle. Semantic
+    // Intern "updatedToken" first, retaining its typed handle as tensor storage. Semantic
     // OVSTAGE_SEMANTIC_TOKEN_ID tells ovstage the payload is a token id.
     path_dictionary_instance_t *token_write_pd = ovstage_get_path_dictionary(stage_);
     ovx_string_t updated_token_str = ovx_str("updatedToken");
-    ovx_token_t updated_token_id = 0;
+    ovx_token_t updated_token_id{};
     ASSERT_EQ(path_dictionary_create_tokens_from_strings(token_write_pd, &updated_token_str, 1, &updated_token_id).status,
               OVX_API_SUCCESS);
-    uint64_t updated_token_value = updated_token_id;
 
     int64_t token_shape[1] = {1};
     DLTensor token_write_tensor{};
-    token_write_tensor.data = &updated_token_value;
+    token_write_tensor.data = &updated_token_id;
     token_write_tensor.device = {kDLCPU, 0};
     token_write_tensor.ndim = 1;
     token_write_tensor.dtype = {kDLUInt, 64, 1};
@@ -1013,14 +1067,14 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     // [/snippet:doc-write-usd-token-c]
     docs_release_query_and_token(stage_, &q_token);
 
-    std::vector<uint64_t> token_values;
+    std::vector<ovx_token_t> token_values;
     read_values("test:token", dl_type(kDLUInt, 64, 1), false, 1, token_values);
     EXPECT_EQ(token_to_string(stage_, token_values[0]), "updatedToken");
 
     DocsQueryAndToken q_token_array;
     docs_make_query_and_token(stage_, kWorld, "test:tokenArray", &q_token_array);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t token_array_attr_ref{};
+    ovx_token_or_string_t token_array_attr_ref{};
     token_array_attr_ref.token = q_token_array.attr_token;
 
     // [snippet:doc-read-usd-token-array-c]
@@ -1034,26 +1088,31 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(token_array_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, token_array_read_eq.op_index);
 
+    size_t token_array_fetched_count = 0;
     ovstage_read_group_t token_array_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, token_array_read_handle, OVSTAGE_TIMEOUT_INFINITE, &token_array_group),
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, token_array_read_handle, OVSTAGE_TIMEOUT_INFINITE, &token_array_group, 1, &token_array_fetched_count),
               OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_TRUE(token_array_group.is_array);
-    ASSERT_GT(token_array_group.data.tensor_count, 0u);
-    DLTensor const &token_array_tensor = token_array_group.data.tensors[0];
+    ASSERT_EQ(token_array_group.column_count, 1u);
+    ASSERT_NE(token_array_group.columns, nullptr);
+    ovstage_read_column_t const &token_array_column = token_array_group.columns[0];
+    ASSERT_TRUE(token_array_column.is_array);
+    ASSERT_GT(token_array_column.data.tensor_count, 0u);
+    DLTensor const &token_array_tensor = token_array_column.data.tensors[0];
     // Array of tokens: shape=[N], dtype={kDLUInt, 64, 1}.
-    uint64_t const *token_array_ids = reinterpret_cast<uint64_t const *>(
+    auto const *token_array_ids = reinterpret_cast<uint64_t const *>(
         static_cast<uint8_t const *>(token_array_tensor.data) + token_array_tensor.byte_offset);
     path_dictionary_instance_t *token_array_pd = ovstage_get_path_dictionary(stage_);
     std::vector<std::string> token_array_strings;
     for (int64_t i = 0; i < token_array_tensor.shape[0]; ++i) {
-        ovx_token_t token_id = token_array_ids[i];
+        ovx_token_t token_id{token_array_ids[i]};
         ovx_string_t token_string{};
         ASSERT_EQ(path_dictionary_get_strings_from_tokens(token_array_pd, &token_id, 1, &token_string).status,
                   OVX_API_SUCCESS);
         token_array_strings.emplace_back(token_string.ptr, token_string.length);
     }
-    ovstage_release_group(stage_, &token_array_group);
+    ovstage_release_groups(stage_, &token_array_group, 1);
     ovstage_release_read(stage_, token_array_read_handle);
     // [/snippet:doc-read-usd-token-array-c]
     EXPECT_EQ(token_array_strings, (std::vector<std::string>{"initialTokenA", "initialTokenB"}));
@@ -1066,11 +1125,10 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
                                                          updated_token_array_ids)
                   .status,
               OVX_API_SUCCESS);
-    uint64_t updated_token_array_values[2] = {updated_token_array_ids[0], updated_token_array_ids[1]};
 
     int64_t token_array_shape[1] = {2};
     DLTensor token_array_write_tensor{};
-    token_array_write_tensor.data = updated_token_array_values;
+    token_array_write_tensor.data = updated_token_array_ids;
     token_array_write_tensor.device = {kDLCPU, 0};
     token_array_write_tensor.ndim = 1;
     token_array_write_tensor.dtype = {kDLUInt, 64, 1};
@@ -1100,7 +1158,7 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     DocsQueryAndToken q_string;
     docs_make_query_and_token(stage_, kWorld, "test:string", &q_string);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t string_attr_ref{};
+    ovx_token_or_string_t string_attr_ref{};
     string_attr_ref.token = q_string.attr_token;
 
     // [snippet:doc-read-usd-string-c]
@@ -1113,18 +1171,24 @@ TEST_F(AllAttributesTest, RawReadWriteSnippets) {
     ASSERT_EQ(string_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, string_read_eq.op_index);
 
+    size_t string_fetched_count = 0;
     ovstage_read_group_t string_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, string_read_handle, OVSTAGE_TIMEOUT_INFINITE, &string_group), OVSTAGE_OK)
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, string_read_handle, OVSTAGE_TIMEOUT_INFINITE, &string_group, 1, &string_fetched_count),
+              OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_TRUE(string_group.is_array);
-    ASSERT_GT(string_group.data.tensor_count, 0u);
-    DLTensor const &string_tensor = string_group.data.tensors[0];
+    ASSERT_EQ(string_group.column_count, 1u);
+    ASSERT_NE(string_group.columns, nullptr);
+    ovstage_read_column_t const &string_column = string_group.columns[0];
+    ASSERT_TRUE(string_column.is_array);
+    ASSERT_GT(string_column.data.tensor_count, 0u);
+    DLTensor const &string_tensor = string_column.data.tensors[0];
     // USD "string" is transported as a variable-length array of bytes: shape=[N],
     // dtype={kDLUInt, 8, 1}. Decode by taking the first N bytes as UTF-8.
     char const *string_bytes =
         static_cast<char const *>(string_tensor.data) + string_tensor.byte_offset;
     std::string string_value(string_bytes, string_bytes + string_tensor.shape[0]);
-    ovstage_release_group(stage_, &string_group);
+    ovstage_release_groups(stage_, &string_group, 1);
     ovstage_release_read(stage_, string_read_handle);
     // [/snippet:doc-read-usd-string-c]
     EXPECT_EQ(string_value, "initial string");
@@ -1178,7 +1242,7 @@ TEST_F(AllAttributesTest, AssetReadWriteSnippets) {
     DocsQueryAndToken q_asset;
     docs_make_query_and_token(stage_, kWorld, "test:asset", &q_asset);
     if (HasFatalFailure()) return;
-    ovx_string_or_token_t asset_attr_ref{};
+    ovx_token_or_string_t asset_attr_ref{};
     asset_attr_ref.token = q_asset.attr_token;
 
     // [snippet:doc-read-usd-asset-c]
@@ -1191,16 +1255,22 @@ TEST_F(AllAttributesTest, AssetReadWriteSnippets) {
     ASSERT_EQ(asset_read_eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, asset_read_eq.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t asset_group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, asset_read_handle, OVSTAGE_TIMEOUT_INFINITE, &asset_group), OVSTAGE_OK)
+    ASSERT_EQ(ovstage_fetch_read_next(
+                  stage_, asset_read_handle, OVSTAGE_TIMEOUT_INFINITE, &asset_group, 1, &fetchedGroupCount),
+              OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(asset_group.data.tensor_count, 0u);
-    DLTensor const &asset_tensor = asset_group.data.tensors[0];
+    ASSERT_EQ(asset_group.column_count, 1u);
+    ASSERT_NE(asset_group.columns, nullptr);
+    ovstage_read_column_t const &asset_column = asset_group.columns[0];
+    ASSERT_GT(asset_column.data.tensor_count, 0u);
+    DLTensor const &asset_tensor = asset_column.data.tensors[0];
     // An asset value is one 16-byte (authored, resolved) token id pair.
-    uint64_t asset_pair[2] = {0, 0};
+    ovx_token_t asset_pair[2]{};
     std::memcpy(asset_pair, static_cast<char const *>(asset_tensor.data) + asset_tensor.byte_offset,
                 sizeof(asset_pair));
-    ovstage_release_group(stage_, &asset_group);
+    ovstage_release_groups(stage_, &asset_group, 1);
     ovstage_release_read(stage_, asset_read_handle);
 
     // Token id 0 is the empty token, so an unresolved asset resolves to "".
@@ -1215,7 +1285,7 @@ TEST_F(AllAttributesTest, AssetReadWriteSnippets) {
     // writes their token ids. Use token id 0 when the path resolves to nothing.
     path_dictionary_instance_t *asset_pd = ovstage_get_path_dictionary(stage_);
     ovx_string_t updated_asset_strings[2] = {ovx_str("updated_asset.usd"), ovx_str("/abs/updated_asset.usd")};
-    ovx_token_t updated_asset_pair[2] = {0, 0};
+    ovx_token_t updated_asset_pair[2]{};
     ASSERT_EQ(path_dictionary_create_tokens_from_strings(asset_pd, updated_asset_strings, 2, updated_asset_pair)
                   .status,
               OVX_API_SUCCESS);
@@ -1245,7 +1315,7 @@ TEST_F(AllAttributesTest, AssetReadWriteSnippets) {
     // [/snippet:doc-write-usd-asset-c]
     docs_release_query_and_token(stage_, &q_asset);
 
-    std::vector<uint64_t> asset_values;
+    std::vector<ovx_token_t> asset_values;
     read_values("test:asset", dl_type(kDLUInt, 64, 2), false, 1, asset_values);
     EXPECT_EQ(token_to_string(stage_, asset_values[0]), "updated_asset.usd");
     EXPECT_EQ(token_to_string(stage_, asset_values[1]), "/abs/updated_asset.usd");
@@ -1261,13 +1331,13 @@ TEST_F(AllAttributesTest, ExtentAndWorldExtentAreReadable) {
     // Intern the _worldExtent token on the shared path dictionary so the read
     // below can pass both tokens in a single ovstage_read_attributes call.
     ovx_string_t world_extent_str = ovx_str("_worldExtent");
-    ovx_token_t world_extent_token = 0;
+    ovx_token_t world_extent_token{};
     ASSERT_EQ(path_dictionary_create_tokens_from_strings(q_extent.pd, &world_extent_str, 1, &world_extent_token).status,
               OVX_API_SUCCESS);
 
     // [snippet:doc-extent-world-extent-c]
-    // Read both attributes in one enqueue and route each returned group by its
-    // group.attribute token. `extent` is per-prim local; `_worldExtent` is the
+    // Read both attributes in one enqueue and route each returned column by its
+    // column.attribute token. `extent` is per-prim local; `_worldExtent` is the
     // composed world-space extent for the same prim.
     ovx_token_t extent_tokens[2] = {q_extent.attr_token, world_extent_token};
     ovstage_ordinal_range_t extent_range{};
@@ -1282,26 +1352,32 @@ TEST_F(AllAttributesTest, ExtentAndWorldExtentAreReadable) {
     std::vector<double> local_extent;
     std::vector<double> world_extent;
     while (true) {
+        size_t fetchedGroupCount = 0;
         ovstage_read_group_t group{};
         ovstage_api_status_t s =
-            ovstage_fetch_read_next(stage_, extent_read_handle, OVSTAGE_TIMEOUT_INFINITE, &group);
+            ovstage_fetch_read_next(stage_, extent_read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount);
         if (s == OVSTAGE_ERROR_END_OF_ITERATION) break;
         ASSERT_EQ(s, OVSTAGE_OK) << format_ovstage_last_error();
 
-        ASSERT_GT(group.data.tensor_count, 0u);
-        DLTensor const &t = group.data.tensors[0];
-        double const *data =
-            reinterpret_cast<double const *>(static_cast<uint8_t const *>(t.data) + t.byte_offset);
-        size_t valueCount = t.dtype.lanes;
-        for (int axis = 0; axis < t.ndim; ++axis)
-            valueCount *= static_cast<size_t>(t.shape[axis]);
-        std::vector<double> values(data, data + valueCount);
-        if (group.attribute == q_extent.attr_token) {
-            local_extent = std::move(values);
-        } else if (group.attribute == world_extent_token) {
-            world_extent = std::move(values);
+        ASSERT_GT(group.column_count, 0u);
+        ASSERT_NE(group.columns, nullptr);
+        for (size_t column_index = 0; column_index < group.column_count; ++column_index) {
+            ovstage_read_column_t const &column = group.columns[column_index];
+            ASSERT_GT(column.data.tensor_count, 0u);
+            DLTensor const &t = column.data.tensors[0];
+            double const *data =
+                reinterpret_cast<double const *>(static_cast<uint8_t const *>(t.data) + t.byte_offset);
+            size_t valueCount = t.dtype.lanes;
+            for (int axis = 0; axis < t.ndim; ++axis)
+                valueCount *= static_cast<size_t>(t.shape[axis]);
+            std::vector<double> values(data, data + valueCount);
+            if (column.attribute == q_extent.attr_token) {
+                local_extent = std::move(values);
+            } else if (column.attribute == world_extent_token) {
+                world_extent = std::move(values);
+            }
         }
-        ovstage_release_group(stage_, &group);
+        ovstage_release_groups(stage_, &group, 1);
     }
     ovstage_release_read(stage_, extent_read_handle);
     // [/snippet:doc-extent-world-extent-c]

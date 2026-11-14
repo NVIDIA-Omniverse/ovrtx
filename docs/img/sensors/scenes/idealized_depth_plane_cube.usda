@@ -1,0 +1,96 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+# A ground plane and one cube ahead of an Idealized depth model sensor with the schema's
+# default emitter set: the scene of the model's overview figure, rendered by ../_render_example_scenes.py.
+# Non-visual materials only; the model reports geometric hits.
+
+def Xform "World"
+{
+    def OmniIDS "DepthSensor" (
+        prepend apiSchemas = ["OmniSensorGenericIDSAPI"]
+    )
+    {
+        double2 omni:sensor:frameRate = (10, 1)
+
+        double3 xformOp:translate = (0, 0, 1)
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Cube "Cube" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 4
+        rel material:binding = </World/Materials/Steel>
+        double3 xformOp:translate = (7, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Mesh "GroundPlane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-30, -30, 0), (30, -30, 0), (30, 30, 0), (-30, 30, 0)]
+        rel material:binding = </World/Materials/Asphalt>
+    }
+
+    def DistantLight "Light"
+    {
+        float intensity = 2500
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    def "Render"
+    {
+        def "Products"
+        {
+            def RenderProduct "DepthProduct"
+            {
+                rel camera = </World/DepthSensor>
+                rel orderedVars = [
+                    <../../Vars/GenericModelOutput>,
+                    <../../Vars/RtxSensorMetadata>,
+                ]
+            }
+        }
+
+        def "Vars"
+        {
+            def RenderVar "GenericModelOutput"
+            {
+                uniform string sourceName = "GenericModelOutput"
+            }
+
+            def RenderVar "RtxSensorMetadata"
+            {
+                uniform string sourceName = "RtxSensorMetadata"
+            }
+        }
+    }
+
+    def Xform "Materials"
+    {
+        def Material "Asphalt"
+        {
+            token omni:simready:nonvisual:base = "asphalt"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+        }
+
+        def Material "Steel"
+        {
+            token omni:simready:nonvisual:base = "steel"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+        }
+    }
+}

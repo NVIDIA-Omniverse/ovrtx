@@ -1,0 +1,500 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    startTimeCode = 0
+    endTimeCode = 10
+    timeCodesPerSecond = 10
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+# An alternative scene for the radar example, selected with "--scene": the same
+# moving steel cube as radar_example.usda, now closing in across a field of
+# thin steel panels at increasing range across the field of view. Every
+# stochastic input of the scan is authored with zero mean and zero deviation so
+# repeated runs differ only through the sensor pipeline. Every Material prim
+# carries both the non-visual label the radar reads and a visual shader the
+# PreviewCamera renders.
+def Xform "World"
+{
+    # [snippet:configure-radar-field-sensor]
+    # One scan whose range, velocity and angle bins are authored explicitly:
+    # each panel sits in a range bin of its own, outside the one-cell CFAR
+    # training neighborhood of its neighbors, with constant antenna gain.
+    def OmniRadar "Radar" (
+        prepend apiSchemas = ["OmniSensorGenericRadarWpmDmatAPI"]
+    )
+    {
+        token omni:sensor:WpmDmat:elementsCoordsType = "CARTESIAN"
+        token omni:sensor:WpmDmat:outputFrameOfReference = "SENSOR"
+        uint omni:sensor:WpmDmat:traceTreeDepth = 1
+        token omni:sensor:WpmDmat:cfarMode = "2D"
+        double2 omni:sensor:frameRate = (10, 1)
+
+        bool omni:sensor:WpmDmat:scan:s001:binsFromSpec = false
+        float omni:sensor:WpmDmat:scan:s001:raysPerDeg = 8
+        uint omni:sensor:WpmDmat:scan:s001:rBins = 112
+        uint omni:sensor:WpmDmat:scan:s001:vBins = 161
+        uint omni:sensor:WpmDmat:scan:s001:azBins = 12
+        uint omni:sensor:WpmDmat:scan:s001:elBins = 2
+        float omni:sensor:WpmDmat:scan:s001:maxRangeM = 90
+        float omni:sensor:WpmDmat:scan:s001:maxAzAngDeg = 75
+        float omni:sensor:WpmDmat:scan:s001:maxElAngDeg = 10
+        token omni:sensor:WpmDmat:scan:s001:txAntennaGainMode = "CONSTANT"
+        token omni:sensor:WpmDmat:scan:s001:rxAntennaGainMode = "CONSTANT"
+        uint omni:sensor:WpmDmat:scan:s001:cfarRnT = 1
+        uint omni:sensor:WpmDmat:scan:s001:cfarRnG = 0
+        uint omni:sensor:WpmDmat:scan:s001:cfarVnT = 1
+        uint omni:sensor:WpmDmat:scan:s001:cfarVnG = 0
+        float omni:sensor:WpmDmat:scan:s001:cfarMinVal = 7e-17
+        float omni:sensor:WpmDmat:scan:s001:cfarOffset = 1
+        float omni:sensor:WpmDmat:scan:s001:cfarNoiseMean = 0
+        float omni:sensor:WpmDmat:scan:s001:cfarNoiseSDev = 0
+        float[] omni:sensor:WpmDmat:scan:s001:rcsTuningCoefficients = [-12, 150, 0]
+        float omni:sensor:WpmDmat:scan:s001:azimuthRadNoiseMean = 0
+        float omni:sensor:WpmDmat:scan:s001:azimuthRadNoiseSDev = 0
+        float omni:sensor:WpmDmat:scan:s001:elevationRadNoiseMean = 0
+        float omni:sensor:WpmDmat:scan:s001:elevationRadNoiseSDev = 0
+        float omni:sensor:WpmDmat:scan:s001:rangeNoiseMean = 0
+        float omni:sensor:WpmDmat:scan:s001:rangeNoiseSDev = 0
+        float omni:sensor:WpmDmat:scan:s001:velocityNoiseMean = 0
+        float omni:sensor:WpmDmat:scan:s001:velocityNoiseSDev = 0
+        float[] omni:sensor:WpmDmat:scan:s001:maxVelMpsSequence = [16.33]
+
+        double3 xformOp:translate = (0, 0, 1)
+        float3 xformOp:rotateXYZ = (90, 0, -90)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+    # [/snippet:configure-radar-field-sensor]
+
+    def Mesh "GroundPlane" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-200, -200, 0), (200, 200, 0)]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        rel material:binding = </World/Materials/Asphalt>
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1)] (
+            interpolation = "faceVarying"
+        )
+        point3f[] points = [(-200, -200, 0), (200, -200, 0), (200, 200, 0), (-200, 200, 0)]
+        color3f[] primvars:displayColor = [(0.05, 0.05, 0.05)]
+    }
+
+    # [snippet:configure-radar-field-targets]
+    # Thin steel panels, each facing the radar with its front face centered in
+    # one range bin; their angular footprints do not overlap.
+    def Xform "SteelPanels" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </World/Materials/Steel>
+
+        def Cube "SteelPanel012"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 0.75, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -69)
+            double3 xformOp:translate = (3.676904, -9.578661, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel015"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 0.75, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -63)
+            double3 xformOp:translate = (5.762305, -11.309161, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel018"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 0.75, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:translate = (15.125, 0, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel021"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 0.75, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -57)
+            double3 xformOp:translate = (9.562463, -14.724902, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel024"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 0.75, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 69)
+            double3 xformOp:translate = (7.163727, 18.662147, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel027"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -49)
+            double3 xformOp:translate = (14.710351, -16.922323, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel030"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -45)
+            double3 xformOp:translate = (17.574948, -17.574948, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel033"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -41)
+            double3 xformOp:translate = (20.593883, -17.901989, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel037"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 11.309932)
+            double3 xformOp:translate = (29.937526, 5.987505, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel040"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -35)
+            double3 xformOp:translate = (27.001576, -18.906707, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel043"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -32)
+            double3 xformOp:translate = (30.016892, -18.756636, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel046"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -29)
+            double3 xformOp:translate = (33.084854, -18.339234, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel049"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -23)
+            double3 xformOp:translate = (37.05965, -15.730888, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel052"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 1.5, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -20)
+            double3 xformOp:translate = (40.117891, -14.601718, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel055"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -17)
+            double3 xformOp:translate = (43.153252, -13.193273, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel058"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -13)
+            double3 xformOp:translate = (46.338539, -10.698095, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel061"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -10)
+            double3 xformOp:translate = (49.230406, -8.680649, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel064"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -7)
+            double3 xformOp:translate = (52.031549, -6.388671, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel067"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, -3)
+            double3 xformOp:translate = (54.779553, -2.870875, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel070"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 3)
+            double3 xformOp:translate = (57.208652, 2.998178, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel073"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 7)
+            double3 xformOp:translate = (59.274454, 7.277988, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel076"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 14)
+            double3 xformOp:translate = (60.305846, 15.035936, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel079"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 17)
+            double3 xformOp:translate = (61.762426, 18.882669, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel082"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 20)
+            double3 xformOp:translate = (62.975279, 22.921127, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel085"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 2, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 23)
+            double3 xformOp:translate = (63.92844, 27.136013, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel088"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 29)
+            double3 xformOp:translate = (62.869201, 34.848967, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel091"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 32)
+            double3 xformOp:translate = (63.022007, 39.38052, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel094"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 35)
+            double3 xformOp:translate = (62.867152, 44.020054, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel097"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 41)
+            double3 xformOp:translate = (59.757191, 51.946133, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel100"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 45)
+            double3 xformOp:translate = (57.708036, 57.708036, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel103"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 49)
+            double3 xformOp:translate = (55.137772, 63.428751, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel106"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 57)
+            double3 xformOp:translate = (47.098397, 72.525171, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+        def Cube "SteelPanel109"
+        {
+            double size = 1
+            float3 xformOp:scale = (0.25, 3, 2)
+            float3 xformOp:rotateXYZ = (0, 0, 63)
+            double3 xformOp:translate = (40.363743, 79.218306, 1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+    }
+
+    # The example's moving target: 1.5 m steel cube closing in along world -X at
+    # 10 m/s, one meter per 0.1 s time code.
+    def Cube "MovingSteelCube" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        double size = 1.5
+        color3f[] primvars:displayColor = [(0.55, 0.55, 0.60)]
+        rel material:binding = </World/Materials/Steel>
+        double3 xformOp:translate.timeSamples = {
+            0: (30, 4, 0.75),
+            1: (29, 4, 0.75),
+            2: (28, 4, 0.75),
+            3: (27, 4, 0.75),
+            4: (26, 4, 0.75),
+            5: (25, 4, 0.75),
+            6: (24, 4, 0.75),
+            7: (23, 4, 0.75),
+            8: (22, 4, 0.75),
+            9: (21, 4, 0.75),
+            10: (20, 4, 0.75)
+        }
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    # [/snippet:configure-radar-field-targets]
+
+    def DistantLight "DistantLight" (
+        prepend apiSchemas = ["ShapingAPI"]
+    )
+    {
+        float intensity = 2500
+        float3 xformOp:rotateXYZ = (315, 45, 0)
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+
+    # Sky light for the camera product only; sensors do not use lights.
+    def DomeLight "Sky"
+    {
+        float inputs:intensity = 120
+        color3f inputs:color = (0.78, 0.84, 0.95)
+    }
+
+    # The camera the CameraProduct below renders through. The radar example steps
+    # only its sensor product; step the CameraProduct to see the scene.
+    def Camera "PreviewCamera"
+    {
+        float focalLength = 15.00
+        float horizontalAperture = 20.955
+        float verticalAperture = 11.787
+        float2 clippingRange = (0.1, 500)
+        matrix4d xformOp:transform = ( (0.469155, -0.883116, 0.000000, 0.000000), (0.563181, 0.299190, 0.770268, 0.000000), (-0.680235, -0.361375, 0.637721, 0.000000), (-30.000000, -34.000000, 60.000000, 1.000000) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    # [snippet:configure-radar-field-output]
+    def "Render"
+    {
+        def "Products"
+        {
+            def RenderProduct "RadarProduct"
+            {
+                rel camera = </World/Radar>
+                rel orderedVars = [<../../Vars/PointCloud>]
+            }
+
+            def RenderProduct "CameraProduct"
+            {
+                rel camera = </World/PreviewCamera>
+                int2 resolution = (960, 540)
+                token omni:rtx:rendermode = "RealTimePathTracing"
+                rel orderedVars = [<../../Vars/LdrColor>]
+            }
+        }
+
+        def "Vars"
+        {
+            def RenderVar "PointCloud"
+            {
+                uniform string sourceName = "PointCloud"
+                token[] channels = [
+                    "Coordinates",
+                    "Counts",
+                    "RCS",
+                    "RadialVelocityMs"
+                ]
+            }
+
+            def RenderVar "LdrColor"
+            {
+                uniform string sourceName = "LdrColor"
+            }
+        }
+    }
+    # [/snippet:configure-radar-field-output]
+
+    # [snippet:configure-radar-field-materials]
+    # One Material prim serves two systems: the omni:simready:nonvisual labels are
+    # what the radar reads, the MDL shader is what the camera renders.
+    def Xform "Materials"
+    {
+        def Material "Asphalt"
+        {
+            token omni:simready:nonvisual:base = "asphalt"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Asphalt/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.07, 0.07, 0.08)
+                float inputs:reflection_roughness_constant = 0.95
+                float inputs:metallic_constant = 0
+                token outputs:out
+            }
+        }
+        def Material "Steel"
+        {
+            token omni:simready:nonvisual:base = "steel"
+            token omni:simready:nonvisual:coating = "none"
+            token[] omni:simready:nonvisual:attributes = ["none"]
+            token outputs:mdl:surface.connect = </World/Materials/Steel/Shader.outputs:out>
+            token outputs:mdl:displacement.connect = </World/Materials/Steel/Shader.outputs:out>
+            token outputs:mdl:volume.connect = </World/Materials/Steel/Shader.outputs:out>
+            def Shader "Shader"
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+                color3f inputs:diffuse_color_constant = (0.72, 0.72, 0.74)
+                float inputs:reflection_roughness_constant = 0.32
+                float inputs:metallic_constant = 1
+                token outputs:out
+            }
+        }
+    }
+    # [/snippet:configure-radar-field-materials]
+}

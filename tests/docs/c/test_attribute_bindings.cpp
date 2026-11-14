@@ -95,7 +95,7 @@ TEST_F(AttributeBindingsTest, CreateWriteDestroyBinding) {
     write_data.is_array = false;
     write_data.semantic = OVSTAGE_SEMANTIC_MATRIX;
 
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = attr_token;
 
     ovstage_enqueue_result_t wq = ovstage_write_attribute(
@@ -139,7 +139,7 @@ TEST_F(AttributeBindingsTest, MapAndUnmapAttribute) {
     // Zero-copy write via map/unmap: map_attribute hands back writable
     // storage for each matched prim; the caller fills it, then unmap_attribute
     // commits and releases the map session.
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = attr_token;
     ovstage_map_desc_t map_desc{};
     map_desc.attribute = attr_ref;

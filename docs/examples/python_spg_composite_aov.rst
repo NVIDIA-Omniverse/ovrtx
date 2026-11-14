@@ -17,7 +17,7 @@ the single image a camera AOV gives you. This node reads the ``Coordinates`` and
 channels, counts the sweep's returns by distance, and publishes a bar chart on its own AOV.
 
 The scene the sensor sweeps, from a second render product with an ordinary camera. The orange
-post is the lidar; the grey box is 6 m away and the tan box 12 m away and twice as wide:
+post marks the lidar; the grey box is 6 m away and the tan box 12 m away and twice as wide:
 
 .. image:: ../../img/example-spg-composite-aov-scene.png
    :alt: The lidar scene, a sensor post and two boxes
@@ -28,11 +28,6 @@ What the node made of that sweep, one bar per box:
 .. image:: ../../img/example-spg-composite-aov.png
    :alt: SPG composite AOV example output, a histogram of lidar returns by distance
    :align: center
-
-The chart is two bars, one per box in the scene, because the scene contains nothing else the
-sensor can reach. ``main.py`` then rebuilds the same histogram on the host from the same
-channels and compares it bar by bar, so the example checks itself rather than being read by
-eye.
 
 Prerequisites
 -------------
@@ -50,5 +45,19 @@ Running
    uv run main.py --scene lidar_scene_slang.usda # Slang
 
 One ``renderer.step()`` fills two render products: the lidar and its histogram, and an
-ordinary camera view of the same scene. See :doc:`../spg/do/composites` for what a composite AOV is and how the channels are
-bound.
+ordinary camera view of the same scene. A successful run writes ``_output/histogram.png``, the
+node's chart with axes and labels drawn around it, and ``_output/scene.png``, the camera's view.
+
+Binding the Channels
+--------------------
+
+Each channel binds like any other buffer:
+
+.. filtered-literalinclude:: ../../examples/python/spg-composite-aov/RangeHistogramKernel.cu.lua
+   :language: lua
+   :start-after: -- [snippet:histogram-binding]
+   :end-before: -- [/snippet:histogram-binding]
+   :exclude-pattern: ^\s*--\s*\[/?snippet:
+   :dedent:
+
+See :doc:`../spg/do/composites` for what a composite AOV is and how the channels are found.

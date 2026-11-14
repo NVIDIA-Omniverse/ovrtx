@@ -62,8 +62,7 @@ produces; it does not sequence anything.
 RenderVar, is not published, and cannot be read back from the host. Publishing it is a
 deliberate act: give it a RenderVar and list it. Refer to :doc:`aovs`.
 
-**Languages can be mixed.** Nothing requires the two nodes in a chain to be written in the
-same language.
+**Languages can be mixed.** A CUDA node can feed a Slang node, and the reverse.
 
 Verify It Worked
 ----------------
@@ -72,15 +71,15 @@ Read back the final AOV and check that both transformations survived. In the
 :doc:`pipeline example <../../examples/python_spg_pipeline>` that means ``R == G == B`` from the
 first node, and each channel equal to ``255 - g`` where ``g`` is the grey value the first node
 produced. Grey but not inverted means the second node did not run. Inverted but still coloured
-means the first did not. The example recomputes the unpublished intermediate on the host and
-prints the largest difference it found.
+means the first did not. The intermediate is not published, so recompute it on the host from the
+input to compare.
 
 When It Goes Wrong
 ------------------
 
 - The second node never runs: its output is not consumed and publishes no RenderVar. Refer to
   :ref:`Nothing Appears <spg-symptom-nothing>`.
-- The intermediate cannot be read back: that is by design. Publish it if you need it.
+- The intermediate cannot be read back: publish it if you need it.
 
 Related
 -------

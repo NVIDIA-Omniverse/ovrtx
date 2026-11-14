@@ -130,7 +130,7 @@ of them from the other:
 
 Under ovrtx, **animation time is the simulation clock**. Everything that
 animates from animation time -- MDL ``state::animation_time()``, video texture
-frame selection, animated NuRec volumes and Gaussian splats -- advances with the
+frame selection, animated NuRec volumes and ParticleFields -- advances with the
 ``ovrtx_step`` delta, not with the applied USD time. Applying a USD time never
 changes animation time.
 
@@ -160,7 +160,7 @@ and has no reason to re-evaluate them at a timeline position. Three consequences
 Ordinals and Write-Floor Gates
 -------------------------------
 
-ovstage uses **ordinals** (application-supplied ``uint64_t`` values) to
+ovstage uses **ordinals** (application-supplied ``int64_t`` values) to
 version writes. Every ``write_attribute``, ``clone``, and related mutation
 carries an ordinal. ovstage retains the latest committed snapshot only; an
 ordinal passed to rendering is a publication gate, not a historical snapshot
@@ -260,7 +260,10 @@ Attaching and Detaching Around In-Flight Operations
 
 Both :c:func:`ovrtx_attach_ovstage` and :c:func:`ovrtx_detach_ovstage` rebuild
 the renderer's internal state on the calling thread, so wait for previously
-enqueued operations with :c:func:`ovrtx_wait_op` before calling either one.
+enqueued operations with :c:func:`ovrtx_wait_op` before calling either one. A
+step whose result :c:func:`ovrtx_fetch_results` has returned has completed,
+together with the operations enqueued before it, so no separate wait is needed
+for them.
 Neither call waits on your behalf, and rebuilding that state underneath a
 running operation can crash or hang the renderer. Note that an
 :c:func:`ovrtx_wait_op` timeout does not cancel the operation it was waiting

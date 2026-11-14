@@ -1,0 +1,3 @@
+# Keep the validated scene's input images despite rendering's output-image rules.
+!/assets/lookdev_grid_10k.png
+!/assets/studio.exr

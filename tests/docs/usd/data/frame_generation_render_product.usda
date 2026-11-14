@@ -1,0 +1,18 @@
+#usda 1.0
+
+# [snippet:doc-frame-generation-render-product]
+def Scope "Render" {
+    def RenderProduct "Camera" {
+        int2 resolution = (640, 480)
+        rel camera = </World/Camera>
+        rel orderedVars = [<LdrColor>]
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:dlss:frameGeneration = 1
+        int omni:rtx:dlss:frameGenerationInterpolatedFrameCount = 3
+
+        def RenderVar "LdrColor" {
+            string sourceName = "LdrColor"
+        }
+    }
+}
+# [/snippet:doc-frame-generation-render-product]

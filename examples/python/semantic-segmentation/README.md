@@ -37,6 +37,7 @@ Logged AOVs:
 
 - `LdrColor`
 - `HdrColor`
+- `SelectionState` (PT/RTPT only)
 - `NormalSD`
 - `DepthSD`
 - `DistanceToCameraSD`
@@ -62,7 +63,7 @@ When `--no-spawn` is used, the example also writes display PNGs for each image A
 
 The example captures the static AOVs after 50 warmup frames by default. It then moves all seven robots between their rest pose and small offsets for ten frames with the camera and warehouse fixed, and captures only `TargetMotionSD`. Motion direction is shown as hue and displacement as brightness, with 20 pixels at full brightness. In headless mode, static PNGs are saved before animation and are not overwritten. The raw motion output is also saved as `_output/TargetMotionSD.npy`.
 
-The example also captures instance segmentation, bounding boxes, visibility, ID maps and camera parameters. Raw additional outputs are saved as `_output/<sourceName>.npy`, display images as PNGs, and shape/content diagnostics in `_output/capture.json`. First-frame ID-map deltas are saved in `_output/initial/`; after warmup the unchanged scene has no new IDs. Empty outputs and mapping failures are recorded without preventing other outputs from being captured.
+The example also captures instance segmentation, bounding boxes, visibility, ID maps and camera parameters. Named fields for bounding boxes, occlusion, identifier maps, token maps, instance maps, ID pairs and camera parameters are saved as `_output/<sourceName>.npz`; CPU params use the `param_` prefix. Image and remaining single-tensor outputs use `.npy`. Display images are PNGs, with shape/content diagnostics in `_output/capture.json`. First-frame ID-map deltas are saved in `_output/initial/`; after warmup the unchanged scene has no new IDs. Empty outputs and mapping failures are recorded without preventing other outputs from being captured.
 
 
 ## Visualizing buffer outputs
@@ -111,6 +112,9 @@ A small ambient fill keeps every robot visible; Minimal ignores dome lights.
 
 Run `main.py --render-mode PathTracing --resolution 960 540 --samples-per-pixel 128 --no-spawn`
 to write PT tensors, PNG previews, and `capture.json` under `_output/pt/`.
+The final PT report includes structured `.npz` outputs: each field has its shape
+and dtype recorded, CPU parameter names start with `param_`, and `bytes` is the
+total size of the fields. Empty fields remain in the report with zero bytes.
 The capture renders one static frame at 128 samples per pixel, without warmup frames.
 It then moves the seven robots for one separate motion frame.
 Empty outputs remain visible in the report. LPE requests use expression source names.
@@ -201,3 +205,40 @@ def build_pt_render_layer_usda(scene_path: Path, resolution: tuple[int, int], sa
 }}
 '''
 ```
+
+## Selection-state preview
+
+PT and RTPT request `SelectionState` and select the humanoid, forklift C, and Kaya
+as groups 1, 2, and 3. Other geometry can occlude those selections. The preview
+shows cyan, orange, and purple respectively: visible samples are bright, hidden
+samples are at 25% brightness, and background is black. Four decoded coverage
+colors are averaged per pixel; the raw uint16 channels are not RGBA colors.
+PNG exports include `SelectionState.png`, with raw values in `SelectionState.npy`.
+Minimal mode neither requests this AOV nor sets selections.
+
+For application-controlled outlines and cross-hatched hidden fills, see the
+[selection SPG example](../../c/selection-spg/README.md).
+
+The preview decodes the samples before applying display colors:
+
+```python
+def _visualize_selection_state(values: np.ndarray) -> np.ndarray:
+    """Decode coverage samples before coloring: hue is group, brightness is visibility."""
+    if values.dtype != np.uint16 or values.ndim != 3 or values.shape[-1] != 4:
+        raise ValueError("SelectionState must have uint16 shape (H, W, 4)")
+    groups = values & 0xFF
+    visible = (values & 0x100) != 0
+    # The robot capture uses groups 1/2/3: cyan, orange, and purple. Zero stays black.
+    palette = np.array([[0, 0, 0], [0, 0.85, 1], [1, 0.55, 0.1], [0.8, 0.35, 1]], dtype=np.float32)
+    colors = palette[(groups - 1) % 3 + 1]
+    brightness = np.where(groups == 0, 0.0, np.where(visible, 1.0, 0.25))
+    # Each channel is a coverage sample, not a color component; average decoded colors.
+    return _to_uint8_image((colors * brightness[..., None]).mean(axis=2))
+```
+
+Selection uses geometry paths from the first frame’s StableIdMap; selecting a
+parent robot Xform does not recursively select its parts.
+
+PT takes one setup step to obtain the geometry path map before selecting robot parts
+and capturing its converged static frame. RTPT uses the first warmup frame for this
+setup, or one explicit setup step when warmup is disabled.

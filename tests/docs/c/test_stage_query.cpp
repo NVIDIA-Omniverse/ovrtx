@@ -192,8 +192,9 @@ TEST_F(StageQueryTest, PathDictionaryResolve) {
     ASSERT_EQ(reads.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, reads.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount),
               OVSTAGE_OK);
 
     // Pull the prim list handle from the group. Each entry is an
@@ -247,7 +248,7 @@ TEST_F(StageQueryTest, PathDictionaryResolve) {
     EXPECT_EQ(rebuilt_num, out_num);
     ASSERT_EQ(path_dictionary_release_path_list_reference(pd, rebuilt).status, OVX_API_SUCCESS);
 
-    ovstage_release_group(stage_, &group);
+    ovstage_release_groups(stage_, &group, 1);
     ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-path-dictionary-resolve-c]
 
@@ -329,7 +330,7 @@ TEST_F(StageQueryLegacyTest, QueryRequireAnyExcludeAllAttrs) {
     desc.attribute_filter.mode = OVRTX_ATTRIBUTE_FILTER_ALL;
     // [/snippet:doc-query-require-any-exclude-c]
 
-    ovrtx_query_handle_t query_handle = 0;
+    ovrtx_query_handle_t query_handle{};
     ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
     ASSERT_API_SUCCESS(eq.status);
     docs_wait_no_errors(renderer_, eq.op_index);
@@ -369,7 +370,7 @@ TEST_F(StageQueryLegacyTest, QuerySpecificEmptyAttributes) {
     desc.attribute_filter.attribute_name_count = 0;
     // [/snippet:doc-query-specific-empty-attributes-c]
 
-    ovrtx_query_handle_t query_handle = 0;
+    ovrtx_query_handle_t query_handle{};
     ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer_, &desc, &query_handle);
     ASSERT_API_SUCCESS(eq.status);
     docs_wait_no_errors(renderer_, eq.op_index);

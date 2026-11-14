@@ -64,14 +64,15 @@ Options
 
 The example decodes ``SemanticIdMap`` before logging ``SemanticSegmentation``. It remaps renderer semantic IDs into compact 16-bit Rerun class IDs, logs an ``AnnotationContext`` with the semantic labels, and displays the segmentation image in the Rerun blueprint grid.
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 The example captures the static AOVs after 50 warmup frames by default. It then moves all seven robots between their rest pose and small offsets for ten frames with the camera and warehouse fixed, and captures only :ref:`TargetMotionSD <camera-output-tables>`. Motion direction is shown as hue and displacement as brightness, with 20 pixels at full brightness. In headless mode, static PNGs are saved before animation and are not overwritten. The raw motion output is also saved as ``_output/TargetMotionSD.npy``.
 
 The example also captures instance segmentation, bounding boxes,
-visibility, ID maps and camera parameters. Raw additional outputs are saved as
-``_output/<sourceName>.npy`` with shape and content diagnostics in
-``_output/capture.json``. First-frame ID-map deltas are saved in ``_output/initial/``;
+visibility, ID maps and camera parameters. Named fields are saved as
+``_output/<sourceName>.npz``; CPU params use the ``param_`` prefix. Images and
+remaining single-tensor outputs use ``.npy``. Shape and content diagnostics are
+written to ``_output/capture.json``. First-frame ID-map deltas are saved in ``_output/initial/``;
 after warmup the unchanged scene has no new IDs, so a zero-entry delta is expected.
 Empty outputs and mapping failures are recorded without preventing the other
 outputs from being captured. See :doc:`../sensors/cameras/decoding_outputs` for
@@ -80,7 +81,7 @@ Python and C API decoding examples.
 Visualizing Buffer Outputs
 --------------------------
 
-The example decodes bounding-box and visibility records into typed arrays and
+The example reads named bounding-box, occlusion, and instance-map tensors and
 joins runtime IDs through ``InstanceMap`` and ``StableIdSemanticIdMap`` to prim
 paths. The overlays show robot geometry only. Raw box outputs show individual
 parts; semantic box outputs show the seven top-level robot bounds.
@@ -127,7 +128,8 @@ Path Tracing capture
 
 Use ``--render-mode PathTracing --resolution 960 540 --samples-per-pixel 128 --no-spawn``
 to save PT tensors, PNG previews, and ``capture.json`` under ``_output/pt/``.
-Path Tracing captures one static frame at 128 samples per pixel, without warmup frames.
+Path Tracing takes one setup step to obtain geometry paths for selection, then
+captures one static frame at 128 samples per pixel. It does not use RT warmup frames.
 The robots then move for one separate motion frame; static outputs are already saved.
 The report retains empty outputs for diagnosis. LPE RenderVars use expression source names.
 
@@ -170,3 +172,24 @@ The first output selects walls, shelves and pallets in RGB, and floors in alpha.
 The grey strip underneath shows each output's full-frame alpha mask.
 Its labels use G for geometry IDs and M for material IDs, in RGBA order;
 G-1 is the disabled alpha component of the fourth output.
+
+Selection-state preview
+-----------------------
+
+PT and RTPT also capture ``SelectionState``. The humanoid, forklift C, and Kaya
+use selection groups 1, 2, and 3. Their previews are cyan, orange, and purple:
+visible samples are bright, hidden samples have 25% brightness, and background
+is black. Each pixel averages four decoded coverage colors. The uint16 channels
+must not be interpreted directly as RGBA.
+
+The following function maps the classification to display colors:
+
+.. literalinclude:: ../../examples/python/semantic-segmentation/main.py
+   :language: python
+   :start-after: # [snippet:doc-selection-state-preview]
+   :end-before: # [/snippet:doc-selection-state-preview]
+
+See :doc:`c_selection_spg` to use the same AOV for custom outlines and fills.
+
+Selection uses geometry paths from the first frame’s StableIdMap; selecting a
+parent robot Xform does not recursively select its parts.

@@ -16,8 +16,7 @@ Overview
 Sensor Processing Graphs (SPG) enables running custom GPU code as post-processing passes on RTX
 render outputs (Arbitrary Output Variables, or AOVs). You write a CUDA kernel or a Slang shader,
 describe its launch configuration in a Lua script, declare its interface in USD, and wire it into
-a RenderProduct. All computation stays on the GPU; there is no CPU-side data transfer in the
-processing pipeline.
+a RenderProduct. The data a node reads and writes stays on the GPU.
 
 This guide assumes proficiency with CUDA kernel programming or Slang Shader programming and basic familiarity
 with USD (Universal Scene Description).
@@ -25,7 +24,7 @@ with USD (Universal Scene Description).
 How SPG Works
 -------------
 
-Every SPG node is defined by three files:
+Every SPG node you write is defined by three files:
 
 .. list-table::
    :header-rows: 1
@@ -59,10 +58,9 @@ The pages after this one come in four kinds:
    * - Section
      - Purpose
    * - :doc:`first_node`
-     - **Walkthrough.** Builds one node from nothing, in order, once.
+     - **Walkthrough.** Builds one node, step by step.
    * - :doc:`How-To <do/index>`
-     - **One page per task.** Find the one you need. Not written to be read in
-       sequence.
+     - **One page per task.** Find the one you need.
    * - :doc:`Reference <ref/index>`
      - **Lookup.** Every Lua function and every USD attribute you can author.
    * - :doc:`Troubleshooting <diagnose/index>`

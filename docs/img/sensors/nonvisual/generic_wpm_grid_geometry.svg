@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="550" viewBox="0 0 1000 550" role="img" aria-labelledby="title desc">
+<title id="title">Generic wpm model grid geometry</title>
+<desc id="desc">Three illustrative three-by-three grids before the pattern pose. Spherical grids share one origin and vary elevation by row and azimuth by column. Planar grids place origins in Y and Z with every local X axis pointing in the positive X direction. Cylindrical grids place origins along Z and vary azimuth by column. Green dots mark element origins; blue arrows show element orientation, not receiver acceptance cones.</desc>
+<defs><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-757575-1p6" markerUnits="userSpaceOnUse" markerWidth="8.8" markerHeight="7.2" refX="0" refY="3.6" orient="auto" overflow="visible"><path d="M0,0 L8.8,3.6 L0,7.2 z" fill="#757575"/></marker></defs>
+<rect width="1000" height="550" fill="#fff"/>
+<text x="24" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="23" fill="#313131" font-weight="bold">Grid element poses, before the pattern pose</text>
+<rect x="24" y="70" width="300" height="365" rx="6" fill="#F2F2F2"/>
+<text x="42" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="21" fill="#313131" font-weight="bold">SPHERICAL</text>
+<text x="42" y="134" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">One origin, angular directions</text>
+<rect x="350" y="70" width="300" height="365" rx="6" fill="#F2F2F2"/>
+<text x="368" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="21" fill="#313131" font-weight="bold">PLANAR</text>
+<text x="368" y="134" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">YZ origins, parallel directions</text>
+<rect x="676" y="70" width="300" height="365" rx="6" fill="#F2F2F2"/>
+<text x="694" y="104" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="21" fill="#313131" font-weight="bold">CYLINDRICAL</text>
+<text x="694" y="134" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#313131">Z origins, azimuth directions</text>
+<line x1="90" y1="285" x2="228.33" y2="322.97" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="206.95" y2="298.58" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="139.61" y2="289.53" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="243.44" y2="264.2" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="220.76" y2="237.74" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="148.72" y2="231.16" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="229.28" y2="209.01" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="209.45" y2="184.78" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="90" y1="285" x2="145.5" y2="178.16" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="90" cy="285" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<polygon points="509.5,325.75 454.5,303.75 454.5,210.25 509.5,232.25" fill="#fff" stroke="#C0C0C0" stroke-width="1.5"/>
+<line x1="507" y1="320.5" x2="600.41" y2="286.74" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="482" y1="310.5" x2="575.41" y2="276.74" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="457" y1="300.5" x2="550.41" y2="266.74" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="507" y1="278" x2="600.41" y2="244.24" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="482" y1="268" x2="575.41" y2="234.24" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="457" y1="258" x2="550.41" y2="224.24" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="507" y1="235.5" x2="600.41" y2="201.74" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="482" y1="225.5" x2="575.41" y2="191.74" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="457" y1="215.5" x2="550.41" y2="181.74" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<circle cx="507" cy="320.5" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="482" cy="310.5" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="457" cy="300.5" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="507" cy="278" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="482" cy="268" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="457" cy="258" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="507" cy="235.5" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="482" cy="225.5" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="457" cy="215.5" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<line x1="742" y1="321" x2="742" y2="219" stroke="#C0C0C0" stroke-width="1.5"/>
+<line x1="742" y1="321" x2="890.6" y2="300.86" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="321" x2="868.61" y2="275.24" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="321" x2="798.76" y2="268.96" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="270" x2="890.6" y2="249.86" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="270" x2="868.61" y2="224.24" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="270" x2="798.76" y2="217.96" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="219" x2="890.6" y2="198.86" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="219" x2="868.61" y2="173.24" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<line x1="742" y1="219" x2="798.76" y2="166.96" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<circle cx="742" cy="321" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="321" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="321" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="270" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="270" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="270" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="219" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="219" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<circle cx="742" cy="219" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<text x="42" y="380" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Rows: elevation (degrees)</text>
+<text x="42" y="410" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Columns: azimuth (degrees)</text>
+<text x="368" y="380" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Rows: Z position (meters)</text>
+<text x="368" y="410" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Columns: Y position (meters)</text>
+<text x="694" y="380" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Rows: height Z (meters)</text>
+<text x="694" y="410" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Columns: azimuth (degrees)</text>
+<circle cx="34" cy="471" r="5" fill="#76B900" stroke="#fff" stroke-width="1.2"/>
+<text x="50" y="477" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Element origin</text>
+<line x1="240" y1="471" x2="269" y2="471" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<text x="294" y="477" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#313131">Element local +X direction</text>
+<text x="24" y="524" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="17" fill="#757575">3 × 3 elements in each example · schematic, not to scale</text>
+<line x1="868" y1="511" x2="905.37" y2="497.49" stroke="#757575" stroke-width="1.6" marker-end="url(#arrow-757575-1p6)"/>
+<text x="925.65" y="499.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#757575" text-anchor="middle">+X</text>
+<line x1="868" y1="511" x2="848.67" y2="503.27" stroke="#757575" stroke-width="1.6" marker-end="url(#arrow-757575-1p6)"/>
+<text x="828.5" y="505" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#757575" text-anchor="middle">+Y</text>
+<line x1="868" y1="511" x2="868" y2="473.05" stroke="#757575" stroke-width="1.6" marker-end="url(#arrow-757575-1p6)"/>
+<text x="868" y="454.25" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="16" fill="#757575" text-anchor="middle">+Z</text>
+</svg>

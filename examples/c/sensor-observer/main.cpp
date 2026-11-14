@@ -97,7 +97,9 @@ void check_cuda(CUresult status) {
 struct Runtime {
     ovrtx_renderer_t* renderer = nullptr;
     ovstage_instance_t* stage = nullptr;
-    std::array<ovstage_query_handle_t, 3> queries{};
+    std::array<ovstage_query_handle_t, 3> queries{
+        OVSTAGE_INVALID_QUERY_HANDLE, OVSTAGE_INVALID_QUERY_HANDLE, OVSTAGE_INVALID_QUERY_HANDLE
+    };
     bool rtx_initialized = false;
     bool stage_initialized = false;
     Runtime() = default;
@@ -135,12 +137,12 @@ struct Runtime {
 
 struct Results {
     ovrtx_renderer_t* renderer;
-    ovrtx_step_result_handle_t handle = OVRTX_INVALID_HANDLE;
+    ovrtx_step_result_handle_t handle{};
     explicit Results(ovrtx_renderer_t* owner) : renderer(owner) {}
     Results(const Results&) = delete;
     Results& operator=(const Results&) = delete;
     ~Results() {
-        if (handle != OVRTX_INVALID_HANDLE) {
+        if (handle != OVRTX_INVALID_STEP_RESULT_HANDLE) {
             ovrtx_destroy_results(renderer, handle);
         }
     }
@@ -169,7 +171,7 @@ struct Mapping {
     Mapping(const Mapping&) = delete;
     Mapping& operator=(const Mapping&) = delete;
     ~Mapping() {
-        if (output.map_handle != OVRTX_INVALID_HANDLE) {
+        if (output.map_handle != OVRTX_INVALID_RENDER_VAR_OUTPUT_MAP_HANDLE) {
             cuStreamSynchronize(stream);
             ovrtx_unmap_render_var_output(renderer, output.map_handle, {});
         }

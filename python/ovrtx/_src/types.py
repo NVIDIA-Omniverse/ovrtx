@@ -11,6 +11,8 @@ import warnings
 from dataclasses import dataclass, fields
 from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, TypeVar
 
+from ..handles import AttributeBindingHandle, MapHandle, OpId, RenderVarOutputMapHandle
+from . import bindings as _bindings
 from .bindings import (  # noqa: F401 — re-exported public API
     AftermathMode,
     AttributeFilterMode,
@@ -33,6 +35,15 @@ from .dlpack import (
     _DLPackable,
 )
 from .helpers import _deprecation_warnings_suppressed, deprecated
+from .provider_bindings import (  # noqa: F401 — re-exported public API
+    AccessorCapability,
+    DataHint,
+    DataKind,
+    DataPinFlag,
+    DataRangeStrategy,
+    DataStatus,
+    DataSubmit,
+)
 
 if TYPE_CHECKING:
     from .renderer import Renderer
@@ -50,6 +61,18 @@ _OVSTAGE_WRITE_REPLACEMENT = "Use ovstage.Stage.write_attribute() with a reusabl
 _OVSTAGE_MAP_REPLACEMENT = "Use ovstage.Stage.map_attribute() with a reusable ovstage query instead."
 _OVSTAGE_UNMAP_REPLACEMENT = "Use ovstage.Map.unmap() or ovstage.Stage.unmap_attribute() instead."
 _OVSTAGE_RELEASE_QUERY_REPLACEMENT = "Release the reusable ovstage query with Query.release() instead."
+
+
+def _process_cleanup_started() -> bool:
+    """True once ovrtx's interpreter-exit cleanup has run.
+
+    The loader stays up while a ``Renderer`` is alive at exit, so finalizers that run afterwards must not do native work
+    (destroy results, unmap, unbind, or block on operations) during interpreter finalization.
+    """
+    try:
+        return _bindings._ovrtx_loader.is_process_cleanup_started
+    except Exception:
+        return True  # Module state is already being torn down.
 
 
 class Operation(Generic[T]):
@@ -114,20 +137,21 @@ class Operation(Generic[T]):
     def __init__(
         self,
         renderer: "Renderer",
-        op_id: int,
+        op_id: OpId,
         handle: Any = None,
         operation_name: str = "",
         fetch_fn: Optional[Callable[[Any], T]] = None,
         cleanup_fn: Optional[Callable[[], None]] = None,
     ):
-        self._op_id = op_id
+        self._ctx = None
+        self._pending_fetch: Optional[T] = None
+        self._op_id = _bindings.ovrtx_op_id_t(_bindings.ovrtx_op_id_t._require(op_id, "op_id"))
         self._operation_name = operation_name
         self._ctx = Operation._Ctx(renderer=renderer, fetch_fn=fetch_fn, cleanup_fn=cleanup_fn)
         self._handle = handle
-        self._pending_fetch: Optional[T] = None
 
     @property
-    def op_id(self) -> int:
+    def op_id(self) -> OpId:
         """The operation ID."""
         return self._op_id
 
@@ -205,6 +229,8 @@ class Operation(Generic[T]):
 
     def __del__(self):
         """Warn and block if operation was never waited on."""
+        if _process_cleanup_started():
+            return
         # Already consumed (wait succeeded) or already cleaned up — nothing to do
         if self._pending_fetch is not None or self._ctx is None:
             return
@@ -281,6 +307,8 @@ class PendingFetch(Generic[T]):
         return self._result
 
     def __del__(self):
+        if _process_cleanup_started():
+            return
         if not self._fetched:
             warnings.warn(
                 "PendingFetch was garbage-collected without fetch(). Blocking to free C resources.",
@@ -363,6 +391,9 @@ class MappedRenderVar(_DLPackable):
        blocks until ``wait_event`` fires; after it returns, the data is
        valid for any subsequent access (CPU read, fresh kernel launch on
        any stream, etc.).
+    4. **Experimental producer stream** — when :attr:`producer_stream` is
+       available, enqueue reads directly on it without a readiness wait.
+       Follow its device, lifetime, and unmap requirements.
 
     CPU mappings (``device=Device.CPU``) are always valid on map return;
     :meth:`wait` and :meth:`wait_on` are silent no-ops in that case
@@ -413,7 +444,7 @@ class MappedRenderVar(_DLPackable):
         self,
         *,
         renderer: "Renderer",
-        map_handle: int,
+        map_handle: RenderVarOutputMapHandle,
         device: Device,
         render_var_path: str,
         type: str,
@@ -422,6 +453,7 @@ class MappedRenderVar(_DLPackable):
         tensors: list,
         params: list,
         wait_event: Optional[int] = None,
+        producer_stream: Optional[int] = None,
     ):
         """Internal: constructed by :meth:`Renderer._map_output` after decoding the C struct.
 
@@ -435,10 +467,13 @@ class MappedRenderVar(_DLPackable):
         resident — the C side already CPU-blocked + copied).
         """
         self._renderer = renderer
-        self._map_handle = map_handle
+        self._map_handle = _bindings.ovrtx_render_var_output_map_handle_t(
+            _bindings.ovrtx_render_var_output_map_handle_t._require(map_handle, "map_handle")
+        )
         self._device = device
         self._cuda_sync = None
         self._wait_event = wait_event
+        self._producer_stream = producer_stream
         self._unmapped = False  # set once the user has called unmap() / __exit__
         self._render_var: Optional["RenderVarOutput"] = None  # set by RenderVarOutput.map() post-construction
 
@@ -550,9 +585,31 @@ class MappedRenderVar(_DLPackable):
         ``None`` for CPU mappings and for any GPU mapping whose tensors all
         landed on the CPU (the C side already CPU-blocked + copied). For
         GPU-resident tensors, this is the event the consumer must observe
-        before reading — see the class docstring for the three usage patterns.
+        before reading — see the class docstring for the ordering patterns.
         """
         return self._wait_event
+
+    @property
+    def producer_stream(self) -> Optional[int]:
+        """Experimental borrowed enqueue stream for uniform zero-copy CUDA outputs.
+
+        ``None`` when unavailable or after unmap. Work queued here is ordered after
+        everything already queued on the stream, including later products, the end
+        of the render graph, and already-submitted subsequent steps. This gives up
+        per-product readiness even when :attr:`wait_event` is per-product; the same
+        queue-tail rule applies to per-device events. Map with ``sync_stream=0`` to
+        avoid the default map-time cross-stream readiness wait.
+        Use the tensor's CUDA device and the renderer's primary context. Never destroy,
+        configure, or capture this stream. The mapping does not pin its lifetime:
+        serialize use with graph rebuilds, reset, and renderer destruction, completing
+        reads and releasing mappings first. Do not cache the handle across those operations.
+
+        Keep work short: it delays renderer work sharing the stream. Pass a
+        completion event or this stream to :meth:`unmap`, or finish reads first.
+        A stream passed to unmap may CPU-block. When unavailable, use
+        :meth:`wait`, :meth:`wait_on`, or map-time ``sync_stream`` instead.
+        """
+        return None if self._unmapped or self._unmap_state.unmapped else self._producer_stream
 
     def wait(self) -> None:
         """Block the calling thread until :attr:`wait_event` has fired.
@@ -661,8 +718,10 @@ class MappedRenderVar(_DLPackable):
         also resets the originating output's re-map gate so the same
         :class:`RenderVarOutput` can be mapped again.
         """
-        state = self._unmap_state
-        if state.unmapped:
+        if _process_cleanup_started():
+            return
+        state = getattr(self, "_unmap_state", None)
+        if state is None or state.unmapped:
             return
         state.unmapped = True
         # Fallback gate-clear for the never-released path. If unmap() ran earlier
@@ -809,6 +868,15 @@ class RenderVarOutput(Generic[T]):
     Use :meth:`map` to obtain a :class:`MappedRenderVar` exposing the render
     variable's tensors and params via DLPack.
 
+    A rendered frame has an output for every RenderVar the render product lists,
+    including one OVRTX could not produce, such as a RenderVar with an invalid
+    ``ovrtx:compression:*`` setting (a DLSS-G interpolated frame has outputs only
+    for its color RenderVars, and one fails when the same RenderVar's compression
+    fails on the rendered frame). Such an output has :attr:`status`
+    :attr:`EventStatus.FAILURE` and says why in :attr:`error_message`; mapping it
+    raises ``RuntimeError`` with that message. The render product's other
+    RenderVars still render.
+
     Example::
 
         with render_var.map(device=Device.CUDA) as rv:
@@ -823,12 +891,20 @@ class RenderVarOutput(Generic[T]):
         renderer: "Renderer",
         source_name: str = "",
         source_type: str = "",
+        status: EventStatus = EventStatus.COMPLETED,
+        error_message: str = "",
     ):
         """Internal: created by :meth:`Renderer._fetch_results`."""
         self.render_var_path = render_var_path
         self.source_name = source_name
         self.source_type = source_type
-        self.handle = handle
+        #: :attr:`EventStatus.COMPLETED` when the output was produced, :attr:`EventStatus.FAILURE` when not.
+        self.status = status
+        #: Why OVRTX could not produce the output; empty when :attr:`status` is :attr:`EventStatus.COMPLETED`.
+        self.error_message = error_message
+        self.handle = _bindings.ovrtx_render_var_output_handle_t(
+            _bindings.ovrtx_render_var_output_handle_t._require(handle, "handle")
+        )
         self._renderer = renderer
         self._map_handle: Any = None  # set while a mapping is outstanding; gates re-map
 
@@ -865,8 +941,47 @@ class RenderVarOutput(Generic[T]):
         return rv
 
     def __repr__(self) -> str:
-        status = "mapped" if self._map_handle else "unmapped"
+        if self.status == EventStatus.FAILURE:
+            return f"RenderVarOutput(render_var_path='{self.render_var_path}', failed: {self.error_message!r})"
+        status = "mapped" if self._map_handle is not None else "unmapped"
         return f"RenderVarOutput(render_var_path='{self.render_var_path}', {status})"
+
+
+class _RenderVarOutputs(dict[str, RenderVarOutput[T]]):
+    """Canonical output dictionary with read-only short-name lookup aliases.
+
+    Mutations operate on exact keys, as in dict. Aliases resolve against the
+    current returned output keys and values, never a cache.
+    """
+
+    def __missing__(self, key):
+        if not isinstance(key, str) or not key or "/" in key:
+            raise KeyError(key)
+        candidate = None
+        for path in self:
+            if isinstance(path, str) and path.startswith("/") and path.rsplit("/", 1)[-1] == key:
+                if candidate is not None:
+                    raise KeyError(f"Ambiguous RenderVar name {key!r}: use a full path ({candidate!r} or {path!r})")
+                candidate = path
+        if candidate is None:
+            raise KeyError(key)
+        return dict.__getitem__(self, candidate)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __contains__(self, key):
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
+
+    def copy(self):
+        return type(self)(self)
 
 
 @dataclass
@@ -894,7 +1009,16 @@ class FrameOutput(Generic[T]):
     exposure); otherwise the end of this sensor's frame exposure window.
     """
     render_vars: dict[str, RenderVarOutput[T]]
-    """Outputs keyed by full authored USD RenderVar prim paths or reserved OVRTX output names."""
+    """Outputs keyed by full authored USD RenderVar prim paths or reserved OVRTX output names.
+
+    Indexing, get and containment also accept a prim name unique among this
+    frame's returned outputs. Configured targets without output do not count. Ambiguous
+    indexing raises KeyError; get returns its default and containment is false.
+    An output absent from this frame remains missing, even if its name is unique.
+    Exact keys take precedence, including reserved names such as ovrtx_pick_hit.
+    Iteration, keys, counts and mutations use canonical keys. Alias lookups return
+    the same object as full-path lookups, including after canonical value replacement.
+    """
     progression: int = 0
     """Path-tracing sample accumulation progress for this render product frame.
 
@@ -933,6 +1057,9 @@ class RenderProductSetOutputs(Generic[T]):
         for product_name, product in products.items():
             for frame in product.frames:
                 for render_var_path, render_var in frame.render_vars.items():
+                    if render_var.status != EventStatus.COMPLETED:
+                        print(render_var.error_message)
+                        continue
                     mapping = render_var.map()
                     # Process mapping...
 
@@ -1028,6 +1155,8 @@ class RenderProductSetOutputs(Generic[T]):
         this call — they are released when their own ``unmap`` fires (via
         the mapping's own deleter chain).
         """
+        if _process_cleanup_started():
+            return
         try:
             self._destroy_fn()
         except Exception as e:
@@ -1077,7 +1206,7 @@ class AttributeBinding(Generic[_BindingTensorT]):
 
     def __init__(
         self,
-        handle: int,
+        handle: AttributeBindingHandle,
         semantic: int,
         dtype: DLDataType,
         renderer: "Renderer",
@@ -1087,7 +1216,7 @@ class AttributeBinding(Generic[_BindingTensorT]):
         """Initialize attribute binding (internal use - created by Renderer.bind_attribute).
 
         Args:
-            handle: Raw C binding handle value
+            handle: Typed attribute binding identity
             semantic: Semantic constant (OVRTX_SEMANTIC_*)
             dtype: Expected DLDataType for tensors used with this binding
             renderer: Renderer instance that created this binding
@@ -1096,7 +1225,10 @@ class AttributeBinding(Generic[_BindingTensorT]):
         """
         import weakref
 
-        self._handle = handle
+        self._handle = None
+        self._handle = _bindings.ovrtx_attribute_binding_handle_t(
+            _bindings.ovrtx_attribute_binding_handle_t._require(handle, "handle")
+        )
         self._semantic = semantic
         self._dtype = dtype
         self._renderer = weakref.ref(renderer)
@@ -1111,8 +1243,8 @@ class AttributeBinding(Generic[_BindingTensorT]):
         return renderer
 
     @property
-    def handle(self) -> int:
-        """Raw C binding handle value."""
+    def handle(self) -> AttributeBindingHandle:
+        """Typed attribute binding identity."""
         return self._handle
 
     @property
@@ -1265,6 +1397,8 @@ class AttributeBinding(Generic[_BindingTensorT]):
 
     def __del__(self):
         """Auto-unbind on garbage collection if not already unbound."""
+        if _process_cleanup_started():
+            return
         if self._handle is None:
             return  # Already unbound
         renderer = self._renderer()  # weakref - may be None if renderer destroyed
@@ -1361,13 +1495,13 @@ class AttributeMapping(_DLPackable):
         return self
 
     @property
-    def map_handle(self) -> int:
+    def map_handle(self) -> MapHandle:
         """Get the map handle for unmap operation.
 
         Returns:
-            Map handle value (uint64)
+            Typed map identity
         """
-        return int(self._mapping.map_handle)
+        return self._mapping.map_handle
 
     @property
     def binding_desc(self) -> Optional[Any]:
@@ -1408,9 +1542,7 @@ class AttributeMapping(_DLPackable):
         if event is not None and stream is not None:
             raise ValueError("Cannot specify both event and stream; use one or the other")
 
-        op = self._renderer._enqueue_attribute_unmap(
-            int(self._mapping.map_handle), self._build_cuda_sync(event, stream)
-        )
+        op = self._renderer._enqueue_attribute_unmap(self._mapping.map_handle, self._build_cuda_sync(event, stream))
         self._unmapped = True
         self._dltensor = None
         self._dlpack_error = "Mapping already released"
@@ -1485,9 +1617,11 @@ class AttributeMapping(_DLPackable):
         can deadlock inside finalizers. The enqueued operation completes
         when the renderer processes its next operation.
         """
+        if _process_cleanup_started():
+            return
         if not self._unmapped:
             try:
-                self._renderer._enqueue_attribute_unmap(int(self._mapping.map_handle))
+                self._renderer._enqueue_attribute_unmap(self._mapping.map_handle)
             except Exception:
                 pass
             self._unmapped = True
@@ -1567,9 +1701,12 @@ class RendererConfig:
     Init-time only; toggling requires recreating the renderer."""
 
     selection_outline_width: Optional[int] = None
-    """Selection outline width in pixels. Valid range is ``0..15`` (the underlying RTX
-    outline pipeline cap); out-of-range values are clamped by the renderer.
-    Init-time only; changing requires recreating the renderer. Default: 2."""
+    """Default selection outline width in pixels, applied to every group without a
+    per-group width of its own. Valid range is ``0..15`` (the underlying RTX outline
+    pipeline cap), where ``0`` draws no outline ring; out-of-range values are clamped
+    by the renderer. Init-time only; changing this default requires recreating the
+    renderer. Per-group overrides are applied at runtime via
+    :attr:`SelectionGroupStyle.outline_width`. Default: 2."""
 
     selection_fill_mode: Optional[SelectionFillMode] = None
     """Selection-outline fill (interior) mode. Accepts a :class:`SelectionFillMode`
@@ -1602,7 +1739,8 @@ class RendererConfig:
     Accepts a :class:`MotionBvh` member, the equivalent ``int`` value (``0..2``),
     or the strings ``"disable"``, ``"enable"``, or ``"auto"``.
 
-    When ``None`` (default), motion BVH is disabled and no config entry is sent.
+    Per renderer instance. When ``None`` (default), motion BVH is disabled.
+    Creating another renderer does not change this instance's policy.
     Sensor workflows should pass :attr:`MotionBvh.AUTO` or :attr:`MotionBvh.ENABLE`.
     Init-time only; changing requires recreating the renderer."""
 
@@ -1683,6 +1821,22 @@ class RendererConfig:
     Start a new process to change it.
     """
 
+    enable_debug_validation: Optional[bool] = None
+    """Enable graphics API debug validation when creating shared graphics devices.
+
+    Applies to Debug and Release builds. None preserves GPU Foundation's default.
+    Additional renderers inherit the existing mode. Conflicting explicit requests warn and
+    create the renderer with that mode. Destroy all renderers and release keep_system_alive
+    retention before selecting a different mode. D3D12 validation disables Aftermath.
+    """
+
+    enable_history_presentation: Optional[bool] = None
+    """Present the retained values of an attached history-capable ovstage when a step names an
+    ordinal below the write floor. When omitted or ``False``, the renderer makes no history calls,
+    and such a step fails with a reason that names ``OVRTX_CONFIG_ENABLE_HISTORY_PRESENTATION``.
+
+    Declared after the fields of the earlier releases, so their positional order is unchanged."""
+
     def __repr__(self) -> str:
         set_fields = ", ".join(
             f"{f.name}={getattr(self, f.name)!r}" for f in fields(self) if getattr(self, f.name) is not None
@@ -1702,10 +1856,12 @@ class SelectionGroupStyle:
     group id assigned through the renderer selection-outline group API.
 
     Note:
-        Outline thickness and the fill/interior mode are global init-time
-        settings — see :attr:`RendererConfig.selection_outline_width` and
-        :attr:`RendererConfig.selection_fill_mode`. Outline dashing is not
-        supported by the underlying renderer.
+        Fill/interior mode is a global init-time setting — see
+        :attr:`RendererConfig.selection_fill_mode`.
+        :attr:`RendererConfig.selection_outline_width` is the default thickness;
+        :attr:`outline_width` overrides it for this group. Omitting
+        :attr:`outline_width` leaves this group's width unchanged, so it keeps
+        the default. Outline dashing is not supported by the underlying renderer.
     """
 
     outline_color: tuple[float, float, float, float]
@@ -1714,6 +1870,28 @@ class SelectionGroupStyle:
     fill_color: tuple[float, float, float, float]
     """Interior fill color (RGBA, ``[0, 1]``). Used when the global fill
     mode selects per-group fill modes (``2`` or ``3``)."""
+
+    outline_width: float = 0.0
+    """Outline width in pixels (``1..15``). Overrides the renderer-creation default
+    from :attr:`RendererConfig.selection_outline_width` for this group. Defaults to
+    ``0``, which leaves this group's current width in place rather than setting a
+    width of ``0``, so color-only constructors keep the configured default.
+    Suppressing a single group's outline is not expressible here — clear the group
+    instead."""
+
+
+@dataclass
+class RenderQuality:
+    """Quality override for the frame rendered after :meth:`Renderer.clear_history`.
+
+    The defaults render the frame once, like passing no override.
+    """
+
+    wait_for_streaming: bool = False
+    """Wait for asset streaming, as ``omni:rtx:waitForEvents = [AllLoadingFinished]``."""
+
+    quality: int = 0
+    """Initial quality in ``[0, 100]``, with the same meaning as ``omni:rtx:quality``."""
 
 
 @dataclass

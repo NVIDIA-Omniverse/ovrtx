@@ -14,19 +14,17 @@ Python: SPG Generating Node
 An SPG node with no input AOV at all. Every value it needs is a typed USD attribute, and it
 draws a checkerboard into its own output, which the scene publishes as ``Checker``.
 
-The run checks itself: it rebuilds the same checkerboard on the host from the attributes the
-scene authored and compares the two pixel for pixel.
-
 Running
 -------
 
 .. code-block:: bash
 
-   uv run main.py
+   uv run main.py                                   # CUDA
+   uv run main.py --scene checker_scene_slang.usda  # Slang
 
-The first step compiles the kernel with NVRTC and can take up to a minute on a cold shader
-cache. A successful run writes ``_output/checker.png`` and prints
-``pixels differing from the host-computed pattern: 0``. A difference above zero exits non-zero.
+The first step compiles the kernel and can take up to 5 minutes on a cold shader
+cache. A successful run writes ``_output/checker.png``: 64-pixel squares in white and dark blue,
+the size and colours the scene authors.
 
 The Node
 --------

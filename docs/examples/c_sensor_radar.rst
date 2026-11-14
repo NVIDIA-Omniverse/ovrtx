@@ -68,6 +68,14 @@ Build and Run
 
          ./build/radar-composite-tensor path/to/radar_example.usda
 
+      The build also copies the alternative scene ``radar_example_field.usda``,
+      the same steel cube closing in across a field of thin steel panels, beside
+      the executable:
+
+      .. code-block:: bash
+
+         ./build/radar-composite-tensor build/radar_example_field.usda
+
    .. tab-item:: Windows
 
       **Prerequisites**

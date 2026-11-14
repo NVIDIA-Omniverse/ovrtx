@@ -74,7 +74,7 @@ find_product_output(ovrtx_render_product_output_t const& product_output,
             }
         }
     }
-    return OVRTX_INVALID_HANDLE;
+    return OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE;
 }
 
 // Find a named render var output handle across all render products.
@@ -83,11 +83,11 @@ find_output(ovrtx_render_product_set_outputs_t const& outputs,
             char const* output_to_find) {
     for (size_t i = 0; i < outputs.output_count; ++i) {
         ovrtx_render_var_output_handle_t handle = find_product_output(outputs.outputs[i], output_to_find);
-        if (handle != OVRTX_INVALID_HANDLE) {
+        if (handle != OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
             return handle;
         }
     }
-    return OVRTX_INVALID_HANDLE;
+    return OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE;
 }
 
 // Return the _output directory. Prefer the OVRTX_TEST_OUTPUT_DIR environment
@@ -141,7 +141,7 @@ static std::string format_op_errors(ovrtx_op_wait_result_t const& wr) {
     std::string msg;
     for (size_t i = 0; i < wr.num_error_ops; ++i) {
         ovx_string_t err = ovrtx_get_last_op_error(wr.error_op_ids[i]);
-        msg += "  op " + std::to_string(wr.error_op_ids[i]) + ": ";
+        msg += "  op " + std::to_string(wr.error_op_ids[i].raw_id) + ": ";
         msg += std::string(err.ptr, err.length) + "\n";
     }
     return msg;
@@ -296,7 +296,7 @@ static std::set<std::string> docs_query_all_paths(ovrtx_renderer_t* renderer) {
     ovrtx_query_desc_t desc{};
     desc.attribute_filter.mode = OVRTX_ATTRIBUTE_FILTER_NONE;
 
-    ovrtx_query_handle_t query_handle = 0;
+    ovrtx_query_handle_t query_handle{};
     ovrtx_enqueue_result_t eq = ovrtx_query_prims(renderer, &desc, &query_handle);
     if (eq.status != OVRTX_API_SUCCESS) {
         return {};
@@ -375,7 +375,7 @@ static void docs_wait_ovstage_no_errors(ovstage_instance_t* stage, ovstage_op_id
     std::string msg;
     for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
         ovx_string_t err = ovstage_get_last_op_error(stage, wait_result.error_op_ids[i]);
-        msg += "  op " + std::to_string(wait_result.error_op_ids[i]) + ": ";
+        msg += "  op " + std::to_string(wait_result.error_op_ids[i].raw_id) + ": ";
         msg += std::string(err.ptr ? err.ptr : "", err.length) + "\n";
     }
     ASSERT_EQ(wait_result.error_op_id_count, 0u) << msg;
@@ -396,7 +396,7 @@ static void docs_wait_ovstage_population_no_errors(ovstage_instance_t* stage,
     std::string msg;
     for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
         ovx_string_t err = ovstage_population_get_last_op_error(wait_result.error_op_ids[i]);
-        msg += "  pop op " + std::to_string(wait_result.error_op_ids[i]) + ": ";
+        msg += "  pop op " + std::to_string(wait_result.error_op_ids[i].raw_id) + ": ";
         msg += std::string(err.ptr ? err.ptr : "", err.length) + "\n";
     }
     ASSERT_EQ(wait_result.error_op_id_count, 0u) << msg;
@@ -502,9 +502,10 @@ static std::set<std::string> docs_ovstage_collect_paths(
     if (wait_result.error_op_id_count != 0) return paths;
 
     while (true) {
+        size_t fetchedGroupCount = 0;
         ovstage_read_group_t group{};
         ovstage_api_status_t s =
-            ovstage_fetch_read_next(stage, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group);
+            ovstage_fetch_read_next(stage, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount);
         if (s == OVSTAGE_ERROR_END_OF_ITERATION) break;
         if (s != OVSTAGE_OK) break;
 
@@ -527,7 +528,7 @@ static std::set<std::string> docs_ovstage_collect_paths(
             }
         }
 
-        ovstage_release_group(stage, &group);
+        ovstage_release_groups(stage, &group, 1);
     }
 
     ovstage_release_read(stage, read_handle);
@@ -579,16 +580,25 @@ static void docs_read_attribute(ovstage_instance_t* stage,
     // non-contiguous strides — this helper is a byte-copy so a stride pattern
     // would just corrupt out_bytes.
     while (true) {
+        size_t fetchedGroupCount = 0;
         ovstage_read_group_t group{};
         ovstage_api_status_t s =
-            ovstage_fetch_read_next(stage, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group);
+            ovstage_fetch_read_next(stage, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount);
         if (s == OVSTAGE_ERROR_END_OF_ITERATION) {
             break;
         }
         ASSERT_EQ(s, OVSTAGE_OK) << format_ovstage_last_error();
 
-        for (uint32_t i = 0; i < group.data.tensor_count; ++i) {
-            DLTensor const& t = group.data.tensors[i];
+        if (group.column_count != 1u || group.columns == nullptr) {
+            ADD_FAILURE() << "docs_read_attribute: expected one column, got "
+                          << group.column_count << " with column array "
+                          << static_cast<const void*>(group.columns);
+            ovstage_release_groups(stage, &group, 1);
+            break;
+        }
+        ovstage_read_column_t const& column = group.columns[0];
+        for (uint32_t i = 0; i < column.data.tensor_count; ++i) {
+            DLTensor const& t = column.data.tensors[i];
             if (t.strides != nullptr) {
                 int64_t expected = 1;
                 bool contiguous = true;
@@ -600,7 +610,7 @@ static void docs_read_attribute(ovstage_instance_t* stage,
                     expected *= t.shape[d];
                 }
                 if (!contiguous) {
-                    ovstage_release_group(stage, &group);
+                    ovstage_release_groups(stage, &group, 1);
                     FAIL() << "docs_read_attribute: non-contiguous DLTensor strides "
                               "not supported (attribute=" << attribute_name << ")";
                     return;
@@ -616,7 +626,7 @@ static void docs_read_attribute(ovstage_instance_t* stage,
                 static_cast<uint8_t const*>(t.data) + t.byte_offset;
             out_bytes->insert(out_bytes->end(), base, base + byte_count);
         }
-        ovstage_release_group(stage, &group);
+        ovstage_release_groups(stage, &group, 1);
     }
 
     ovstage_release_read(stage, read_handle);
@@ -689,7 +699,7 @@ static ovrtx_step_result_handle_t docs_step_once(ovrtx_renderer_t* renderer,
     products.render_products = &rp_path;
     products.num_render_products = 1;
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     ovrtx_enqueue_result_t eq;
     if (ordinal_or_zero == 0) {
         eq = ovrtx_step(renderer, products, 1.0 / 60.0, &step_handle);

@@ -95,7 +95,7 @@ static bool print_wait_errors(ovrtx_op_wait_result_t const& wait_result) {
 
     for (size_t i = 0; i < wait_result.num_error_ops; ++i) {
         ovx_string_t error = ovrtx_get_last_op_error(wait_result.error_op_ids[i]);
-        std::cerr << "ovrtx operation " << wait_result.error_op_ids[i] << " failed";
+        std::cerr << "ovrtx operation " << wait_result.error_op_ids[i].raw_id << " failed";
         if (error.ptr && error.length > 0) {
             std::cerr << ": " << std::string_view(error.ptr, error.length);
         }
@@ -196,7 +196,7 @@ static bool wait_population_op(ovstage_instance_t* stage,
     for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
         ovstage_population_op_id_t op_id = wait_result.error_op_ids[i];
         ovx_string_t error = ovstage_population_get_last_op_error(op_id);
-        std::cerr << "ovstage " << operation << ": op " << op_id << " failed";
+        std::cerr << "ovstage " << operation << ": op " << op_id.raw_id << " failed";
         if (error.ptr && error.length > 0) {
             std::cerr << ": " << std::string_view(error.ptr, error.length);
         }
@@ -222,7 +222,7 @@ static bool wait_ovstage_op(ovstage_instance_t* stage,
     for (size_t i = 0; i < wait_result.error_op_id_count; ++i) {
         ovstage_op_id_t op_id = wait_result.error_op_ids[i];
         ovx_string_t error = ovstage_get_last_op_error(stage, op_id);
-        std::cerr << "ovstage " << operation << ": op " << op_id << " failed";
+        std::cerr << "ovstage " << operation << ": op " << op_id.raw_id << " failed";
         if (error.ptr && error.length > 0) {
             std::cerr << ": " << std::string_view(error.ptr, error.length);
         }
@@ -358,7 +358,7 @@ int main() {
     render_products.num_render_products = 1;
 
     // [snippet:compile-shader-cache-with-status-c]
-    ovrtx_step_result_handle_t shader_cache_step_handle = 0;
+    ovrtx_step_result_handle_t shader_cache_step_handle{};
     ovrtx_enqueue_result_t enqueue_result =
         ovrtx_step_with_stage(renderer, render_products, 1.0 / 60.0, stage_ordinal, &shader_cache_step_handle);
     if (check_and_print_error(enqueue_result, "step")) {
@@ -376,7 +376,7 @@ int main() {
 
     // [snippet:step-with-status-c]
     std::cerr << "Stepping renderer..." << std::endl;
-    ovrtx_step_result_handle_t step_result_handle = 0;
+    ovrtx_step_result_handle_t step_result_handle{};
     enqueue_result =
         ovrtx_step_with_stage(renderer, render_products, 1.0 / 60.0, stage_ordinal, &step_result_handle);
     if (check_and_print_error(enqueue_result, "step")) {
@@ -402,7 +402,7 @@ int main() {
     // Find LdrColor by its authored RenderVar prim path.
     ovrtx_render_var_output_handle_t ldrcolor_output_handle =
         find_output(outputs, "/Render/Camera/LdrColor");
-    if (ldrcolor_output_handle == OVRTX_INVALID_HANDLE) {
+    if (ldrcolor_output_handle == OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE) {
         std::cerr << "LdrColor output not found" << std::endl;
         ovrtx_destroy_results(renderer, step_result_handle);
         return cleanup(1);
@@ -493,6 +493,6 @@ find_output(ovrtx_render_product_set_outputs_t const& outputs,
             }
         }
     }
-    return OVRTX_INVALID_HANDLE;
+    return OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE;
 }
 // [/snippet:find-output-helper]

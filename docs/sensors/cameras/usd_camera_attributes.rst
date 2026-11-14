@@ -8,6 +8,9 @@
 .. without an express license agreement from NVIDIA CORPORATION or
 .. its affiliates is strictly prohibited.
 
+.. _sensors-cameras-usd-camera-attributes:
+.. _sensors-cameras-attributes:
+
 USD Camera Attributes
 =====================
 
@@ -19,6 +22,35 @@ schema defines the standard camera model used by ovrtx.
 
 Use these attributes to control projection, focus, clipping, and exposure on
 the camera targeted by a RenderProduct.
+
+.. _sensors-cameras-attributes-schemas:
+
+Camera schemas
+--------------
+
+Camera capabilities are configured by these schemas:
+
+.. list-table::
+   :class: compact-table
+   :header-rows: 1
+   :widths: 48 52
+
+   * - Schema
+     - Controls
+   * - ``UsdGeomCamera``
+     - Standard projection, focus, clipping and exposure, described below.
+   * - ``OmniSensorAPI``
+     - :doc:`Sensor Scheduling <../common/multi_rate>` configures capture rates.
+   * - Lens-distortion APIs
+     - :doc:`Lens Calibration <lens_calibration>` lists projection models and their attributes.
+   * - ``OmniRtxRollingShutterAPI``
+     - :doc:`Rolling Shutter <rolling_shutter>` configures per-line capture timing.
+   * - ``OmniSensorGenericCameraCoreAPI``
+     - :doc:`Camera-core attributes <../visual/camera_core/attributes>` configure sensor response and image processing.
+   * - ``OmniSensorGenericDepthSensorSingleViewAPI``
+     - :doc:`Depth-camera attributes <../visual/depth_camera/attributes>` configure stereo-depth simulation.
+
+.. _sensors-cameras-attributes-units:
 
 Units
 -----
@@ -66,25 +98,42 @@ Clipping
    "``float4[] clippingPlanes``", "Plane equations adding arbitrary clipping planes."
    "``float2 clippingRange = (1, 1000000)``", "Near and far distances in scene units."
 
+.. _sensors-cameras-attributes-exposure:
+
 Exposure
 --------
 
-Camera brightness is a combination of exposure time and other properties of the
+Image brightness combines the exposure time with the other properties of the
 camera system. OpenUSD separates physical exposure from depth of field and
-motion blur. Author ``exposure:fStop`` for image brightness and ``fStop`` for
+motion blur: author ``exposure:fStop`` for image brightness and ``fStop`` for
 depth of field. Likewise, ``exposure:time`` controls brightness independently of
 ``shutter:open`` and ``shutter:close``, which describe the motion-blur interval.
 
+Rolling-shutter timing is configured separately; see :doc:`rolling_shutter`.
+
 .. csv-table::
-   :header: "USD declaration", "Description"
+   :header: "USD declaration (ovrtx default)", "Description"
    :widths: 46, 54
    :class: compact-table
 
    "``float exposure = 0``", "Base-2 compensation in stops. One doubles image-plane intensity; negative one halves it."
-   "``float exposure:fStop = 1``", "F-number. Smaller values brighten the image."
+   "``float exposure:fStop = 5``", "F-number. Smaller values brighten the image."
    "``float exposure:iso = 100``", "ISO rating. Higher values brighten the image."
-   "``float exposure:responsivity = 1``", "Scale for the camera system's response to light."
-   "``float exposure:time = 1``", "Exposure duration in seconds. Longer values brighten the image."
+   "``float exposure:responsivity = 1.10267091``", "Scale for the camera system's response to light."
+   "``float exposure:time = 0.02``", "Exposure duration in seconds. Longer values brighten the image."
+
+.. _sensors-cameras-attributes-exposure-defaults:
+
+The table lists the defaults ovrtx uses for unauthored attributes. These differ
+from the OpenUSD schema defaults for ``exposure:fStop``,
+``exposure:responsivity`` and ``exposure:time``, which are all 1 in USD.
+Each attribute defaults independently: authoring one leaves the others at their
+ovrtx defaults.
+
+Author every exposure attribute explicitly whenever image brightness must be
+reproducible, for example when renders are compared across scenes or feed a
+trained model. A camera that leaves them unauthored renders with the defaults
+above while a plain USD tool reading the same prim reports the OpenUSD fallbacks.
 
 Creating A Camera
 -----------------
@@ -95,13 +144,16 @@ unit is one meter.
 .. tab-set::
 
    .. tab-item:: USDA
+      :sync: usda
 
       .. literalinclude:: ../../../tests/docs/usd/data/camera_attributes.usda
          :language: usda
          :start-after: # [snippet:doc-camera-attributes]
          :end-before: # [/snippet:doc-camera-attributes]
+         :prepend: #usda 1.0
 
    .. tab-item:: USD Python
+      :sync: python
 
       .. literalinclude:: ../../../tests/docs/usd/test_usd_python_examples.py
          :language: python
@@ -109,10 +161,11 @@ unit is one meter.
          :end-before: # [/snippet:doc-camera-attributes-python]
          :dedent:
 
-Further Reading
----------------
+Related
+-------
 
 - :doc:`lens_calibration`
 - :doc:`rolling_shutter`
+- :doc:`../common/sensor_configuration`
 - :doc:`scene_partitions`
-- :doc:`../configuration`
+- :doc:`../common/output_configuration`

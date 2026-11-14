@@ -1,0 +1,21 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+mdl 1.6;
+
+import ::df::*;
+import ::math::*;
+import ::scene::*;
+
+// Treat the view-independent spherical-harmonics color as diffuse albedo.
+export material ParticleFieldSHDiffuse() = let {
+    float3 sh0 = scene::data_lookup_float3("radiance:sphericalHarmonicsCoefficients_0", float3(0.0));
+    // Reconstruct RGB from the degree-zero coefficient: RGB = 0.5 + Y00 * SH0.
+    float3 albedo = math::max(float3(0.0), float3(0.5) + 0.28209479177387814 * sh0);
+} in material(
+    surface: material_surface(
+        scattering: df::diffuse_reflection_bsdf(tint: color(albedo))
+    )
+);

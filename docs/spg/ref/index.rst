@@ -13,7 +13,7 @@
 Reference
 =========
 
-Lookup, not teaching. Every surface a node touches, stated once and in full.
+Every surface a node touches.
 
 .. list-table::
    :header-rows: 1
@@ -34,7 +34,7 @@ Lookup, not teaching. Every surface a node touches, stated once and in full.
    * - :doc:`builtin_catalogue`
      - The pre-built nodes, their IDs, and the ports each one carries.
    * - :doc:`glossary`
-     - SPG's own vocabulary, defined once.
+     - SPG's own vocabulary.
 
 .. toctree::
    :hidden:

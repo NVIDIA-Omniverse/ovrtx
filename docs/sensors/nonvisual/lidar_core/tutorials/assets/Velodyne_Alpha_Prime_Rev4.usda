@@ -1,0 +1,190 @@
+#usda 1.0
+(
+    doc = "Generated from the Velodyne VLS-128 User Manual (63-9483 Rev. 2) and Alpha Prime datasheet (63-9679 Rev-B)."
+    metersPerUnit = 1
+    upAxis = "Z"
+    defaultPrim = "Velodyne_Alpha_Prime_Rev4"
+)
+
+def OmniLidar "Velodyne_Alpha_Prime_Rev4" (
+    doc = """Velodyne Alpha Prime (VLS-128) nominal 10 Hz profile.
+The emitter geometry and timing are from the user manual. Range, detection,
+accuracy, and wavelength values are from the Rev-B product datasheet."""
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    string omni:sensor:modelName = "LidarCore"
+    string omni:sensor:modelVersion = "0"
+    string omni:sensor:modelVendor = "NVIDIA"
+    string omni:sensor:marketName = "Velodyne Alpha Prime Rev 4 (VLS-128)"
+    double2 omni:sensor:frameRate = (10, 1)
+
+    token omni:sensor:Core:scanType = "ROTARY"
+    token omni:sensor:Core:rotationDirection = "CW"
+    token omni:sensor:Core:rayType = "IDEALIZED"
+    float omni:sensor:Core:validStartAzimuthDeg = 0.0
+    float omni:sensor:Core:validEndAzimuthDeg = 360.0
+    float omni:sensor:Core:startAzimuthOffsetDeg = 270.0
+
+    # The public sources do not state the minimum range. Retain the generic
+    # model's 0.3 m starting value until it can be checked against sensor data.
+    float omni:sensor:Core:nearRangeM = 0.3
+    float omni:sensor:Core:farRangeM = 300.0
+    float omni:sensor:Core:rangeResolutionM = 0.004
+    float omni:sensor:Core:rangeAccuracyM = 0.03
+
+    # The datasheet publishes two detection points. Use the farther point for
+    # the generic model's single threshold anchor and validate 5% at 180 m.
+    float omni:sensor:Core:minReflectance = 0.10
+    float omni:sensor:Core:minReflectionRangeM = 300.0
+    float omni:sensor:Core:waveLengthNm = 905.0
+    float omni:sensor:Core:divergenceHorDeg = 0.1197482
+    float omni:sensor:Core:divergenceVerDeg = 0.06016057
+
+    token omni:sensor:Core:intensityProcessing = "NORMALIZATION"
+    token omni:sensor:Core:intensityMappingType = "LINEAR"
+    float omni:sensor:Core:intensityScalePercent = 255.0
+
+    # These radiometric values are generic-model starting points, not
+    # published Alpha Prime specifications. Calibrate them against real data.
+    float omni:sensor:Core:peakPowerW = 10.0
+    uint omni:sensor:Core:pulseTimeNs = 6
+    float omni:sensor:Core:reflectionPowerFraction = 0.5
+
+    uint omni:sensor:Core:maxReturns = 2
+    float omni:sensor:Core:minDistBetweenEchosM = 1.0
+    float omni:sensor:Core:rotPatternFiringResDeg = 0.19188
+    uint omni:sensor:Core:numberOfEmitters = 128
+    uint omni:sensor:Core:numberOfChannels = 128
+    uint omni:sensor:Core:rangeCount = 1
+    float[] omni:sensor:Core:rangesMinM = [0.3]
+    float[] omni:sensor:Core:rangesMaxM = [300.0]
+    uint omni:sensor:Core:stateResolutionStep = 1
+
+    # The public documents do not define angular-noise distributions. Start
+    # without synthetic jitter and add measured noise during calibration.
+    float omni:sensor:Core:azimuthErrorMean = 0.0
+    float omni:sensor:Core:azimuthErrorStd = 0.0
+    float omni:sensor:Core:elevationErrorMean = 0.0
+    float omni:sensor:Core:elevationErrorStd = 0.0
+
+    # Values are the manual's AziOffset values. startAzimuthOffsetDeg maps the
+    # manual's zero-azimuth +Y axis into the simulation sensor frame.
+    float[] omni:sensor:Core:emitterState:s001:azimuthDeg = [
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354,
+        -6.354, -4.548, -2.732, -0.911, 0.911, 2.732, 4.548, 6.354
+    ]
+    float[] omni:sensor:Core:emitterState:s001:elevationDeg = [
+        -11.742, -1.99, 3.4, -5.29, -0.78, 4.61, -4.08, 1.31,
+        -6.5, -1.11, 4.28, -4.41, 0.1, 6.48, -3.2, 2.19,
+        -3.86, 1.53, -9.244, -1.77, 2.74, -5.95, -0.56, 4.83,
+        -2.98, 2.41, -6.28, -0.89, 3.62, -5.07, 0.32, 7.58,
+        -0.34, 5.18, -3.64, 1.75, -25.0, -2.43, 2.96, -5.73,
+        0.54, 9.7, -2.76, 2.63, -7.65, -1.55, 3.84, -4.85,
+        3.18, -5.51, -0.12, 5.73, -4.3, 1.09, -16.042, -2.21,
+        4.06, -4.63, 0.76, 15.0, -3.42, 1.97, -6.85, -1.33,
+        -5.62, -0.23, 5.43, -3.53, 0.98, -19.582, -2.32, 3.07,
+        -4.74, 0.65, 11.75, -2.65, 1.86, -7.15, -1.44, 3.95,
+        -2.1, 3.29, -5.4, -0.01, 4.5, -4.19, 1.2, -13.565,
+        -1.22, 4.17, -4.52, 0.87, 6.08, -3.31, 2.08, -6.65,
+        1.42, -10.346, -1.88, 3.51, -6.06, -0.67, 4.72, -3.97,
+        2.3, -6.39, -1.0, 4.39, -5.18, 0.21, 6.98, -3.09,
+        4.98, -3.75, 1.64, -8.352, -2.54, 2.85, -5.84, -0.45,
+        8.43, -2.87, 2.52, -6.17, -1.66, 3.73, -4.96, 0.43
+    ]
+    # All emitter origins use the manual's data origin, 66.11 mm above the
+    # mechanical sensor base represented by the OmniLidar prim.
+    float[] omni:sensor:Core:emitterState:s001:vertOffsetM = [
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611,
+        0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611, 0.06611
+    ]
+    uint[] omni:sensor:Core:emitterState:s001:fireTimeNs = [
+        0, 0, 0, 0, 0, 0, 0, 0,
+        2665, 2665, 2665, 2665, 2665, 2665, 2665, 2665,
+        5330, 5330, 5330, 5330, 5330, 5330, 5330, 5330,
+        7995, 7995, 7995, 7995, 7995, 7995, 7995, 7995,
+        10660, 10660, 10660, 10660, 10660, 10660, 10660, 10660,
+        13325, 13325, 13325, 13325, 13325, 13325, 13325, 13325,
+        15990, 15990, 15990, 15990, 15990, 15990, 15990, 15990,
+        18655, 18655, 18655, 18655, 18655, 18655, 18655, 18655,
+        23985, 23985, 23985, 23985, 23985, 23985, 23985, 23985,
+        26650, 26650, 26650, 26650, 26650, 26650, 26650, 26650,
+        29315, 29315, 29315, 29315, 29315, 29315, 29315, 29315,
+        31980, 31980, 31980, 31980, 31980, 31980, 31980, 31980,
+        34645, 34645, 34645, 34645, 34645, 34645, 34645, 34645,
+        37310, 37310, 37310, 37310, 37310, 37310, 37310, 37310,
+        39975, 39975, 39975, 39975, 39975, 39975, 39975, 39975,
+        42640, 42640, 42640, 42640, 42640, 42640, 42640, 42640
+    ]
+    # The manual numbers channels from zero. This profile authors manual
+    # channel n as n + 1, the schema default's numbering, and PointCloud
+    # ChannelId reports the authored ID, so output ID n + 1 is manual channel n.
+    # Array order remains manual channel and figure laser-ID order.
+    uint[] omni:sensor:Core:emitterState:s001:channelId = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+        17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+        33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+        49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+        65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+        81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96,
+        97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
+        113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128
+    ]
+    uint[] omni:sensor:Core:emitterState:s001:rangeId = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ]
+
+    def RenderProduct "RenderedOutputs"
+    {
+        uniform int2 resolution = (1280, 720)
+        rel camera = <../../Velodyne_Alpha_Prime_Rev4>
+        rel orderedVars = [
+            <SupportedOutputs/PointCloud>
+        ]
+
+        def Scope "SupportedOutputs"
+        {
+            def RenderVar "PointCloud"
+            {
+                string sourceName = "PointCloud"
+                # Request individual PointCloud channels as needed.
+                token[] channels = ["Coordinates", "Intensity", "TimeOffsetNs", "EmitterId", "ChannelId", "EchoId"]
+            }
+        }
+    }
+}

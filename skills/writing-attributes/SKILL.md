@@ -1,18 +1,11 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: writing-attributes
 description: >
   Writing scalar and array attribute data to prims. Use when user asks to write an
   attribute, set a property, change a material, set a color, or modify mesh data.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -110,7 +103,7 @@ The C API accepts `DLDataType::lanes` for multi-component writes; shape-based sc
 
 > **Source:** `tests/docs/c/test_attribute_shapes.cpp` snippets `doc-shape-scalar-int32-c`, `doc-shape-float3-array-c`, `doc-shape-mat4-array-c`.
 
-For a C `point3f[]` attribute with 10 points, write one tensor with `shape=[10]`, `dtype={kDLFloat, 32, 3}` or `shape=[10,3]`, `dtype={kDLFloat,32,1}`; the read tensor is `[10,3]` with scalar lanes. A shape-based `[N,4,4]` float64 write to a new generic attribute records a matrix role, allowing a `[N,4,4]` read. Rendered output/AOV tensors are separate and use channel-last shapes such as `[height, width, channels]`.
+For a C `point3f[]` attribute with 10 points, write one tensor with `shape=[10]`, `dtype={kDLFloat, 32, 3}` or `shape=[10,3]`, `dtype={kDLFloat,32,1}`; the read tensor is `[10,3]` with scalar lanes. When creating a matrix attribute through OVStage, set `semantic=AttributeSemantic.MATRIX` in Python or `OVSTAGE_SEMANTIC_MATRIX` in C; shape alone does not assign the matrix semantic. The deprecated OVRTX Python `Renderer.write_attribute` convenience API can infer the matrix semantic from `[N,4,4]` float64 input; this inference does not apply to OVStage writes. Rendered output/AOV tensors are separate and use channel-last shapes such as `[height, width, channels]`.
 
 ## USD Type Lookup
 
@@ -142,6 +135,10 @@ Use this table to answer "how do I write USD type X?" For ovstage, pass `is_arra
 ### Array attribute write (mesh points)
 
 > **Source:** `tests/docs/python/test_attribute_shapes.py` snippet `doc-shape-float3-array`
+
+### Publish related Generic WPM selectors at one ordinal
+
+> **Source:** `examples/python/generic-wpm/main.py` snippet `doc-generic-wpm-select-patterns`
 
 ### Array attribute write (same pattern for other array schemas)
 
@@ -193,6 +190,10 @@ to intern token and relationship strings, then write the resulting IDs with
 ### Generic scalar write in C
 
 > **Source:** `tests/docs/c/test_attribute_bindings.cpp` snippet `doc-write-bound-attribute-c`
+
+### Publish related Generic WPM selectors at one ordinal
+
+> **Source:** `examples/c/generic-wpm/main.cpp` snippet `doc-generic-wpm-select-patterns-c`
 
 ### Supported authored attribute write snippets in C
 
@@ -278,3 +279,24 @@ See `docs/core/ovstage_integration.rst`, `skills/update-0_3-0_4-c/SKILL.md` and 
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+## Stage-owned runtime textures
+
+Create a texture through ovstage and set an existing UsdUVTexture shader's asset
+path to its dynamic URI, then publish the writes:
+
+> **Source:** `tests/docs/python/test_runtime_textures.py` snippet `doc-runtime-texture-ovstage-python`
+
+Publish packed bytes and explicit extent at one ordinal, wait for successful
+writes, then advance the write floor before stepping the attached renderer.
+The snippets demonstrate CUDA producers, and the C example covers both loader models.
+
+> **Source:** `tests/docs/python/test_runtime_textures.py` snippet `doc-runtime-texture-python-update`
+>
+> **Source:** `examples/c/runtime-textures/main.cpp` snippet `doc-runtime-texture-c-update`
+
+For rendered camera output processed by Warp and republished as a texture on the
+next frame, keep the output mapping alive until the kernel finishes, then write
+the CUDA bytes and seal the ordinal:
+
+> **Source:** `examples/python/runtime-textures/main.py` snippet `doc-runtime-texture-camera-feedback`

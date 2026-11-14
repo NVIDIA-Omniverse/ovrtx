@@ -66,6 +66,10 @@ def build_render_layer_usda(
 
     # Minimal has no HDR color output. Request its clip-depth aliases alongside the shared annotations.
     hdr_request = "<HdrColor>," if render_mode != "MinimalRendering" else ""
+    selection_request = "<SelectionState>," if render_mode != "MinimalRendering" else ""
+    selection_definition = ('def RenderVar "SelectionState" {\n'
+                            '            string sourceName = "SelectionState"\n        }'
+                            if render_mode != "MinimalRendering" else "")
     minimal_depth_requests = "<Depth>, <XRDepth>," if render_mode == "MinimalRendering" else ""
     # Minimal ignores dome lighting; add ambient fill so every robot is visible in the preview.
     minimal_settings_and_vars = """color3f omni:rtx:rt:ambientLight:color = (1, 1, 1)
@@ -167,6 +171,7 @@ def "Render"
         rel orderedVars = [
             <LdrColor>,
             {hdr_request}
+            {selection_request}
             {minimal_depth_requests}
             <NormalSD>,
             <DepthSD>,
@@ -205,6 +210,8 @@ def "Render"
         def RenderVar "HdrColor" {{
             string sourceName = "HdrColor"
         }}
+
+        {selection_definition}
 
         def RenderVar "NormalSD" {{
             string sourceName = "NormalSD"
@@ -367,6 +374,39 @@ def _visualize_labels(values: np.ndarray) -> np.ndarray:
     return colors
 
 
+def _select_lineup_robots(renderer, frame) -> None:
+    """Select rendered geometry beneath three robots; parent Xforms do not select their children."""
+    robot_groups = {"/World/GR1T2_fourier_hand_6dof": 1, "/World/forklift_c": 2, "/World/kaya": 3}
+    selected_paths = []
+    selected_groups = []
+    # Reuse the captured path map, including instance-proxy paths, instead of guessing mesh names.
+    for path in sorted(set(_map_id_map(frame, "StableIdMap").values())):
+        for root, group in robot_groups.items():
+            if path.startswith(root + "/"):
+                selected_paths.append(path)
+                selected_groups.append(group)
+                break
+    # Custom scenes may contain none of these robots; still capture their AOVs with empty selection.
+    if selected_paths:
+        renderer.set_selection_outline_group_strings(selected_paths, selected_groups)
+
+
+# [snippet:doc-selection-state-preview]
+def _visualize_selection_state(values: np.ndarray) -> np.ndarray:
+    """Decode coverage samples before coloring: hue is group, brightness is visibility."""
+    if values.dtype != np.uint16 or values.ndim != 3 or values.shape[-1] != 4:
+        raise ValueError("SelectionState must have uint16 shape (H, W, 4)")
+    groups = values & 0xFF
+    visible = (values & 0x100) != 0
+    # The robot capture uses groups 1/2/3: cyan, orange, and purple. Zero stays black.
+    palette = np.array([[0, 0, 0], [0, 0.85, 1], [1, 0.55, 0.1], [0.8, 0.35, 1]], dtype=np.float32)
+    colors = palette[(groups - 1) % 3 + 1]
+    brightness = np.where(groups == 0, 0.0, np.where(visible, 1.0, 0.25))
+    # Each channel is a coverage sample, not a color component; average decoded colors.
+    return _to_uint8_image((colors * brightness[..., None]).mean(axis=2))
+# [/snippet:doc-selection-state-preview]
+
+
 def _visualize_vector3(values: np.ndarray) -> np.ndarray:
     vector = np.nan_to_num(np.asarray(values[..., :3], dtype=np.float32), copy=False)
     normalized = np.empty_like(vector, dtype=np.float32)
@@ -418,6 +458,7 @@ def build_aov_blueprint(rrb, grid_columns: int):
         rrb.Grid(
             rrb.Spatial2DView(origin="/", contents="+/render/aovs/LdrColor/display", name="LdrColor"),
             rrb.Spatial2DView(origin="/", contents="+/render/aovs/HdrColor/display", name="HdrColor"),
+            rrb.Spatial2DView(origin="/", contents="+/render/aovs/SelectionState/display", name="SelectionState"),
             rrb.Spatial2DView(origin="/", contents="+/render/aovs/NormalSD/display", name="NormalSD"),
             rrb.Spatial2DView(origin="/", contents="+/render/aovs/DepthSD/display", name="DepthSD"),
             rrb.Spatial2DView(
@@ -470,13 +511,22 @@ def build_aov_blueprint(rrb, grid_columns: int):
     )
 
 
-def _map_render_var(frame, name: str) -> np.ndarray:
-    mapped = frame.render_vars[f"/Render/Camera/{name}"].map(device=ovrtx.Device.CPU)
-    view = np.from_dlpack(mapped)
-    pixels = view.copy()
-    del view, mapped
-    return pixels
-
+def _map_render_var(frame, name: str) -> np.ndarray | dict:
+    """Copy named fields and CPU parameters, or the existing single tensor while mapped."""
+    with frame.render_vars[f"/Render/Camera/{name}"].map(device=ovrtx.Device.CPU) as mapped:
+        if name in {"BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
+                    "SemanticBoundingBox2DTight", "SemanticBoundingBox2DLoose", "SemanticBoundingBox3D"}:
+            return {key: np.from_dlpack(mapped[key]).copy() for key in mapped}
+        if name in {"SemanticIdMap", "StableIdMap", "SemanticIdMapDeltas", "StableIdMapDeltas"}:
+            return {key: np.from_dlpack(mapped[key]).copy() for key in mapped}
+        if name in {"OcclusionSD", "InstanceIdTokenMapSD", "InstanceMap", "StableIdSemanticIdMap"}:
+            fields = {key: np.from_dlpack(mapped[key]).copy() for key in mapped}
+            if mapped.params:
+                fields["params"] = {key: np.from_dlpack(value).copy() for key, value in mapped.params.items()}
+            return fields
+        if name == "CameraParams":
+            return {"params": {key: np.from_dlpack(value).copy() for key, value in mapped.params.items()}}
+        return np.from_dlpack(mapped).copy()
 
 def _log_raw_tensor(rr, name: str, pixels: np.ndarray) -> None:
     if hasattr(rr, "Tensor"):
@@ -491,57 +541,22 @@ def _print_missing(name: str) -> None:
     print(f"  Missing AOV: {name}", file=sys.stderr)
 
 
-def _decode_id_map(tensor: np.ndarray) -> dict[bytes, str]:
-    """Decode an RT2 IdentifierMap render var into raw ID bytes mapped to labels."""
-    # SemanticIdMap is a byte buffer, not an image. It contains:
-    #
-    #   IdentifierMap entries:
-    #     uint32 id[4]         16-byte identifier, with semantic IDs in id[0]
-    #     uint32 labelLength   byte length of the UTF-8 label
-    #     uint32 labelOffset   byte offset of the label inside this same buffer
-    #   packed label bytes
-    #   uint32 numEntries      stored in the final 4 bytes
-    #
-    # Keep IDs as their raw 16 bytes so they can be compared directly with the
-    # zero-extended SemanticSegmentation pixel IDs below.
-    data = np.ascontiguousarray(tensor).view(np.uint8).reshape(-1)
-    if data.size < 4:
-        return {}
-
-    entry_data_type = np.dtype(
-        [("id", "<u4", (4)), ("label_length", "<u4"), ("label_offset", "<u4")]
-    )
-
-    num_entries = int.from_bytes(data[-4:].tobytes(), byteorder="little")
-    entry_data_length = num_entries * entry_data_type.itemsize
-    if entry_data_length > data.size - 4:
-        raise ValueError(
-            f"ID map declares {num_entries} entries, but the tensor has only {data.size} bytes"
-        )
-
-    entries = data[:entry_data_length].view(entry_data_type).reshape(num_entries)
-    mapping: dict[bytes, str] = {}
-    for entry in entries:
-        id_bytes = entry["id"].tobytes()
-        label_offset = int(entry["label_offset"])
-        label_length = int(entry["label_length"])
-        label_end = label_offset + label_length
-        if label_end > data.size:
-            id_text = f"0x{int.from_bytes(id_bytes, byteorder='little'):032x}"
-            raise ValueError(f"ID map label for {id_text} extends past the tensor")
-
-        label = data[label_offset:label_end].tobytes().decode("utf-8", errors="replace")
-        mapping[id_bytes] = label.rstrip("\x00").rstrip()
-
-    return mapping
-
-
 def _map_id_map(frame, name: str) -> dict[bytes, str]:
-    mapped = frame.render_vars[f"/Render/Camera/{name}"].map(device=ovrtx.Device.CPU)
-    view = np.from_dlpack(mapped)
-    tensor = view.copy()
-    del view, mapped
-    return _decode_id_map(tensor)
+    """Read full-width IDs and UTF-8 label spans from named public tensors."""
+    return _decode_id_map(_map_render_var(frame, name))
+
+
+def _decode_id_map(values: dict) -> dict[bytes, str]:
+    ids, offsets, data = values["id"], values["label_offsets"], values["label_data"]
+    if (ids.dtype != np.uint32 or ids.shape != (len(ids), 4)
+            or offsets.dtype != np.uint64 or offsets.shape != (len(ids) + 1,)
+            or data.dtype != np.uint8 or data.ndim != 1 or offsets[0] != 0
+            or offsets[-1] != data.size or np.any(offsets[1:] < offsets[:-1])):
+        raise ValueError("Invalid identifier map shape or label spans")
+    # This semantic-label lookup uses the full128-bit ID as its key. Stable path
+    # maps may contain duplicate IDs; consumers of those maps should keep rows.
+    return {identifier.tobytes(): data[int(start):int(end)].tobytes().decode("utf-8").rstrip()
+            for identifier, start, end in zip(ids, offsets[:-1], offsets[1:]) if start != end}
 
 
 def _print_logged_id_map(name: str, id_map: dict[bytes, str]) -> None:
@@ -580,12 +595,12 @@ def _build_class_id_mapping(
     id_map: dict[bytes, str],
 ) -> tuple[dict[bytes, int], list[tuple[int, str, tuple[int, int, int]]]]:
     # Rerun SegmentationImage pixels must be uint16 ClassIds. The renderer IDs
-    # are stored in 16-byte IdentifierMap slots, so allocate a compact uint16
+    # are stored as four uint32 words per IdentifierMap row, so allocate a compact uint16
     # class ID for each map entry and log the reverse lookup through
     # AnnotationContext.
     #
     # Python dicts preserve insertion order. That order is the order authored by
-    # the IdentifierMap buffer, so class ID 0 corresponds to the first map entry,
+    # the decoded IdentifierMap lookup, so class ID 0 corresponds to its first entry,
     # class ID 1 to the second, and so on.
     if len(id_map) > np.iinfo(np.uint16).max + 1:
         raise ValueError(f"Rerun SegmentationImage supports 65536 class ids, got {len(id_map)}")
@@ -712,6 +727,13 @@ def log_aovs_to_rerun(rr, frame) -> int:
         logged += 1
     else:
         _print_missing("HdrColor")
+
+    if "/Render/Camera/SelectionState" in frame.render_vars:
+        selection = _map_render_var(frame, "SelectionState")
+        _log_raw_tensor(rr, "SelectionState", selection)
+        rr.log("render/aovs/SelectionState/display", rr.Image(_visualize_selection_state(selection)))
+        _print_logged("SelectionState", selection)
+        logged += 1
 
     if "/Render/Camera/NormalSD" in frame.render_vars:
         normal_sd = _map_render_var(frame, "NormalSD")
@@ -912,6 +934,7 @@ def export_aov_pngs(frame, output_dir: Path) -> int:
     converters = {
         "LdrColor": rgba_or_rgb_uint8,
         "HdrColor": hdr_to_srgb,
+        "SelectionState": _visualize_selection_state,
         "NormalSD": normal_to_uint8,
         "Depth": turbo_colormap,
         "XRDepth": turbo_colormap,
@@ -940,7 +963,7 @@ def capture_additional_aovs(rr, frame, initial_maps: dict, output_dir: Path) -> 
     output_dir.mkdir(parents=True, exist_ok=True)
     report = {}
     tensors = {name: _map_render_var(frame, name) for name in ("LdrColor", "SemanticIdMap")}
-    np.save(output_dir / "SemanticIdMap.npy", tensors["SemanticIdMap"])
+    np.savez(output_dir / "SemanticIdMap.npz", **tensors["SemanticIdMap"])
     names = (
         "SemanticInstanceSegmentation", "StableIdSegmentation",
         "NonStableInstanceSegmentation", "BoundingBox2DTightSD", "BoundingBox2DLooseSD", "BoundingBox3DSD",
@@ -948,12 +971,20 @@ def capture_additional_aovs(rr, frame, initial_maps: dict, output_dir: Path) -> 
         "TruncationSD", "InstanceIdTokenMapSD", "StableIdMap", "InstanceMap", "StableIdMapDeltas",
         "SemanticIdMapDeltas", "CameraParams", "CrossCorrespondenceSD", "StableIdSemanticIdMap",
     )
-    names += tuple(name for name in ("Depth", "XRDepth") if f"/Render/Camera/{name}" in frame.render_vars)
+    names += tuple(name for name in ("Depth", "XRDepth", "SelectionState") if f"/Render/Camera/{name}" in frame.render_vars)
     for name in names:
         try:
             values = _map_render_var(frame, name)
-            np.save(output_dir / f"{name}.npy", values)
             tensors[name] = values
+            if isinstance(values, dict):
+                fields = {key: value for key, value in values.items() if key != "params"}
+                fields.update({"param_" + key: value for key, value in values.get("params", {}).items()})
+                np.savez(output_dir / f"{name}.npz", **fields)
+                report[name] = {"fields": {key: {"shape": list(value.shape), "dtype": str(value.dtype)}
+                                          for key, value in fields.items()},
+                                "bytes": sum(value.nbytes for value in fields.values())}
+                continue
+            np.save(output_dir / f"{name}.npy", values)
             entry = {"shape": list(values.shape), "dtype": str(values.dtype), "bytes": values.nbytes}
             if values.size:
                 entry.update(nonzero=int(np.count_nonzero(values)), finite=bool(np.all(np.isfinite(values))))
@@ -961,7 +992,8 @@ def capture_additional_aovs(rr, frame, initial_maps: dict, output_dir: Path) -> 
                 if values.ndim == 3:
                     entry["occupied_pixels"] = int(np.count_nonzero(np.any(values != 0, axis=-1)))
                     entry["unique_ids"] = int(np.unique(values.reshape(-1, values.shape[-1]), axis=0).shape[0])
-                    display = (_visualize_scalar(np.squeeze(values)) if name in ("Depth", "XRDepth")
+                    display = (_visualize_selection_state(values) if name == "SelectionState" else
+                               _visualize_scalar(np.squeeze(values)) if name in ("Depth", "XRDepth")
                                else _visualize_labels(values))
                     Image.fromarray(display).save(output_dir / f"{name}.png")
                     rr.log(f"render/aovs/{name}/display", rr.Image(display))
@@ -986,15 +1018,14 @@ def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path
         if values is None:
             continue
         id_maps[name] = _decode_id_map(values)
-        count = int.from_bytes(values[-4:].tobytes(), "little")
-        entries = values[:count * 24].view("<u4").reshape(-1, 6)
-        # Preserve repeated stable IDs: a mesh and its first subset can share an ID but have different paths.
-        decoded[name] = [
-            {"id": row[:4].tolist(), "label": values[int(row[5]):int(row[5] + row[4])].tobytes().decode("utf-8")}
-            for row in entries
-        ]
+        # Preserve repeated IDs in the saved rows even when a display lookup selects one path.
+        decoded[name] = [{"id": identifier.tolist(),
+                          "label": values["label_data"][int(start):int(end)].tobytes().decode("utf-8")}
+                         for identifier, start, end in zip(values["id"], values["label_offsets"][:-1],
+                                                            values["label_offsets"][1:])]
 
-    pairs = tensors["StableIdSemanticIdMap"].view("<u4").reshape(-1, 8)
+    pairs = np.concatenate((tensors["StableIdSemanticIdMap"]["stable_id"],
+                            tensors["StableIdSemanticIdMap"]["semantic_id"]), axis=1)
     decoded["StableIdSemanticIdMap"] = pairs.tolist()
     stable_paths = id_maps["StableIdMap"]
     semantic_labels = id_maps["SemanticIdMap"]
@@ -1014,20 +1045,17 @@ def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path
                 robot_by_stable[pair[:4].tobytes()] = robot
                 break
 
-    # InstanceIdToken has native alignment padding; the first record is metadata, not an instance.
-    token_dtype = np.dtype({"names": ["instance", "token", "prototype", "instancer"],
-                           "formats": ["<u4", "<u8", "<u4", "<u4"],
-                           "offsets": [0, 8, 16, 20], "itemsize": 24})
-    tokens = tensors["InstanceIdTokenMapSD"].view(token_dtype)
-    count = int(tokens[0]["instance"])
-    if count + 1 != len(tokens):
-        raise ValueError("Instance token-map count does not match its byte length")
-    min_instance = int(tokens[0]["token"]) & 0xFFFFFFFF
-    instance_map = tensors["InstanceMap"].view("<u4")
+    # Instance records are named tensors; range and tile metadata are CPU parameters.
+    tokens = tensors["InstanceIdTokenMapSD"]
+    token_params = tokens["params"]
+    count = len(tokens["instance_id"])
+    min_instance = token_params["min_instance_id"].item()
+    instance_map = tensors["InstanceMap"]["semantic_instance_index"]
     decoded["InstanceIdTokenMapSD"] = {
-        "count": count, "min_instance": min_instance, "max_instance": int(tokens[0]["token"]) >> 32,
-        "tiles": int(tokens[0]["prototype"]),
-        "records": [[int(row[field]) for field in token_dtype.names] for row in tokens[1:]],
+        "count": count, "min_instance": min_instance, "max_instance": token_params["max_instance_id"].item(),
+        "tiles": token_params["render_tile_count"].item(),
+        "records": [[int(value) for value in row] for row in zip(tokens["instance_id"], tokens["prim_token"],
+                                                               tokens["prototype_index"], tokens["instance_index"])],
     }
     decoded["InstanceMap"] = instance_map.tolist()
     robot_by_instance = {
@@ -1036,21 +1064,21 @@ def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path
     }
 
     # Camera matrices use row vectors. Keep camera and box values in scene units; no extra metre scaling is needed.
-    camera = tensors["CameraParams"]
-    if camera.size != 260:
-        raise ValueError(f"Expected a 260-byte CameraParams record, got {camera.size}")
-    view, projection = camera[:128].view("<f4").reshape(2, 4, 4).astype(np.float64)
-    width, height = map(int, camera[132:140].view("<u4"))
-    near, far = map(float, camera[140:148].view("<f4"))
-    camera_model = camera[148:173].tobytes().split(b"\0", 1)[0].decode("utf-8")
+    camera = tensors["CameraParams"]["params"]
+    view, projection = camera["view_matrix"].astype(np.float64), camera["projection_matrix"].astype(np.float64)
+    width, height = map(int, camera["render_product_resolution"])
+    near, far = map(float, camera["near_far"])
+    camera_model = camera["camera_model"].tobytes().decode("utf-8")
     if camera_model != "pinhole":
         raise ValueError("This example's box projection currently supports pinhole cameras only")
     decoded["CameraParams"] = {
         "view": view.tolist(), "projection": projection.tolist(),
-        "meters_per_scene_unit": float(camera[128:132].view("<f4")[0]),
+        "meters_per_scene_unit": camera["meters_per_scene_unit"].item(),
         "resolution": [width, height], "near_far": [near, far], "model": camera_model,
-        "focal_length_distance_fstop_fovx": camera[176:192].view("<f4").tolist(),
-        "fisheye_parameters": camera[192:].view("<f4").tolist(),
+        "focal_length_distance_fstop_fovx": [camera[key].item() for key in
+                                              ("focal_length", "focal_distance", "f_stop", "fov_x_radians")],
+        "fisheye_parameters": {key: value.item() if value.shape == (1,) else value.tolist()
+                               for key, value in camera.items() if key.startswith(("ftheta_", "lens_"))},
     }
     base = Image.fromarray(tensors["LdrColor"]).convert("RGB")
     base = Image.blend(base, Image.new("RGB", base.size, (15, 20, 28)), 0.35)
@@ -1061,19 +1089,21 @@ def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path
                  "SemanticBoundingBox2DTight", "SemanticBoundingBox2DLoose", "SemanticBoundingBox3D"):
         semantic = name.startswith("Semantic")
         three_d = "3D" in name
-        fields = [("stable", "<u4", 4), ("semantic", "<u4", 4)] if semantic else [
-            ("instance", "<u4"), ("tile", "<u4")]
-        fields += [("min", "<f4" if three_d else "<i4", 3 if three_d else 2),
-                   ("max", "<f4" if three_d else "<i4", 3 if three_d else 2)]
-        if three_d:
-            fields += [("transform", "<f4", (4, 4))]
-        dtype = np.dtype(fields)
         values = tensors[name]
-        count = int.from_bytes(values[-4:].tobytes(), "little") if semantic else values.size // dtype.itemsize
-        if count * dtype.itemsize > values.size - (4 if semantic else 0):
+        count = int(values["valid_count"][0]) if semantic else len(values["extent"])
+        if not 0 <= count <= len(values["extent"]):
             raise ValueError(f"Invalid record count for {name}")
-        records = values[:count * dtype.itemsize].view(dtype)
-        decoded[name] = [{field: row[field].tolist() for field in dtype.names} for row in records]
+        records = []
+        for index in range(count):
+            row = {"min": values["extent"][index, 0], "max": values["extent"][index, 1]}
+            if semantic:
+                row.update(stable=values["id"][index], semantic=values["semantic_id"][index])
+            else:
+                row.update(instance=values["instance_id"][index], tile=values["render_tile_id"][index])
+            if three_d:
+                row["transform"] = values["object_to_world"][index]
+            records.append(row)
+        decoded[name] = [{field: value.tolist() for field, value in row.items()} for row in records]
         selected = []
         for row in records:
             robot = (robot_by_stable.get(row["stable"].tobytes()) if semantic
@@ -1138,15 +1168,16 @@ def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path
         visual_report[name] = {"selected_records": len(selected), "drawn_boxes": drawn}
 
     # Occlusion is a per-instance statistic, not a pixel image: color the corresponding loose boxes.
-    visibility_dtype = np.dtype([("instance", "<u4"), ("tile", "<u4"), ("ratio", "<f4")])
-    occlusion = tensors["OcclusionSD"].view(visibility_dtype)
-    decoded["OcclusionSD"] = [{field: row[field].tolist() for field in visibility_dtype.names} for row in occlusion]
-    ratios = {int(row["instance"]): float(row["ratio"]) for row in occlusion}
+    occlusion = tensors["OcclusionSD"]
+    decoded["OcclusionSD"] = [dict(instance=int(instance), tile=int(tile), ratio=float(ratio))
+                               for instance, tile, ratio in zip(occlusion["instance_id"], occlusion["render_tile_id"],
+                                                                occlusion["occlusion_ratio"])]
+    ratios = {(row["instance"], row["tile"]): row["ratio"] for row in decoded["OcclusionSD"]}
     image = base.copy()
     draw = ImageDraw.Draw(image)
     drawn = 0
     for robot, row in boxes["BoundingBox2DLooseSD"]:
-        ratio = ratios.get(int(row["instance"]), -1)
+        ratio = ratios.get((int(row["instance"]), int(row["tile"])), -1)
         if not 0 <= ratio <= 1:
             continue
         color = (int(70 + 185 * ratio), int(220 - 150 * ratio), 75)
@@ -1159,7 +1190,8 @@ def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path
     visual_report["OcclusionSD"] = {"drawn_boxes": drawn}
 
     # Metadata gets an annotated scene plus readable decoded rows. These are derived illustrations, not image AOVs.
-    token_by_instance = {int(row["instance"]): row for row in tokens[1:]}
+    token_by_instance = {int(instance): {"instance": int(instance), "token": int(token)}
+                         for instance, token in zip(tokens["instance_id"], tokens["prim_token"])}
     for name in ("SemanticIdMap", "StableIdMap", "InstanceIdTokenMapSD", "InstanceMap", "StableIdMapDeltas",
                  "SemanticIdMapDeltas", "StableIdSemanticIdMap", "CameraParams"):
         image = Image.new("RGB", (width, height), (15, 20, 28))
@@ -1225,7 +1257,7 @@ def visualize_sd_buffers(rr, tensors: dict, initial_maps: dict, output_dir: Path
             y += max(18, height // 36)
         footer = "Robot subset shown; all decoded records are saved in decoded.json."
         if name.endswith("Deltas"):
-            current_count = int.from_bytes(tensors[name][-4:].tobytes(), "little")
+            current_count = len(tensors[name]["id"])
             footer = f"First frame: {len(decoded.get(name, []))} entries. Static capture: {current_count} new entries."
         elif name == "StableIdMap":
             unique_ids = np.unique(tensors["StableIdSegmentation"].reshape(-1, 4), axis=0)
@@ -1256,7 +1288,7 @@ PT_AOV_NAMES = [
     'SpecularAlbedo', 'ReflectionsMotion2d', 'ReflectionsFirstBounceDiffuseAlbedo', 'ReflectionsFirstBounceNormal',
     'DepthLinearized', 'Motion2dXYZ', 'Motion2dDilated', 'Motion2dXYZDilated',
     'MotionWorld', 'EmissionAndForegroundMask', 'DiffuseLightingDirectAndIndirect', 'SpecularLightingDirectAndIndirect',
-    'LightingComposited', 'Exposure', 'ViewMatricesAux', 'Roughness',
+    'LightingComposited', 'Exposure', 'Roughness',
     'DisocclusionMask', 'ReprojectionQuality', 'ViewspacePosition', 'ReflectionsHitT',
     'SubsurfaceScattering', 'SubsurfaceTransmission', 'HighResDepth', 'HighResMotion2d',
     'HighResMotion2dXYZ', 'HighResDisocclusionMask', 'HighResReflectionsMotion2d', 'ReflectionsFirstBounceRayDirAndHitT',
@@ -1355,6 +1387,8 @@ def build_pt_render_layer_usda(scene_path: Path, resolution: tuple[int, int], sa
 
 
 # [snippet:doc-pt-pixels-python]
+import numpy as np
+
 def decode_pt_pixels(values: np.ndarray) -> np.ndarray:
     """Read typed PT pixels, converting half floats to float32 and UNORM bytes to [0,1]."""
     if values.ndim != 3 or values.shape[-1] not in (1, 2, 4):
@@ -1367,36 +1401,9 @@ def decode_pt_pixels(values: np.ndarray) -> np.ndarray:
 # [/snippet:doc-pt-pixels-python]
 
 
-# [snippet:doc-pt-view-data-python]
-def decode_pt_view_data(values: np.ndarray) -> np.void:
-    """Decode the 236 float32 values in ViewMatricesAux, preserving its matrix order."""
-    matrix_names = ["projection", "projection_no_jitter", "inverse_projection", "view", "inverse_view",
-                    "view_projection", "inverse_view_projection", "view_no_roll", "translated_view",
-                    "inverse_translated_view", "overridden_translated_view", "inverse_overridden_translated_view",
-                    "translated_view_projection", "inverse_translated_view_projection"]
-    dtype = np.dtype([(name, "<f4", (4, 4)) for name in matrix_names] + [
-        ("pre_view_translation", "<f4", 4), ("view_origin", "<f4", 4),
-        ("projection_scale", "<f4", 2), ("projection_jitter", "<f4", 2)])
-    if values.dtype != np.float32 or values.size != 236:
-        raise ValueError("ViewMatricesAux must contain exactly 236 float32 values")
-    return np.ascontiguousarray(values).reshape(-1).view(dtype)[0]
-# [/snippet:doc-pt-view-data-python]
-
-
 def pt_display_image(name: str, values: np.ndarray, exposure: float = 1.0) -> np.ndarray:
     """Make PT previews by output meaning; display remapping never changes saved raw values."""
     pixels = decode_pt_pixels(values)
-    if name == "ViewMatricesAux":
-        # Give the auxiliary record a readable preview rather than a 236-pixel strip.
-        record = decode_pt_view_data(values)
-        image = Image.new("RGB", (640, 540), "#101820")
-        draw = ImageDraw.Draw(image)
-        draw.text((16, 12), "ViewMatricesAux: 236 float32 values", fill="white")
-        for index, field in enumerate(record.dtype.names):
-            data = np.asarray(record[field]).reshape(-1)
-            summary = ", ".join(f"{value:.4g}" for value in data[:4])
-            draw.text((16, 42 + index * 26), f"{field}: {summary}", fill="white")
-        return np.asarray(image)
     if name == "Exposure":
         image = Image.new("RGB", (640, 360), "#101820")
         ImageDraw.Draw(image).text((40, 160), f"Exposure multiplier: {float(pixels[0, 0, 0]):.7g}", fill="white")
@@ -1465,12 +1472,29 @@ def capture_pt_lineup(args) -> None:
         frame = next(iter(products.values())).frames[0]
         for name in ("StableIdMapDeltas", "SemanticIdMapDeltas"):
             initial_maps[name] = _map_render_var(frame, name)
+        # The first step creates renderer instances; selection flags require those instances to exist.
+        _select_lineup_robots(renderer, frame)
+        del frame, products
+        products = renderer.step(render_products={"/Render/Camera"}, delta_time=args.step_dt, ordinal=1)
+        frame = next(iter(products.values())).frames[0]
         if not frame.converged:
             raise RuntimeError("PT static frame did not reach the requested sample count")
         print(f"PT static capture: one frame at {args.samples_per_pixel} SPP, converged={frame.converged}, iterations={frame.progression}", file=sys.stderr, flush=True)
         for name in names:
             try:
                 values = _map_render_var(frame, name)
+                if isinstance(values, dict):
+                    # The final PT report must retain diagnostics for the structured .npz outputs too.
+                    fields = {key: value for key, value in values.items() if key != "params"}
+                    fields.update({"param_" + key: value for key, value in values.get("params", {}).items()})
+                    report[name] = {
+                        "fields": {
+                            key: {"shape": list(value.shape), "dtype": str(value.dtype)}
+                            for key, value in fields.items()
+                        },
+                        "bytes": sum(value.nbytes for value in fields.values()),
+                    }
+                    continue  # Structured outputs are saved by capture_additional_aovs below.
                 tensors[name] = values
                 np.save(output_dir / f"{name}.npy", values)
                 content = values[..., :min(values.shape[-1], 3)] if values.ndim == 3 else values
@@ -1534,9 +1558,10 @@ def capture_pt_lineup(args) -> None:
                 transforms = np.full((len(robot_paths),4,4), np.nan, dtype=np.float64)
                 with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
                     while (group := read.fetch_next()) is not None:
-                        values = np.from_dlpack(group.dlpack(0)).reshape(-1,4,4)
+                        column = group.columns[0]
+                        values = np.from_dlpack(column.dlpack(0)).reshape(-1,4,4)
                         for i in range(group.prim_count):
-                            transforms[group.prim_index(i)] = values[group.data_row_index(i)]
+                            transforms[group.prim_index(i)] = values[column.data_row_index(i)]
                         del values
                         stage.release_group(group)
                 if not np.isfinite(transforms).all():
@@ -1677,11 +1702,19 @@ def main() -> None:
                         initial_maps[name] = values
                         initial_dir = output_dir / "initial"
                         initial_dir.mkdir(parents=True, exist_ok=True)
-                        np.save(initial_dir / f"{name}.npy", values)
+                        np.savez(initial_dir / f"{name}.npz", **values)
+                    if args.render_mode != "MinimalRendering":
+                        _select_lineup_robots(renderer, warmup_frame)
             del warmup_frame, warmup_product
         del warmup_products
         sim_step += 1
         sim_time = sim_step * step_dt
+
+    # Even with warmup disabled, capture the path map once before selecting geometry.
+    if args.render_mode != "MinimalRendering" and args.warmup_frames <= 0:
+        setup_products = renderer.step(render_products={render_product_path}, delta_time=step_dt, ordinal=ordinal)
+        _select_lineup_robots(renderer, next(iter(setup_products.values())).frames[0])
+        del setup_products
 
     # [snippet:step-all-aovs]
     print("Rendering camera AOVs...", file=sys.stderr)
@@ -1725,9 +1758,10 @@ def main() -> None:
             # Preserve authored orientation and scale, including the centimetre-scaled forklift payload.
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(ordinal)) as read:
                 while (group := read.fetch_next()) is not None:
-                    values = np.from_dlpack(group.dlpack(0)).reshape(-1, 4, 4)
+                    column = group.columns[0]
+                    values = np.from_dlpack(column.dlpack(0)).reshape(-1, 4, 4)
                     for i in range(group.prim_count):
-                        transforms[group.prim_index(i)] = values[group.data_row_index(i)]
+                        transforms[group.prim_index(i)] = values[column.data_row_index(i)]
                     del values
                     stage.release_group(group)
             if not np.all(np.isfinite(transforms)):

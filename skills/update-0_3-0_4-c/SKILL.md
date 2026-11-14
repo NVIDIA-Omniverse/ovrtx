@@ -1,13 +1,6 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: update-0_3-0_4-c
 description: >
   Upgrade skill: migrate user C/C++ application code from ovrtx 0.3.x standalone
@@ -15,7 +8,7 @@ description: >
   "upgrade from 0.3 to 0.4 with ovstage", "ovrtx 0.4 ovstage 0.1 migration",
   "migrate my ovrtx app", or "port my application to ovstage". Reference
   implementations: `examples/c/minimal` and `examples/c/status-queries` (Recipe A).
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -212,9 +205,17 @@ Every `OVRTX_DEPRECATED` entry point in [`ovrtx.h`](../../include/ovrtx/ovrtx.h)
 | `ovrtx_clone_usd` | `ovstage_clone` (explicit ordinal satisfying configured admission and applicable floors; wait for completion, then pair with `ovstage_advance_write_floor` -> `ovrtx_update_from_stage` -> `ovrtx_step_with_stage`, Recipe B). The source must exist and target paths must be absent. |
 | `ovrtx_write_attribute` | `ovstage_query` / `ovstage_query_from_path_list` -> `ovstage_write_attribute`. |
 | `ovrtx_map_attribute` / `ovrtx_unmap_attribute` | `ovstage_map_attribute` + `ovstage_fetch_map_next`; commit with `ovstage_unmap_attribute` / `ovstage_unmap_group`. |
-| `ovrtx_read_attribute` / `ovrtx_fetch_read_result` / `ovrtx_release_read_result` | `ovstage_read_attributes` + `ovstage_fetch_read_next` + `ovstage_release_read` (also `ovstage_release_group` for fetched groups). |
+| `ovrtx_read_attribute` / `ovrtx_fetch_read_result` / `ovrtx_release_read_result` | `ovstage_read_attributes` + `ovstage_fetch_read_next` + `ovstage_release_read` (also `ovstage_release_groups` for fetched groups with current OVStage headers). |
 | `ovrtx_query_prims` / `ovrtx_fetch_query_results` / `ovrtx_release_query_results` | `ovstage_query` + `ovstage_fetch_query_result` + `ovstage_release_query_result` + `ovstage_release_query`. |
 | `ovrtx_create_attribute_binding` / `ovrtx_destroy_attribute_binding` | No persistent-binding equivalent; reuse an `ovstage_query` handle across writes, release with `ovstage_release_query`. |
+
+With current OVStage headers, `ovstage_fetch_read_next` takes an output array,
+capacity, and output count; `ovstage_release_groups` takes an array and count.
+For single-group recipes, pass capacity `1` to `ovstage_fetch_read_next` and
+inspect the returned count. Release only delivered groups by passing that count
+to `ovstage_release_groups`. Earlier paired OVStage SDKs used the single-group
+fetch signature and `ovstage_release_group`; compile against matching headers
+and runtime libraries.
 
 `ovrtx_step` is **not** deprecated — it remains the standalone-mode step function. While a stage is attached it returns `OVRTX_API_ERROR`; use `ovrtx_step_with_stage(renderer, render_products, delta_time, ordinal, ...)` there instead. The deprecated `ovrtx_query_prims` / read APIs also still function against attached ovstage scene state in the default mode, but new query call sites should be authored against `ovstage_query`.
 

@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1136" height="484" viewBox="0 0 1136 484" role="img" aria-labelledby="title desc">
+<title id="title">One lidar return, two independent output choices</title>
+<desc id="desc">A 2 by 2 grid. Columns: Cartesian and spherical components, chosen by elementsCoordsType. Rows: the sensor frame and the world frame, chosen by outputFrameOfReference. A top view of the scene shows the world origin, a displaced and rotated sensor and one return; each cell gives that return's three numbers for its combination. The delivered params coordsType and frameOfReference say which cell a frame is in.</desc>
+<defs><marker id="arrow-0074df-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#0074DF"/></marker><marker id="arrow-0074df-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#0074DF"/></marker><marker id="arrow-952fc6-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#952FC6"/></marker><marker id="arrow-952fc6-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#952FC6"/></marker></defs>
+<rect width="1136" height="484" fill="#fff"/>
+<rect x="24" y="24" width="340" height="348" rx="6" fill="#F2F2F2"/>
+<text x="38" y="50" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">The scene, seen from above</text>
+<line x1="74" y1="294" x2="121" y2="294" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<line x1="74" y1="294" x2="74" y2="247" stroke="#952FC6" stroke-width="2" marker-end="url(#arrow-952fc6-2)"/>
+<text x="144" y="298" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#952FC6" text-anchor="middle" font-weight="bold">x</text>
+<text x="74" y="228" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#952FC6" text-anchor="middle" font-weight="bold">y</text>
+<circle cx="74" cy="294" r="4" fill="#952FC6"/>
+<text x="66" y="314" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#952FC6">world origin</text>
+<line x1="74" y1="294" x2="225.1" y2="141.07" stroke="#952FC6" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<path d="M110,294 A36,36 0 0,0 99.3,268.39" fill="none" stroke="#952FC6" stroke-width="1.5"/>
+<text x="125.67" y="276.41" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#952FC6" text-anchor="middle">45.3°</text>
+<line x1="174" y1="281.5" x2="202.58" y2="265" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<text x="222.5" y="257.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" text-anchor="middle" font-weight="bold">x</text>
+<line x1="174" y1="281.5" x2="157.5" y2="252.92" stroke="#0074DF" stroke-width="2" marker-end="url(#arrow-0074df-2)"/>
+<text x="142.47" y="252.89" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" text-anchor="middle" font-weight="bold">y</text>
+<rect x="165" y="275.5" width="18" height="12" rx="2" fill="#0074DF" transform="rotate(-30 174 281.5)"/>
+<text x="186" y="297.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#0074DF">sensor</text>
+<line x1="174" y1="281.5" x2="225.1" y2="141.07" stroke="#76B900" stroke-width="2"/>
+<path d="M203.44,264.5 A34,34 0 0,0 185.63,249.55" fill="none" stroke="#0074DF" stroke-width="1.5"/>
+<text x="204.21" y="249.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#0074DF" text-anchor="middle">40°</text>
+<line x1="200.84" y1="125.86" x2="253.46" y2="145.01" stroke="#757575" stroke-width="6"/>
+<circle cx="225.1" cy="141.07" r="5" fill="#76B900"/>
+<text x="251.1" y="119.07" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#757575">object</text>
+<text x="211.1" y="147.07" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#76B900" text-anchor="end">one return</text>
+<text x="38" y="342" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">Top view; z is up, out of the page.</text>
+<text x="38" y="358" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">Sensor at (4.0, 0.5, 0.5) m in the world, yawed 30°.</text>
+<text x="384" y="39" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">outputFrameOfReference</text>
+<text x="829" y="39" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="middle">elementsCoordsType</text>
+<rect x="544" y="50" width="280" height="54" rx="6" fill="#313131"/>
+<text x="684" y="73" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">CARTESIAN</text>
+<text x="684" y="92" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#fff" text-anchor="middle">x, y, z in meters</text>
+<rect x="834" y="50" width="280" height="54" rx="6" fill="#313131"/>
+<text x="974" y="73" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">SPHERICAL</text>
+<text x="974" y="92" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#fff" text-anchor="middle">azimuth, elevation (deg), range (m)</text>
+<rect x="384" y="114" width="150" height="128" rx="6" fill="#0074DF"/>
+<text x="459" y="166" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">SENSOR</text>
+<text x="459" y="188" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#fff" text-anchor="middle">from the sensor,</text>
+<text x="459" y="204" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#fff" text-anchor="middle">in its axes</text>
+<rect x="544" y="114" width="280" height="128" rx="6" fill="#F2F2F2"/>
+<line x1="574" y1="208" x2="585.75" y2="208" stroke="#0074DF" stroke-width="1.5" marker-end="url(#arrow-0074df-1p5)"/>
+<line x1="574" y1="208" x2="574" y2="196.25" stroke="#0074DF" stroke-width="1.5" marker-end="url(#arrow-0074df-1p5)"/>
+<rect x="568" y="204" width="12" height="8" rx="1.5" fill="#0074DF"/>
+<line x1="574" y1="208" x2="630" y2="208" stroke="#757575" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<line x1="630" y1="208" x2="630" y2="158" stroke="#757575" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<circle cx="630" cy="158" r="4.5" fill="#76B900"/>
+<text x="656" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">x &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;4.58 m</text>
+<text x="656" y="186" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">y &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;3.84 m</text>
+<text x="656" y="210" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">z &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;0.52 m</text>
+<rect x="834" y="114" width="280" height="128" rx="6" fill="#F2F2F2"/>
+<line x1="864" y1="208" x2="875.75" y2="208" stroke="#0074DF" stroke-width="1.5" marker-end="url(#arrow-0074df-1p5)"/>
+<line x1="864" y1="208" x2="864" y2="196.25" stroke="#0074DF" stroke-width="1.5" marker-end="url(#arrow-0074df-1p5)"/>
+<rect x="858" y="204" width="12" height="8" rx="1.5" fill="#0074DF"/>
+<line x1="864" y1="208" x2="920" y2="158" stroke="#757575" stroke-width="1.2"/>
+<path d="M882,208 A18,18 0 0,0 877.43,196.01" fill="none" stroke="#757575" stroke-width="1.2"/>
+<circle cx="920" cy="158" r="4.5" fill="#76B900"/>
+<text x="946" y="162" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">azimuth &#160;&#160;&#160;40.00 deg</text>
+<text x="946" y="186" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">elevation &#160;&#160;5.00 deg</text>
+<text x="946" y="210" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">range &#160;&#160;&#160;&#160;&#160;&#160;6.00 m</text>
+<rect x="384" y="252" width="150" height="128" rx="6" fill="#952FC6"/>
+<text x="459" y="304" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="14" fill="#fff" text-anchor="middle" font-weight="bold">WORLD</text>
+<text x="459" y="326" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#fff" text-anchor="middle">from the world origin,</text>
+<text x="459" y="342" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11.5" fill="#fff" text-anchor="middle">in world axes</text>
+<rect x="544" y="252" width="280" height="128" rx="6" fill="#F2F2F2"/>
+<line x1="574" y1="346" x2="585.75" y2="346" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<line x1="574" y1="346" x2="574" y2="334.25" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<circle cx="574" cy="346" r="3.5" fill="#952FC6"/>
+<line x1="574" y1="346" x2="630" y2="346" stroke="#757575" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<line x1="630" y1="346" x2="630" y2="296" stroke="#757575" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<circle cx="630" cy="296" r="4.5" fill="#76B900"/>
+<text x="656" y="300" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">x &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;6.04 m</text>
+<text x="656" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">y &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;6.12 m</text>
+<text x="656" y="348" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">z &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;1.02 m</text>
+<rect x="834" y="252" width="280" height="128" rx="6" fill="#F2F2F2"/>
+<line x1="864" y1="346" x2="875.75" y2="346" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<line x1="864" y1="346" x2="864" y2="334.25" stroke="#952FC6" stroke-width="1.5" marker-end="url(#arrow-952fc6-1p5)"/>
+<circle cx="864" cy="346" r="3.5" fill="#952FC6"/>
+<line x1="864" y1="346" x2="920" y2="296" stroke="#757575" stroke-width="1.2"/>
+<path d="M882,346 A18,18 0 0,0 877.43,334.01" fill="none" stroke="#757575" stroke-width="1.2"/>
+<circle cx="920" cy="296" r="4.5" fill="#76B900"/>
+<text x="946" y="300" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">azimuth &#160;&#160;&#160;45.34 deg</text>
+<text x="946" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">elevation &#160;&#160;6.78 deg</text>
+<text x="946" y="348" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">range &#160;&#160;&#160;&#160;&#160;&#160;8.66 m</text>
+<rect x="24" y="388" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="43" y="398.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">sensor frame</text>
+<rect x="144.16" y="388" width="12" height="12" rx="2" fill="#952FC6"/>
+<text x="163.16" y="398.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">world frame</text>
+<rect x="257.6" y="388" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="276.6" y="398.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">the return</text>
+<text x="384" y="412" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">The delivered params</text>
+<text x="520.34" y="412" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">coordsType</text>
+<text x="597.68" y="412" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">and</text>
+<text x="625.36" y="412" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">frameOfReference</text>
+<text x="746.04" y="412" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">say which cell you are in.</text>
+<text x="384" y="432" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">HitNormal</text>
+<text x="454.12" y="432" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">and</text>
+<text x="481.8" y="432" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">Velocity</text>
+<text x="544.69" y="432" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">are rotated into the chosen frame, never translated, and stay Cartesian in every cell.</text>
+<text x="384" y="452" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">A third frame choice,</text>
+<text x="515.22" y="452" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">CUSTOM</text>
+<text x="563.66" y="452" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">measures from a frame you place with</text>
+<text x="801.44" y="452" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">customFrameOfReferenceTrafo.</text>
+</svg>

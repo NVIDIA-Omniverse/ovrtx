@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="418" viewBox="0 0 1200 418" role="img" aria-labelledby="title desc">
+<title id="title">From a step result to a mapped output</title>
+<desc id="desc">A step result holds zero or more frames per RenderProduct, each with its own capture window (start_time .. end_time) that may begin before the step's simulation_start_time. A frame holds one render var output per RenderVar, keyed by the RenderVar's prim path. Mapping an output with DEFAULT, CPU, CUDA or CUDA_ARRAY hands you a container: name, type, status, version and one wait_event, a list of named tensors on the mapped device and a list of named host-resident params.</desc>
+<defs><marker id="arrow-757575-1" markerUnits="userSpaceOnUse" markerWidth="5.5" markerHeight="4.5" refX="0" refY="2.25" orient="auto" overflow="visible"><path d="M0,0 L5.5,2.25 L0,4.5 z" fill="#757575"/></marker><marker id="arrow-757575-2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" refX="0" refY="4.5" orient="auto" overflow="visible"><path d="M0,0 L11,4.5 L0,9 z" fill="#757575"/></marker><marker id="arrow-757575-2p5" markerUnits="userSpaceOnUse" markerWidth="13.75" markerHeight="11.25" refX="0" refY="5.62" orient="auto" overflow="visible"><path d="M0,0 L13.75,5.62 L0,11.25 z" fill="#757575"/></marker></defs>
+<rect width="1200" height="418" fill="#fff"/>
+<rect x="30" y="40" width="390" height="324" rx="8" fill="#F2F2F2"/>
+<text x="46" y="64" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">step result</text>
+<text x="46" y="82" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">zero or more frames per RenderProduct you stepped</text>
+<rect x="44" y="120" width="362" height="56" rx="4" fill="#fff"/>
+<text x="56" y="152.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" font-weight="bold">product A</text>
+<line x1="140" y1="126" x2="140" y2="170" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="44" y="186" width="362" height="56" rx="4" fill="#fff"/>
+<text x="56" y="218.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" font-weight="bold">product B</text>
+<line x1="140" y1="192" x2="140" y2="236" stroke="#C0C0C0" stroke-width="1"/>
+<rect x="206" y="112" width="186" height="146" fill="#313131" fill-opacity="0.06"/>
+<line x1="206" y1="112" x2="206" y2="258" stroke="#757575" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="392" y1="112" x2="392" y2="258" stroke="#757575" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="296" y="106" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">step window</text>
+<text x="302" y="106" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131">[t, t + delta_time]</text>
+<text x="273" y="152" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">absent, or an empty frame list</text>
+<rect x="158" y="204" width="48" height="20" rx="3" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<rect x="206" y="204" width="52" height="20" rx="3" fill="#9A9A9A"/>
+<rect x="272" y="204" width="114" height="20" rx="3" fill="#9A9A9A"/>
+<text x="386" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="end">end_time</text>
+<text x="272" y="237" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131">start_time</text>
+<line x1="140" y1="258" x2="406" y2="258" stroke="#757575" stroke-width="1.5"/>
+<line x1="206" y1="258" x2="206" y2="264" stroke="#757575" stroke-width="1.5"/>
+<line x1="392" y1="258" x2="392" y2="264" stroke="#757575" stroke-width="1.5"/>
+<text x="202" y="278" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131">simulation_start_time</text>
+<text x="396" y="295" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="end">simulation_end_time</text>
+<line x1="178" y1="308" x2="178" y2="232.5" stroke="#757575" stroke-width="1" marker-end="url(#arrow-757575-1)"/>
+<text x="46" y="318" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">completes a capture begun in an earlier step: its start_time</text>
+<text x="46" y="333.95" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">precedes simulation_start_time. In C the frame fields are</text>
+<text x="46" y="349.9" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">frame_start_time and frame_end_time.</text>
+<rect x="480" y="118" width="240" height="170" rx="8" fill="#F2F2F2"/>
+<text x="492" y="140" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">render var outputs</text>
+<text x="492" y="156" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">one per RenderVar of the product,</text>
+<text x="492" y="172" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">keyed by its full prim path</text>
+<rect x="492" y="184" width="216" height="26" rx="4" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="600" y="200.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">/World/Render/Vars/PointCloud</text>
+<rect x="492" y="216" width="216" height="26" rx="4" fill="#fff" stroke="#C0C0C0" stroke-width="1"/>
+<text x="600" y="232.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">/Render/Camera/LdrColor</text>
+<text x="492" y="258" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A">keys taken from the lidar example</text>
+<text x="492" y="274" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A">and from the camera example</text>
+<path d="M389,214 C421.76,214 434.24,205 467,205" fill="none" stroke="#757575" stroke-width="2" marker-end="url(#arrow-757575-2)"/>
+<text x="450" y="190" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">frame</text>
+<line x1="711" y1="197" x2="834.25" y2="197" stroke="#757575" stroke-width="2.5" marker-end="url(#arrow-757575-2p5)"/>
+<text x="779" y="155" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">map</text>
+<text x="779" y="171" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">DEFAULT | CPU</text>
+<text x="779" y="187" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">CUDA | CUDA_ARRAY</text>
+<rect x="850" y="80" width="320" height="252" rx="8" fill="#F2F2F2"/>
+<text x="862" y="104" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131">name = /World/Render/Vars/PointCloud</text>
+<text x="862" y="122" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131">type = PointCloud &#160;&#160;status &#160;&#160;version</text>
+<text x="862" y="140" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575">one wait_event covers every tensor of the container</text>
+<text x="862" y="166" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#0074DF" font-weight="bold">tensors</text>
+<rect x="862" y="172" width="88.34" height="18" rx="9" fill="#0074DF"/>
+<text x="906.17" y="184.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#fff" text-anchor="middle">CPU or CUDA</text>
+<rect x="862" y="198" width="142" height="26" rx="4" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="933" y="214.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">Coordinates</text>
+<rect x="862" y="230" width="142" height="26" rx="4" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="933" y="246.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">Intensity</text>
+<rect x="862" y="262" width="142" height="26" rx="4" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="933" y="278.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">Flags</text>
+<rect x="862" y="294" width="142" height="26" rx="4" fill="#fff" stroke="#0074DF" stroke-width="1.5"/>
+<text x="933" y="310.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">Counts</text>
+<text x="1016" y="166" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#952FC6" font-weight="bold">params</text>
+<rect x="1016" y="172" width="88.36" height="18" rx="9" fill="#952FC6"/>
+<text x="1060.18" y="184.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#fff" text-anchor="middle">host resident</text>
+<rect x="1016" y="198" width="142" height="26" rx="4" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="1087" y="214.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">frameId</text>
+<rect x="1016" y="230" width="142" height="26" rx="4" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="1087" y="246.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">timestampNs</text>
+<rect x="1016" y="262" width="142" height="26" rx="4" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="1087" y="278.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">modelToAppTransform</text>
+<rect x="1016" y="294" width="142" height="26" rx="4" fill="#fff" stroke="#952FC6" stroke-width="1.5"/>
+<text x="1087" y="310.96" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">coordsType</text>
+<rect x="30" y="384" width="12" height="12" rx="2" fill="#9A9A9A"/>
+<text x="49" y="393.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">frame: its own capture window</text>
+<rect x="242.21" y="385" width="10" height="10" rx="2" fill="none" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="260.21" y="393.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">portion rendered in an earlier step</text>
+<rect x="472.27" y="384" width="12" height="12" rx="2" fill="#0074DF"/>
+<text x="491.27" y="393.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">tensors: bulk data, on the mapped device</text>
+<rect x="743.47" y="384" width="12" height="12" rx="2" fill="#952FC6"/>
+<text x="762.47" y="393.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">params: metadata, always host resident</text>
+</svg>

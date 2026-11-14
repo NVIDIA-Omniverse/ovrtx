@@ -1,0 +1,255 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1114" height="516" viewBox="0 0 1114 516" role="img" aria-labelledby="title desc">
+<title id="title">The scan cycle against the stepping cadence</title>
+<desc id="desc">Two timelines for scans s001 and s002 with zero start and scan offsets, on one time axis ticked in scan periods. At the scan period, every step starts on a scan time and delivers a frame, and the scan index alternates 0, 1, 0, 1. At twice the rate, only every other step starts on a scan time; the steps in between fire no scan, publish no radar frame and leave the pending scan unchanged, so the published frames still alternate s001 and s002.</desc>
+<rect width="1114" height="516" fill="#fff"/>
+<line x1="124" y1="82" x2="124" y2="204" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="124" y1="272" x2="124" y2="394" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="124" y1="418" x2="124" y2="446" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="284" y1="82" x2="284" y2="204" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="284" y1="272" x2="284" y2="394" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="284" y1="418" x2="284" y2="446" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="444" y1="82" x2="444" y2="204" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="444" y1="272" x2="444" y2="394" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="444" y1="418" x2="444" y2="446" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="604" y1="82" x2="604" y2="204" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="604" y1="272" x2="604" y2="394" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="604" y1="418" x2="604" y2="446" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="764" y1="82" x2="764" y2="204" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="764" y1="272" x2="764" y2="394" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="764" y1="418" x2="764" y2="446" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="924" y1="82" x2="924" y2="204" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="924" y1="272" x2="924" y2="394" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="924" y1="418" x2="924" y2="446" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="1084" y1="82" x2="1084" y2="204" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="1084" y1="272" x2="1084" y2="394" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="1084" y1="418" x2="1084" y2="446" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<rect x="30" y="20" width="20" height="14" rx="3" fill="#F2F2F2" stroke="#0074DF" stroke-width="1.5"/>
+<circle cx="35" cy="27" r="1.6" fill="#0074DF"/>
+<circle cx="40" cy="27" r="1.6" fill="#0074DF"/>
+<circle cx="45" cy="27" r="1.6" fill="#0074DF"/>
+<text x="58" y="31.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">frame from s001 (scanIdx 0)</text>
+<rect x="253.25" y="20" width="20" height="14" rx="3" fill="#F2F2F2" stroke="#952FC6" stroke-width="1.5"/>
+<circle cx="258.25" cy="27" r="1.6" fill="#952FC6"/>
+<circle cx="263.25" cy="27" r="1.6" fill="#952FC6"/>
+<circle cx="268.25" cy="27" r="1.6" fill="#952FC6"/>
+<text x="281.25" y="31.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">frame from s002 (scanIdx 1)</text>
+<rect x="476.5" y="20" width="20" height="14" rx="3" fill="#fff" stroke="#9A9A9A" stroke-width="1.2" stroke-dasharray="3.6 2.4"/>
+<text x="504.5" y="31.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">no radar frame</text>
+<polygon points="624.86,34 619.86,25 629.86,25" fill="#313131"/>
+<text x="638.86" y="31.5" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">scan time (every multiple of T)</text>
+<text x="124" y="76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Steps at the scan period</text>
+<text x="329.32" y="76" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">one step per T</text>
+<rect x="130" y="86" width="148" height="60" rx="5" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<circle cx="146.44" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="162.89" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="179.33" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="195.78" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="212.22" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="228.67" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="245.11" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="261.56" cy="101" r="2.4" fill="#0074DF"/>
+<text x="204" y="126" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">s001 / scanIdx 0</text>
+<rect x="124" y="152" width="160" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="204" y="170.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 1</text>
+<text x="204" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="290" y="86" width="148" height="60" rx="5" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<circle cx="306.44" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="322.89" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="339.33" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="355.78" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="372.22" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="388.67" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="405.11" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="421.56" cy="101" r="2.4" fill="#952FC6"/>
+<text x="364" y="126" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">s002 / scanIdx 1</text>
+<rect x="284" y="152" width="160" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="364" y="170.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 2</text>
+<text x="364" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="450" y="86" width="148" height="60" rx="5" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<circle cx="466.44" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="482.89" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="499.33" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="515.78" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="532.22" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="548.67" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="565.11" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="581.56" cy="101" r="2.4" fill="#0074DF"/>
+<text x="524" y="126" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">s001 / scanIdx 0</text>
+<rect x="444" y="152" width="160" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="524" y="170.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 3</text>
+<text x="524" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="610" y="86" width="148" height="60" rx="5" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<circle cx="626.44" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="642.89" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="659.33" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="675.78" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="692.22" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="708.67" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="725.11" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="741.56" cy="101" r="2.4" fill="#952FC6"/>
+<text x="684" y="126" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">s002 / scanIdx 1</text>
+<rect x="604" y="152" width="160" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="684" y="170.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 4</text>
+<text x="684" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="770" y="86" width="148" height="60" rx="5" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<circle cx="786.44" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="802.89" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="819.33" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="835.78" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="852.22" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="868.67" cy="101" r="2.4" fill="#0074DF"/>
+<circle cx="885.11" cy="98" r="2.4" fill="#0074DF"/>
+<circle cx="901.56" cy="101" r="2.4" fill="#0074DF"/>
+<text x="844" y="126" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">s001 / scanIdx 0</text>
+<rect x="764" y="152" width="160" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="844" y="170.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 5</text>
+<text x="844" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="930" y="86" width="148" height="60" rx="5" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<circle cx="946.44" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="962.89" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="979.33" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="995.78" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="1012.22" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="1028.67" cy="101" r="2.4" fill="#952FC6"/>
+<circle cx="1045.11" cy="98" r="2.4" fill="#952FC6"/>
+<circle cx="1061.56" cy="101" r="2.4" fill="#952FC6"/>
+<text x="1004" y="126" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">s002 / scanIdx 1</text>
+<rect x="924" y="152" width="160" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="1004" y="170.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 6</text>
+<text x="1004" y="199" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<text x="124" y="222" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">every step starts on a scan time and delivers a frame</text>
+<text x="124" y="266" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Steps at twice the rate</text>
+<text x="316.35" y="266" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">one step per T/2</text>
+<rect x="130" y="276" width="68" height="60" rx="5" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<circle cx="141.33" cy="288" r="2.4" fill="#0074DF"/>
+<circle cx="152.67" cy="291" r="2.4" fill="#0074DF"/>
+<circle cx="164" cy="288" r="2.4" fill="#0074DF"/>
+<circle cx="175.33" cy="291" r="2.4" fill="#0074DF"/>
+<circle cx="186.67" cy="288" r="2.4" fill="#0074DF"/>
+<text x="164" y="307" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">s001</text>
+<text x="164" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">scanIdx 0</text>
+<rect x="124" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="164" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 1</text>
+<text x="164" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="210" y="276" width="68" height="60" rx="5" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="244" y="307" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">no</text>
+<text x="244" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">frame</text>
+<rect x="204" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="244" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 2</text>
+<text x="244" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="290" y="276" width="68" height="60" rx="5" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<circle cx="301.33" cy="288" r="2.4" fill="#952FC6"/>
+<circle cx="312.67" cy="291" r="2.4" fill="#952FC6"/>
+<circle cx="324" cy="288" r="2.4" fill="#952FC6"/>
+<circle cx="335.33" cy="291" r="2.4" fill="#952FC6"/>
+<circle cx="346.67" cy="288" r="2.4" fill="#952FC6"/>
+<text x="324" y="307" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">s002</text>
+<text x="324" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">scanIdx 1</text>
+<rect x="284" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="324" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 3</text>
+<text x="324" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="370" y="276" width="68" height="60" rx="5" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="404" y="307" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">no</text>
+<text x="404" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">frame</text>
+<rect x="364" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="404" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 4</text>
+<text x="404" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="450" y="276" width="68" height="60" rx="5" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<circle cx="461.33" cy="288" r="2.4" fill="#0074DF"/>
+<circle cx="472.67" cy="291" r="2.4" fill="#0074DF"/>
+<circle cx="484" cy="288" r="2.4" fill="#0074DF"/>
+<circle cx="495.33" cy="291" r="2.4" fill="#0074DF"/>
+<circle cx="506.67" cy="288" r="2.4" fill="#0074DF"/>
+<text x="484" y="307" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">s001</text>
+<text x="484" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">scanIdx 0</text>
+<rect x="444" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="484" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 5</text>
+<text x="484" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="530" y="276" width="68" height="60" rx="5" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="564" y="307" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">no</text>
+<text x="564" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">frame</text>
+<rect x="524" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="564" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 6</text>
+<text x="564" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="610" y="276" width="68" height="60" rx="5" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<circle cx="621.33" cy="288" r="2.4" fill="#952FC6"/>
+<circle cx="632.67" cy="291" r="2.4" fill="#952FC6"/>
+<circle cx="644" cy="288" r="2.4" fill="#952FC6"/>
+<circle cx="655.33" cy="291" r="2.4" fill="#952FC6"/>
+<circle cx="666.67" cy="288" r="2.4" fill="#952FC6"/>
+<text x="644" y="307" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">s002</text>
+<text x="644" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">scanIdx 1</text>
+<rect x="604" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="644" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 7</text>
+<text x="644" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="690" y="276" width="68" height="60" rx="5" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="724" y="307" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">no</text>
+<text x="724" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">frame</text>
+<rect x="684" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="724" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 8</text>
+<text x="724" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="770" y="276" width="68" height="60" rx="5" fill="#F2F2F2" stroke="#0074DF" stroke-width="2"/>
+<circle cx="781.33" cy="288" r="2.4" fill="#0074DF"/>
+<circle cx="792.67" cy="291" r="2.4" fill="#0074DF"/>
+<circle cx="804" cy="288" r="2.4" fill="#0074DF"/>
+<circle cx="815.33" cy="291" r="2.4" fill="#0074DF"/>
+<circle cx="826.67" cy="288" r="2.4" fill="#0074DF"/>
+<text x="804" y="307" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">s001</text>
+<text x="804" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">scanIdx 0</text>
+<rect x="764" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="804" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 9</text>
+<text x="804" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<rect x="850" y="276" width="68" height="60" rx="5" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="884" y="307" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">no</text>
+<text x="884" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">frame</text>
+<rect x="844" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="884" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 10</text>
+<text x="884" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="930" y="276" width="68" height="60" rx="5" fill="#F2F2F2" stroke="#952FC6" stroke-width="2"/>
+<circle cx="941.33" cy="288" r="2.4" fill="#952FC6"/>
+<circle cx="952.67" cy="291" r="2.4" fill="#952FC6"/>
+<circle cx="964" cy="288" r="2.4" fill="#952FC6"/>
+<circle cx="975.33" cy="291" r="2.4" fill="#952FC6"/>
+<circle cx="986.67" cy="288" r="2.4" fill="#952FC6"/>
+<text x="964" y="307" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle" font-weight="bold">s002</text>
+<text x="964" y="324" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#313131" text-anchor="middle">scanIdx 1</text>
+<rect x="924" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="964" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 11</text>
+<text x="964" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#952FC6" text-anchor="middle">s002</text>
+<rect x="1010" y="276" width="68" height="60" rx="5" fill="#fff" stroke="#9A9A9A" stroke-width="1.5" stroke-dasharray="4.5 3"/>
+<text x="1044" y="307" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">no</text>
+<text x="1044" y="324" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#9A9A9A" text-anchor="middle">frame</text>
+<rect x="1004" y="342" width="80" height="28" rx="3" fill="#F2F2F2" stroke="#9A9A9A" stroke-width="1"/>
+<text x="1044" y="360.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131" text-anchor="middle">step 12</text>
+<text x="1044" y="389" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#0074DF" text-anchor="middle">s001</text>
+<text x="124" y="412" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">only firings advance the scan; the steps between scan times leave it unchanged, so the published frames still alternate s001 and s002</text>
+<text x="112" y="120" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">output</text>
+<text x="112" y="170" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">step</text>
+<text x="112" y="199" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">active scan</text>
+<text x="112" y="310" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">output</text>
+<text x="112" y="360" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">step</text>
+<text x="112" y="389" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">active scan</text>
+<line x1="124" y1="446" x2="1084" y2="446" stroke="#757575" stroke-width="1.5"/>
+<line x1="124" y1="446" x2="124" y2="452" stroke="#757575" stroke-width="1.5"/>
+<text x="124" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">0</text>
+<line x1="284" y1="446" x2="284" y2="452" stroke="#757575" stroke-width="1.5"/>
+<text x="284" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">T</text>
+<line x1="444" y1="446" x2="444" y2="452" stroke="#757575" stroke-width="1.5"/>
+<text x="444" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">2T</text>
+<line x1="604" y1="446" x2="604" y2="452" stroke="#757575" stroke-width="1.5"/>
+<text x="604" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">3T</text>
+<line x1="764" y1="446" x2="764" y2="452" stroke="#757575" stroke-width="1.5"/>
+<text x="764" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">4T</text>
+<line x1="924" y1="446" x2="924" y2="452" stroke="#757575" stroke-width="1.5"/>
+<text x="924" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">5T</text>
+<line x1="1084" y1="446" x2="1084" y2="452" stroke="#757575" stroke-width="1.5"/>
+<text x="1084" y="464" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">6T</text>
+<polygon points="124,445 119,436 129,436" fill="#313131"/>
+<polygon points="284,445 279,436 289,436" fill="#313131"/>
+<polygon points="444,445 439,436 449,436" fill="#313131"/>
+<polygon points="604,445 599,436 609,436" fill="#313131"/>
+<polygon points="764,445 759,436 769,436" fill="#313131"/>
+<polygon points="924,445 919,436 929,436" fill="#313131"/>
+<polygon points="1084,445 1079,436 1089,436" fill="#313131"/>
+<text x="604" y="492" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">time in scan periods T, the reciprocal of the frame rate; a scan is scheduled at every multiple of T</text>
+</svg>

@@ -13,7 +13,7 @@
 What You Can Author in USD
 ==========================
 
-Everything SPG reads from a scene. Attributes not listed here are not read by SPG.
+Everything SPG reads from a scene.
 
 .. _spg-nodes-and-ports:
 
@@ -41,7 +41,7 @@ definition and come in three kinds.
      - What this node writes.
 
 The port name is the contract. It is what the scene connects to, and what the launch script
-keys on. Nothing is matched by position at this level; position only matters inside a launch
+keys on. Position only matters inside a launch
 script, where the GPU code's parameters or declarations are matched in order.
 
 The Shader Prim
@@ -58,9 +58,11 @@ The Shader Prim
    * - ``uniform asset info:spg:sourceAsset``
      - The GPU source. The extension selects the language. May be a path, a file inside a package, or a URI; refer to :ref:`Where Assets May Live <spg-asset-locations>`.
    * - ``uniform token info:spg:sourceAsset:subIdentifier``
-     - The entry point to invoke. Must match the GPU source and the Lua function name. Optional:
-       without it the prim's own name is used, so a prim named ``GrayscaleKernel`` looks for an
-       entry point called ``GrayscaleKernel``.
+     - The entry point to invoke, and the Lua function that launches it. The GPU source must
+       export an entry point of that name for the node's stage; a ``.spv`` runs its compute entry
+       point ``main`` instead, whatever this names. Optional: without it the prim's own name is
+       used, so a prim named ``GrayscaleKernel`` looks for an entry point called
+       ``GrayscaleKernel``.
    * - ``uniform token info:id``
      - The built-in node, as ``spg:<node-id>``. Refer to :doc:`builtin_catalogue`.
    * - ``opaque inputs:<name>``
@@ -70,11 +72,26 @@ The Shader Prim
    * - a typed attribute, such as ``float inputs:strength``
      - A value-input. The types are below.
 
-The launch script is not authored. It is found by appending ``.lua`` to
-``info:spg:sourceAsset``, so the pairing is by file name and cannot be redirected.
-
 Shader prims must not be nested under a ``Material`` prim, and a shader under an instance
 prototype is ignored.
+
+.. _spg-schema-inputs:
+
+Ports and Values an API Schema Declares
+---------------------------------------
+
+A shader prim may apply a single-apply API schema that declares ports and value-inputs with their
+defaults. The node has every port and value-input such a schema declares, as if the prim authored
+it. A value-input takes ``inputs:X`` when it holds a value or a connection to a source the prim
+authors in any layer, else a legacy ``params:X`` that holds one, else the schema's default of
+``inputs:X``. An empty connection list, which disconnecting through UsdShade leaves, connects nothing.
+Authoring, changing, connecting or removing a value while the stage runs reaches the node on the step
+after the edit is applied, and the same rule picks the value then: removing an authored ``inputs:X``
+gives the node ``params:X`` when the prim authors one, else the schema's default.
+
+Register the schema before the stage is populated, with
+``ovstage.population.register_usd_schemas``; a stage populated before that sees only what the
+prims author.
 
 .. _spg-value-input-types:
 
@@ -122,7 +139,14 @@ the launch script is handed and what the GPU code has to declare.
      - SPG resolves the path and uploads the contents. It may be a path, a file inside a package, or a URI; refer to :ref:`Where Assets May Live <spg-asset-locations>` and :doc:`../do/upload_data`.
    * - an array, such as ``float[]``
      - a buffer
-     - Read on Slang as a ``StructuredBuffer<T>``.
+     - Read on Slang as a ``StructuredBuffer<T>``. A ``matrix2d[]``, ``matrix3d[]`` or
+       ``matrix4d[]`` of N matrices arrives with every one, in stored order: its ``sourceShape`` is
+       ``{N, D, D}``, ``cuda.array`` gives a kernel a pointer to all N × D × D doubles, and
+       ``slang.array(inputs["m"], slang.float)`` gives a shader all of them as floats. An array of
+       no elements arrives with none: its ``sourceShape`` starts with 0, ``cuda.array`` gives a null
+       pointer, and a Slang buffer a placeholder the shader must not read. A ``token[]``
+       is not taken: an input that holds one, or is connected to one, keeps the node's graph from
+       being built, with an error naming the node and the input.
 
 Types that share a base type behave alike, so ``color3f``, ``point3f``, ``normal3f`` and
 ``texCoord3f`` all arrive as a three-component float, exactly as ``float3`` does. A type whose base
@@ -155,9 +179,6 @@ come from any of three places.
 ``info:spg:sourceAsset`` says, so a kernel loaded from a server takes its script from that same
 server. Inside a package the suffix goes within the brackets, so ``pkg.usdz[Kernel.cu]`` pairs
 with ``pkg.usdz[Kernel.cu.lua]``.
-
-**A data file is read as raw bytes wherever it came from.** Nothing parses a format, so the
-location changes nothing about how the launch script reads it. Refer to :doc:`../do/upload_data`.
 
 The RenderVar Prim
 ------------------
@@ -205,4 +226,6 @@ The pattern a graph is wired with, in order:
     Shader.outputs:Y        ->  RenderVar.omni:rtx:aov.connect   (publishing)
 
 A shader-to-shader connection groups both prims into one graph. A node output can be bound to
-one RenderVar at a time.
+one RenderVar at a time. An input, ``inputs:X`` or ``params:X``, a resource port or a value, takes
+one source: an input connected to two or more is an error that names the shader, the input and the
+sources, and no node of that shader's graph runs until the input has one source again.

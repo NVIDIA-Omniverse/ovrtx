@@ -8,6 +8,8 @@
 .. without an express license agreement from NVIDIA CORPORATION or
 .. its affiliates is strictly prohibited.
 
+.. _sensors-cameras-light-path-expressions:
+
 Light Path Expressions
 ======================
 
@@ -16,6 +18,7 @@ a RenderVar. Use them to split a Path Tracing image into compositing passes such
 as diffuse reflection, glossy reflection, emission, direct light, or caustics.
 
 .. figure:: ../../img/light-path-expressions.avif
+   :width: 700
    :alt: Beauty, diffuse reflection, glossy reflection, glossy transmission, and caustics outputs from one scene
    :align: center
    :target: ../../examples/python_lpes.html
@@ -26,6 +29,8 @@ as diffuse reflection, glossy reflection, emission, direct light, or caustics.
 LPEs are available in ``PathTracing`` mode. Author each expression as the
 ``sourceName`` of a ``RenderVar``, set its ``sourceType`` to ``lpe``, and target
 the RenderVar from the RenderProduct's ``orderedVars`` relationship.
+
+.. _sensors-cameras-light-path-expressions-author:
 
 Author LPE Outputs
 ------------------
@@ -39,19 +44,24 @@ outputs even though they remain present in the beauty output.
 .. tab-set::
 
    .. tab-item:: USDA
+      :sync: usda
 
       .. literalinclude:: ../../../tests/docs/usd/data/light_path_expressions.usda
          :language: usda
          :start-after: # [snippet:doc-lpe-render-vars]
          :end-before: # [/snippet:doc-lpe-render-vars]
+         :prepend: #usda 1.0
 
-   .. tab-item:: Python
+   .. tab-item:: USD Python
+      :sync: python
 
       .. literalinclude:: ../../../tests/docs/usd/test_usd_python_examples.py
          :language: python
          :start-after: # [snippet:doc-lpe-render-vars-python]
          :end-before: # [/snippet:doc-lpe-render-vars-python]
          :dedent:
+
+.. _sensors-cameras-light-path-expressions-syntax:
 
 Syntax
 ------
@@ -92,19 +102,19 @@ Terminal Tokens
      - Any light.
    * - ``La``
      - Light subtype
-     - Area light. RTX currently produces this marker.
+     - Area light. ovrtx produces this marker.
    * - ``Le``
      - Light subtype
-     - Environment or background light. RTX currently produces this marker.
+     - Environment or background light. ovrtx produces this marker.
    * - ``Lp``
      - Light subtype
-     - Point light. This marker parses but RTX does not currently produce it.
+     - Point light. This marker parses but ovrtx does not produce it.
    * - ``Lm``
      - Light subtype
-     - Matte lookup or backplate light. This marker parses but RTX does not currently produce it.
+     - Matte lookup or backplate light. This marker parses but ovrtx does not produce it.
    * - ``Lv``
      - Light subtype
-     - Emissive volume. This marker parses but RTX does not currently produce it.
+     - Emissive volume. This marker parses but ovrtx does not produce it.
    * - ``I``
      - Path endpoint
      - Irradiance marker.
@@ -192,12 +202,14 @@ Common Expressions
      - Diffuse reflection visible from the camera.
    * - ``E<RG>.*L``
      - Glossy reflection visible from the camera.
-   * - ``EDG.*L``
-     - Caustics.
+   * - ``ED[GS].*L``
+     - Caustics from glossy or ideal specular scattering. Use ``EDG.*L`` to include only glossy scattering.
    * - ``EL``
      - Directly visible emission.
    * - ``E.{2,}L``
      - Indirect illumination with at least two scattering events.
+
+.. _sensors-cameras-light-path-expressions-labels:
 
 Labels
 ------
@@ -205,8 +217,8 @@ Labels
 Labels restrict an event to named scene elements. Author
 ``primvars:omni:label`` as a uniform token on geometry and ``omni:label`` as a
 uniform token on lights. For example, ``E<RD'ground'>.*L`` selects diffuse
-reflection at geometry labelled ``ground``, while ``E.*<L'key'>`` selects paths
-ending at a light labelled ``key``.
+reflection at geometry labeled ``ground``, while ``E.*<L'key'>`` selects paths
+ending at a light labeled ``key``.
 
 Read And Visualize Outputs
 --------------------------
@@ -215,6 +227,8 @@ After stepping the RenderProduct, map each LPE output like any other camera
 RenderVar. LPE outputs use the same linear floating-point image representation
 as :ref:`HdrColor <camera-output-tables>`. See :doc:`../../examples/python_lpes`
 for a runnable example that reads, converts, and displays all requested outputs.
+
+.. _sensors-cameras-light-path-expressions-limits:
 
 Limitations
 -----------
@@ -226,14 +240,14 @@ Limitations
   omitted from LPE outputs because they do not retain path history.
 * Area (``La``) and environment (``Le``) light markers are produced. Point
   (``Lp``), emissive-volume (``Lv``), and matte (``Lm``) markers parse but do
-  not currently match renderer contributions.
-* Volume-scattering events are currently classified as glossy (``VG``).
+  not match renderer contributions.
+* Volume-scattering events are classified as glossy (``VG``).
 
-Further Reading
----------------
+Related
+-------
 
-* :doc:`render_modes/path_tracing`
-* :doc:`outputs`
-* :doc:`../sensor_outputs`
-* :doc:`../../examples/python_lpes`
-* `OpenUSD UsdRenderVar documentation <https://openusd.org/release/api/class_usd_render_var.html>`_
+- :doc:`outputs`
+- :doc:`render_modes/path_tracing`
+- :doc:`../common/sensor_outputs`
+- :doc:`../../examples/python_lpes`
+- `OpenUSD UsdRenderVar documentation <https://openusd.org/release/api/class_usd_render_var.html>`_

@@ -67,7 +67,7 @@ TEST_F(AttributeReadTest, ReadScalarAttribute) {
     write_data.tensor_count = 1;
     write_data.is_array = false;
 
-    ovx_string_or_token_t attr_ref{};
+    ovx_token_or_string_t attr_ref{};
     attr_ref.token = attr_token;
 
     ovstage_enqueue_result_t wq = ovstage_write_attribute(
@@ -91,18 +91,22 @@ TEST_F(AttributeReadTest, ReadScalarAttribute) {
     docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
     // Fetch the first (and, for a single-prim scalar read, only) group. The
-    // group's tensor is a DLPack view into the sealed attribute storage —
-    // valid until release_group.
+    // column's tensor is a DLPack view into the sealed attribute storage —
+    // valid until its containing group is released.
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount),
               OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(group.data.tensor_count, 0u);
-    uint32_t value = *static_cast<uint32_t const*>(group.data.tensors[0].data);
+    ASSERT_EQ(group.column_count, 1u);
+    ASSERT_NE(group.columns, nullptr);
+    ovstage_read_column_t const& column = group.columns[0];
+    ASSERT_GT(column.data.tensor_count, 0u);
+    uint32_t value = *static_cast<uint32_t const*>(column.data.tensors[0].data);
 
     // Release the fetched storage (synchronous) then the read handle (async;
     // the release is per-handle-ordered so any in-flight fetch drains first).
-    ovstage_release_group(stage_, &group);
+    ovstage_release_groups(stage_, &group, 1);
     ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-read-attribute-scalar-c]
 
@@ -150,14 +154,18 @@ TEST_F(AttributeReadTest, ReadArrayAttribute) {
     ASSERT_EQ(eq.status, OVSTAGE_OK) << format_ovstage_last_error();
     docs_wait_ovstage_no_errors(stage_, eq.op_index);
 
+    size_t fetchedGroupCount = 0;
     ovstage_read_group_t group{};
-    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group),
+    ASSERT_EQ(ovstage_fetch_read_next(stage_, read_handle, OVSTAGE_TIMEOUT_INFINITE, &group, 1, &fetchedGroupCount),
               OVSTAGE_OK)
         << format_ovstage_last_error();
-    ASSERT_GT(group.data.tensor_count, 0u);
-    ASSERT_TRUE(group.is_array);
+    ASSERT_EQ(group.column_count, 1u);
+    ASSERT_NE(group.columns, nullptr);
+    ovstage_read_column_t const& column = group.columns[0];
+    ASSERT_GT(column.data.tensor_count, 0u);
+    ASSERT_TRUE(column.is_array);
 
-    DLTensor const& t = group.data.tensors[0];
+    DLTensor const& t = column.data.tensors[0];
     // ovrtx-test-base-geometry.usda authors 4 float3 points on the Plane.
     ASSERT_EQ(t.dtype.code, kDLFloat);
     ASSERT_EQ(t.dtype.bits, 32u);
@@ -167,7 +175,7 @@ TEST_F(AttributeReadTest, ReadArrayAttribute) {
     ASSERT_EQ(t.shape[1], 3);
     int64_t element_count = t.shape[0] * t.shape[1];
 
-    ovstage_release_group(stage_, &group);
+    ovstage_release_groups(stage_, &group, 1);
     ovstage_release_read(stage_, read_handle);
     // [/snippet:doc-read-array-attribute-c]
 

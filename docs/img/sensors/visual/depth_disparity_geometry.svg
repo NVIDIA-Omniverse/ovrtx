@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="680" viewBox="0 0 1040 680" role="img" aria-labelledby="title desc">
+<title id="title">Disparity geometry</title>
+<desc id="desc">Two imagers separated by a baseline observe one point at distance d; the point projects to different pixel columns on the two imagers, and the column difference is the disparity. An inset plots the applied confidence threshold against the authored threshold.</desc>
+<defs><marker id="arrow-757575-1p2" markerUnits="userSpaceOnUse" markerWidth="6.6" markerHeight="5.4" refX="0" refY="2.7" orient="auto" overflow="visible"><path d="M0,0 L6.6,2.7 L0,5.4 z" fill="#757575"/></marker></defs>
+<rect width="1040" height="680" fill="#fff"/>
+<text x="24" y="30" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" font-weight="bold">Top view: one scene point P seen by two imagers</text>
+<line x1="300" y1="372" x2="300" y2="452" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="220" y1="452" x2="380" y2="452" stroke="#313131" stroke-width="3"/>
+<line x1="220" y1="454" x2="220" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="236" y1="454" x2="236" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="252" y1="454" x2="252" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="268" y1="454" x2="268" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="284" y1="454" x2="284" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="300" y1="454" x2="300" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="316" y1="454" x2="316" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="332" y1="454" x2="332" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="348" y1="454" x2="348" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="364" y1="454" x2="364" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="380" y1="454" x2="380" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="480" y1="372" x2="480" y2="452" stroke="#C0C0C0" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="400" y1="452" x2="560" y2="452" stroke="#313131" stroke-width="3"/>
+<line x1="400" y1="454" x2="400" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="416" y1="454" x2="416" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="432" y1="454" x2="432" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="448" y1="454" x2="448" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="464" y1="454" x2="464" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="480" y1="454" x2="480" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="496" y1="454" x2="496" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="512" y1="454" x2="512" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="528" y1="454" x2="528" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="544" y1="454" x2="544" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="560" y1="454" x2="560" y2="459" stroke="#757575" stroke-width="1"/>
+<line x1="456" y1="452" x2="504" y2="452" stroke="#76B900" stroke-width="6"/>
+<line x1="390" y1="72" x2="276" y2="452" stroke="#0074DF" stroke-width="2"/>
+<line x1="390" y1="72" x2="504" y2="452" stroke="#952FC6" stroke-width="2"/>
+<circle cx="390" cy="72" r="5" fill="#313131"/>
+<text x="390" y="60" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="14" fill="#313131" text-anchor="middle" font-weight="bold">P</text>
+<circle cx="300" cy="372" r="4" fill="#313131" stroke="#fff" stroke-width="1.5"/>
+<circle cx="480" cy="372" r="4" fill="#313131" stroke="#fff" stroke-width="1.5"/>
+<circle cx="276" cy="452" r="4.5" fill="#0074DF" stroke="#fff" stroke-width="1.5"/>
+<circle cx="456" cy="452" r="4.5" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<circle cx="504" cy="452" r="4.5" fill="#952FC6" stroke="#fff" stroke-width="1.5"/>
+<text x="292" y="362" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="end">rendered camera</text>
+<text x="488" y="362" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">simulated second imager</text>
+<line x1="300" y1="364" x2="300" y2="332" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="480" y1="364" x2="480" y2="332" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="390" y1="338" x2="306.6" y2="338" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<line x1="390" y1="338" x2="473.4" y2="338" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<text x="390" y="328" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">baselineMM (mm)</text>
+<line x1="398" y1="72" x2="690" y2="72" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="488" y1="372" x2="690" y2="372" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="684" y1="222" x2="684" y2="78.6" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<line x1="684" y1="222" x2="684" y2="365.4" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<text x="692" y="226" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">distance_m (m)</text>
+<line x1="564" y1="452" x2="586" y2="452" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="580" y1="412" x2="580" y2="378.6" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<line x1="580" y1="412" x2="580" y2="445.4" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<text x="590" y="416" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131">focalLengthPixel (px)</text>
+<path d="M456,461 L456,466 L504,466 L504,461" fill="none" stroke="#76B900" stroke-width="1.5"/>
+<text x="480" y="484" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">disparity_px</text>
+<line x1="220" y1="456" x2="220" y2="506" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="380" y1="456" x2="380" y2="506" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="300" y1="502" x2="226.6" y2="502" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<line x1="300" y1="502" x2="373.4" y2="502" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<text x="300" y="520" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">sensorSizePixel (px)</text>
+<line x1="400" y1="456" x2="400" y2="506" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="560" y1="456" x2="560" y2="506" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="480" y1="502" x2="406.6" y2="502" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<line x1="480" y1="502" x2="553.4" y2="502" stroke="#757575" stroke-width="1.2" marker-end="url(#arrow-757575-1p2)"/>
+<text x="480" y="520" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">sensorSizePixel (px)</text>
+<rect x="400" y="538" width="160" height="24" fill="#fff" stroke="#757575" stroke-width="1"/>
+<rect x="456" y="538" width="48" height="24" fill="#76B900" fill-opacity="0.3"/>
+<line x1="408" y1="538" x2="408" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="416" y1="538" x2="416" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="424" y1="538" x2="424" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="432" y1="538" x2="432" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="440" y1="538" x2="440" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="448" y1="538" x2="448" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="456" y1="538" x2="456" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="464" y1="538" x2="464" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="472" y1="538" x2="472" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="480" y1="538" x2="480" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="488" y1="538" x2="488" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="496" y1="538" x2="496" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="504" y1="538" x2="504" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="512" y1="538" x2="512" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="520" y1="538" x2="520" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="528" y1="538" x2="528" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="536" y1="538" x2="536" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="544" y1="538" x2="544" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="552" y1="538" x2="552" y2="562" stroke="#C0C0C0" stroke-width="1"/>
+<line x1="400" y1="550" x2="560" y2="550" stroke="#C0C0C0" stroke-width="1"/>
+<text x="480" y="582" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#313131" text-anchor="middle">width_px = product resolution</text>
+<text x="40" y="614" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">disparity_px = width_px * baselineMM * focalLengthPixel</text>
+<text x="157.39" y="634" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="13" fill="#313131">/ sensorSizePixel / (distance_m * 1000)</text>
+<line x1="700" y1="110" x2="716" y2="110" stroke="#0074DF" stroke-width="2"/>
+<text x="724" y="114.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">ray to the rendered camera (left imager)</text>
+<line x1="700" y1="130" x2="716" y2="130" stroke="#952FC6" stroke-width="2"/>
+<text x="724" y="134.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">ray to the simulated second imager</text>
+<line x1="700" y1="150" x2="716" y2="150" stroke="#76B900" stroke-width="4"/>
+<text x="724" y="154.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">disparity: the column shift between the two</text>
+<circle cx="707" cy="170" r="4.5" fill="#fff" stroke="#0074DF" stroke-width="2"/>
+<text x="724" y="174.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">the left imager's column on the right imager</text>
+<rect x="620" y="430" width="400" height="230" rx="8" fill="#F2F2F2"/>
+<text x="636" y="452" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" font-weight="bold">Applied confidence threshold</text>
+<text x="636" y="469" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575">1 - confidenceThreshold^0.05</text>
+<line x1="700" y1="616" x2="1004" y2="616" stroke="#757575" stroke-width="1.5"/>
+<line x1="700" y1="616" x2="700" y2="622" stroke="#757575" stroke-width="1.5"/>
+<text x="700" y="633" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">0</text>
+<line x1="730.4" y1="616" x2="730.4" y2="622" stroke="#757575" stroke-width="1.5"/>
+<text x="730.4" y="633" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">0.1</text>
+<line x1="852" y1="616" x2="852" y2="622" stroke="#757575" stroke-width="1.5"/>
+<text x="852" y="633" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">0.5</text>
+<line x1="973.6" y1="616" x2="973.6" y2="622" stroke="#757575" stroke-width="1.5"/>
+<text x="973.6" y="633" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">0.9</text>
+<line x1="1004" y1="616" x2="1004" y2="622" stroke="#757575" stroke-width="1.5"/>
+<text x="1004" y="633" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle">1</text>
+<line x1="700" y1="486" x2="700" y2="616" stroke="#757575" stroke-width="1.5"/>
+<line x1="700" y1="486" x2="694" y2="486" stroke="#757575" stroke-width="1.5"/>
+<text x="688" y="489.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">1</text>
+<line x1="700" y1="551" x2="694" y2="551" stroke="#757575" stroke-width="1.5"/>
+<text x="688" y="554.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">0.5</text>
+<line x1="700" y1="616" x2="694" y2="616" stroke="#757575" stroke-width="1.5"/>
+<text x="688" y="619.96" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="end">0</text>
+<text x="852" y="652" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="11" fill="#757575" text-anchor="middle">authored confidenceThreshold</text>
+<text x="656" y="551" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#757575" text-anchor="middle" transform="rotate(-90 656 551)">applied threshold</text>
+<path d="M700,486 L700,551.15 L700,559.1 L700.03,568.02 L700.3,578.03 L700.61,581.28 L701.52,585.75 L703.04,589.26 L706.08,592.9 L709.12,595.09 L715.2,597.92 L722.8,600.21 L730.4,601.86 L738,603.16 L745.6,604.24 L753.2,605.15 L760.8,605.95 L768.4,606.66 L776,607.29 L783.6,607.87 L791.2,608.41 L798.8,608.9 L806.4,609.35 L814,609.78 L821.6,610.18 L829.2,610.56 L836.8,610.91 L844.4,611.25 L852,611.57 L859.6,611.88 L867.2,612.17 L874.8,612.45 L882.4,612.72 L890,612.98 L897.6,613.23 L905.2,613.47 L912.8,613.7 L920.4,613.93 L928,614.14 L935.6,614.35 L943.2,614.56 L950.8,614.76 L958.4,614.95 L966,615.13 L973.6,615.32 L981.2,615.49 L988.8,615.67 L996.4,615.84 L1004,616" fill="none" stroke="#0074DF" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="730.4" cy="601.86" r="3" fill="#0074DF"/>
+<circle cx="852" cy="611.57" r="3" fill="#0074DF"/>
+<circle cx="973.6" cy="615.32" r="4.5" fill="#76B900" stroke="#fff" stroke-width="1.5"/>
+<text x="738.4" y="594.86" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131">about 0.11</text>
+<text x="852" y="602.57" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131" text-anchor="middle">about 0.034</text>
+<text x="1004" y="602.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="11" fill="#313131" text-anchor="end">about 0.005</text>
+</svg>

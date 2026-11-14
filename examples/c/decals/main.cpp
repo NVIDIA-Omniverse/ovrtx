@@ -58,7 +58,7 @@ static bool report_wait_errors(ovrtx_op_wait_result_t const& wait_result) {
     for (size_t i = 0; i < wait_result.num_error_ops; ++i) {
         ovrtx_op_id_t op_id = wait_result.error_op_ids[i];
         ovx_string_t error = ovrtx_get_last_op_error(op_id);
-        std::cerr << "ovrtx operation " << op_id << " failed";
+        std::cerr << "ovrtx operation " << op_id.raw_id << " failed";
         if (error.ptr && error.length) {
             std::cerr << ": " << std::string_view(error.ptr, error.length);
         }
@@ -84,7 +84,7 @@ static ovrtx_render_var_output_handle_t find_ldr_color(
             }
         }
     }
-    return OVRTX_INVALID_HANDLE;
+    return OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE;
 }
 
 int main(int argc, char** argv) {
@@ -166,9 +166,9 @@ int main(int argc, char** argv) {
 
     ovx_string_t product_path = {"/Render/Camera", strlen("/Render/Camera")};
     ovrtx_render_product_set_t render_products {&product_path, 1};
-    ovrtx_step_result_handle_t final_handle = OVRTX_INVALID_HANDLE;
+    ovrtx_step_result_handle_t final_handle{};
     for (int frame = 0; frame <= 40; ++frame) {
-        ovrtx_step_result_handle_t step_handle = OVRTX_INVALID_HANDLE;
+        ovrtx_step_result_handle_t step_handle{};
         auto enqueue = ovrtx_step_with_stage(
             renderer, render_products, 1.0 / 60.0, ordinal, &step_handle);
         ovrtx_op_wait_result_t wait_result {};
@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
     ovrtx_map_output_description_t map_desc {};
     map_desc.device_type = OVRTX_MAP_DEVICE_TYPE_CPU;
     ovrtx_render_var_output_t output {};
-    if (output_handle == OVRTX_INVALID_HANDLE ||
+    if (output_handle == OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE ||
         failed(ovrtx_map_render_var_output(renderer,
                                            output_handle,
                                            &map_desc,

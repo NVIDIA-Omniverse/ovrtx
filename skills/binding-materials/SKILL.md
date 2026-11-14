@@ -1,18 +1,11 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: binding-materials
 description: >
   Binding materials to prims at runtime. Use when user asks to assign a material,
   change a material, set material binding, or swap materials on a prim.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -103,3 +96,9 @@ The material prim must already exist in the stage (e.g., loaded from USD). You w
 
 - Use the `> **Source:**` directives in this skill to locate tested snippets before reusing API patterns.
 - Keep related skills, docs, and snippets synchronized when changing the workflow.
+
+## ParticleField authoring
+
+> **Source:** `tests/docs/usd/test_gaussian_splats_usda.py` snippet `doc-gaussian-sh-diffuse-python`
+
+See `docs/geometry/gaussian_splats.rst` for mode restrictions and material behavior.

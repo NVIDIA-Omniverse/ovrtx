@@ -73,17 +73,21 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    core/cuda_vulkan_scheduling
    core/usd_plugin_paths
    core/ovstage_integration
+   core/profiling
 
 .. toctree::
    :maxdepth: 3
    :titlesonly:
    :caption: Sensors
 
-   sensors/configuration
-   sensors/multi_rate
-   sensors/sensor_outputs
+   sensors/overview
+   sensors/first_sensor
+   sensors/common/index
    sensors/cameras
-   sensors/nonvisual
+   sensors/visual/index
+   sensors/nonvisual/index
+   sensors/reference/index
+   sensors/troubleshooting/index
 
 .. toctree::
    :maxdepth: 2
@@ -120,8 +124,12 @@ The software and materials are governed by the `NVIDIA Software License Agreemen
    :caption: Materials
 
    materials/material_binding
+   materials/opacity_handling
+   materials/nonvisual_sensor_materials
    materials/projectors
    materials/decals
+   materials/video_textures
+   materials/runtime_textures
 
 .. toctree::
    :maxdepth: 2

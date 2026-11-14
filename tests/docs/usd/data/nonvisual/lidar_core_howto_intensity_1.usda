@@ -1,0 +1,18 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-howto-intensity-1]
+#usda 1.0
+
+def OmniLidar "lidar" (
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    token omni:sensor:Core:intensityProcessing = "NORMALIZATION"
+    float omni:sensor:Core:intensityScalePercent = 255
+
+    float omni:sensor:Core:minReflectance = 0.1
+    float omni:sensor:Core:minReflectionRangeM = 200
+}
+# [/snippet:doc-nonvisual-lidar-core-howto-intensity-1]

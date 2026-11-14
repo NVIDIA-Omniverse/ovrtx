@@ -1,0 +1,21 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-tutorials-blickfeld-cube1-1]
+#usda 1.0
+
+def OmniLidar "Blickfeld_Cube1_Analytic" (
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    string omni:sensor:modelName = "LidarCore"
+    string omni:sensor:modelVersion = "0"
+    string omni:sensor:modelVendor = "NVIDIA"
+    string omni:sensor:marketName = "Blickfeld Cube 1"
+    double2 omni:sensor:frameRate = (10, 1)
+
+    token omni:sensor:Core:scanType = "SOLID_STATE"
+    bool omni:sensor:Core:partialOutputs = false
+}
+# [/snippet:doc-nonvisual-lidar-core-tutorials-blickfeld-cube1-1]

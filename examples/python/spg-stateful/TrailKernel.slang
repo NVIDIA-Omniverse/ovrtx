@@ -9,19 +9,17 @@
 // its affiliates is strictly prohibited.
 
 // [snippet:trail-slang-kernel]
-// Slang counterpart of TrailKernel.cu: fade what the node published last time,
+// Slang counterpart of TrailKernel.cu: fade what the node kept from last time,
 // add what it was handed this time.
 //
 //     history[n] = current[n] + decay * history[n-1]
 //
 // The history is bound as RWTexture2D because the shader reads it as well as
-// writes it. Nothing in the shader marks it as state: what makes it survive
-// between executions is the launch script allocating it with slang.stateful, so
-// the shader treats it exactly like an ordinary output.
+// writes it. It survives between executions because the launch script states
+// it in self.memory; the shader binds it like an output.
 //
 // The node publishes both images so they can be compared directly. Live is the
-// frame as handed in, Trail is the feedback result, and the only difference
-// between them is history[n-1].
+// frame as handed in, Trail is the feedback result.
 struct Params
 {
     float decay;   // fraction of the previous frame kept, 0 to 1
@@ -52,15 +50,14 @@ void trail(uint3 tid : SV_DispatchThreadID)
 
     float3 current = g_InImage.Load(int3(tid.xy, 0)).rgb;
 
-    // history[n-1], read through an ordinary read/write binding: a stateful
-    // output binds like any other. Without the stateful marker this reads back
-    // empty every frame, whatever the shader writes below.
+    // history[n-1], read through a read/write binding: the node's
+    // memory binds like an output. Were it an ordinary output instead, it
+    // would not be guaranteed to hold anything, whatever the shader writes below.
     float3 previous = g_History[tid.xy].rgb;
 
     float3 fed = current + g_Params.decay * previous;
 
-    // Carry it to the next execution. This write is the other half of the loop,
-    // and it is the only reason the shader has anything to fade next frame.
+    // Carry it to the next execution, so the next frame has something to fade.
     g_History[tid.xy] = float4(fed, 1.0);
 
     g_OutLive[tid.xy] = float4(toneMap(current), 1.0);

@@ -26,7 +26,7 @@ stands at 3.0 m. The example reports the strongest echo, which locates the wall.
 Unlike the point-cloud sensors, the acoustic model reports an amplitude series
 per signal way rather than discrete returns, and publishes the frame's extent as
 composite parameters rather than as a ``Counts`` channel. For the channel and
-parameter reference, see :doc:`../sensors/acoustic`.
+parameter reference, see :doc:`../sensors/nonvisual/acoustic_wpm/index`.
 
 Prerequisites
 -------------
@@ -59,9 +59,6 @@ Options
    * - ``--log [PATH]``
      - Write a carb log file, by default under ``_output/``
 
-A successful run prints one summary line. Amplitude carries detector noise and
-varies slightly between runs, but the range locates the wall at 3.0 m:
-
-.. code-block:: text
-
-   signal ways=1, responding=1, median peak range=3.022 m, median peak amplitude=4593
+A successful run prints the signal-way count, responding count, median peak
+range and median peak amplitude. The range is the lower boundary of the
+strongest echo bin; amplitude varies with detector noise.

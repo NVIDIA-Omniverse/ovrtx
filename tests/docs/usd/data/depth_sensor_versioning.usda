@@ -1,0 +1,26 @@
+#usda 1.0
+
+# [snippet:doc-depth-sensor-versioning]
+def Xform "World" {
+    def Camera "Camera" (
+        prepend apiSchemas = ["OmniSensorGenericDepthSensorSingleViewAPI"]
+    )
+    {
+        string omni:sensor:modelVersion = "0"
+
+        float omni:sensor:depthSensor:baselineMM = 55.0
+        float omni:sensor:depthSensor:focalLengthPixel = 897.0
+    }
+}
+
+def "Render" {
+    def RenderProduct "Camera" {
+        rel camera = </World/Camera>
+        rel orderedVars = [<DepthSensorDistance>]
+
+        def RenderVar "DepthSensorDistance" {
+            string sourceName = "DepthSensorDistance"
+        }
+    }
+}
+# [/snippet:doc-depth-sensor-versioning]

@@ -18,9 +18,12 @@
 # toolchain ever needs to be reproducible, generate a pinned file with `uv pip compile`.
 
 sphinx>=8.2
+Pygments>=2.21.0
 nvidia-sphinx-theme
 sphinx-autodoc-typehints
 sphinx-copybutton
-sphinx-design
+# sphinx-design 0.8 deprecates the ^^^/+++ card separators that docs/examples/index.rst
+# uses and warns on them. Lift this bound once the cards use the card-footer syntax.
+sphinx-design<0.8
 sphinx-mdinclude
 breathe

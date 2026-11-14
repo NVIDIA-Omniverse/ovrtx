@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500" role="img" aria-labelledby="title desc">
+<title id="title">The example scene from above</title>
+<desc id="desc">Top view of the example scene: the lidar at the origin looking along +X, the cube ten meters ahead, the ground plane extending 200 meters in every direction</desc>
+<defs><marker id="arrow-0074df-2p5" markerUnits="userSpaceOnUse" markerWidth="13.75" markerHeight="11.25" refX="0" refY="5.62" orient="auto" overflow="visible"><path d="M0,0 L13.75,5.62 L0,11.25 z" fill="#0074DF"/></marker><marker id="arrow-757575-1p5" markerUnits="userSpaceOnUse" markerWidth="8.25" markerHeight="6.75" refX="0" refY="3.38" orient="auto" overflow="visible"><path d="M0,0 L8.25,3.38 L0,6.75 z" fill="#757575"/></marker></defs>
+<rect width="960" height="500" fill="#fff"/>
+<text x="24" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#757575" font-weight="bold">Whole ground plane, 400 m by 400 m</text>
+<rect x="24" y="70" width="320" height="320" rx="2" fill="#F2F2F2" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="184" y="112" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">asphalt ground plane</text>
+<text x="184" y="129" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">-200 m to 200 m in X and Y</text>
+<text x="32" y="382" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575">(-200, -200)</text>
+<text x="336" y="88" font-family="'Roboto Mono','DejaVu Sans Mono',Menlo,monospace" font-size="12" fill="#757575" text-anchor="end">(200, 200)</text>
+<rect x="181.6" y="225.2" width="13.6" height="9.6" fill="none" stroke="#0074DF" stroke-width="1.5"/>
+<circle cx="184" cy="230" r="2.5" fill="#76B900"/>
+<line x1="195.2" y1="225.2" x2="420" y2="50" stroke="#9A9A9A" stroke-width="1" stroke-dasharray="3 2"/>
+<line x1="195.2" y1="234.8" x2="420" y2="410" stroke="#9A9A9A" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="32" y="362" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">sensor and cube at the center: detail at right</text>
+<text x="420" y="34" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#757575" font-weight="bold">Detail around the sensor</text>
+<rect x="420" y="50" width="510" height="360" rx="0" fill="#F2F2F2" stroke="#C0C0C0" stroke-width="1.5"/>
+<text x="480" y="70" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">asphalt ground plane</text>
+<line x1="420" y1="410" x2="930" y2="410" stroke="#757575" stroke-width="1.5"/>
+<line x1="510" y1="410" x2="510" y2="416" stroke="#757575" stroke-width="1.5"/>
+<text x="510" y="428" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">0</text>
+<line x1="660" y1="410" x2="660" y2="416" stroke="#757575" stroke-width="1.5"/>
+<text x="660" y="428" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">5</text>
+<line x1="810" y1="410" x2="810" y2="416" stroke="#757575" stroke-width="1.5"/>
+<text x="810" y="428" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">10</text>
+<line x1="420" y1="80" x2="426" y2="80" stroke="#757575" stroke-width="1.5"/>
+<text x="431" y="84.3" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">5</text>
+<line x1="420" y1="230" x2="426" y2="230" stroke="#757575" stroke-width="1.5"/>
+<text x="431" y="234.3" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">0</text>
+<line x1="420" y1="380" x2="426" y2="380" stroke="#757575" stroke-width="1.5"/>
+<text x="431" y="384.3" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">-5</text>
+<text x="675" y="450" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575" text-anchor="middle">X (m)</text>
+<text x="431" y="62" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">Y (m)</text>
+<rect x="787.5" y="207.5" width="45" height="45" fill="#9A9A9A" stroke="#313131" stroke-width="1.5"/>
+<text x="810" y="180" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">concrete cube, 1.5 m,</text>
+<text x="810" y="197" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" text-anchor="middle">at (10, 0, 0.75)</text>
+<circle cx="510" cy="230" r="8" fill="#76B900"/>
+<line x1="520" y1="230" x2="541.25" y2="230" stroke="#0074DF" stroke-width="2.5" marker-end="url(#arrow-0074df-2p5)"/>
+<text x="452" y="196" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131" font-weight="bold">OmniLidar at (0, 0, 1)</text>
+<text x="452" y="213" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12.5" fill="#313131">looks along +X, 1 m above the plane</text>
+<line x1="510" y1="240" x2="510" y2="312" stroke="#757575" stroke-width="1"/>
+<line x1="810" y1="254.5" x2="810" y2="312" stroke="#757575" stroke-width="1"/>
+<line x1="660" y1="305" x2="518.25" y2="305" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<line x1="660" y1="305" x2="801.75" y2="305" stroke="#757575" stroke-width="1.5" marker-end="url(#arrow-757575-1p5)"/>
+<text x="660" y="298" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="13" fill="#313131" text-anchor="middle" font-weight="bold">10 m</text>
+<rect x="24" y="468" width="12" height="12" rx="2" fill="#76B900"/>
+<text x="47" y="478.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">lidar</text>
+<line x1="95.58" y1="474" x2="111.58" y2="474" stroke="#0074DF" stroke-width="2"/>
+<text x="118.58" y="478.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">looks along +X</text>
+<rect x="230.98" y="468" width="12" height="12" rx="2" fill="#9A9A9A"/>
+<text x="253.98" y="478.32" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#313131">concrete cube</text>
+<text x="369.55" y="478.3" font-family="Inter,'DejaVu Sans',Helvetica,Arial,sans-serif" font-size="12" fill="#757575">the Z-up scene seen from above: +X to the right, +Y up</text>
+</svg>

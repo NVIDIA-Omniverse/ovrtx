@@ -6,7 +6,7 @@ transform, and looks up the world position of every marker a prim of the scene l
 projects each marker into the camera image and draws a crosshair on it, over the renderer's
 `LdrColor`.
 
-Nothing in the node names a camera or a marker. Point the product at another camera, move the
+Point the product at another camera, move the
 rig, or list other prims on `/World/Overlay`, and the overlay follows.
 
 | File | Role |
@@ -44,7 +44,7 @@ uv run main.py                                    # CUDA
 uv run main.py --scene overlay_scene_slang.usda   # Slang
 ```
 
-The first step compiles the kernel and may block for up to a minute on a fresh shader cache. A
+The first step compiles the kernel and may block for up to 5 minutes on a fresh shader cache. A
 successful run writes `_output/color.png`, the rendered image, and `_output/overlay.png`, the same
 image with a white crosshair on each marker.
 

@@ -39,7 +39,7 @@ Build the data in Lua and hand it to ``array`` with a dtype:
 
           local keys = slang.array({ 0xA5, 0x5A, 0x12, 0x34 }, slang.uint)
 
-Then bind ``keys`` in the launch configuration like any other buffer.
+Then bind ``keys`` in the launch configuration as a buffer.
 
 How It Works
 ------------
@@ -47,14 +47,20 @@ How It Works
 ``array`` **takes the data from wherever you have it.** Given a Lua table and a dtype it creates a
 device buffer holding that data. Given a resource descriptor it binds a buffer that already exists,
 which is what :doc:`composites` does with a sensor's channels. Given an ``asset`` input and a dtype
-it creates a device buffer from that file's bytes, which is the next section. Both forms are on ``cuda`` and on ``slang``.
+it creates a device buffer from that file's bytes, which is the next section.
+All three forms are on ``cuda`` and on ``slang``.
+With a vector dtype such as ``float3``, each element of the table is a table of its components, so
+``cuda.array({ { 1, 2, 3 }, { 4, 5, 6 } }, cuda.float3)`` holds two ``float3`` values.
 
 ``ones`` **and** ``zeros`` **take a shape and a dtype** and create a filled buffer with no Lua data to
-build.
+build; ``full`` also takes the value to fill it with. The shape counts elements, so with a vector
+dtype every component of every element holds the value, and a Lua integer fills a 64-bit integer
+buffer with all its bits.
 
 **Build the table once.** Wrap the call in ``static``, or it is rebuilt on every frame,
 because the launch script runs on every frame, and a launch script has an instruction budget. The
-upload itself is redone each frame either way. Refer to :doc:`caching`.
+upload does not depend on it: an array whose bytes stay the same from frame to frame stays on the
+GPU and is not copied again. Refer to :doc:`caching`.
 
 From a File
 ~~~~~~~~~~~
@@ -90,16 +96,8 @@ read as. SPG resolves the path and uploads the contents:
 On CUDA the call is complete on its own. On Slang a binder still has to wrap it, because Slang
 binds by declared type.
 
-Which Slang binder you reach for is three independent choices, not a list to memorise.
-``StructuredBuffer`` is read-only, storage-backed, addressed by element, and each of those three
-has an alternative. Storage or typed decides whether the shader interprets the bytes itself or the
-hardware converts on access, and that one is fixed when the buffer is created. Read-only or
-read/write is the ``RW`` prefix. By element or by byte offset is the only one that costs nothing to
-change, because both are the same descriptor and differ only in how the shader addresses it. The
-exact names are in :doc:`../ref/lua_slang`.
-
 The file is read as raw bytes. Nothing parses a format or converts between types, so the dtype has
-to match how the file was written, and the shader indexes the result like any other buffer.
+to match how the file was written.
 
 **The file need not be a local one.** An ``asset`` value-input is resolved exactly as the GPU
 source is, so a lookup table may sit beside the scene, inside a ``.usdz`` package, or behind a
@@ -119,8 +117,9 @@ When It Goes Wrong
 - The values are wrong but structured: the dtype does not match what the GPU code reads, or, for a
   file, does not match how the file was written.
 - The data is right on the first frame only, or is rebuilt every frame: refer to :doc:`caching`.
-- The script is stopped part way through: building the table exceeded the launch script's
-  instruction budget. Wrap it in ``static`` so it runs once, or move the work into the GPU code.
+- The script is stopped part way through, and the node's graph with it: building the table
+  exceeded the launch script's instruction budget. Wrap it in ``static`` so it runs once, or move
+  the work into the GPU code.
 
 Related
 -------

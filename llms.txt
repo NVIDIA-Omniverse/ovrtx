@@ -53,7 +53,7 @@ cd examples/python/minimal
 uv run main.py --png
 ```
 
-Success means `_output/render.png` exists and matches the documented minimal reference image. The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+Success means `_output/render.png` exists and matches the documented minimal reference image. The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 For C validation:
 

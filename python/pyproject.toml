@@ -1,8 +1,8 @@
 [project]
 name = "ovrtx"
-version = "0.6.0"
+version = "0.7.0"
 description = "NVIDIA RTX Rendering Python API"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 dependencies = []
 authors = [{name = "NVIDIA Corporation"}]
 license = "LicenseRef-NvidiaProprietary"
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
     "Environment :: GPU :: NVIDIA CUDA",
     "Environment :: GPU :: NVIDIA CUDA :: 12",
@@ -36,9 +37,11 @@ Changelog = "https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/CHANGELOG.md"
 # package's requires-python up to 3.11. See docs/requirements.txt.
 [project.optional-dependencies]
 test = [
-    "pytest==9.0.2",
+    "pytest==9.2.0",
+    "Pygments>=2.21.0",
     "Pillow==12.1.1",
-    "numpy>=2.2,<2.3",
+    "numpy>=2.2,<2.3; python_version < '3.14'",
+    "numpy==2.4.6; python_version >= '3.14'",
     "warp-lang>=1.11.1",
 ]
 
@@ -54,5 +57,5 @@ managed = true
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.2.0",
 ]

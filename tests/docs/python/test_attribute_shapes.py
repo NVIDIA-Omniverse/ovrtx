@@ -43,7 +43,8 @@ def test_scalar_int32_shape(stage):
             stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
                 group = read.fetch_next()
-                values = np.from_dlpack(group.dlpack(0)).copy()
+                column = group.columns[0]
+                values = np.from_dlpack(column.dlpack(0)).copy()
                 stage.release_group(group)
             assert values.shape == (1,)
             # [/snippet:doc-shape-scalar-int32]
@@ -80,7 +81,8 @@ def test_float3_array_shape(stage):
             stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
                 group = read.fetch_next()
-                values = np.from_dlpack(group.dlpack(0)).copy()
+                column = group.columns[0]
+                values = np.from_dlpack(column.dlpack(0)).copy()
                 stage.release_group(group)
             assert values.shape == (4, 3)
         paths.destroy_path_list(path_list)
@@ -117,7 +119,8 @@ def test_mat4_array_shape(stage):
             stage.advance_write_floor(2, ovstage.Scope.ALL).wait()
             with stage.read_attributes(query, [attribute], ovstage.OrdinalRange.latest(2)) as read:
                 group = read.fetch_next()
-                values = np.from_dlpack(group.dlpack(0)).copy()
+                column = group.columns[0]
+                values = np.from_dlpack(column.dlpack(0)).copy()
                 stage.release_group(group)
             assert values.shape == (1, 4, 4)
         paths.destroy_path_list(path_list)

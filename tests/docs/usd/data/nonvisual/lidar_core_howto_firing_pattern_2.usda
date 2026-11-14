@@ -1,0 +1,29 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-nonvisual-lidar-core-howto-firing-pattern-2]
+#usda 1.0
+
+def OmniLidar "two_state_lidar" (
+    prepend apiSchemas = [
+        "OmniSensorGenericLidarCoreAPI",
+        "OmniSensorGenericLidarCoreEmitterStateAPI:s002",
+    ]
+)
+{
+    uint omni:sensor:Core:numberOfEmitters = 2
+    uint omni:sensor:Core:numberOfChannels = 2
+    uint omni:sensor:Core:stateResolutionStep = 1
+
+    float[] omni:sensor:Core:emitterState:s001:azimuthDeg = [0, 0]
+    float[] omni:sensor:Core:emitterState:s001:elevationDeg = [-1, 1]
+    uint[] omni:sensor:Core:emitterState:s001:fireTimeNs = [0, 1000]
+    uint[] omni:sensor:Core:emitterState:s001:channelId = [1, 2]
+
+    float[] omni:sensor:Core:emitterState:s002:azimuthDeg = [0, 0]
+    float[] omni:sensor:Core:emitterState:s002:elevationDeg = [-2, 2]
+    uint[] omni:sensor:Core:emitterState:s002:fireTimeNs = [0, 1000]
+    uint[] omni:sensor:Core:emitterState:s002:channelId = [1, 2]
+}
+# [/snippet:doc-nonvisual-lidar-core-howto-firing-pattern-2]

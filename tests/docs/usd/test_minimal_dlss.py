@@ -41,6 +41,8 @@ def test_minimal_dlss_usd_python():
     stage = Usd.Stage.CreateInMemory()
 
     # [snippet:doc-minimal-dlss-render-product-python]
+    from pxr import Gf, Sdf, UsdRender
+
     stage.DefinePrim("/Render", "Scope")
     product = UsdRender.Product.Define(stage, "/Render/Camera")
     prim = product.GetPrim()

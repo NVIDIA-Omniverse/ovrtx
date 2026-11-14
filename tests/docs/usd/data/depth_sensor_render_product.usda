@@ -1,0 +1,61 @@
+#usda 1.0
+
+# [snippet:doc-depth-sensor-render-product]
+def Xform "World"
+{
+    def Camera "Camera" (
+        prepend apiSchemas = ["OmniSensorGenericDepthSensorSingleViewAPI"]
+    )
+    {
+        float omni:sensor:depthSensor:baselineMM = 55.0
+        float omni:sensor:depthSensor:focalLengthPixel = 897.0
+        float omni:sensor:depthSensor:sensorSizePixel = 1280.0
+        float omni:sensor:depthSensor:maxDisparityPixel = 110.0
+        float omni:sensor:depthSensor:minDistance = 0.5
+    }
+}
+
+def Scope "Render"
+{
+    def RenderProduct "CameraDepthSingleView"
+    {
+        rel camera = </World/Camera>
+        rel orderedVars = [
+            <LdrColor>,
+            <DistanceToImagePlaneSD>,
+            <Camera3dPositionSD>,
+            <DepthSensorImager>,
+            <DepthSensorDistance>,
+            <DepthSensorPointCloudPosition>,
+            <DepthSensorPointCloudColor>,
+            <DepthSensorOutputVisualization>
+        ]
+        uniform int2 resolution = (1280, 720)
+
+        def RenderVar "LdrColor" {
+            string sourceName = "LdrColor"
+        }
+        def RenderVar "DistanceToImagePlaneSD" {
+            string sourceName = "DistanceToImagePlaneSD"
+        }
+        def RenderVar "Camera3dPositionSD" {
+            string sourceName = "Camera3dPositionSD"
+        }
+        def RenderVar "DepthSensorImager" {
+            string sourceName = "DepthSensorImager"
+        }
+        def RenderVar "DepthSensorDistance" {
+            string sourceName = "DepthSensorDistance"
+        }
+        def RenderVar "DepthSensorPointCloudPosition" {
+            string sourceName = "DepthSensorPointCloudPosition"
+        }
+        def RenderVar "DepthSensorPointCloudColor" {
+            string sourceName = "DepthSensorPointCloudColor"
+        }
+        def RenderVar "DepthSensorOutputVisualization" {
+            string sourceName = "DepthSensorOutputVisualization"
+        }
+    }
+}
+# [/snippet:doc-depth-sensor-render-product]

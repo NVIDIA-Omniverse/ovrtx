@@ -1,0 +1,240 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    timeCodesPerSecond = 10
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Camera "Camera_0"
+    {
+        float2 clippingRange = (0.1, 1000)
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        double3 xformOp:translate = (0, 0, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "Camera_1"
+    {
+        float2 clippingRange = (0.1, 1000)
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        double3 xformOp:translate = (5, 0, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "Camera_2"
+    {
+        float2 clippingRange = (0.1, 1000)
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        double3 xformOp:translate = (10, 0, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Camera "Camera_3"
+    {
+        float2 clippingRange = (0.1, 1000)
+        float focalLength = 50
+        float horizontalAperture = 36
+        float verticalAperture = 20.25
+        double3 xformOp:translate = (15, 0, 5)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def DomeLight "DomeLight"
+    {
+        float inputs:intensity = 1000
+        asset inputs:texture:file = @../../../tests/docs/data/studio.exr@
+        token inputs:texture:format = "latlong"
+    }
+
+    def Scope "Looks"
+    {
+        # [snippet:doc-video-texture-material]
+        def Material "VideoMaterial_0"
+        {
+            token outputs:surface.connect = <Shader.outputs:out>
+
+            def Shader "Shader" (
+                prepend apiSchemas = ["OmniPlaybackAPI:inputs:diffuse_texture"]
+            )
+            {
+                uniform token info:implementationSource = "sourceAsset"
+                uniform asset info:mdl:sourceAsset = @OmniPBR.mdl@
+                uniform token info:mdl:sourceAsset:subIdentifier = "OmniPBR"
+
+                asset inputs:diffuse_texture = @./video_texture_h265.mp4@ (
+                    colorSpace = "sRGB"
+                )
+                color3f inputs:diffuse_color_constant = (1, 1, 1)
+                float inputs:reflection_roughness_constant = 0.4
+
+                uniform float inputs:omni:playback:inputs:diffuse_texture:rate = 1
+                uniform double inputs:omni:playback:inputs:diffuse_texture:sourceStart = 0
+                uniform double inputs:omni:playback:inputs:diffuse_texture:sourceEnd = 3.9
+                uniform timecode inputs:omni:playback:inputs:diffuse_texture:playbackStart = 0
+                uniform token inputs:omni:playback:inputs:diffuse_texture:before = "hold"
+                uniform token inputs:omni:playback:inputs:diffuse_texture:after = "hold"
+
+                token outputs:out (
+                    renderType = "material"
+                )
+            }
+        }
+        # [/snippet:doc-video-texture-material]
+
+        def Material "VideoMaterial_1" (
+            inherits = </World/Looks/VideoMaterial_0>
+        )
+        {
+        }
+
+        def Material "VideoMaterial_2" (
+            inherits = </World/Looks/VideoMaterial_0>
+        )
+        {
+        }
+
+        def Material "VideoMaterial_3" (
+            inherits = </World/Looks/VideoMaterial_0>
+        )
+        {
+        }
+    }
+
+    # [snippet:doc-video-texture-binding]
+    def Mesh "Screen_0" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = false
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1.777778, -1, 0), (1.777778, -1, 0), (1.777778, 1, 0), (-1.777778, 1, 0)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        rel material:binding = </World/Looks/VideoMaterial_0>
+        uniform token subdivisionScheme = "none"
+    }
+    # [/snippet:doc-video-texture-binding]
+
+    def Mesh "Screen_1" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = false
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1.777778, -1, 0), (1.777778, -1, 0), (1.777778, 1, 0), (-1.777778, 1, 0)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        rel material:binding = </World/Looks/VideoMaterial_1>
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (5, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Mesh "Screen_2" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = false
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1.777778, -1, 0), (1.777778, -1, 0), (1.777778, 1, 0), (-1.777778, 1, 0)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        rel material:binding = </World/Looks/VideoMaterial_2>
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (10, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Mesh "Screen_3" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        uniform bool doubleSided = false
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1.777778, -1, 0), (1.777778, -1, 0), (1.777778, 1, 0), (-1.777778, 1, 0)]
+        texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (
+            interpolation = "faceVarying"
+        )
+        rel material:binding = </World/Looks/VideoMaterial_3>
+        uniform token subdivisionScheme = "none"
+        double3 xformOp:translate = (15, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+
+def Scope "Render"
+{
+    def RenderProduct "Camera_0"
+    {
+        rel camera = </World/Camera_0>
+        rel orderedVars = [<LdrColor>]
+        int2 resolution = (640, 360)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        # [snippet:doc-video-texture-blocking]
+        bool omni:rtx:videostreamer:blocking = true
+        # [/snippet:doc-video-texture-blocking]
+
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+
+    def RenderProduct "Camera_1"
+    {
+        rel camera = </World/Camera_1>
+        rel orderedVars = [<LdrColor>]
+        int2 resolution = (640, 360)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:videostreamer:blocking = true
+
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+
+    def RenderProduct "Camera_2"
+    {
+        rel camera = </World/Camera_2>
+        rel orderedVars = [<LdrColor>]
+        int2 resolution = (640, 360)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:videostreamer:blocking = true
+
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+
+    def RenderProduct "Camera_3"
+    {
+        rel camera = </World/Camera_3>
+        rel orderedVars = [<LdrColor>]
+        int2 resolution = (640, 360)
+        token omni:rtx:rendermode = "RealTimePathTracing"
+        bool omni:rtx:videostreamer:blocking = true
+
+        def RenderVar "LdrColor"
+        {
+            string sourceName = "LdrColor"
+        }
+    }
+}

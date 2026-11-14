@@ -1,20 +1,13 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: update-0-5-to-0-6
 description: >
   Upgrade an existing Python or C/C++ application from ovrtx 0.5.x to 0.6.x,
   including attached ovstage 0.2 to 0.3 workflows. Use when migrating logging,
   animation clocks, population and raw attribute contracts, sensor revisions
   and outputs, or SPG Lua scripts. Does not cover renderer-setting migrations.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -255,7 +248,7 @@ schema revisions, deprecation allowances, and
   `16777215.0`. Update custom bindings/raw writers and author it as float.
   Fractional scales are now representable.
 
-Read [sensor configuration](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/docs/sensors/configuration.rst).
+Read [sensor configuration](https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/docs/sensors/common/sensor_configuration.rst).
 
 ### 7. Lidar channel IDs
 

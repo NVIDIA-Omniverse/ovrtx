@@ -14,8 +14,8 @@ Built-In Node Catalogue
 =======================
 
 Nodes that ship with SPG, usable with no GPU source and no launch script. Author them with
-``info:implementationSource = "id"`` and one of the ``info:id`` values listed here. These four are
-the whole of the supported set. An ID outside this table may still resolve, and is not an
+``info:implementationSource = "id"`` and one of the ``info:id`` values listed here.
+An ID outside this table may still resolve, and is not an
 authoring surface you can rely on.
 
 Available Nodes

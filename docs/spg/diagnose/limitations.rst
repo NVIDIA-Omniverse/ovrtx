@@ -42,11 +42,28 @@ evolve across releases. This is what it does not do today.
   the GPU code cannot call back to the host.
 - A node cannot reach other frames, beyond what a stateful output or a previous-frame read
   carries.
-- A launch script cannot reach the filesystem or the OS; its sandbox has neither.
+- A launch script cannot reach the filesystem or the OS.
 - A launch script cannot catch errors or use the string pattern functions. Refer to
   :ref:`the sandbox <spg-lua-sandbox>`.
+- A ``.spv`` runs its compute entry point ``main``; another of its entry points cannot be run by
+  naming it. Compile the function to run so that it is exported as ``main``. Refer to
+  :doc:`../do/precompiled`.
 - A shader output can be bound to one RenderVar at a time.
 - A node cannot read an AOV and publish under that same name within one RenderProduct.
-- A previous-frame read reaches at most 8 frames back.
+- A previous-frame read reaches as far back as ``/rtx/spg/state/maxPreviousFrameOffset`` allows, 8
+  frames by default.
+- An earlier frame of a sensor composite is kept only when every channel is a GPU buffer of an
+  element type SPG binds, stored compactly, with no ``/`` in its name. A ``:-N`` read of a composite
+  with any other channel, such as a CPU channel, a CUDA array or a channel that has no buffer when SPG
+  records the frame, stops the node's graph with an error naming the channel and why.
+- A node input cannot take a ``token[]``. An input that holds one, or is connected to one, keeps
+  the node's graph from being built, with an error naming the node and the input.
+- A launch script cannot read a composite param of a 64-bit element type, such as a lidar's
+  ``timestamp`` or ``frameId``: the param is listed in ``paramNames``, and reading it stops the
+  node's graph.
+- A CUDA or built-in node that fails while its work runs on the GPU stops the CUDA and built-in
+  nodes after it in that frame, but not the Slang nodes after it, which run on its unwritten
+  output. The graph's outputs of that frame are still published; the graph stops from the next
+  frame. The log has an error naming the node and saying so.
 - Cross-product reads can be one frame stale when the consuming product renders before the
   producing one, and converge once the dependency has rendered.

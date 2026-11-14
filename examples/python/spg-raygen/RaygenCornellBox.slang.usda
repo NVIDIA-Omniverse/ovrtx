@@ -21,8 +21,7 @@ def Shader "RaygenCornellBox"
     uniform token info:spg:sourceAsset:subIdentifier = "rayGenCornellBox"
 
     # Camera-space shading parameters. The scene acceleration structure and the camera-to-trace-space
-    # transform are provided implicitly because the shader lives under a RenderProduct -- no authored
-    # input or connection for either.
+    # transform are provided implicitly because the shader lives under a RenderProduct.
     #
     # The light sits just under the ceiling, slightly in front of the blocks, so both cast a visible
     # shadow. Camera space = world space translated by the camera position (0, 0, 400): the light's world

@@ -15,34 +15,17 @@
 
 #include <ovx/dlpack/dlpack.h>
 
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <map>
 #include <set>
 #include <string>
+#include <stdexcept>
 
 static constexpr int WIDTH = 1280;
 static constexpr int HEIGHT = 720;
-
-static size_t tensor_num_elements(DLTensor const& tensor) {
-    size_t count = 1;
-    for (int i = 0; i < tensor.ndim; ++i) {
-        count *= static_cast<size_t>(tensor.shape[i]);
-    }
-    return count * static_cast<size_t>(tensor.dtype.lanes);
-}
-
-static size_t tensor_byte_size(DLTensor const& tensor) {
-    return tensor_num_elements(tensor) * static_cast<size_t>((tensor.dtype.bits + 7) / 8);
-}
-
-static uint32_t read_u32_le(uint8_t const* data) {
-    return static_cast<uint32_t>(data[0]) |
-           (static_cast<uint32_t>(data[1]) << 8) |
-           (static_cast<uint32_t>(data[2]) << 16) |
-           (static_cast<uint32_t>(data[3]) << 24);
-}
 
 static void trim_semantic_label(std::string& label) {
     while (!label.empty()) {
@@ -55,41 +38,58 @@ static void trim_semantic_label(std::string& label) {
 }
 
 // [snippet:doc-interpret-semantic-segmentation-c]
-static std::map<uint32_t, std::string> decode_semantic_id_map(DLTensor const& tensor) {
-    uint8_t const* data = static_cast<uint8_t const*>(tensor.data) + tensor.byte_offset;
-    size_t const byte_count = tensor_byte_size(tensor);
-    if (byte_count < sizeof(uint32_t)) {
-        return {};
-    }
-
-    uint32_t const num_entries = read_u32_le(data + byte_count - sizeof(uint32_t));
-    size_t constexpr entry_size = sizeof(uint32_t) * 6;
-    if (static_cast<size_t>(num_entries) * entry_size > byte_count - sizeof(uint32_t)) {
-        return {};
-    }
-
-    std::map<uint32_t, std::string> labels_by_id;
-    for (uint32_t i = 0; i < num_entries; ++i) {
-        uint8_t const* entry = data + static_cast<size_t>(i) * entry_size;
-        uint32_t const semantic_id = read_u32_le(entry);
-        uint32_t const label_length = read_u32_le(entry + sizeof(uint32_t) * 4);
-        uint32_t const label_offset = read_u32_le(entry + sizeof(uint32_t) * 5);
-        size_t const label_end = static_cast<size_t>(label_offset) + label_length;
-        if (label_end > byte_count) {
-            continue;
+static std::map<std::array<uint32_t, 4>, std::string> decode_semantic_id_map(ovrtx_render_var_output_t const& output) {
+    auto field = [&](char const* name, uint8_t bits, int ndim) -> DLTensor const& {
+        for (size_t i = 0; i < output.num_tensors; ++i) {
+            auto const& entry = output.tensors[i];
+            if (!entry.name || !entry.name->ptr || entry.name->length != strlen(name) ||
+                memcmp(entry.name->ptr, name, entry.name->length)) continue;
+            if (!entry.dl || entry.dl->device.device_type != kDLCPU || entry.dl->dtype.code != kDLUInt ||
+                entry.dl->dtype.bits != bits || entry.dl->dtype.lanes != 1 || entry.dl->ndim != ndim ||
+                !entry.dl->shape) throw std::invalid_argument("Invalid semantic identifier field");
+            for (int dim = 0; dim < ndim; ++dim)
+                if (entry.dl->shape[dim] < 0 || (entry.dl->strides && entry.dl->strides[dim] < 0))
+                    throw std::invalid_argument("Invalid semantic identifier shape or stride");
+            return *entry.dl;
         }
-
-        std::string label(
-            reinterpret_cast<char const*>(data + label_offset),
-            static_cast<size_t>(label_length));
+        throw std::invalid_argument("Missing named semantic identifier field");
+    };
+    DLTensor const& ids = field("id", 32, 2);
+    DLTensor const& offsets = field("label_offsets", 64, 1);
+    DLTensor const& data = field("label_data", 8, 1);
+    if (ids.shape[1] != 4 || offsets.shape[0] < 1 || offsets.shape[0] - 1 != ids.shape[0] ||
+        (ids.shape[0] && !ids.data) || !offsets.data || (data.shape[0] && !data.data) ||
+        (data.strides && data.strides[0] != 1))
+        throw std::invalid_argument("Invalid semantic identifier field shapes");
+    auto offset = [&](int64_t index) {
+        uint64_t value;
+        size_t const stride = offsets.strides ? size_t(offsets.strides[0]) : 1;
+        memcpy(&value, static_cast<uint8_t const*>(offsets.data) + offsets.byte_offset +
+                       size_t(index) * stride * sizeof(value), sizeof(value));
+        return value;
+    };
+    if (offset(0) != 0 || offset(ids.shape[0]) != uint64_t(data.shape[0]))
+        throw std::invalid_argument("Invalid semantic label spans");
+    std::map<std::array<uint32_t, 4>, std::string> labels_by_id;
+    for (int64_t i = 0; i < ids.shape[0]; ++i) {
+        uint64_t const start = offset(i), end = offset(i + 1);
+        if (start > end || end > uint64_t(data.shape[0]))
+            throw std::invalid_argument("Invalid semantic label spans");
+        std::array<uint32_t, 4> id{};
+        for (size_t word = 0; word < 4; ++word) {
+            size_t const index = size_t(i) * (ids.strides ? size_t(ids.strides[0]) : 4) +
+                                 word * (ids.strides ? size_t(ids.strides[1]) : 1);
+            memcpy(&id[word], static_cast<uint8_t const*>(ids.data) + ids.byte_offset + index * sizeof(uint32_t), 4);
+        }
+        char const* text = data.data ? static_cast<char const*>(data.data) + data.byte_offset + start : "";
+        std::string label(text, size_t(end - start));
         trim_semantic_label(label);
-        labels_by_id[semantic_id] = label;
+        labels_by_id[id] = label;
     }
-
     return labels_by_id;
 }
 
-static std::set<uint32_t> collect_semantic_segmentation_ids(DLTensor const& tensor) {
+static std::set<std::array<uint32_t, 4>> collect_semantic_segmentation_ids(DLTensor const& tensor) {
     EXPECT_EQ(tensor.dtype.bits, 32);
     EXPECT_EQ(tensor.dtype.lanes, 1);
     EXPECT_TRUE(tensor.ndim == 2 || tensor.ndim == 3);
@@ -108,19 +108,20 @@ static std::set<uint32_t> collect_semantic_segmentation_ids(DLTensor const& tens
 
     uint8_t const* base = static_cast<uint8_t const*>(tensor.data) + tensor.byte_offset;
 
-    std::set<uint32_t> ids;
+    // Scalar class pixels occupy the first word of the full semantic map ID.
+    std::set<std::array<uint32_t, 4>> ids;
     if (tensor.dtype.code == kDLUInt) {
         uint32_t const* values = reinterpret_cast<uint32_t const*>(base);
         for (int64_t y = 0; y < height; ++y) {
             for (int64_t x = 0; x < width; ++x) {
-                ids.insert(values[y * stride_y + x * stride_x]);
+                ids.insert({values[y * stride_y + x * stride_x], 0, 0, 0});
             }
         }
     } else if (tensor.dtype.code == kDLInt) {
         int32_t const* values = reinterpret_cast<int32_t const*>(base);
         for (int64_t y = 0; y < height; ++y) {
             for (int64_t x = 0; x < width; ++x) {
-                ids.insert(static_cast<uint32_t>(values[y * stride_y + x * stride_x]));
+                ids.insert({static_cast<uint32_t>(values[y * stride_y + x * stride_x]), 0, 0, 0});
             }
         }
     } else {
@@ -185,7 +186,7 @@ TEST_F(SemanticLabelsTest, SemanticClassesAreRendered) {
     render_products.num_render_products = 1;
 
     for (int i = 0; i < 5; ++i) {
-        ovrtx_step_result_handle_t warmup_handle = 0;
+        ovrtx_step_result_handle_t warmup_handle{};
         ovrtx_enqueue_result_t warmup_eq = ovrtx_step_with_stage(
             renderer_, render_products, 1.0 / 60.0, /*ordinal=*/1, &warmup_handle);
         ASSERT_API_SUCCESS(warmup_eq.status);
@@ -193,7 +194,7 @@ TEST_F(SemanticLabelsTest, SemanticClassesAreRendered) {
         ovrtx_destroy_results(renderer_, warmup_handle);
     }
 
-    ovrtx_step_result_handle_t step_handle = 0;
+    ovrtx_step_result_handle_t step_handle{};
     ovrtx_enqueue_result_t enqueue_result = ovrtx_step_with_stage(
         renderer_, render_products, 1.0 / 60.0, /*ordinal=*/1, &step_handle);
     ASSERT_API_SUCCESS(enqueue_result.status);
@@ -211,25 +212,25 @@ TEST_F(SemanticLabelsTest, SemanticClassesAreRendered) {
     ovrtx_render_var_output_handle_t id_map_handle = find_output(outputs, "/Render/SemanticCamera/SemanticIdMap");
     ovrtx_render_var_output_handle_t segmentation_handle =
         find_output(outputs, "/Render/SemanticCamera/SemanticSegmentation");
-    ASSERT_NE(id_map_handle, OVRTX_INVALID_HANDLE);
-    ASSERT_NE(segmentation_handle, OVRTX_INVALID_HANDLE);
+    ASSERT_NE(id_map_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
+    ASSERT_NE(segmentation_handle, OVRTX_INVALID_RENDER_VAR_OUTPUT_HANDLE);
 
     ovrtx_render_var_output_t id_map_output = {};
     result = ovrtx_map_render_var_output(
         renderer_, id_map_handle, &map_desc, ovrtx_timeout_infinite, &id_map_output);
     ASSERT_API_SUCCESS(result.status);
-    std::map<uint32_t, std::string> semantic_id_map =
-        decode_semantic_id_map(*id_map_output.tensors[0].dl);
+    std::map<std::array<uint32_t, 4>, std::string> semantic_id_map =
+        decode_semantic_id_map(id_map_output);
     ovrtx_unmap_render_var_output(renderer_, id_map_output.map_handle, no_sync);
 
-    std::map<std::string, uint32_t> ids_by_label;
+    std::map<std::string, std::array<uint32_t, 4>> ids_by_label;
     for (auto const& [semantic_id, label] : semantic_id_map) {
         ids_by_label[label] = semantic_id;
     }
     ASSERT_TRUE(ids_by_label.count("class: logo;"));
     ASSERT_TRUE(ids_by_label.count("class: ground;"));
-    uint32_t const logo_id = ids_by_label["class: logo;"];
-    uint32_t const ground_id = ids_by_label["class: ground;"];
+    auto const logo_id = ids_by_label["class: logo;"];
+    auto const ground_id = ids_by_label["class: ground;"];
 
     ovrtx_render_var_output_t segmentation_output = {};
     result = ovrtx_map_render_var_output(
@@ -238,7 +239,7 @@ TEST_F(SemanticLabelsTest, SemanticClassesAreRendered) {
     DLTensor const& segmentation_tensor = *segmentation_output.tensors[0].dl;
     EXPECT_EQ(segmentation_tensor.shape[0], HEIGHT);
     EXPECT_EQ(segmentation_tensor.shape[1], WIDTH);
-    std::set<uint32_t> semantic_ids_in_image =
+    std::set<std::array<uint32_t, 4>> semantic_ids_in_image =
         collect_semantic_segmentation_ids(segmentation_tensor);
     ovrtx_unmap_render_var_output(renderer_, segmentation_output.map_handle, no_sync);
 
@@ -246,4 +247,34 @@ TEST_F(SemanticLabelsTest, SemanticClassesAreRendered) {
     EXPECT_TRUE(semantic_ids_in_image.count(ground_id));
 
     ovrtx_destroy_results(renderer_, step_handle);
+}
+
+
+TEST(SemanticLabelsDecoding, NamedFieldsAndBounds) {
+    uint32_t ids_data[12] = {99, 7, 0, 0, 0, 99, 99, 9, 0, 0, 0, 99};
+    char labels[] = "class: logo; class: caf\xc3\xa9; ";
+    uint64_t offsets_data[3] = {0, 13, sizeof(labels) - 1};
+    int64_t ids_shape[2] = {2, 4}, ids_strides[2] = {6, 1};
+    int64_t offsets_shape[1] = {3}, data_shape[1] = {sizeof(labels) - 1};
+    DLTensor ids{ids_data, {kDLCPU, 0}, 2, {kDLUInt, 32, 1}, ids_shape, ids_strides, 4};
+    DLTensor offsets{offsets_data, {kDLCPU, 0}, 1, {kDLUInt, 64, 1}, offsets_shape, nullptr, 0};
+    DLTensor data{labels, {kDLCPU, 0}, 1, {kDLUInt, 8, 1}, data_shape, nullptr, 0};
+    ovx_string_t names[] = {{"label_data", 10}, {"id", 2}, {"label_offsets", 13}};
+    // Deliberately change slot order: names, not tensor zero, define the contract.
+    ovrtx_render_var_tensor_t fields[] = {{&data, &names[0], nullptr}, {&ids, &names[1], nullptr},
+                                        {&offsets, &names[2], nullptr}};
+    ovrtx_render_var_output_t output{};
+    output.num_tensors = 3; output.tensors = fields;
+    auto decoded = decode_semantic_id_map(output);
+    EXPECT_EQ(decoded.at({7, 0, 0, 0}), "class: logo;");
+    EXPECT_EQ(decoded.at({9, 0, 0, 0}), "class: caf\xc3\xa9;");
+    offsets_data[2] = 1000;
+    EXPECT_THROW(decode_semantic_id_map(output), std::invalid_argument);
+    offsets_data[2] = sizeof(labels) - 1;
+    ids_data[7] = 7; ids_data[8] = 2; ids_data[9] = 3; ids_data[10] = 4;
+    decoded = decode_semantic_id_map(output);
+    EXPECT_EQ(decoded.at({7, 0, 0, 0}), "class: logo;");
+    EXPECT_EQ(decoded.at({7, 2, 3, 4}), "class: caf\xc3\xa9;");
+    ids_shape[0] = 0; offsets_shape[0] = 1; data_shape[0] = 0;
+    EXPECT_TRUE(decode_semantic_id_map(output).empty());
 }

@@ -15,7 +15,7 @@ An SPG node that reads the scene it runs in. Its launch script asks for the rend
 sits under, takes the camera that product is bound to, reads the camera's lens values and world
 transform, and looks up the world position of every marker a prim of the scene lists. The kernel
 projects each marker into the camera image and draws a crosshair on it, over the renderer's
-``LdrColor``. Nothing in the node names a camera or a marker.
+``LdrColor``.
 
 .. pull-quote::
 
@@ -40,7 +40,7 @@ Running
    uv run main.py                                    # CUDA
    uv run main.py --scene overlay_scene_slang.usda   # Slang
 
-The first step compiles the kernel and can block for up to a minute on a fresh shader cache. A
+The first step compiles the kernel and can block for up to 5 minutes on a fresh shader cache. A
 successful run writes ``_output/color.png``, the rendered image, and ``_output/overlay.png``, the
 same image with a white crosshair on each marker.
 

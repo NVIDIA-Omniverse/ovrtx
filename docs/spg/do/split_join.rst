@@ -20,7 +20,7 @@ Split and Join
 The Shape
 ---------
 
-Both are ordinary connections. A port may be the source of more than one edge, and a node may
+A port may be the source of more than one edge, and a node may
 declare more than one input.
 
 **Fan out.** One node's output feeds a published AOV and a second node at the same time.
@@ -56,7 +56,7 @@ passes, which feeds the second pass and a RenderVar of its own:
    :caption: ``blur_scene.usda``, from the runnable :doc:`blur example <../../examples/python_spg_blur>`
 
 **A published RenderVar may also feed more than one node.** Both fan-outs are allowed, and the
-choice is not about the graph but about who else may see the intermediate. A direct connection keeps
+choice is about who else may see the intermediate. A direct connection keeps
 it inside the graph; a RenderVar exposes it to the host and to other products, and costs you a name
 in ``orderedVars``. Refer to :doc:`aovs`.
 
@@ -87,10 +87,8 @@ Give the branches kernels with different, recognisable effects, then read every 
 back. Each must show its own branch's transform, and no two may be equal. Two identical outputs
 mean one branch is unwired and both RenderVars are reading the same producer.
 
-The blur example reads all three of its AOVs and checks that they fall in order: the sharpest edge
-in the image drops once after the horizontal pass and again after the vertical one. The middle
-value only exists because the first pass feeds a RenderVar as well as the second node. The check is
-the ordering, not the three figures, which move with the render.
+The blur example publishes all three of its images, and the sharpest edge drops once after the
+horizontal pass and again after the vertical one.
 
 When It Goes Wrong
 ------------------

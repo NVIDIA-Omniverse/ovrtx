@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: update-0_2-0_3
 description: >
   Upgrade skill to migrate an existing ovrtx codebase from 0.2.0 to 0.3.0. Use
   when the user asks to "upgrade from 0.2 to 0.3", migrate ovrtx API usage,
   update 0.2 projects to 0.3, or fix code after moving from ovrtx 0.2.x to 0.3.x.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -61,7 +54,7 @@ Resolve inputs in this order: the user's repository, its dependency files, then 
    - Additive removable content under a new prim path: use `add_usd_reference*` and keep the returned handle for `remove_usd`.
 5. Rewrite Python async rendering. `Renderer.step()` still returns fetched outputs. `Renderer.step_async()` now returns `Operation[PendingFetch[RenderProductSetOutputs]]`; call `wait()` for the pending fetch and then `fetch()` for outputs.
 6. Rewrite render output mapping. In Python, use DLPack directly on a single-tensor mapping or named tensor/param access for composite outputs. In C, map to `ovrtx_render_var_output_t`, read `tensors[]` and `params[]`, then unmap with `ovrtx_unmap_render_var_output`.
-7. Remove global partial-frame config. If 0.2 code explicitly disabled partial frames, author `bool omni:sensor:Core:accumulateOutputs = true` on the affected camera prim instead. If 0.2 code omitted the setting or used the default partial-frame behavior, remove the config without replacement.
+7. Remove global partial-frame config. If 0.2 code explicitly disabled partial frames, author `bool omni:sensor:Core:partialOutputs = false` instead on the prim that each affected RenderProduct's `camera` relationship targets, whether a `Camera` or an `OmniLidar`; ovrtx 0.3 reads it from either, although only the lidar schema declares it. The 0.3.0 changelog names `bool omni:sensor:Core:accumulateOutputs = true` for this; that attribute was removed from the sensor schema before 0.3.0 shipped and ovrtx does not read it, so follow this step rather than the changelog. If 0.2 code omitted the setting or used the default partial-frame behavior, remove the config without replacement.
 8. Rewrite C wait/error handling. Read `ovrtx_op_wait_result_t.error_op_ids`, fetch strings with `ovrtx_get_last_op_error()`, copy or print them before the next wait on the same thread, and remove `ovrtx_release_errors`.
 9. Rewrite C logging. The callback is process-global, no longer receives an op id, uses carb-style severity values, and flushing is `ovrtx_flush_log(timeout)`.
 10. Validate with the narrowest runnable project tests or examples. For Python projects, run the user's normal test command or at least import and exercise the migrated code path. For C/C++ projects, rebuild so removed symbols are caught at compile time.

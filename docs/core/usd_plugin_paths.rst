@@ -8,7 +8,7 @@ USD Plugin Paths and Schema Registration
 
 USD schemas describe prim types, attribute types, and fallback values.
 ovrtx ships schema plugins for renderer settings, sensors, lens distortion,
-particle fields, and other capabilities. An application that creates USD
+ParticleFields, and other capabilities. An application that creates USD
 through its own OpenUSD installation must make the required schema definitions
 available before it first uses the schema registry.
 
@@ -29,6 +29,8 @@ Choose the Registration Path
      - Author with your own OpenUSD installation. Enumerate ovrtx's directories, select the required families, and register them with that installation.
    * - `Register for the Bundled USD Runtime`_
      - Populate an ovstage scene. Publish ovrtx's schema paths before initializing ovstage, or initialize the renderer first.
+   * - `Use the Schemas Without Installing ovrtx`_
+     - Author with your own OpenUSD installation but without ovrtx. Extract the release's ``ovrtx-schemas`` zip and add its directory to your plugin path.
 
 Register with External OpenUSD
 ------------------------------
@@ -209,6 +211,53 @@ Importing ``ovrtx`` registers paths automatically only when
 upstream ``PXR_PLUGINPATH_NAME``. Keep it unset when you need to select paths
 yourself. The bundled runtime uses its own versioned plugin-path environment key;
 prefer the public functions over hard-coding that key.
+
+Use the Schemas Without Installing ovrtx
+----------------------------------------
+
+Starting with ovrtx 0.7, each GitHub release has an
+``ovrtx-schemas@<version>.zip`` asset. It holds the same schema plugins
+as the runtime package. The zip is platform independent and contains only
+plugin descriptors, generated schema definitions and the ovrtx ``LICENSE``,
+with no libraries:
+
+.. code-block:: text
+
+   ovrtx-schemas/
+       LICENSE
+       plugInfo.json             {"Includes": ["*/"]}
+       omni_sensors/
+           plugInfo.json
+           generatedSchema.usda
+       physical_lighting/
+           ...
+
+The top-level ``plugInfo.json`` includes every schema directory beside it, so
+one plugin path registers all of them. Extract the zip, then register the
+``ovrtx-schemas`` directory before the first schema registry lookup:
+
+.. code-block:: bash
+
+   VERSION=0.7.0.1234567890  # replace with the version in your zip's file name
+   unzip "ovrtx-schemas@${VERSION}.zip" -d /opt/ovrtx
+   export PXR_PLUGINPATH_NAME=/opt/ovrtx/ovrtx-schemas${PXR_PLUGINPATH_NAME:+:$PXR_PLUGINPATH_NAME}
+
+.. code-block:: python
+
+   from pxr import Plug
+   Plug.Registry().RegisterPlugins("/opt/ovrtx/ovrtx-schemas")
+
+Use ``;`` instead of ``:`` to separate ``PXR_PLUGINPATH_NAME`` entries on
+Windows. The ordering and provider warnings in `Register with External OpenUSD`_
+apply here too.
+
+To register only some families, point at their subdirectories (for example
+``/opt/ovrtx/ovrtx-schemas/omni_sensors``) instead of the root. Do this when
+your OpenUSD already provides the ``UsdVol`` particle field schemas (for
+example ``usd-core`` 26.x). Registering the root then includes
+``usd_particle_field``, and OpenUSD reports its duplicate schema identifiers
+as errors. Python raises these errors as ``Tf.ErrorException`` on the first
+registry access.
 
 Further Reading
 ---------------

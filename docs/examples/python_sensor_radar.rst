@@ -60,5 +60,14 @@ Options
    * - ``--rrd PATH``
      - Write a Rerun recording instead of spawning a viewer
 
+``radar_example_field.usda``, beside the example, is an alternative scene for
+``--scene``: the same steel cube closing in across a field of 33 thin steel
+panels at increasing range, with a preview camera product the example does not
+step.
+
+.. code-block:: bash
+
+   uv run main.py --scene radar_example_field.usda
+
 Expected console output values vary, but a successful run prints per-step valid
 point counts and radial velocity min/max values.

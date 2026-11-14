@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: async-operations
 description: >
   Asynchronous operation patterns including polling, timeouts, and non-blocking
   workflows. Use when user asks about async rendering, non-blocking operations,
   polling, timeouts, or parallel rendering.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -155,7 +148,7 @@ C timeout constants:
 
 C wait result fields:
 - `error_op_ids` / `num_error_ops` -- operations that errored since last wait
-- `lowest_pending_op_id` -- 0 if all operations complete, nonzero if still pending
+- `lowest_pending_op_id` -- `OVRTX_INVALID_OP_ID` if all operations are complete; otherwise a typed pending operation ID
 
 ## Troubleshooting
 

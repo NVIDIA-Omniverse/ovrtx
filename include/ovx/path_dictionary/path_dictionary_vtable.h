@@ -21,8 +21,11 @@ extern "C"
     {
         /* Intern `num_strings` strings as tokens. Output handles are
            dict-lifetime — no per-handle release. Equal input strings yield
-           equal output tokens. Empty input strings and strings containing
-           embedded NUL bytes are rejected with `OVX_API_ERROR`. */
+           equal output tokens. Empty strings (length 0, with either a NULL or
+           non-NULL pointer) succeed and always produce token id 0.
+           `OVX_INVALID_TOKEN` (UINT64_MAX) is reserved and never produced.
+           Strings containing embedded NUL bytes are rejected with
+           `OVX_API_ERROR`. */
         ovx_api_result_t (*create_tokens_from_strings)(path_dictionary_context_t* instance,
                                                        const ovx_string_t* strings,
                                                        size_t num_strings,
@@ -37,7 +40,9 @@ extern "C"
            same handle as `create_paths_from_strings` for that absolute path
            in this dictionary.
            A path with zero tokens represents `/`. Supply a non-null
-           `tokens_per_path` array even when every path has zero tokens. */
+           `tokens_per_path` array even when every path has zero tokens.
+           The empty token (id 0) and `OVX_INVALID_TOKEN` are rejected as path
+           components with `OVX_API_ERROR`. */
         ovx_api_result_t (*create_paths_from_tokens)(path_dictionary_context_t* instance,
                                                      const ovx_token_t* tokens_per_path,
                                                      const size_t* num_tokens_per_path,
@@ -92,7 +97,9 @@ extern "C"
 
         /* Resolve tokens to strings. Each `out_strings[i].ptr` references
            dict-owned storage and is valid for the dictionary's lifetime; do
-           NOT free. */
+           NOT free. Token id 0 resolves to the empty string with a non-NULL
+           pointer and length 0. `OVX_INVALID_TOKEN` is rejected with
+           `OVX_API_ERROR`, without modifying the output array. */
         ovx_api_result_t (*get_strings_from_tokens)(path_dictionary_context_t* instance,
                                                     const ovx_token_t* tokens,
                                                     size_t num_tokens,

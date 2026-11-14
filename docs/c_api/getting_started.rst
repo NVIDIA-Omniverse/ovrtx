@@ -62,7 +62,7 @@ The minimal example shows how to create the renderer, load an OpenUSD scene, and
 
 A successful run writes ``./out.png``. The output should match the reference image above.
 
-The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached.
+The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached.
 
 Installation
 ------------
@@ -82,11 +82,18 @@ The simplest way to add ovrtx as a dependency to your project is using CMake Fet
    :exclude-pattern: ^\s*#\s*AUTOREMOVE:
 
 Note that the macro above is provided for convenience in ``ovrtx.cmake`` in the ``examples/c/cmake`` directory in `the repository <https://github.com/NVIDIA-Omniverse/ovrtx>`__.
+Copy ``ovstage.cmake`` from the same directory beside it.
 
 Alternatively, download the appropriate package for your system from the `Releases page <https://github.com/NVIDIA-Omniverse/ovrtx/releases>`__, point
 ``CMAKE_PREFIX_PATH`` at the directory where you extracted the archive, and use ``find_package(ovrtx)``
 from your ``CMakeLists.txt``. The macro above already takes this path when it can: it tries
 ``find_package(ovrtx QUIET)`` first and only downloads the package if that fails.
+
+``ovrtx.h`` includes ovstage public headers, which the ovrtx package does not ship.
+``find_package(ovrtx)`` therefore also finds the matching ovstage package and adds its
+include directory to the ovrtx targets. Put the ovstage package on ``CMAKE_PREFIX_PATH`` too,
+or extract it beside ovrtx as ``ovstage/``. ``ovrtx_fetch()`` fetches ovstage first, so this
+works without extra setup.
 
 For a complete example ``CMakeLists.txt`` that includes package fetching, both
 loader models, the Windows release-CRT setting, and runtime setup, see

@@ -1,13 +1,6 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: update-0_3-0_4-python
 description: >
   Upgrade skill to migrate an existing Python ovrtx codebase from 0.3.x to 0.4.x by
@@ -15,7 +8,7 @@ description: >
   and persistent binding workflows to ovstage while keeping rendering in ovrtx.
   Use when the user asks to upgrade from ovrtx 0.3 to 0.4, remove ovrtx 0.4
   deprecation warnings, or adopt ovstage interop in an existing ovrtx project.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx

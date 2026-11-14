@@ -21,10 +21,13 @@ def Shader "TrailKernel"
     uniform asset info:spg:sourceAsset = @TrailKernel.slang@
     uniform token info:spg:sourceAsset:subIdentifier = "trail"
 
+    # Fraction of the previous frame kept, which sets the whole length of the
+    # tail: a pixel the ball crossed k frames ago still holds decay^k of the
+    # light it left. Values closer to 1 give longer tails, and 0.0 keeps nothing
+    # and makes Trail identical to Live.
     float inputs:decay = 0.7
 
     opaque inputs:Image
-    opaque outputs:History
     opaque outputs:Live
     opaque outputs:Trail
 }

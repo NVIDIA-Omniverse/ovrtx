@@ -1,0 +1,16 @@
+#usda 1.0
+
+# [snippet:doc-sensor-config-orientation]
+(
+    upAxis = "Z"
+)
+
+def OmniLidar "Lidar" (
+    prepend apiSchemas = ["OmniSensorGenericLidarCoreAPI"]
+)
+{
+    # Aim local -Z along world +X, with local +Y along world +Z.
+    float3 xformOp:rotateXYZ = (90, 0, -90)
+    uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+}
+# [/snippet:doc-sensor-config-orientation]

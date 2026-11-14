@@ -23,7 +23,7 @@ usage patterns, start with :doc:`practical_patterns`.
 Overview
 --------
 
-All operations return a status code indicating success or failure:
+Functions returning ``ovrtx_result_t`` report success or failure through a status code:
 
 - **OVRTX_API_SUCCESS**: The operation completed successfully
 - **OVRTX_API_ERROR**: The operation failed (use :c:func:`ovrtx_get_last_error` for details)
@@ -48,6 +48,13 @@ Creation and Destruction
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. doxygengroup:: ovrtx_creation
+   :project: ovrtx
+   :content-only:
+
+Data Providers
+^^^^^^^^^^^^^^
+
+.. doxygengroup:: ovrtx_data_provider
    :project: ovrtx
    :content-only:
 
@@ -79,6 +86,8 @@ Stage Queries
    :project: ovrtx
    :content-only:
 
+.. _c-api-sensor-simulation:
+
 Sensor Simulation
 ^^^^^^^^^^^^^^^^^
 
@@ -97,6 +106,27 @@ Extensions
 ^^^^^^^^^^
 
 .. doxygengroup:: ovrtx_extension
+   :project: ovrtx
+   :content-only:
+
+Performance Profiling
+^^^^^^^^^^^^^^^^^^^^^
+
+Collect simplified performance metrics, grouped RTX stages, and grouped memory data.
+The update functions document retained-batch ownership, measurement meanings, and recommended
+copy intervals for data collection and live visualization. Each sample includes an
+execution ID identifying its CPU thread or RTX GPU, or zero if unspecified.
+Injection variants accept no ID, attribute the calling thread, or preserve a supplied ID.
+
+Retain a zero-initialized batch and reuse ``ovrtx_get_performance_data_update``
+or its JSON counterpart. Each batch has independent progress.
+Per-metric samples follow collection order, not timestamp order. A sample timestamp
+can precede an earlier returned sample or a previous collection time.
+``collection_time_ns`` is informational, not a bound on sample timestamps. Release the batch
+before renderer teardown. No timestamp input is needed.
+Copying does not recover overwritten history or guarantee a complete concurrent snapshot.
+
+.. doxygengroup:: ovrtx_profiling
    :project: ovrtx
    :content-only:
 
@@ -131,8 +161,27 @@ Core Types
    :project: ovrtx
    :content-only:
 
+.. _c-api-handle-types:
+
 Handle Types
 ^^^^^^^^^^^^
+
+Renderer resources, operations, provider registrations, and accessor array
+leases use distinct structs containing ``uint64_t raw_id``. Keep that type
+through function arguments, arrays, callbacks, and result fields. Use
+``.raw_id`` for numeric diagnostics, C comparisons, or serialization; C++
+supports same-kind comparison and hashing.
+
+C++ value initialization (``Handle{}``) produces the invalid value for renderer
+handles and provider IDs. Use the matching typed invalid constant for resets
+and comparisons, such as ``query == OVRTX_INVALID_QUERY_HANDLE`` in C++.
+These sentinels reserve zero for invalid renderer handles and provider IDs;
+``OVRTX_INVALID_HANDLE`` is the raw numeric zero sentinel, not a typed handle.
+An array lease is different: zero is a valid accessor-local ID and must be
+released after a successful acquisition. Copying any identity does not retain
+its resource, prove liveness, or identify its renderer or accessor.
+
+For Python handle types and usage, see :ref:`python-handle-types`.
 
 .. doxygengroup:: ovrtx_handle_types
    :project: ovrtx
@@ -179,6 +228,10 @@ Read Types
 .. doxygengroup:: ovrtx_read_types
    :project: ovrtx
    :content-only:
+
+.. _sensors-reference-composite-output:
+
+.. _c-api-sensor-types:
 
 Sensor Types
 ^^^^^^^^^^^^

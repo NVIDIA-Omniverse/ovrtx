@@ -128,8 +128,8 @@ def _read_pick_hits(renderer, products):
 
     hits = []
     for i in range(hit_count):
-        prim_path = int(prim_paths[i])
-        if prim_path == 0:
+        prim_path = ovrtx.PrimPath(prim_paths[i])
+        if not prim_path:
             raise RuntimeError("Pick hit has an empty prim path id")
         hits.append(
             {

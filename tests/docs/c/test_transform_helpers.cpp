@@ -27,7 +27,7 @@ void read_xform_matrix(ovrtx_renderer_t* renderer, char const* prim_path, double
     ovrtx_binding_desc_or_handle_t binding =
         ovrtx_make_binding_desc(&prim, 1, ovx_str("omni:xform"), OVRTX_SEMANTIC_NONE, mat_type);
 
-    ovrtx_read_handle_t read_handle = 0;
+    ovrtx_read_handle_t read_handle{};
     ovrtx_enqueue_result_t eq = ovrtx_read_attribute(renderer, &binding, nullptr, &read_handle);
     ASSERT_API_SUCCESS(eq.status);
     docs_wait_no_errors(renderer, eq.op_index);
@@ -52,7 +52,7 @@ void read_reset_xform_stack(ovrtx_renderer_t* renderer, char const* prim_path, b
     ovrtx_binding_desc_or_handle_t binding = ovrtx_make_binding_desc(
         &prim, 1, ovx_str("omni:resetXformStack"), OVRTX_SEMANTIC_NONE, bool_type);
 
-    ovrtx_read_handle_t read_handle = 0;
+    ovrtx_read_handle_t read_handle{};
     ovrtx_enqueue_result_t eq = ovrtx_read_attribute(renderer, &binding, nullptr, &read_handle);
     ASSERT_API_SUCCESS(eq.status);
     docs_wait_no_errors(renderer, eq.op_index);

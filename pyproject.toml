@@ -1,10 +1,10 @@
 [project]
 name = "ovrtx"
-version = "0.6.0"
+version = "0.7.0"
 description = "Physically accurate, real-time, sensor simulation and visualization using NVIDIA Omniverse RTX"
 requires-python = ">=3.10,<3.14"
 dependencies = [
-    "ovstage==0.3.0.1791986420",
+    "ovstage==0.4.0.1794520352",
 ]
 authors = [{name = "NVIDIA Corporation"}]
 license = "LicenseRef-NvidiaProprietary"
@@ -39,7 +39,8 @@ Changelog = "https://github.com/NVIDIA-Omniverse/ovrtx/blob/main/CHANGELOG.md"
 # package's requires-python up to 3.11. See docs/requirements.txt.
 [project.optional-dependencies]
 test = [
-    "pytest==9.0.2",
+    "pytest==9.2.0",
+    "Pygments>=2.21.0",
     "Pillow==12.1.1",
     "numpy>=2.2,<2.3",
     "warp-lang>=1.11.1",

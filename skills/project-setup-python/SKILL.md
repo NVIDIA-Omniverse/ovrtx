@@ -1,19 +1,12 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-License-Identifier: CC-BY-4.0 AND Apache-2.0
 name: project-setup-python
 description: >
   Setting up a new Python project that uses ovrtx. Use when user asks to create a new
   Python project, set up ovrtx in Python, create a pyproject.toml, or scaffold a Python
   app.
-license: LicenseRef-NvidiaProprietary
+license: CC-BY-4.0 AND Apache-2.0
 author: NVIDIA ovrtx
 tags:
   - ovrtx
@@ -37,8 +30,8 @@ Use this skill when the user asks to create a new Python project, set up ovrtx i
 Resolve inputs in this order: existing repository files and referenced snippets, explicit user request, then broader agent context.
 
 - Project language, package manager, build system, and target platform from the user request.
-- Whether the project should use packaged ovrtx or the local dev-mode build.
 - Repository source snippets and example projects referenced below. Treat these snippets as the API source of truth.
+
 
 ## Prerequisites
 
@@ -197,7 +190,7 @@ A successful run writes `_output/render.png`. The output should match the docume
 - Supported NVIDIA driver versions are listed in `docs/driver_requirements.rst`. Use that page as the ovrtx source of truth for runtime validation. If driver detection fails, the driver is inaccessible, or the detected version is older than the listed baseline for the host OS, GPU generation, and GPU type, rerun validation outside the sandbox. If the driver is still missing or incompatible, stop runtime validation and tell the user they need a supported NVIDIA driver.
 - Run ovrtx-related runtime code outside sandboxed environments.
 - Examples that load remote S3 assets require internet access.
-- The first step from a newly built application will block for 1-2 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure.
+- The first step from a newly built application will block for up to 5 minutes while shaders are compiled and cached. Wait at least 5 minutes before treating this as a failure.
 - USD files can be loaded from local paths, `file://` URIs, or `https://` URLs.
 
 ## Standalone Compatibility (ovrtx 0.4)

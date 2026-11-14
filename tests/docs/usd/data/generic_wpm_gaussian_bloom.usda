@@ -1,0 +1,22 @@
+#usda 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# [snippet:doc-generic-wpm-gaussian-bloom]
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    timeCodesPerSecond = 10
+    subLayers = [@generic_wpm_gaussian.usda@]
+)
+
+over "World"
+{
+    over "Sensor"
+    {
+        # Radius one allocates nine receiver slots per ray; edge slots can be invalid.
+        uint[] omni:sensor:GenericWpm:tx:mappingBloomFactors = [1]
+    }
+}
+# [/snippet:doc-generic-wpm-gaussian-bloom]

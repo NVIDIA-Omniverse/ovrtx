@@ -16,14 +16,9 @@ local BLOCK = 256
 
 -- [snippet:blur-weights]
 -- One row of Gaussian taps for the stated radius, normalised so the blur keeps
--- the image's brightness. It depends on nothing but the radius, so it is built
+-- the image's brightness. It depends only on the radius, so it is built
 -- here rather than recomputed by every GPU thread.
---
--- The warning is what makes the caching visible: this line appears once per
--- distinct radius over a run, not once per frame.
 local function gaussianWeights(radius)
-    warning("blur: building the weight table for radius " .. radius)
-
     if radius == 0 then
         return cuda.array({ 1.0 }, cuda.float)
     end
