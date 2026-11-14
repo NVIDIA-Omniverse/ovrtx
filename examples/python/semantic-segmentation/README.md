@@ -136,6 +136,7 @@ the fourth alpha component is disabled. The grey strip shows full-frame alpha ma
 
 The render layer requests the PT and Synthetic Data outputs on the same scene:
 
+{% raw %}
 ```python
 def build_pt_render_layer_usda(scene_path: Path, resolution: tuple[int, int], samples_per_pixel: int = 128) -> str:
     """Request PT outputs on the same labeled lineup without changing its source scene."""
@@ -205,6 +206,7 @@ def build_pt_render_layer_usda(scene_path: Path, resolution: tuple[int, int], sa
 }}
 '''
 ```
+{% endraw %}
 
 ## Selection-state preview
 

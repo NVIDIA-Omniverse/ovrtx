@@ -46,6 +46,7 @@ renderer = ovrtx.Renderer(config=config)
 
 The following snippet selects the shared scene variants and renders one converged PathTracing frame.
 
+{% raw %}
 ```python
 # Camera prims share geometry/exposure; only their spectral response differs.
 camera_path = {"cie1931": "/World/Camera", "canon5d": "/World/Canon5D", "sony_a7iv": "/World/SonyA7IV"}[args.camera]
@@ -84,6 +85,7 @@ pixels = np.from_dlpack(mapped).copy()
 mapped.unmap()
 del mapped
 ```
+{% endraw %}
 
 
 ## Camera responsivity example
