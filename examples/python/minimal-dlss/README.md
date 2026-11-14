@@ -40,6 +40,7 @@ that USD stage, and renders consecutive frames before copying `LdrColor` to CPU
 memory. Argument parsing, renderer setup, Rerun logging, and PNG output are in
 `main.py`.
 
+{% raw %}
 ```python
 # Compose the scene with the selected settings on its RenderProduct.
 # --usd swaps in a scene that defines /World/Camera and /Render/Camera with LdrColor.
@@ -75,3 +76,4 @@ for frame_index in range(args.frames):
         del mapped, frame
     del products
 ```
+{% endraw %}
